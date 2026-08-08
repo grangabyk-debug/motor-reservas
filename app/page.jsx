@@ -142,26 +142,35 @@ const [reservaSeleccionada, setReservaSeleccionada] = useState(null)
       return
     }
 
-    let error
+   let error = null
+
+const datosReserva = {
+  alojamiento_id: Number(alojamientoSeleccionado),
+  habitacion_id: Number(habitacionSeleccionada),
+  nombre_huesped: nombre.trim(),
+  email_huesped: email.trim(),
+  telefono_huesped: telefono.trim(),
+  fecha_entrada: fechaEntrada,
+  fecha_salida: fechaSalida,
+  cantidad_huespedes: Number(cantidadHuespedes) || 1,
+  estado,
+  notas: notas.trim(),
+}
 
 if (reservaSeleccionada) {
   const resultado = await supabase
     .from("reservas")
-    .update({
-      alojamiento_id: Number(alojamientoSeleccionado),
-      habitacion_id: Number(habitacionSeleccionada),
-      nombre_huesped: nombre.trim(),
-      email_huesped: email.trim(),
-      telefono_huesped: telefono.trim(),
-      fecha_entrada: fechaEntrada,
-      fecha_salida: fechaSalida,
-      cantidad_huespedes: Number(cantidadHuespedes) || 1,
-      estado,
-      notas: notas.trim(),
-    })
+    .update(datosReserva)
     .eq("id", reservaSeleccionada.id)
 
   error = resultado.error
+} else {
+  const resultado = await supabase
+    .from("reservas")
+    .insert([datosReserva])
+
+  error = resultado.error
+}
 } else {
   const resultado = await supabase
     .from("reservas")
