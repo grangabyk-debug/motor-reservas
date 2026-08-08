@@ -179,6 +179,7 @@ if (reservaSeleccionada) {
         notas: notas.trim(),
       },
     ])
+    }
 
   error = resultado.error
 }
