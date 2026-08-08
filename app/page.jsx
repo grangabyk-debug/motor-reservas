@@ -687,13 +687,13 @@ function diasEntre(fechaInicio, fechaFin) {
                     reserva.estado === "confirmada" ||
                     reserva.estado === "finalizada"
 
-                  const background = confirmada
-                    ? "#e2f0d9"
-                    : "#fff2cc"
+                 const background = confirmada
+  ? "#22c55e"
+  : "#facc15"
 
-                  const color = confirmada
-                    ? "#385723"
-                    : "#7f6000"
+const color = confirmada
+  ? "#ffffff"
+  : "#713f12"
 
                   return (
                     <div
