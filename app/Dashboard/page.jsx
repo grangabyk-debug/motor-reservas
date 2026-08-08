@@ -129,45 +129,60 @@ export default function Home() {
   )
 
   useEffect(() => {
-    let mounted = true
+  let mounted = true
 
-    async function iniciarSesion() {
-      try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession()
+  async function iniciarSesion() {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
 
-        if (!mounted) return
+      if (!mounted) return
 
-        if (!session?.user) {
-          setAuthLoading(false)
-          window.location.href = "/login"
-          return
-        }
-
-        setUser(session.user)
+      if (!session?.user) {
         setAuthLoading(false)
+        window.location.href = "/login"
+        return
+      }
 
-        try {
-          const claveConfig = `habitacion_llena_config_${session.user.id}`
-          const guardada = localStorage.getItem(claveConfig)
+      setUser(session.user)
+      setAuthLoading(false)
 
-          if (guardada) {
-            setConfig((actual) => ({
-              ...actual,
-              ...JSON.parse(guardada),
-            }))
-          }
-        } catch (error) {
-          console.error("No se pudo cargar la configuración local:", error)
+      try {
+        const claveConfig = `habitacion_llena_config_${session.user.id}`
+        const guardada = localStorage.getItem(claveConfig)
+
+        if (guardada) {
+          setConfig((actual) => ({
+            ...actual,
+            ...JSON.parse(guardada),
+          }))
         }
       } catch (error) {
-        console.error("No se pudo comprobar la sesión:", error)
-        if (mounted) {
-          setAuthLoading(false)
-        }
+        console.error(
+          "No se pudo cargar la configuración local:",
+          error
+        )
+      }
+    } catch (error) {
+      console.error(
+        "No se pudo comprobar la sesión:",
+        error
+      )
+
+      if (mounted) {
+        setAuthLoading(false)
+        window.location.href = "/login"
       }
     }
+  }
+
+  iniciarSesion()
+
+  return () => {
+    mounted = false
+  }
+}, [])
 
     iniciarSesion()
 
