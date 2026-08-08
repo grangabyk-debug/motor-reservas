@@ -182,7 +182,7 @@ export default function Home() {
   return () => {
     mounted = false
   }
-}, [])
+}
 
     iniciarSesion()
 
