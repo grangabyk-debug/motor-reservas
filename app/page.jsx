@@ -170,41 +170,6 @@ if (reservaSeleccionada) {
     .insert([datosReserva])
 
   error = resultado.error
-} else {
-  const resultado = await supabase
-    .from("reservas")
-    .insert([
-      {
-        alojamiento_id: Number(alojamientoSeleccionado),
-        habitacion_id: Number(habitacionSeleccionada),
-        nombre_huesped: nombre.trim(),
-        email_huesped: email.trim(),
-        telefono_huesped: telefono.trim(),
-        fecha_entrada: fechaEntrada,
-        fecha_salida: fechaSalida,
-        cantidad_huespedes: Number(cantidadHuespedes) || 1,
-        estado,
-        notas: notas.trim(),
-      },
-    ])
-    }
-
-  error = resultado.error
-}
-        {
-          alojamiento_id: Number(alojamientoSeleccionado),
-          habitacion_id: Number(habitacionSeleccionada),
-          nombre_huesped: nombre.trim(),
-          email_huesped: email.trim(),
-          telefono_huesped: telefono.trim(),
-          fecha_entrada: fechaEntrada,
-          fecha_salida: fechaSalida,
-          cantidad_huespedes:
-            Number(cantidadHuespedes) || 1,
-          estado,
-          notas: notas.trim(),
-        },
-      ])
 
     if (error) {
       console.error(error)
