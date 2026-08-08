@@ -491,265 +491,198 @@ function diasEntre(fechaInicio, fechaFin) {
             </p>
           )}
         </section>
+{/* CALENDARIO DE OCUPACIÓN */}
+<section
+  style={{
+    background: "#fff",
+    border: "1px solid #e5e5e5",
+    borderRadius: "16px",
+    padding: "28px",
+    marginBottom: "30px",
+  }}
+>
+  <h2 style={{ marginTop: 0, marginBottom: "8px" }}>
+    Calendario de ocupación
+  </h2>
 
-        {/* CALENDARIO */}
-        <section style={sectionStyle}>
-          <h2 style={titleStyle}>
-            Calendario de ocupación
-          </h2>
+  <p style={{ color: "#777", marginTop: 0 }}>
+    Próximos 30 días
+  </p>
 
-          <p
-            style={{
-              color: "#777",
-              marginTop: "-8px",
-              marginBottom: "20px",
-            }}
-          >
-            Próximos 30 días
-          </p>
-
-          {habitacionesActivas.length === 0 ? (
-            <p style={{ color: "#777" }}>
-              No hay habitaciones cargadas.
-            </p>
-          ) : (
-            <div
-              style={{
-                overflowX: "auto",
-                width: "100%",
-              }}
-            >
-              <div
-                style={{
-                  minWidth: "1150px",
-                  border: "1px solid #e5e5e5",
-                  borderRadius: "12px",
-                  overflow: "hidden",
-                }}
-              >
-                {/* CABECERA */}
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns:
-                      "190px repeat(30, 1fr)",
-                    background: "#fafafa",
-                  }}
-                >
-                  <div
-                    style={{
-                      padding: "12px",
-                      fontWeight: "700",
-                      fontSize: "13px",
-                      borderBottom: "1px solid #ddd",
-                    }}
-                  >
-                    Habitación
-                  </div>
-
-                 {proximos30Dias.map((fecha) => {
-  const reserva = reservaParaFecha(habitacion.id, fecha)
-
-  let background = "#fff"
-  let color = "#999"
-
-  if (reserva) {
-    if (
-      reserva.estado === "confirmada" ||
-      reserva.estado === "finalizada"
-    ) {
-      background = "#e2f0d9"
-      color = "#385723"
-    } else {
-      background = "#fff2cc"
-      color = "#7f6000"
-    }
-  }
-
-  const esInicioReserva =
-    reserva && fecha === reserva.fecha_entrada
-
-  const esFinReserva =
-    reserva && fecha === reserva.fecha_salida
-
-  return (
+  {habitacionesActivas.length === 0 ? (
+    <p style={{ color: "#777" }}>
+      No hay habitaciones cargadas.
+    </p>
+  ) : (
     <div
-      key={fecha}
-      title={
-        reserva
-          ? `${reserva.nombre_huesped} - ${reserva.estado}`
-          : `${habitacion.nombre} - Disponible`
-      }
       style={{
-        minHeight: "58px",
-        background,
-        color,
-        borderLeft: "1px solid #eee",
-        borderBottom: "1px solid #eee",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: "11px",
-        fontWeight: reserva ? "600" : "normal",
-        overflow: "hidden",
-        whiteSpace: "nowrap",
-        position: "relative",
+        overflowX: "auto",
+        width: "100%",
+        WebkitOverflowScrolling: "touch",
       }}
     >
-      {esInicioReserva && (
-        <span
+      <div
+        style={{
+          minWidth: "1200px",
+          border: "1px solid #eee",
+          borderRadius: "8px",
+          overflow: "hidden",
+        }}
+      >
+        {/* ENCABEZADO */}
+        <div
           style={{
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-            padding: "0 4px",
+            display: "grid",
+            gridTemplateColumns: "200px repeat(30, 1fr)",
+            background: "#f9f9f9",
           }}
         >
-          {reserva.nombre_huesped}
-        </span>
-      )}
-    </div>
-  )
-})}
-
-                {/* FILAS */}
-                {habitacionesActivas.map(
-                  (habitacion) => (
-                    <div
-                      key={habitacion.id}
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns:
-                          "190px repeat(30, 1fr)",
-                      }}
-                    >
-                      <div
-                        style={{
-                          padding: "12px",
-                          borderBottom:
-                            "1px solid #eee",
-                          background: "#fff",
-                          minHeight: "54px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            fontWeight: "700",
-                            fontSize: "13px",
-                          }}
-                        >
-                          {habitacion.nombre}
-                        </div>
-
-                        <div
-                          style={{
-                            fontSize: "11px",
-                            color: "#777",
-                            marginTop: "3px",
-                          }}
-                        >
-                          {nombreAlojamiento(
-                            habitacion.alojamiento_id
-                          )}
-                        </div>
-                      </div>
-
-                      {proximos30Dias.map(
-                        (fecha) => {
-                          const reserva =
-                            reservaParaFecha(
-                              habitacion.id,
-                              fecha
-                            )
-
-                          let background = "#fff"
-                          let color = "#999"
-
-                          if (reserva) {
-                            if (
-                              reserva.estado ===
-                              "confirmada" ||
-                              reserva.estado ===
-                              "finalizada"
-                            ) {
-                              background = "#e2f0d9"
-                              color = "#385723"
-                            } else {
-                              background = "#fff2cc"
-                              color = "#7f6000"
-                            }
-                          }
-
-                          return (
-                            <div
-                              key={`${habitacion.id}-${fecha}`}
-                              title={
-                                reserva
-                                  ? `${reserva.nombre_huesped} — ${reserva.estado}`
-                                  : "Disponible"
-                              }
-                              style={{
-                                minHeight: "54px",
-                                borderLeft:
-                                  "1px solid #eee",
-                                borderBottom:
-                                  "1px solid #eee",
-                                background,
-                                color,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent:
-                                  "center",
-                                textAlign: "center",
-                                padding: "2px",
-                                fontSize: "9px",
-                                fontWeight:
-                                  reserva
-                                    ? "700"
-                                    : "400",
-                                overflow: "hidden",
-                              }}
-                            >
-                              {reserva
-                                ? reserva.nombre_huesped
-                                    .split(" ")[0]
-                                    .substring(0, 6)
-                                : ""}
-                            </div>
-                          )
-                        }
-                      )}
-                    </div>
-                  )
-                )}
-              </div>
-            </div>
-          
-
           <div
             style={{
-              display: "flex",
-              gap: "20px",
-              marginTop: "16px",
-              fontSize: "13px",
-              color: "#666",
+              padding: "10px",
+              fontWeight: "600",
+              fontSize: "12px",
+              borderBottom: "1px solid #ddd",
             }}
           >
-            <span>
-              🟩 Confirmada / finalizada
-            </span>
-
-            <span>
-              🟨 Pendiente
-            </span>
-
-            <span>
-              ⬜ Disponible
-            </span>
+            Habitación
           </div>
-        </section>
 
-       {/* RESERVAS */}
+          {proximos30Dias.map((fecha) => (
+            <div
+              key={fecha}
+              title={fecha}
+              style={{
+                textAlign: "center",
+                padding: "6px 2px",
+                borderLeft: "1px solid #eee",
+                borderBottom: "1px solid #ddd",
+                fontSize: "10px",
+              }}
+            >
+              <div style={{ color: "#777" }}>
+                {formatearMes(fecha)}
+              </div>
+              <strong>{formatearDia(fecha)}</strong>
+            </div>
+          ))}
+        </div>
+
+        {/* FILAS DE HABITACIONES */}
+        {habitacionesActivas.map((habitacion) => (
+          <div
+            key={habitacion.id}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "200px repeat(30, 1fr)",
+            }}
+          >
+            <div
+              style={{
+                padding: "10px",
+                borderBottom: "1px solid #eee",
+                background: "#fff",
+                fontSize: "12px",
+              }}
+            >
+              <strong>{habitacion.nombre}</strong>
+
+              <div
+                style={{
+                  color: "#888",
+                  fontSize: "10px",
+                  marginTop: "3px",
+                }}
+              >
+                {nombreAlojamiento(habitacion.alojamiento_id)}
+              </div>
+            </div>
+
+            {proximos30Dias.map((fecha) => {
+              const reserva = reservaParaFecha(
+                habitacion.id,
+                fecha
+              )
+
+              let background = "#fff"
+              let color = "#999"
+
+              if (reserva) {
+                if (
+                  reserva.estado === "confirmada" ||
+                  reserva.estado === "finalizada"
+                ) {
+                  background = "#e2f0d9"
+                  color = "#385723"
+                } else {
+                  background = "#fff2cc"
+                  color = "#7f6000"
+                }
+              }
+
+              return (
+                <div
+                  key={`${habitacion.id}-${fecha}`}
+                  title={
+                    reserva
+                      ? `${reserva.nombre_huesped} - ${reserva.estado}`
+                      : "Disponible"
+                  }
+                  style={{
+                    minHeight: "42px",
+                    padding: "4px 2px",
+                    background,
+                    color,
+                    borderLeft: "1px solid #eee",
+                    borderBottom: "1px solid #eee",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    textAlign: "center",
+                    fontSize: "10px",
+                    fontWeight: reserva ? "600" : "400",
+                    overflow: "hidden",
+                  }}
+                >
+                  {reserva
+                    ? reserva.nombre_huesped
+                        .split(" ")[0]
+                        .substring(0, 6)
+                    : ""}
+                </div>
+              )
+            })}
+          </div>
+        ))}
+      </div>
+
+      {/* REFERENCIAS */}
+      <div
+        style={{
+          display: "flex",
+          gap: "20px",
+          marginTop: "16px",
+          fontSize: "13px",
+          color: "#666",
+        }}
+      >
+        <span>
+          🟩 Confirmada / finalizada
+        </span>
+
+        <span>
+          🟨 Pendiente
+        </span>
+
+        <span>
+          ⬜ Disponible
+        </span>
+      </div>
+    </div>
+  )}
+</section>
+
+{/* RESERVAS */}
         <section
           style={{
             background: "#fff",
