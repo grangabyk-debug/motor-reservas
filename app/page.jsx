@@ -779,6 +779,40 @@ const color = confirmada
         <strong>Notas:</strong> {reservaSeleccionada.notas}
       </p>
     )}
+    <div
+  style={{
+    display: "flex",
+    gap: "10px",
+    marginTop: "20px",
+  }}
+>
+  <button
+    onClick={() => {
+      setAlojamientoSeleccionado(reservaSeleccionada.alojamiento_id)
+      setHabitacionSeleccionada(reservaSeleccionada.habitacion_id)
+      setNombre(reservaSeleccionada.nombre_huesped)
+      setEmail(reservaSeleccionada.email || "")
+      setTelefono(reservaSeleccionada.telefono || "")
+      setFechaEntrada(reservaSeleccionada.fecha_entrada)
+      setFechaSalida(reservaSeleccionada.fecha_salida)
+      setCantidadHuespedes(reservaSeleccionada.cantidad_huespedes || "1")
+      setEstado(reservaSeleccionada.estado)
+      setNotas(reservaSeleccionada.notas || "")
+      setReservaSeleccionada(null)
+      window.scrollTo({ top: 0, behavior: "smooth" })
+    }}
+    style={{
+      background: "#222",
+      color: "#fff",
+      border: "none",
+      borderRadius: "8px",
+      padding: "10px 16px",
+      cursor: "pointer",
+    }}
+  >
+    ✏️ Editar reserva
+  </button>
+</div>
   </div>
 )}
       {/* REFERENCIAS */}
