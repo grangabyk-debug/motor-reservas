@@ -698,6 +698,7 @@ const color = confirmada
                   return (
                     <div
                       key={reserva.id}
+                      onClick={() => setReservaSeleccionada(reserva)}
                       title={`${reserva.nombre_huesped} - ${reserva.estado} - Entrada: ${reserva.fecha_entrada} - Salida: ${reserva.fecha_salida}`}
                       style={{
                         position: "absolute",
@@ -722,7 +723,7 @@ const color = confirmada
                         border: "1px solid rgba(0,0,0,0.08)",
                       }}
                     >
-                      {reserva.nombre_huesped.split(" ")[0].substring(0, 6)} · {reserva.fecha_entrada.substring(8, 10)}/{reserva.fecha_entrada.substring(5, 7)} → {reserva.fecha_salida.substring(8, 10)}/{reserva.fecha_salida.substring(5, 7)}
+                      {reserva.nombre_huesped}
                     </div>
                   )
                 })}
