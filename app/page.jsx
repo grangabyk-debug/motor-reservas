@@ -170,7 +170,6 @@ if (reservaSeleccionada) {
     .insert([datosReserva])
 
   error = resultado.error
-}
 } else {
   const resultado = await supabase
     .from("reservas")
