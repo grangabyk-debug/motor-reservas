@@ -1,4 +1,4 @@
-"use login"
+"use
 
 import { useEffect, useMemo, useState } from "react"
 import { supabase } from "../lib/supabase"
