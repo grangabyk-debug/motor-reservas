@@ -5,77 +5,75 @@ import { supabase } from "../lib/supabase"
 
 export default function Home() {
   const [alojamientos, setAlojamientos] = useState([])
-  const [cargando, setCargando] = useState(true)
+  const [habitaciones, setHabitaciones] = useState([])
+  const [alojamientoSeleccionado, setAlojamientoSeleccionado] = useState("")
+
   const [nombre, setNombre] = useState("")
   const [tipo, setTipo] = useState("")
-  const [ciudad, setCiudad] = useState("")
-  const [direccion, setDireccion] = useState("")
-  const [telefono, setTelefono] = useState("")
-  const [email, setEmail] = useState("")
-  const [guardando, setGuardando] = useState(false)
+  const [capacidad, setCapacidad] = useState("")
+  const [precio, setPrecio] = useState("")
+
   const [mensaje, setMensaje] = useState("")
-
-  async function cargarAlojamientos() {
-    setCargando(true)
-
-    const { data, error } = await supabase
-      .from("alojamientos")
-      .select("*")
-      .order("created_at", { ascending: false })
-
-    if (error) {
-      console.error(error)
-      setMensaje("No se pudieron cargar los alojamientos.")
-    } else {
-      setAlojamientos(data || [])
-    }
-
-    setCargando(false)
-  }
+  const [cargando, setCargando] = useState(false)
 
   useEffect(() => {
-    cargarAlojamientos()
+    cargarDatos()
   }, [])
 
-  async function crearAlojamiento(e) {
-    e.preventDefault()
+  async function cargarDatos() {
+    const { data: alojamientosData } = await supabase
+      .from("alojamientos")
+      .select("*")
+      .order("id", { ascending: true })
 
-    if (!nombre.trim()) {
-      setMensaje("El nombre del alojamiento es obligatorio.")
+    const { data: habitacionesData } = await supabase
+      .from("habitaciones")
+      .select("*")
+      .order("id", { ascending: true })
+
+    setAlojamientos(alojamientosData || [])
+    setHabitaciones(habitacionesData || [])
+  }
+
+  async function crearHabitacion(e) {
+    e.preventDefault()
+    setMensaje("")
+
+    if (!alojamientoSeleccionado || !nombre || !tipo || !capacidad || !precio) {
+      setMensaje("Completá todos los campos.")
       return
     }
 
-    setGuardando(true)
-    setMensaje("")
+    setCargando(true)
 
     const { error } = await supabase
-      .from("alojamientos")
+      .from("habitaciones")
       .insert([
         {
-          nombre: nombre.trim(),
-          tipo: tipo.trim(),
-          ciudad: ciudad.trim(),
-          direccion: direccion.trim(),
-          telefono: telefono.trim(),
-          email: email.trim(),
+          alojamiento_id: Number(alojamientoSeleccionado),
+          nombre,
+          tipo,
+          capacidad: Number(capacidad),
+          precio: Number(precio),
+          activa: true,
         },
       ])
 
+    setCargando(false)
+
     if (error) {
       console.error(error)
-      setMensaje("No se pudo guardar el alojamiento.")
-    } else {
-      setNombre("")
-      setTipo("")
-      setCiudad("")
-      setDireccion("")
-      setTelefono("")
-      setEmail("")
-      setMensaje("Alojamiento creado correctamente.")
-      await cargarAlojamientos()
+      setMensaje("No se pudo crear la habitación.")
+      return
     }
 
-    setGuardando(false)
+    setNombre("")
+    setTipo("")
+    setCapacidad("")
+    setPrecio("")
+    setMensaje("Habitación creada correctamente.")
+
+    cargarDatos()
   }
 
   return (
@@ -94,57 +92,38 @@ export default function Home() {
           margin: "0 auto",
         }}
       >
-        <header
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            marginBottom: "40px",
-          }}
-        >
-          <div>
-            <p
-              style={{
-                fontSize: "13px",
-                fontWeight: "700",
-                letterSpacing: "2px",
-                textTransform: "uppercase",
-                marginBottom: "10px",
-              }}
-            >
-              Plataforma hotelera
-            </p>
-
-            <h1
-              style={{
-                fontSize: "48px",
-                lineHeight: "1.05",
-                margin: "0 0 12px",
-              }}
-            >
-              Habitación Llena
-            </h1>
-
-            <p
-              style={{
-                fontSize: "18px",
-                color: "#666",
-                margin: 0,
-              }}
-            >
-              Gestión y reservas para alojamientos.
-            </p>
-          </div>
-
-          <div
+        <header style={{ marginBottom: "40px" }}>
+          <p
             style={{
               fontSize: "14px",
-              fontWeight: "600",
-              color: "#286b3f",
+              fontWeight: "700",
+              letterSpacing: "3px",
+              textTransform: "uppercase",
+              marginBottom: "8px",
             }}
           >
-            ● Supabase conectado
-          </div>
+            Plataforma hotelera
+          </p>
+
+          <h1
+            style={{
+              fontSize: "52px",
+              lineHeight: "1.05",
+              margin: "0 0 10px",
+            }}
+          >
+            Habitación Llena
+          </h1>
+
+          <p
+            style={{
+              fontSize: "18px",
+              color: "#666",
+              margin: 0,
+            }}
+          >
+            Gestión y reservas para alojamientos.
+          </p>
         </header>
 
         <section
@@ -152,79 +131,80 @@ export default function Home() {
             background: "#fff",
             border: "1px solid #e5e5e5",
             borderRadius: "16px",
-            padding: "28px",
+            padding: "30px",
             marginBottom: "30px",
           }}
         >
-          <h2 style={{ marginTop: 0 }}>
-            Nuevo alojamiento
-          </h2>
+          <h2 style={{ marginTop: 0 }}>Nueva habitación</h2>
 
-          <form onSubmit={crearAlojamiento}>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "16px",
-              }}
+          <form
+            onSubmit={crearHabitacion}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "16px",
+            }}
+          >
+            <select
+              value={alojamientoSeleccionado}
+              onChange={(e) => setAlojamientoSeleccionado(e.target.value)}
+              style={campo}
             >
-              <input
-                placeholder="Nombre del alojamiento *"
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                style={inputStyle}
-              />
+              <option value="">Seleccioná un alojamiento</option>
 
-              <input
-                placeholder="Tipo: hotel, cabaña, hostería..."
-                value={tipo}
-                onChange={(e) => setTipo(e.target.value)}
-                style={inputStyle}
-              />
+              {alojamientos.map((alojamiento) => (
+                <option key={alojamiento.id} value={alojamiento.id}>
+                  {alojamiento.nombre}
+                </option>
+              ))}
+            </select>
 
-              <input
-                placeholder="Ciudad"
-                value={ciudad}
-                onChange={(e) => setCiudad(e.target.value)}
-                style={inputStyle}
-              />
+            <input
+              placeholder="Nombre de la habitación *"
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              style={campo}
+            />
 
-              <input
-                placeholder="Dirección"
-                value={direccion}
-                onChange={(e) => setDireccion(e.target.value)}
-                style={inputStyle}
-              />
+            <input
+              placeholder="Tipo (Doble, Triple, Suite...)"
+              value={tipo}
+              onChange={(e) => setTipo(e.target.value)}
+              style={campo}
+            />
 
-              <input
-                placeholder="Teléfono"
-                value={telefono}
-                onChange={(e) => setTelefono(e.target.value)}
-                style={inputStyle}
-              />
+            <input
+              type="number"
+              placeholder="Capacidad"
+              value={capacidad}
+              onChange={(e) => setCapacidad(e.target.value)}
+              style={campo}
+            />
 
-              <input
-                placeholder="Email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                style={inputStyle}
-              />
-            </div>
+            <input
+              type="number"
+              placeholder="Precio por noche"
+              value={precio}
+              onChange={(e) => setPrecio(e.target.value)}
+              style={campo}
+            />
 
             <button
               type="submit"
-              disabled={guardando}
-              style={buttonStyle}
+              disabled={cargando}
+              style={{
+                ...boton,
+                opacity: cargando ? 0.6 : 1,
+              }}
             >
-              {guardando ? "Guardando..." : "Crear alojamiento"}
+              {cargando ? "Guardando..." : "Crear habitación"}
             </button>
           </form>
 
           {mensaje && (
             <p
               style={{
-                marginBottom: 0,
-                marginTop: "18px",
+                marginTop: "20px",
                 fontWeight: "600",
               }}
             >
@@ -234,67 +214,66 @@ export default function Home() {
         </section>
 
         <section>
-          <h2>Alojamientos</h2>
+          <h2>Habitaciones</h2>
 
-          {cargando ? (
-            <p>Cargando alojamientos...</p>
-          ) : alojamientos.length === 0 ? (
-            <div
-              style={{
-                background: "#fff",
-                border: "1px solid #e5e5e5",
-                borderRadius: "16px",
-                padding: "30px",
-              }}
-            >
-              <p style={{ margin: 0 }}>
-                Todavía no hay alojamientos cargados.
-              </p>
-            </div>
+          {habitaciones.length === 0 ? (
+            <p style={{ color: "#666" }}>
+              Todavía no hay habitaciones cargadas.
+            </p>
           ) : (
             <div
               style={{
                 display: "grid",
                 gridTemplateColumns:
                   "repeat(auto-fit, minmax(280px, 1fr))",
-                gap: "18px",
+                gap: "20px",
               }}
             >
-              {alojamientos.map((alojamiento) => (
-                <div
-                  key={alojamiento.id}
-                  style={{
-                    background: "#fff",
-                    border: "1px solid #e5e5e5",
-                    borderRadius: "16px",
-                    padding: "24px",
-                  }}
-                >
-                  <h3 style={{ marginTop: 0 }}>
-                    {alojamiento.nombre}
-                  </h3>
+              {habitaciones.map((habitacion) => {
+                const alojamiento = alojamientos.find(
+                  (a) => a.id === habitacion.alojamiento_id
+                )
 
-                  {alojamiento.tipo && (
-                    <p>Tipo: {alojamiento.tipo}</p>
-                  )}
+                return (
+                  <div
+                    key={habitacion.id}
+                    style={{
+                      background: "#fff",
+                      border: "1px solid #e5e5e5",
+                      borderRadius: "16px",
+                      padding: "24px",
+                    }}
+                  >
+                    <h3 style={{ marginTop: 0 }}>
+                      {habitacion.nombre}
+                    </h3>
 
-                  {alojamiento.ciudad && (
-                    <p>Ciudad: {alojamiento.ciudad}</p>
-                  )}
+                    <p>
+                      <strong>Alojamiento:</strong>{" "}
+                      {alojamiento?.nombre || "Sin asignar"}
+                    </p>
 
-                  {alojamiento.direccion && (
-                    <p>Dirección: {alojamiento.direccion}</p>
-                  )}
+                    <p>
+                      <strong>Tipo:</strong> {habitacion.tipo}
+                    </p>
 
-                  {alojamiento.telefono && (
-                    <p>Teléfono: {alojamiento.telefono}</p>
-                  )}
+                    <p>
+                      <strong>Capacidad:</strong>{" "}
+                      {habitacion.capacidad} personas
+                    </p>
 
-                  {alojamiento.email && (
-                    <p>Email: {alojamiento.email}</p>
-                  )}
-                </div>
-              ))}
+                    <p>
+                      <strong>Precio:</strong> $
+                      {habitacion.precio}
+                    </p>
+
+                    <p>
+                      <strong>Estado:</strong>{" "}
+                      {habitacion.activa ? "Activa" : "Inactiva"}
+                    </p>
+                  </div>
+                )
+              })}
             </div>
           )}
         </section>
@@ -303,24 +282,23 @@ export default function Home() {
   )
 }
 
-const inputStyle = {
+const campo = {
   width: "100%",
   boxSizing: "border-box",
-  padding: "14px 16px",
+  padding: "14px",
+  border: "1px solid #ddd",
   borderRadius: "10px",
-  border: "1px solid #dcdcdc",
-  fontSize: "15px",
-  outline: "none",
+  fontSize: "16px",
+  background: "#fff",
 }
 
-const buttonStyle = {
-  marginTop: "20px",
-  padding: "14px 22px",
-  borderRadius: "10px",
+const boton = {
+  padding: "14px 20px",
   border: "none",
+  borderRadius: "10px",
   background: "#202020",
   color: "#fff",
-  fontSize: "15px",
+  fontSize: "16px",
   fontWeight: "700",
   cursor: "pointer",
 }
