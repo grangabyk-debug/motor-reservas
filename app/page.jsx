@@ -724,7 +724,7 @@ function diasEntre(fechaInicio, fechaFin) {
                 )}
               </div>
             </div>
-          )}
+          
 
           <div
             style={{
