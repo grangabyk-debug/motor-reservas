@@ -1,0 +1,17 @@
+{
+  "name": "motor-reservas",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@supabase/ssr": "latest",
+    "@supabase/supabase-js": "latest",
+    "next": "16.2.11",
+    "react": "latest",
+    "react-dom": "latest"
+  }
+}
