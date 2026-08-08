@@ -501,11 +501,11 @@ function diasEntre(fechaInicio, fechaFin) {
     marginBottom: "30px",
   }}
 >
-  <h2 style={{ marginTop: 0, marginBottom: "8px" }}>
+  <h2 style={{ marginTop: 0, marginBottom: "6px" }}>
     Calendario de ocupación
   </h2>
 
-  <p style={{ color: "#777", marginTop: 0 }}>
+  <p style={{ color: "#777", marginTop: 0, marginBottom: "20px" }}>
     Próximos 30 días
   </p>
 
@@ -529,7 +529,7 @@ function diasEntre(fechaInicio, fechaFin) {
           overflow: "hidden",
         }}
       >
-        {/* ENCABEZADO */}
+        {/* ENCABEZADO DE FECHAS */}
         <div
           style={{
             display: "grid",
@@ -548,112 +548,188 @@ function diasEntre(fechaInicio, fechaFin) {
             Habitación
           </div>
 
-          {proximos30Dias.map((fecha) => (
-            <div
-              key={fecha}
-              title={fecha}
-              style={{
-                textAlign: "center",
-                padding: "6px 2px",
-                borderLeft: "1px solid #eee",
-                borderBottom: "1px solid #ddd",
-                fontSize: "10px",
-              }}
-            >
-              <div style={{ color: "#777" }}>
-                {formatearMes(fecha)}
-              </div>
-              <strong>{formatearDia(fecha)}</strong>
-            </div>
-          ))}
-        </div>
+          {proximos30Dias.map((fecha) => {
+            const partes = fecha.split("-")
+            const mes = partes[1]
+            const dia = partes[2]
 
-        {/* FILAS DE HABITACIONES */}
-        {habitacionesActivas.map((habitacion) => (
-          <div
-            key={habitacion.id}
-            style={{
-              display: "grid",
-              gridTemplateColumns: "200px repeat(30, 1fr)",
-            }}
-          >
-            <div
-              style={{
-                padding: "10px",
-                borderBottom: "1px solid #eee",
-                background: "#fff",
-                fontSize: "12px",
-              }}
-            >
-              <strong>{habitacion.nombre}</strong>
-
+            return (
               <div
+                key={fecha}
+                title={fecha}
                 style={{
-                  color: "#888",
+                  textAlign: "center",
+                  padding: "6px 2px",
+                  borderLeft: "1px solid #eee",
+                  borderBottom: "1px solid #ddd",
                   fontSize: "10px",
-                  marginTop: "3px",
                 }}
               >
-                {nombreAlojamiento(habitacion.alojamiento_id)}
+                <div style={{ color: "#777" }}>
+                  {mes === "01"
+                    ? "Ene"
+                    : mes === "02"
+                    ? "Feb"
+                    : mes === "03"
+                    ? "Mar"
+                    : mes === "04"
+                    ? "Abr"
+                    : mes === "05"
+                    ? "May"
+                    : mes === "06"
+                    ? "Jun"
+                    : mes === "07"
+                    ? "Jul"
+                    : mes === "08"
+                    ? "Ago"
+                    : mes === "09"
+                    ? "Sep"
+                    : mes === "10"
+                    ? "Oct"
+                    : mes === "11"
+                    ? "Nov"
+                    : "Dic"}
+                </div>
+
+                <strong>{dia}</strong>
               </div>
-            </div>
+            )
+          })}
+        </div>
 
-            {proximos30Dias.map((fecha) => {
-              const reserva = reservaParaFecha(
-                habitacion.id,
-                fecha
-              )
+        {/* HABITACIONES */}
+        {habitacionesActivas.map((habitacion) => {
+          const reservasHabitacion = reservas.filter(
+            (reserva) =>
+              String(reserva.habitacion_id) === String(habitacion.id) &&
+              reserva.estado !== "cancelada" &&
+              reserva.fecha_salida > proximos30Dias[0] &&
+              reserva.fecha_entrada <=
+                proximos30Dias[proximos30Dias.length - 1]
+          )
 
-              let background = "#fff"
-              let color = "#999"
+          return (
+            <div
+              key={habitacion.id}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "200px 1fr",
+                minHeight: "58px",
+              }}
+            >
+              {/* NOMBRE DE HABITACIÓN */}
+              <div
+                style={{
+                  padding: "10px",
+                  borderBottom: "1px solid #eee",
+                  background: "#fff",
+                  fontSize: "12px",
+                }}
+              >
+                <strong>{habitacion.nombre}</strong>
 
-              if (reserva) {
-                if (
-                  reserva.estado === "confirmada" ||
-                  reserva.estado === "finalizada"
-                ) {
-                  background = "#e2f0d9"
-                  color = "#385723"
-                } else {
-                  background = "#fff2cc"
-                  color = "#7f6000"
-                }
-              }
-
-              return (
                 <div
-                  key={`${habitacion.id}-${fecha}`}
-                  title={
-                    reserva
-                      ? `${reserva.nombre_huesped} - ${reserva.estado}`
-                      : "Disponible"
-                  }
                   style={{
-                    minHeight: "42px",
-                    padding: "4px 2px",
-                    background,
-                    color,
-                    borderLeft: "1px solid #eee",
-                    borderBottom: "1px solid #eee",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    textAlign: "center",
+                    color: "#888",
                     fontSize: "10px",
-                    fontWeight: reserva ? "600" : "400",
-                    overflow: "hidden",
+                    marginTop: "3px",
                   }}
                 >
-                  {reserva
-                    ? reserva.nombre_huesped
-                        .split(" ")[0]
-                        .substring(0, 6)
-                    : ""}
+                  {nombreAlojamiento(habitacion.alojamiento_id)}
                 </div>
-              )
-            })}
-          </div>
-        ))}
+              </div>
+
+              {/* CALENDARIO DE ESA HABITACIÓN */}
+              <div
+                style={{
+                  position: "relative",
+                  display: "grid",
+                  gridTemplateColumns: "repeat(30, 1fr)",
+                  minHeight: "58px",
+                  borderBottom: "1px solid #eee",
+                }}
+              >
+                {/* CELDAS VACÍAS */}
+                {proximos30Dias.map((fecha) => (
+                  <div
+                    key={fecha}
+                    style={{
+                      borderLeft: "1px solid #eee",
+                      minHeight: "58px",
+                      background: "#fff",
+                    }}
+                  />
+                ))}
+
+                {/* BARRAS DE RESERVAS */}
+                {reservasHabitacion.map((reserva) => {
+                  let inicio = proximos30Dias.findIndex(
+                    (fecha) => fecha >= reserva.fecha_entrada
+                  )
+
+                  let fin = proximos30Dias.findIndex(
+                    (fecha) => fecha >= reserva.fecha_salida
+                  )
+
+                  if (inicio === -1) {
+                    inicio = 0
+                  }
+
+                  if (fin === -1) {
+                    fin = proximos30Dias.length
+                  }
+
+                  if (fin <= inicio) {
+                    return null
+                  }
+
+                  const confirmada =
+                    reserva.estado === "confirmada" ||
+                    reserva.estado === "finalizada"
+
+                  const background = confirmada
+                    ? "#e2f0d9"
+                    : "#fff2cc"
+
+                  const color = confirmada
+                    ? "#385723"
+                    : "#7f6000"
+
+                  return (
+                    <div
+                      key={reserva.id}
+                      title={`${reserva.nombre_huesped} - ${reserva.estado} - Entrada: ${reserva.fecha_entrada} - Salida: ${reserva.fecha_salida}`}
+                      style={{
+                        position: "absolute",
+                        left: `calc(${inicio} * (100% / 30) + 3px)`,
+                        width: `calc(${fin - inicio} * (100% / 30) - 6px)`,
+                        top: "9px",
+                        height: "40px",
+                        background,
+                        color,
+                        borderRadius: "7px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: "0 8px",
+                        boxSizing: "border-box",
+                        fontSize: "11px",
+                        fontWeight: "600",
+                        overflow: "hidden",
+                        whiteSpace: "nowrap",
+                        textOverflow: "ellipsis",
+                        zIndex: 2,
+                        border: "1px solid rgba(0,0,0,0.08)",
+                      }}
+                    >
+                      {reserva.nombre_huesped}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
       </div>
 
       {/* REFERENCIAS */}
@@ -664,19 +740,12 @@ function diasEntre(fechaInicio, fechaFin) {
           marginTop: "16px",
           fontSize: "13px",
           color: "#666",
+          flexWrap: "wrap",
         }}
       >
-        <span>
-          🟩 Confirmada / finalizada
-        </span>
-
-        <span>
-          🟨 Pendiente
-        </span>
-
-        <span>
-          ⬜ Disponible
-        </span>
+        <span>🟩 Confirmada / finalizada</span>
+        <span>🟨 Pendiente</span>
+        <span>⬜ Disponible</span>
       </div>
     </div>
   )}
