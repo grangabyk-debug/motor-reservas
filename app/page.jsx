@@ -114,12 +114,12 @@ const [reservaSeleccionada, setReservaSeleccionada] = useState(null)
 
     // Comprobar disponibilidad
     const { data: reservasExistentes, error: errorBusqueda } =
-      await supabase
-        .from("reservas")
-        .select("*")
-        .eq("habitacion_id", habitacionSeleccionada)
-        .neq("estado", "cancelada")
-
+  await supabase
+    .from("reservas")
+    .select("*")
+    .eq("habitacion_id", habitacionSeleccionada)
+    .neq("estado", "cancelada")
+    .neq("id", reservaSeleccionada?.id || 0)
     if (errorBusqueda) {
       console.error(errorBusqueda)
       setMensaje("No se pudo verificar la disponibilidad.")
