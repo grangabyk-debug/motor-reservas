@@ -21,7 +21,8 @@ export default function Home() {
 
   const [mensaje, setMensaje] = useState("")
   const [cargando, setCargando] = useState(false)
-
+const [reservaSeleccionada, setReservaSeleccionada] = useState(null)
+  
   // Próximos 30 días
   const proximos30Dias = Array.from({ length: 30 }, (_, i) => {
     const fecha = new Date()
@@ -208,6 +209,26 @@ export default function Home() {
     const partes = fecha.split("-")
     return partes[2]
   }
+  function reservaParaFecha(habitacionId, fecha) {
+  return reservas.find((reserva) => {
+    return (
+      String(reserva.habitacion_id) === String(habitacionId) &&
+      reserva.estado !== "cancelada" &&
+      fecha >= reserva.fecha_entrada &&
+      fecha < reserva.fecha_salida
+    )
+  })
+}
+
+function diasEntre(fechaInicio, fechaFin) {
+  const inicio = new Date(`${fechaInicio}T00:00:00`)
+  const fin = new Date(`${fechaFin}T00:00:00`)
+
+  return Math.max(
+    1,
+    Math.round((fin - inicio) / (1000 * 60 * 60 * 24))
+  )
+}
 
   function formatearMes(fecha) {
     const partes = fecha.split("-")
@@ -526,39 +547,70 @@ export default function Home() {
                     Habitación
                   </div>
 
-                  {proximos30Dias.map((fecha) => (
-                    <div
-                      key={fecha}
-                      title={fecha}
-                      style={{
-                        textAlign: "center",
-                        padding: "8px 2px",
-                        borderLeft:
-                          "1px solid #eee",
-                        borderBottom:
-                          "1px solid #ddd",
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: "10px",
-                          color: "#777",
-                        }}
-                      >
-                        {formatearMes(fecha)}
-                      </div>
+                 {proximos30Dias.map((fecha) => {
+  const reserva = reservaParaFecha(habitacion.id, fecha)
 
-                      <div
-                        style={{
-                          fontSize: "13px",
-                          fontWeight: "700",
-                        }}
-                      >
-                        {formatearDia(fecha)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+  let background = "#fff"
+  let color = "#999"
+
+  if (reserva) {
+    if (
+      reserva.estado === "confirmada" ||
+      reserva.estado === "finalizada"
+    ) {
+      background = "#e2f0d9"
+      color = "#385723"
+    } else {
+      background = "#fff2cc"
+      color = "#7f6000"
+    }
+  }
+
+  const esInicioReserva =
+    reserva && fecha === reserva.fecha_entrada
+
+  const esFinReserva =
+    reserva && fecha === reserva.fecha_salida
+
+  return (
+    <div
+      key={fecha}
+      title={
+        reserva
+          ? `${reserva.nombre_huesped} - ${reserva.estado}`
+          : `${habitacion.nombre} - Disponible`
+      }
+      style={{
+        minHeight: "58px",
+        background,
+        color,
+        borderLeft: "1px solid #eee",
+        borderBottom: "1px solid #eee",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: "11px",
+        fontWeight: reserva ? "600" : "normal",
+        overflow: "hidden",
+        whiteSpace: "nowrap",
+        position: "relative",
+      }}
+    >
+      {esInicioReserva && (
+        <span
+          style={{
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            padding: "0 4px",
+          }}
+        >
+          {reserva.nombre_huesped}
+        </span>
+      )}
+    </div>
+  )
+})}
 
                 {/* FILAS */}
                 {habitacionesActivas.map(
