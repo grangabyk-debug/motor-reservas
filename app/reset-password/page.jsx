@@ -8,40 +8,83 @@ export default function ResetPasswordPage() {
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [mensaje, setMensaje] = useState("")
-  const [error, setError] = useState("")
+  const [tipoMensaje, setTipoMensaje] = useState("")
   const [cargando, setCargando] = useState(false)
-  const [listo, setListo] = useState(false)
   const [verificando, setVerificando] = useState(true)
+  const [sesionValida, setSesionValida] = useState(false)
 
   useEffect(() => {
-    async function verificarSesion() {
+    let activo = true
+
+    const procesarRecuperacion = async () => {
       const { data } = await supabase.auth.getSession()
 
-      if (!data?.session) {
-        setError(
-          "El enlace de recuperación no es válido o ya venció. Solicitá un nuevo enlace."
+      if (data?.session) {
+        if (activo) {
+          setSesionValida(true)
+          setVerificando(false)
+        }
+      }
+    }
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("Evento de autenticación:", event)
+
+      if (
+        event === "PASSWORD_RECOVERY" ||
+        event === "SIGNED_IN"
+      ) {
+        if (session && activo) {
+          setSesionValida(true)
+          setVerificando(false)
+        }
+      }
+    })
+
+    procesarRecuperacion()
+
+    const timeout = setTimeout(async () => {
+      if (!activo) return
+
+      const { data } = await supabase.auth.getSession()
+
+      if (data?.session) {
+        setSesionValida(true)
+      } else {
+        setSesionValida(false)
+        setMensaje(
+          "El enlace de recuperación no es válido o ya venció. Solicitá un nuevo enlace desde el inicio de sesión."
         )
+        setTipoMensaje("error")
       }
 
       setVerificando(false)
-    }
+    }, 1500)
 
-    verificarSesion()
+    return () => {
+      activo = false
+      clearTimeout(timeout)
+      subscription.unsubscribe()
+    }
   }, [])
 
   async function cambiarPassword(e) {
     e.preventDefault()
 
     setMensaje("")
-    setError("")
+    setTipoMensaje("")
 
     if (password.length < 6) {
-      setError("La contraseña debe tener al menos 6 caracteres.")
+      setMensaje("La contraseña debe tener al menos 6 caracteres.")
+      setTipoMensaje("error")
       return
     }
 
     if (password !== confirmPassword) {
-      setError("Las contraseñas no coinciden.")
+      setMensaje("Las contraseñas no coinciden.")
+      setTipoMensaje("error")
       return
     }
 
@@ -53,13 +96,15 @@ export default function ResetPasswordPage() {
 
     if (error) {
       console.error("Error al cambiar contraseña:", error)
-      setError(error.message)
+
+      setMensaje(error.message)
+      setTipoMensaje("error")
       setCargando(false)
       return
     }
 
     setMensaje("Contraseña actualizada correctamente.")
-    setListo(true)
+    setTipoMensaje("success")
     setCargando(false)
 
     await supabase.auth.signOut()
@@ -69,10 +114,14 @@ export default function ResetPasswordPage() {
     return (
       <main style={page}>
         <div style={card}>
-          <div style={brand}>Habitación Llena</div>
+          <Link href="/" style={brand}>
+            Habitación Llena
+          </Link>
+
           <h1 style={title}>Verificando enlace</h1>
+
           <p style={muted}>
-            Estamos comprobando tu enlace de recuperación...
+            Estamos verificando tu enlace de recuperación...
           </p>
         </div>
       </main>
@@ -88,7 +137,7 @@ export default function ResetPasswordPage() {
 
         <h1 style={title}>Nueva contraseña</h1>
 
-        {!listo ? (
+        {sesionValida ? (
           <>
             <p style={muted}>
               Elegí una nueva contraseña para acceder a tu cuenta.
@@ -96,18 +145,16 @@ export default function ResetPasswordPage() {
 
             <form
               onSubmit={cambiarPassword}
-              style={{
-                display: "grid",
-                gap: 16,
-                marginTop: 26,
-              }}
+              style={form}
             >
               <label style={label}>
                 Nueva contraseña
+
                 <input
                   type="password"
                   required
                   minLength={6}
+                  autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Mínimo 6 caracteres"
@@ -117,44 +164,60 @@ export default function ResetPasswordPage() {
 
               <label style={label}>
                 Repetir contraseña
+
                 <input
                   type="password"
                   required
                   minLength={6}
+                  autoComplete="new-password"
                   value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onChange={(e) =>
+                    setConfirmPassword(e.target.value)
+                  }
                   placeholder="Repetí tu contraseña"
                   style={input}
                 />
               </label>
 
-              {error && <div style={errorBox}>{error}</div>}
+              {mensaje && (
+                <div
+                  style={
+                    tipoMensaje === "success"
+                      ? success
+                      : error
+                  }
+                >
+                  {mensaje}
+                </div>
+              )}
 
               <button
                 type="submit"
-                disabled={cargando || !!error}
+                disabled={cargando}
                 style={{
                   ...button,
-                  opacity: cargando || error ? 0.7 : 1,
-                  cursor: cargando || error ? "not-allowed" : "pointer",
+                  opacity: cargando ? 0.7 : 1,
+                  cursor: cargando
+                    ? "not-allowed"
+                    : "pointer",
                 }}
               >
-                {cargando ? "Guardando..." : "Cambiar contraseña"}
+                {cargando
+                  ? "Guardando..."
+                  : "Cambiar contraseña"}
               </button>
             </form>
           </>
         ) : (
           <>
-            <div style={successBox}>
-              {mensaje}
-            </div>
-
-            <p style={muted}>
-              Ya podés ingresar a tu cuenta con tu nueva contraseña.
-            </p>
+            {mensaje && (
+              <div style={error}>
+                {mensaje}
+              </div>
+            )}
 
             <Link href="/login" style={buttonLink}>
-              Ir a iniciar sesión
+              Volver a iniciar sesión
             </Link>
           </>
         )}
@@ -206,6 +269,12 @@ const muted = {
   lineHeight: 1.6,
 }
 
+const form = {
+  display: "grid",
+  gap: 16,
+  marginTop: 26,
+}
+
 const label = {
   display: "grid",
   gap: 7,
@@ -214,11 +283,12 @@ const label = {
 }
 
 const input = {
+  width: "100%",
+  boxSizing: "border-box",
   padding: "12px 13px",
   border: "1px solid #dfe4ea",
   borderRadius: 8,
   fontSize: 14,
-  outline: "none",
 }
 
 const button = {
@@ -244,22 +314,22 @@ const buttonLink = {
   marginTop: 24,
 }
 
-const errorBox = {
+const error = {
   background: "#fff0f0",
   color: "#b42318",
-  padding: 11,
+  padding: 12,
   borderRadius: 8,
   fontSize: 13,
+  lineHeight: 1.5,
 }
 
-const successBox = {
+const success = {
   background: "#e8f7f0",
-  color: "#00875a",
-  padding: 14,
+  color: "#087443",
+  padding: 12,
   borderRadius: 8,
-  fontSize: 14,
-  fontWeight: 700,
-  marginTop: 24,
+  fontSize: 13,
+  lineHeight: 1.5,
 }
 
 const bottom = {
