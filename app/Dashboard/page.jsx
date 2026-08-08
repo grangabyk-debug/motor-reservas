@@ -1,3 +1,4 @@
+
 "use client"
 import { useEffect, useMemo, useState } from "react"
 import { supabase } from "../../lib/supabase"
@@ -129,81 +130,52 @@ export default function Home() {
   )
 
   useEffect(() => {
-  let mounted = true
+    let mounted = true
 
-  async function iniciarSesion() {
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-
-      if (!mounted) return
-
-      if (!session?.user) {
-        setAuthLoading(false)
-        window.location.href = "/login"
-        return
-      }
-
-      setUser(session.user)
-      setAuthLoading(false)
-
+    async function iniciarSesion() {
       try {
-        const claveConfig = `habitacion_llena_config_${session.user.id}`
-        const guardada = localStorage.getItem(claveConfig)
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
 
-        if (guardada) {
-          setConfig((actual) => ({
-            ...actual,
-            ...JSON.parse(guardada),
-          }))
+        if (!mounted) return
+
+        if (!session?.user) {
+          setAuthLoading(false)
+          window.location.href = "/login"
+          return
+        }
+
+        setUser(session.user)
+        setAuthLoading(false)
+
+        try {
+          const claveConfig = `habitacion_llena_config_${session.user.id}`
+          const guardada = localStorage.getItem(claveConfig)
+
+          if (guardada) {
+            setConfig((actual) => ({
+              ...actual,
+              ...JSON.parse(guardada),
+            }))
+          }
+        } catch (error) {
+          console.error("No se pudo cargar la configuración local:", error)
         }
       } catch (error) {
-        console.error(
-          "No se pudo cargar la configuración local:",
-          error
-        )
-      }
-    } catch (error) {
-      console.error(
-        "No se pudo comprobar la sesión:",
-        error
-      )
+        console.error("No se pudo comprobar la sesión:", error)
 
-      if (mounted) {
-        setAuthLoading(false)
-        window.location.href = "/login"
+        if (mounted) {
+          setAuthLoading(false)
+          window.location.href = "/login"
+        }
       }
     }
-  }
-
-  iniciarSesion()
-
-  return () => {
-    mounted = false
-  }
-}
 
     iniciarSesion()
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!mounted) return
-
-      if (session?.user) {
-        setUser(session.user)
-        setAuthLoading(false)
-      } else {
-        setUser(null)
-        setAuthLoading(false)
-        window.location.href = "/login"
-      }
-    })
-
     return () => {
       mounted = false
-      subscription.unsubscribe()
     }
   }, [])
 
@@ -2137,3 +2109,4 @@ const emptyStyle = {
   color: colors.muted,
   fontSize: 13,
 }
+```
