@@ -33,6 +33,7 @@ const inputStyle = {
   outline: "none",
 }
 
+
 function fechaLocal(offset = 0) {
   const fecha = new Date()
   fecha.setHours(12, 0, 0, 0)
