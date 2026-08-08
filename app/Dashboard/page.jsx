@@ -122,18 +122,78 @@ export default function Home() {
   )
 
   useEffect(() => {
-    cargarDatos()
-    try {
-      const guardada = localStorage.getItem("habitacion_llena_config")
-      if (guardada) {
-        setConfig((actual) => ({ ...actual, ...JSON.parse(guardada) }))
+    let mounted = true
+
+    async function iniciarSesion() {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+
+        if (!mounted) return
+
+        if (!session?.user) {
+          setAuthLoading(false)
+          window.location.href = "/login"
+          return
+        }
+
+        setUser(session.user)
+        setAuthLoading(false)
+
+        try {
+          const claveConfig = `habitacion_llena_config_${session.user.id}`
+          const guardada = localStorage.getItem(claveConfig)
+
+          if (guardada) {
+            setConfig((actual) => ({
+              ...actual,
+              ...JSON.parse(guardada),
+            }))
+          }
+        } catch (error) {
+          console.error("No se pudo cargar la configuración local:", error)
+        }
+      } catch (error) {
+        console.error("No se pudo comprobar la sesión:", error)
+        if (mounted) {
+          setAuthLoading(false)
+        }
       }
-    } catch (error) {
-      console.error(error)
+    }
+
+    iniciarSesion()
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return
+
+      if (session?.user) {
+        setUser(session.user)
+        setAuthLoading(false)
+      } else {
+        setUser(null)
+        setAuthLoading(false)
+        window.location.href = "/login"
+      }
+    })
+
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
     }
   }, [])
 
+  useEffect(() => {
+    if (user?.id) {
+      cargarDatos()
+    }
+  }, [user])
+
   async function cargarDatos() {
+    if (!user?.id) return
+
     const [
       { data: alojamientosData, error: alojamientosError },
       { data: habitacionesData, error: habitacionesError },
@@ -681,13 +741,20 @@ export default function Home() {
         >
           + Nueva reserva
         </button>
+        </div>
       </header>
     )
   }
 
   function guardarConfiguracion() {
     try {
-      localStorage.setItem("habitacion_llena_config", JSON.stringify(config))
+      if (!user?.id) {
+        alert("No hay una sesión activa.")
+        return
+      }
+
+      const claveConfig = `habitacion_llena_config_${user.id}`
+      localStorage.setItem(claveConfig, JSON.stringify(config))
       setConfigGuardada(true)
       setTimeout(() => setConfigGuardada(false), 2500)
     } catch (error) {
