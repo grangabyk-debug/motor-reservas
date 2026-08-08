@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Habitación Llena | Plataforma hotelera</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f7f7f5;
+      color: #202020;
+    }
+
+    header {
+      height: 72px;
+      background: white;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 7%;
+      border-bottom: 1px solid #e8e8e8;
+    }
+
+    .logo {
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    .login {
+      padding: 11px 20px;
+      border: 1px solid #222;
+      border-radius: 8px;
+      text-decoration: none;
+      color: #222;
+      font-weight: 600;
+    }
+
+    .hero {
+      min-height: calc(100vh - 72px);
+      display: flex;
+      align-items: center;
+      padding: 70px 7%;
+    }
+
+    .content {
+      max-width: 720px;
+    }
+
+    .tag {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      font-size: clamp(42px, 7vw, 76px);
+      line-height: 1.02;
+      margin: 0 0 25px;
+    }
+
+    .description {
+      font-size: 19px;
+      line-height: 1.6;
+      color: #666;
+      max-width: 620px;
+    }
+
+    .buttons {
+      margin-top: 35px;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .button {
+      padding: 14px 23px;
+      border-radius: 9px;
+      text-decoration: none;
+      font-weight: 700;
+      display: inline-block;
+    }
+
+    .primary {
+      background: #202020;
+      color: white;
+    }
+
+    .secondary {
+      border: 1px solid #ccc;
+      color: #202020;
+      background: white;
+    }
+
+    footer {
+      padding: 25px 7%;
+      color: #888;
+      font-size: 13px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <div class="logo">Habitación Llena</div>
+
+    <a class="login" href="#">
+      Ingresar
+    </a>
+  </header>
+
+  <main class="hero">
+
+    <div class="content">
+
+      <div class="tag">
+        Plataforma hotelera
+      </div>
+
+      <h1>
+        Más reservas.<br>
+        Menos complicaciones.
+      </h1>
+
+      <p class="description">
+        Una plataforma online para que hoteles, hosterías y cabañas
+        administren sus reservas, disponibilidad y tarifas desde un solo lugar.
+      </p>
+
+      <div class="buttons">
+
+        <a class="button primary" href="#">
+          Ingresar al sistema
+        </a>
+
+        <a class="button secondary" href="#">
+          Conocer la plataforma
+        </a>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <footer>
+    © 2026 Habitación Llena · Plataforma de gestión hotelera
+  </footer>
+
+</body>
+</html>
