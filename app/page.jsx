@@ -732,7 +732,55 @@ const color = confirmada
           )
         })}
       </div>
+{reservaSeleccionada && (
+  <div
+    style={{
+      marginTop: "20px",
+      padding: "20px",
+      border: "1px solid #ddd",
+      borderRadius: "12px",
+      background: "#fff",
+    }}
+  >
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+      }}
+    >
+      <h3 style={{ margin: 0 }}>
+        Reserva de {reservaSeleccionada.nombre_huesped}
+      </h3>
 
+      <button
+        onClick={() => setReservaSeleccionada(null)}
+        style={{
+          border: "none",
+          background: "transparent",
+          fontSize: "20px",
+          cursor: "pointer",
+        }}
+      >
+        ×
+      </button>
+    </div>
+
+    <p><strong>Alojamiento:</strong> {nombreAlojamiento(reservaSeleccionada.alojamiento_id)}</p>
+    <p><strong>Habitación:</strong> {nombreHabitacion(reservaSeleccionada.habitacion_id)}</p>
+    <p><strong>Entrada:</strong> {reservaSeleccionada.fecha_entrada}</p>
+    <p><strong>Salida:</strong> {reservaSeleccionada.fecha_salida}</p>
+    <p><strong>Estado:</strong> {reservaSeleccionada.estado}</p>
+    <p><strong>Email:</strong> {reservaSeleccionada.email}</p>
+    <p><strong>Teléfono:</strong> {reservaSeleccionada.telefono}</p>
+
+    {reservaSeleccionada.notas && (
+      <p>
+        <strong>Notas:</strong> {reservaSeleccionada.notas}
+      </p>
+    )}
+  </div>
+)}
       {/* REFERENCIAS */}
       <div
         style={{
