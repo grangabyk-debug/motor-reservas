@@ -10,13 +10,11 @@
   "dependencies": {
     "@supabase/ssr": "latest",
     "@supabase/supabase-js": "latest",
+    "@types/node": "latest",
+    "@types/react": "latest",
     "next": "16.2.11",
     "react": "latest",
-    "react-dom": "latest"
-  },
-  "devDependencies": {
-    "typescript": "latest",
-    "@types/react": "latest",
-    "@types/node": "latest"
+    "react-dom": "latest",
+    "typescript": "latest"
   }
 }
