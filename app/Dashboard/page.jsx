@@ -76,6 +76,13 @@ export default function Home() {
     logo: "",
     nombreMarca: "Habitación Llena",
     whatsapp: "",
+    email: "",
+    telefono: "",
+    direccion: "",
+    ciudad: "",
+    descripcion: "",
+    checkIn: "14:00",
+    checkOut: "10:00",
     bookingUrl: "",
     expediaUrl: "",
     airbnbUrl: "",
@@ -297,6 +304,7 @@ export default function Home() {
     const { data: existentes, error: errorBusqueda } = await supabase
       .from("reservas")
       .select("*")
+      .eq("user_id", user.id)
       .eq("habitacion_id", habitacionSeleccionada)
       .neq("estado", "cancelada")
       .neq("id", reservaSeleccionada?.id || 0)
@@ -339,6 +347,7 @@ export default function Home() {
         .from("reservas")
         .update(datos)
         .eq("id", reservaSeleccionada.id)
+        .eq("user_id", user.id)
       error = resultado.error
     } else {
       const resultado = await supabase.from("reservas").insert([datos])
@@ -365,6 +374,7 @@ export default function Home() {
       .from("reservas")
       .update({ estado: "cancelada" })
       .eq("id", reserva.id)
+      .eq("user_id", user.id)
 
     if (error) {
       console.error(error)
@@ -681,7 +691,8 @@ export default function Home() {
           fontSize: 11,
           opacity: .5,
         }}>
-          Habitación Llena · MVP
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>Habitación Llena · MVP</div>
+          <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user?.email || ""}</div>
         </div>
       </aside>
     )
@@ -707,6 +718,21 @@ export default function Home() {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button
+            onClick={() => cargarDatos()}
+            style={{
+              border: `1px solid ${colors.border}`,
+              background: colors.white,
+              color: colors.text,
+              borderRadius: 7,
+              padding: "9px 12px",
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+            title="Actualizar datos"
+          >
+            ↻ Actualizar
+          </button>
           <button
             onClick={async () => {
               await supabase.auth.signOut()
@@ -1205,7 +1231,7 @@ export default function Home() {
           <section style={{ ...cardStyle, maxWidth: 900 }}>
             <h2 style={{ margin: 0, fontSize: 18 }}>Marca</h2>
             <div style={{ color: colors.muted, fontSize: 12, marginTop: 4, marginBottom: 20 }}>
-              Esta configuración se guarda en este navegador por ahora.
+              Esta configuración se guarda de forma local por ahora. La base operativa (alojamientos, habitaciones y reservas) ya está vinculada a tu cuenta en Supabase.
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
@@ -1240,6 +1266,41 @@ export default function Home() {
                 <span style={{ color: colors.muted, fontSize: 12 }}>Vista previa del logo</span>
               </div>
             )}
+
+            <h2 style={{ margin: "30px 0 18px", fontSize: 18 }}>Datos del alojamiento</h2>
+            <div style={{ color: colors.muted, fontSize: 12, marginBottom: 18 }}>
+              Estos datos quedan asociados a tu cuenta en este MVP y después los llevaremos a Supabase para que puedan usarse en el motor de reservas y las automatizaciones.
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+              <Field label="Email comercial">
+                <input value={config.email} onChange={(e) => setConfig({ ...config, email: e.target.value })} placeholder="reservas@tuhotel.com" style={inputStyle} />
+              </Field>
+
+              <Field label="Teléfono">
+                <input value={config.telefono} onChange={(e) => setConfig({ ...config, telefono: e.target.value })} placeholder="+54 9..." style={inputStyle} />
+              </Field>
+
+              <Field label="Dirección">
+                <input value={config.direccion} onChange={(e) => setConfig({ ...config, direccion: e.target.value })} placeholder="Dirección del alojamiento" style={inputStyle} />
+              </Field>
+
+              <Field label="Ciudad / localidad">
+                <input value={config.ciudad} onChange={(e) => setConfig({ ...config, ciudad: e.target.value })} placeholder="Ej. Villa General Belgrano" style={inputStyle} />
+              </Field>
+
+              <Field label="Check-in">
+                <input type="time" value={config.checkIn} onChange={(e) => setConfig({ ...config, checkIn: e.target.value })} style={inputStyle} />
+              </Field>
+
+              <Field label="Check-out">
+                <input type="time" value={config.checkOut} onChange={(e) => setConfig({ ...config, checkOut: e.target.value })} style={inputStyle} />
+              </Field>
+
+              <Field label="Descripción" wide>
+                <textarea value={config.descripcion} onChange={(e) => setConfig({ ...config, descripcion: e.target.value })} placeholder="Breve descripción del alojamiento" style={{ ...inputStyle, minHeight: 90, resize: "vertical" }} />
+              </Field>
+            </div>
 
             <h2 style={{ margin: "30px 0 18px", fontSize: 18 }}>Accesos a canales</h2>
 
@@ -1307,6 +1368,31 @@ export default function Home() {
               Gestioná reservas y ocupación desde un solo lugar.
             </div>
           </div>
+
+          {alojamientos.length > 0 && (
+            <section style={{
+              ...cardStyle,
+              marginBottom: 22,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 18,
+              flexWrap: "wrap",
+            }}>
+              <div>
+                <div style={{ fontSize: 11, color: colors.muted, textTransform: "uppercase", letterSpacing: 1 }}>Alojamiento activo</div>
+                <div style={{ fontSize: 20, fontWeight: 800, marginTop: 5 }}>{alojamientos[0]?.nombre}</div>
+                {(config.ciudad || config.direccion) && (
+                  <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>
+                    {[config.direccion, config.ciudad].filter(Boolean).join(" · ")}
+                  </div>
+                )}
+              </div>
+              <button onClick={() => setVista("configuracion")} style={secondaryButton}>
+                Completar configuración
+              </button>
+            </section>
+          )}
 
           <div style={{
             display: "grid",
@@ -1933,6 +2019,8 @@ export default function Home() {
         button:hover { opacity: .92; }
         @media (max-width: 900px) {
           .desktop-sidebar { display: none; }
+          header { padding: 0 16px !important; }
+          header > div:first-child { min-width: 0; }
           .mobile-topbar { display: flex !important; }
           main { margin-left: 0 !important; padding-top: 58px; }
         }
