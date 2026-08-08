@@ -1,4 +1,3 @@
-
 "use client"
 import { useEffect, useMemo, useState } from "react"
 import { supabase } from "../../lib/supabase"
@@ -164,18 +163,32 @@ export default function Home() {
         }
       } catch (error) {
         console.error("No se pudo comprobar la sesión:", error)
-
         if (mounted) {
           setAuthLoading(false)
-          window.location.href = "/login"
         }
       }
     }
 
     iniciarSesion()
 
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return
+
+      if (session?.user) {
+        setUser(session.user)
+        setAuthLoading(false)
+      } else {
+        setUser(null)
+        setAuthLoading(false)
+        window.location.href = "/login"
+      }
+    })
+
     return () => {
       mounted = false
+      subscription.unsubscribe()
     }
   }, [])
 
@@ -2109,4 +2122,3 @@ const emptyStyle = {
   color: colors.muted,
   fontSize: 13,
 }
-```
