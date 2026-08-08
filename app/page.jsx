@@ -10,7 +10,6 @@ export default function Home() {
 
   const [alojamientoSeleccionado, setAlojamientoSeleccionado] = useState("")
   const [habitacionSeleccionada, setHabitacionSeleccionada] = useState("")
-
   const [nombre, setNombre] = useState("")
   const [email, setEmail] = useState("")
   const [telefono, setTelefono] = useState("")
@@ -23,25 +22,45 @@ export default function Home() {
   const [mensaje, setMensaje] = useState("")
   const [cargando, setCargando] = useState(false)
 
+  // Próximos 30 días
+  const proximos30Dias = Array.from({ length: 30 }, (_, i) => {
+    const fecha = new Date()
+    fecha.setHours(12, 0, 0, 0)
+    fecha.setDate(fecha.getDate() + i)
+
+    const año = fecha.getFullYear()
+    const mes = String(fecha.getMonth() + 1).padStart(2, "0")
+    const dia = String(fecha.getDate()).padStart(2, "0")
+
+    return `${año}-${mes}-${dia}`
+  })
+
   useEffect(() => {
     cargarDatos()
   }, [])
 
   async function cargarDatos() {
-    const { data: alojamientosData } = await supabase
-      .from("alojamientos")
-      .select("*")
-      .order("id", { ascending: true })
+    const { data: alojamientosData, error: alojamientosError } =
+      await supabase
+        .from("alojamientos")
+        .select("*")
+        .order("id", { ascending: true })
 
-    const { data: habitacionesData } = await supabase
-      .from("habitaciones")
-      .select("*")
-      .order("id", { ascending: true })
+    const { data: habitacionesData, error: habitacionesError } =
+      await supabase
+        .from("habitaciones")
+        .select("*")
+        .order("id", { ascending: true })
 
-    const { data: reservasData } = await supabase
-      .from("reservas")
-      .select("*")
-      .order("id", { ascending: false })
+    const { data: reservasData, error: reservasError } =
+      await supabase
+        .from("reservas")
+        .select("*")
+        .order("id", { ascending: false })
+
+    if (alojamientosError) console.error(alojamientosError)
+    if (habitacionesError) console.error(habitacionesError)
+    if (reservasError) console.error(reservasError)
 
     setAlojamientos(alojamientosData || [])
     setHabitaciones(habitacionesData || [])
@@ -50,8 +69,13 @@ export default function Home() {
 
   const habitacionesDisponibles = habitaciones.filter(
     (habitacion) =>
-      String(habitacion.alojamiento_id) === String(alojamientoSeleccionado) &&
+      String(habitacion.alojamiento_id) ===
+        String(alojamientoSeleccionado) &&
       habitacion.activa !== false
+  )
+
+  const habitacionesActivas = habitaciones.filter(
+    (habitacion) => habitacion.activa !== false
   )
 
   async function crearReserva(e) {
@@ -79,20 +103,24 @@ export default function Home() {
     }
 
     if (fechaSalida <= fechaEntrada) {
-      setMensaje("La fecha de salida debe ser posterior a la fecha de entrada.")
+      setMensaje(
+        "La fecha de salida debe ser posterior a la fecha de entrada."
+      )
       return
     }
 
     setCargando(true)
 
-    // Verificamos que no exista otra reserva que se cruce con las fechas.
-    const { data: reservasExistentes, error: errorBusqueda } = await supabase
-      .from("reservas")
-      .select("*")
-      .eq("habitacion_id", habitacionSeleccionada)
-      .neq("estado", "cancelada")
+    // Comprobar disponibilidad
+    const { data: reservasExistentes, error: errorBusqueda } =
+      await supabase
+        .from("reservas")
+        .select("*")
+        .eq("habitacion_id", habitacionSeleccionada)
+        .neq("estado", "cancelada")
 
     if (errorBusqueda) {
+      console.error(errorBusqueda)
       setMensaje("No se pudo verificar la disponibilidad.")
       setCargando(false)
       return
@@ -106,25 +134,30 @@ export default function Home() {
     })
 
     if (hayCruce) {
-      setMensaje("La habitación no está disponible para esas fechas.")
+      setMensaje(
+        "La habitación no está disponible para esas fechas."
+      )
       setCargando(false)
       return
     }
 
-    const { error } = await supabase.from("reservas").insert([
-      {
-        alojamiento_id: Number(alojamientoSeleccionado),
-        habitacion_id: Number(habitacionSeleccionada),
-        nombre_huesped: nombre.trim(),
-        email_huesped: email.trim(),
-        telefono_huesped: telefono.trim(),
-        fecha_entrada: fechaEntrada,
-        fecha_salida: fechaSalida,
-        cantidad_huespedes: Number(cantidadHuespedes) || 1,
-        estado: estado,
-        notas: notas.trim(),
-      },
-    ])
+    const { error } = await supabase
+      .from("reservas")
+      .insert([
+        {
+          alojamiento_id: Number(alojamientoSeleccionado),
+          habitacion_id: Number(habitacionSeleccionada),
+          nombre_huesped: nombre.trim(),
+          email_huesped: email.trim(),
+          telefono_huesped: telefono.trim(),
+          fecha_entrada: fechaEntrada,
+          fecha_salida: fechaSalida,
+          cantidad_huespedes:
+            Number(cantidadHuespedes) || 1,
+          estado,
+          notas: notas.trim(),
+        },
+      ])
 
     if (error) {
       console.error(error)
@@ -156,7 +189,9 @@ export default function Home() {
       (item) => String(item.id) === String(id)
     )
 
-    return alojamiento ? alojamiento.nombre : "Sin alojamiento"
+    return alojamiento
+      ? alojamiento.nombre
+      : "Sin alojamiento"
   }
 
   function nombreHabitacion(id) {
@@ -164,7 +199,47 @@ export default function Home() {
       (item) => String(item.id) === String(id)
     )
 
-    return habitacion ? habitacion.nombre : "Sin habitación"
+    return habitacion
+      ? habitacion.nombre
+      : "Sin habitación"
+  }
+
+  function formatearDia(fecha) {
+    const partes = fecha.split("-")
+    return partes[2]
+  }
+
+  function formatearMes(fecha) {
+    const partes = fecha.split("-")
+    const mes = Number(partes[1])
+
+    const nombres = [
+      "Ene",
+      "Feb",
+      "Mar",
+      "Abr",
+      "May",
+      "Jun",
+      "Jul",
+      "Ago",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dic",
+    ]
+
+    return nombres[mes - 1]
+  }
+
+  function reservaParaFecha(habitacionId, fecha) {
+    return reservas.find((reserva) => {
+      return (
+        String(reserva.habitacion_id) === String(habitacionId) &&
+        reserva.estado !== "cancelada" &&
+        fecha >= reserva.fecha_entrada &&
+        fecha < reserva.fecha_salida
+      )
+    })
   }
 
   return (
@@ -179,10 +254,11 @@ export default function Home() {
     >
       <div
         style={{
-          maxWidth: "1100px",
+          maxWidth: "1200px",
           margin: "0 auto",
         }}
       >
+        {/* HEADER */}
         <header style={{ marginBottom: "40px" }}>
           <div
             style={{
@@ -205,28 +281,27 @@ export default function Home() {
             Habitación Llena
           </h1>
 
-          <p style={{ fontSize: "18px", color: "#666" }}>
+          <p
+            style={{
+              fontSize: "18px",
+              color: "#666",
+              margin: 0,
+            }}
+          >
             Gestión y reservas para alojamientos.
           </p>
         </header>
 
-        {/* RESERVAS */}
-        <section
-          style={{
-            background: "#fff",
-            border: "1px solid #e5e5e5",
-            borderRadius: "16px",
-            padding: "28px",
-            marginBottom: "30px",
-          }}
-        >
-          <h2 style={{ marginTop: 0 }}>Nueva reserva</h2>
+        {/* NUEVA RESERVA */}
+        <section style={sectionStyle}>
+          <h2 style={titleStyle}>Nueva reserva</h2>
 
           <form onSubmit={crearReserva}>
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "1fr 1fr",
+                gridTemplateColumns:
+                  "repeat(auto-fit, minmax(250px, 1fr))",
                 gap: "14px",
               }}
             >
@@ -238,10 +313,15 @@ export default function Home() {
                 }}
                 style={inputStyle}
               >
-                <option value="">Seleccionar alojamiento</option>
+                <option value="">
+                  Seleccionar alojamiento
+                </option>
 
                 {alojamientos.map((alojamiento) => (
-                  <option key={alojamiento.id} value={alojamiento.id}>
+                  <option
+                    key={alojamiento.id}
+                    value={alojamiento.id}
+                  >
                     {alojamiento.nombre}
                   </option>
                 ))}
@@ -255,10 +335,15 @@ export default function Home() {
                 style={inputStyle}
                 disabled={!alojamientoSeleccionado}
               >
-                <option value="">Seleccionar habitación</option>
+                <option value="">
+                  Seleccionar habitación
+                </option>
 
                 {habitacionesDisponibles.map((habitacion) => (
-                  <option key={habitacion.id} value={habitacion.id}>
+                  <option
+                    key={habitacion.id}
+                    value={habitacion.id}
+                  >
                     {habitacion.nombre} - {habitacion.tipo}
                   </option>
                 ))}
@@ -293,26 +378,38 @@ export default function Home() {
                 min="1"
                 placeholder="Cantidad de huéspedes"
                 value={cantidadHuespedes}
-                onChange={(e) => setCantidadHuespedes(e.target.value)}
+                onChange={(e) =>
+                  setCantidadHuespedes(e.target.value)
+                }
                 style={inputStyle}
               />
 
               <div>
-                <label style={labelStyle}>Fecha de entrada</label>
+                <label style={labelStyle}>
+                  Fecha de entrada
+                </label>
+
                 <input
                   type="date"
                   value={fechaEntrada}
-                  onChange={(e) => setFechaEntrada(e.target.value)}
+                  onChange={(e) =>
+                    setFechaEntrada(e.target.value)
+                  }
                   style={inputStyle}
                 />
               </div>
 
               <div>
-                <label style={labelStyle}>Fecha de salida</label>
+                <label style={labelStyle}>
+                  Fecha de salida
+                </label>
+
                 <input
                   type="date"
                   value={fechaSalida}
-                  onChange={(e) => setFechaSalida(e.target.value)}
+                  onChange={(e) =>
+                    setFechaSalida(e.target.value)
+                  }
                   style={inputStyle}
                 />
               </div>
@@ -322,10 +419,21 @@ export default function Home() {
                 onChange={(e) => setEstado(e.target.value)}
                 style={inputStyle}
               >
-                <option value="pendiente">Pendiente</option>
-                <option value="confirmada">Confirmada</option>
-                <option value="cancelada">Cancelada</option>
-                <option value="finalizada">Finalizada</option>
+                <option value="pendiente">
+                  Pendiente
+                </option>
+
+                <option value="confirmada">
+                  Confirmada
+                </option>
+
+                <option value="cancelada">
+                  Cancelada
+                </option>
+
+                <option value="finalizada">
+                  Finalizada
+                </option>
               </select>
 
               <input
@@ -340,9 +448,14 @@ export default function Home() {
             <button
               type="submit"
               disabled={cargando}
-              style={buttonStyle}
+              style={{
+                ...buttonStyle,
+                opacity: cargando ? 0.6 : 1,
+              }}
             >
-              {cargando ? "Guardando..." : "Crear reserva"}
+              {cargando
+                ? "Guardando..."
+                : "Crear reserva"}
             </button>
           </form>
 
@@ -358,7 +471,233 @@ export default function Home() {
           )}
         </section>
 
-        {/* LISTADO DE RESERVAS */}
+        {/* CALENDARIO */}
+        <section style={sectionStyle}>
+          <h2 style={titleStyle}>
+            Calendario de ocupación
+          </h2>
+
+          <p
+            style={{
+              color: "#777",
+              marginTop: "-8px",
+              marginBottom: "20px",
+            }}
+          >
+            Próximos 30 días
+          </p>
+
+          {habitacionesActivas.length === 0 ? (
+            <p style={{ color: "#777" }}>
+              No hay habitaciones cargadas.
+            </p>
+          ) : (
+            <div
+              style={{
+                overflowX: "auto",
+                width: "100%",
+              }}
+            >
+              <div
+                style={{
+                  minWidth: "1150px",
+                  border: "1px solid #e5e5e5",
+                  borderRadius: "12px",
+                  overflow: "hidden",
+                }}
+              >
+                {/* CABECERA */}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns:
+                      "190px repeat(30, 1fr)",
+                    background: "#fafafa",
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: "12px",
+                      fontWeight: "700",
+                      fontSize: "13px",
+                      borderBottom: "1px solid #ddd",
+                    }}
+                  >
+                    Habitación
+                  </div>
+
+                  {proximos30Dias.map((fecha) => (
+                    <div
+                      key={fecha}
+                      title={fecha}
+                      style={{
+                        textAlign: "center",
+                        padding: "8px 2px",
+                        borderLeft:
+                          "1px solid #eee",
+                        borderBottom:
+                          "1px solid #ddd",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: "10px",
+                          color: "#777",
+                        }}
+                      >
+                        {formatearMes(fecha)}
+                      </div>
+
+                      <div
+                        style={{
+                          fontSize: "13px",
+                          fontWeight: "700",
+                        }}
+                      >
+                        {formatearDia(fecha)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* FILAS */}
+                {habitacionesActivas.map(
+                  (habitacion) => (
+                    <div
+                      key={habitacion.id}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns:
+                          "190px repeat(30, 1fr)",
+                      }}
+                    >
+                      <div
+                        style={{
+                          padding: "12px",
+                          borderBottom:
+                            "1px solid #eee",
+                          background: "#fff",
+                          minHeight: "54px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontWeight: "700",
+                            fontSize: "13px",
+                          }}
+                        >
+                          {habitacion.nombre}
+                        </div>
+
+                        <div
+                          style={{
+                            fontSize: "11px",
+                            color: "#777",
+                            marginTop: "3px",
+                          }}
+                        >
+                          {nombreAlojamiento(
+                            habitacion.alojamiento_id
+                          )}
+                        </div>
+                      </div>
+
+                      {proximos30Dias.map(
+                        (fecha) => {
+                          const reserva =
+                            reservaParaFecha(
+                              habitacion.id,
+                              fecha
+                            )
+
+                          let background = "#fff"
+                          let color = "#999"
+
+                          if (reserva) {
+                            if (
+                              reserva.estado ===
+                              "confirmada" ||
+                              reserva.estado ===
+                              "finalizada"
+                            ) {
+                              background = "#e2f0d9"
+                              color = "#385723"
+                            } else {
+                              background = "#fff2cc"
+                              color = "#7f6000"
+                            }
+                          }
+
+                          return (
+                            <div
+                              key={`${habitacion.id}-${fecha}`}
+                              title={
+                                reserva
+                                  ? `${reserva.nombre_huesped} — ${reserva.estado}`
+                                  : "Disponible"
+                              }
+                              style={{
+                                minHeight: "54px",
+                                borderLeft:
+                                  "1px solid #eee",
+                                borderBottom:
+                                  "1px solid #eee",
+                                background,
+                                color,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent:
+                                  "center",
+                                textAlign: "center",
+                                padding: "2px",
+                                fontSize: "9px",
+                                fontWeight:
+                                  reserva
+                                    ? "700"
+                                    : "400",
+                                overflow: "hidden",
+                              }}
+                            >
+                              {reserva
+                                ? reserva.nombre_huesped
+                                    .split(" ")[0]
+                                    .substring(0, 6)
+                                : ""}
+                            </div>
+                          )
+                        }
+                      )}
+                    </div>
+                  )
+                )}
+              </div>
+            </div>
+          )}
+
+          <div
+            style={{
+              display: "flex",
+              gap: "20px",
+              marginTop: "16px",
+              fontSize: "13px",
+              color: "#666",
+            }}
+          >
+            <span>
+              🟩 Confirmada / finalizada
+            </span>
+
+            <span>
+              🟨 Pendiente
+            </span>
+
+            <span>
+              ⬜ Disponible
+            </span>
+          </div>
+        </section>
+
+       {/* RESERVAS */}
         <section
           style={{
             background: "#fff",
@@ -375,7 +714,12 @@ export default function Home() {
               Todavía no hay reservas cargadas.
             </p>
           ) : (
-            <div style={{ display: "grid", gap: "14px" }}>
+            <div
+              style={{
+                display: "grid",
+                gap: "14px",
+              }}
+            >
               {reservas.map((reserva) => (
                 <div
                   key={reserva.id}
@@ -442,96 +786,6 @@ export default function Home() {
                 </div>
               ))}
             </div>
-          )}
-        </section>
-
-        {/* ALOJAMIENTOS */}
-        <section
-          style={{
-            background: "#fff",
-            border: "1px solid #e5e5e5",
-            borderRadius: "16px",
-            padding: "28px",
-            marginBottom: "30px",
-          }}
-        >
-          <h2 style={{ marginTop: 0 }}>Alojamientos</h2>
-
-          {alojamientos.length === 0 ? (
-            <p style={{ color: "#777" }}>
-              Todavía no hay alojamientos cargados.
-            </p>
-          ) : (
-            alojamientos.map((alojamiento) => (
-              <div
-                key={alojamiento.id}
-                style={{
-                  borderBottom: "1px solid #eee",
-                  padding: "18px 0",
-                }}
-              >
-                <h3>{alojamiento.nombre}</h3>
-                <p>Tipo: {alojamiento.tipo}</p>
-                <p>Ciudad: {alojamiento.ciudad}</p>
-                <p>Dirección: {alojamiento.direccion}</p>
-                <p>Teléfono: {alojamiento.telefono}</p>
-                <p>Email: {alojamiento.email}</p>
-              </div>
-            ))
-          )}
-        </section>
-
-        {/* HABITACIONES */}
-        <section
-          style={{
-            background: "#fff",
-            border: "1px solid #e5e5e5",
-            borderRadius: "16px",
-            padding: "28px",
-          }}
-        >
-          <h2 style={{ marginTop: 0 }}>Habitaciones</h2>
-
-          {habitaciones.length === 0 ? (
-            <p style={{ color: "#777" }}>
-              Todavía no hay habitaciones cargadas.
-            </p>
-          ) : (
-            habitaciones.map((habitacion) => (
-              <div
-                key={habitacion.id}
-                style={{
-                  borderBottom: "1px solid #eee",
-                  padding: "18px 0",
-                }}
-              >
-                <h3>{habitacion.nombre}</h3>
-
-                <p>
-                  <strong>Alojamiento:</strong>{" "}
-                  {nombreAlojamiento(habitacion.alojamiento_id)}
-                </p>
-
-                <p>
-                  <strong>Tipo:</strong> {habitacion.tipo}
-                </p>
-
-                <p>
-                  <strong>Capacidad:</strong>{" "}
-                  {habitacion.capacidad} personas
-                </p>
-
-                <p>
-                  <strong>Precio:</strong> $
-                  {habitacion.precio}
-                </p>
-
-                <p>
-                  <strong>Estado:</strong>{" "}
-                  {habitacion.activa ? "Activa" : "Inactiva"}
-                </p>
-              </div>
-            ))
           )}
         </section>
       </div>
