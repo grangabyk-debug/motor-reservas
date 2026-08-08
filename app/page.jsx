@@ -1,4 +1,4 @@
- "use client"
+"use client"
 
 import { useEffect, useMemo, useState } from "react"
 import { supabase } from "../lib/supabase"
@@ -70,6 +70,27 @@ export default function Home() {
   const [vista, setVista] = useState("dashboard")
   const [menuAbierto, setMenuAbierto] = useState(false)
 
+  const [config, setConfig] = useState({
+    logo: "",
+    nombreMarca: "Habitación Llena",
+    whatsapp: "",
+    bookingUrl: "",
+    expediaUrl: "",
+    airbnbUrl: "",
+    despegarUrl: "",
+    webUrl: "",
+  })
+
+  const [assistantMessages, setAssistantMessages] = useState([
+    {
+      role: "assistant",
+      content: "Hola. Soy el asistente de Habitación Llena. Puedo ayudarte a interpretar reservas, ocupación y rendimiento de tu alojamiento.",
+    },
+  ])
+  const [assistantInput, setAssistantInput] = useState("")
+  const [assistantLoading, setAssistantLoading] = useState(false)
+  const [configGuardada, setConfigGuardada] = useState(false)
+
   const [alojamientoSeleccionado, setAlojamientoSeleccionado] = useState("")
   const [habitacionSeleccionada, setHabitacionSeleccionada] = useState("")
   const [nombre, setNombre] = useState("")
@@ -100,6 +121,14 @@ export default function Home() {
 
   useEffect(() => {
     cargarDatos()
+    try {
+      const guardada = localStorage.getItem("habitacion_llena_config")
+      if (guardada) {
+        setConfig((actual) => ({ ...actual, ...JSON.parse(guardada) }))
+      }
+    } catch (error) {
+      console.error(error)
+    }
   }, [])
 
   async function cargarDatos() {
@@ -519,6 +548,10 @@ export default function Home() {
       ["calendario", "▤", "Calendario"],
       ["alojamientos", "⌂", "Alojamientos"],
       ["habitaciones", "▥", "Habitaciones"],
+      ["ventas", "◫", "Ventas"],
+      ["integraciones", "↔", "Integraciones"],
+      ["asistente", "✦", "Asistente IA"],
+      ["configuracion", "⚙", "Configuración"],
     ]
 
     return (
@@ -537,7 +570,12 @@ export default function Home() {
       }}>
         <div style={{ padding: "6px 12px 30px" }}>
           <div style={{ fontSize: 10, letterSpacing: 2.5, opacity: .75 }}>PLATAFORMA HOTELERA</div>
-          <div style={{ fontSize: 22, fontWeight: 800, marginTop: 6 }}>Habitación Llena</div>
+          <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 9 }}>
+            {config.logo && (
+              <img src={config.logo} alt="" style={{ width: 34, height: 34, objectFit: "contain", borderRadius: 7, background: "#fff" }} />
+            )}
+            <div style={{ fontSize: 22, fontWeight: 800 }}>{config.nombreMarca || "Habitación Llena"}</div>
+          </div>
         </div>
 
         <div style={{ fontSize: 11, opacity: .55, padding: "0 12px 8px" }}>GESTIÓN</div>
@@ -622,6 +660,540 @@ export default function Home() {
           + Nueva reserva
         </button>
       </header>
+    )
+  }
+
+  function guardarConfiguracion() {
+    try {
+      localStorage.setItem("habitacion_llena_config", JSON.stringify(config))
+      setConfigGuardada(true)
+      setTimeout(() => setConfigGuardada(false), 2500)
+    } catch (error) {
+      console.error(error)
+      alert("No se pudo guardar la configuración.")
+    }
+  }
+
+  function handleLogoUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert("El logo debe pesar menos de 2 MB.")
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      setConfig((actual) => ({ ...actual, logo: String(reader.result) }))
+    }
+    reader.readAsDataURL(file)
+  }
+
+  function whatsappLink() {
+    const phone = (config.whatsapp || "").replace(/\D/g, "")
+    if (!phone) return ""
+    return `https://wa.me/${phone}`
+  }
+
+  function volumenVentas() {
+    const hoy = fechaLocal(0)
+    const ultimos30 = reservas.filter(
+      (r) =>
+        r.estado !== "cancelada" &&
+        r.fecha_entrada >= fechaLocal(-29) &&
+        r.fecha_entrada <= hoy
+    )
+
+    const noches = ultimos30.reduce(
+      (total, r) => total + diasEntre(r.fecha_entrada, r.fecha_salida),
+      0
+    )
+
+    const ingresos = ultimos30.reduce((total, r) => {
+      const valor =
+        Number(
+          r.precio_total ??
+          r.total ??
+          r.importe_total ??
+          r.monto_total ??
+          r.ingreso_total ??
+          0
+        ) || 0
+      return total + valor
+    }, 0)
+
+    return {
+      reservas: ultimos30.length,
+      noches,
+      ingresos,
+    }
+  }
+
+  async function enviarPreguntaIA(e) {
+    e?.preventDefault()
+    const pregunta = assistantInput.trim()
+    if (!pregunta || assistantLoading) return
+
+    setAssistantInput("")
+    setAssistantMessages((actual) => [
+      ...actual,
+      { role: "user", content: pregunta },
+    ])
+    setAssistantLoading(true)
+
+    const metricas = volumenVentas()
+    const contexto = {
+      alojamientos: alojamientos.map((a) => ({ id: a.id, nombre: a.nombre })),
+      habitaciones: habitaciones.map((h) => ({
+        id: h.id,
+        nombre: h.nombre,
+        tipo: h.tipo,
+        activa: h.activa !== false,
+        alojamiento: nombreAlojamiento(h.alojamiento_id),
+      })),
+      reservas: reservas.slice(0, 100).map((r) => ({
+        id: r.id,
+        huesped: r.nombre_huesped,
+        alojamiento: nombreAlojamiento(r.alojamiento_id),
+        habitacion: nombreHabitacion(r.habitacion_id),
+        entrada: r.fecha_entrada,
+        salida: r.fecha_salida,
+        estado: r.estado,
+        huespedes: r.cantidad_huespedes,
+      })),
+      metricas,
+      hoy: fechaLocal(0),
+    }
+
+    try {
+      const response = await fetch("/api/assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: pregunta, context: contexto }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "No se pudo consultar al asistente.")
+      }
+
+      setAssistantMessages((actual) => [
+        ...actual,
+        {
+          role: "assistant",
+          content:
+            data.answer ||
+            "No pude generar una respuesta en este momento.",
+        },
+      ])
+    } catch (error) {
+      console.error(error)
+      setAssistantMessages((actual) => [
+        ...actual,
+        {
+          role: "assistant",
+          content:
+            "No pude conectar con el asistente. La plataforma sigue funcionando; revisá la configuración de IA del proyecto.",
+        },
+      ])
+    } finally {
+      setAssistantLoading(false)
+    }
+  }
+
+  function Ventas() {
+    const metricas = volumenVentas()
+    const ocupacion = habitacionesActivas.length
+      ? Math.round((reservasHoy.length / habitacionesActivas.length) * 100)
+      : 0
+
+    const porEstado = reservas.reduce((acc, r) => {
+      acc[r.estado] = (acc[r.estado] || 0) + 1
+      return acc
+    }, {})
+
+    const canales = [
+      { nombre: "Directas / PMS", valor: reservas.length, color: colors.blue },
+      { nombre: "Booking.com", valor: 0, color: "#003b95" },
+      { nombre: "Expedia", valor: 0, color: "#f5a623" },
+      { nombre: "Airbnb", valor: 0, color: "#ff385c" },
+      { nombre: "Despegar", valor: 0, color: "#ff6b00" },
+    ]
+
+    return (
+      <>
+        <Header titulo="Ventas y rendimiento" subtitulo="Volumen comercial y ocupación" />
+        <div style={{ padding: 30 }}>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+            gap: 16,
+            marginBottom: 20,
+          }}>
+            {[
+              ["Reservas últimos 30 días", metricas.reservas, "reservas"],
+              ["Noches vendidas", metricas.noches, "noches"],
+              ["Ocupación hoy", `${ocupacion}%`, "de habitaciones activas"],
+              ["Ingresos registrados", metricas.ingresos ? `$${metricas.ingresos.toLocaleString("es-AR")}` : "—", metricas.ingresos ? "según datos cargados" : "requiere importe en reservas"],
+            ].map(([titulo, valor, detalle]) => (
+              <div key={titulo} style={cardStyle}>
+                <div style={{ color: colors.muted, fontSize: 12 }}>{titulo}</div>
+                <div style={{ fontSize: 29, fontWeight: 800, marginTop: 8 }}>{valor}</div>
+                <div style={{ color: colors.muted, fontSize: 11, marginTop: 5 }}>{detalle}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1.2fr .8fr", gap: 18 }}>
+            <section style={cardStyle}>
+              <h2 style={{ margin: 0, fontSize: 18 }}>Volumen por canal</h2>
+              <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>
+                Preparado para recibir datos del channel manager.
+              </div>
+
+              <div style={{ marginTop: 22, display: "grid", gap: 15 }}>
+                {canales.map((canal) => {
+                  const max = Math.max(reservas.length, 1)
+                  const porcentaje = Math.min(100, (canal.valor / max) * 100)
+                  return (
+                    <div key={canal.nombre}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 6 }}>
+                        <span style={{ fontWeight: 700 }}>{canal.nombre}</span>
+                        <span style={{ color: colors.muted }}>{canal.valor}</span>
+                      </div>
+                      <div style={{ height: 8, background: "#edf0f4", borderRadius: 99 }}>
+                        <div style={{
+                          width: `${porcentaje}%`,
+                          height: "100%",
+                          background: canal.color,
+                          borderRadius: 99,
+                        }} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
+
+            <section style={cardStyle}>
+              <h2 style={{ margin: 0, fontSize: 18 }}>Estado de reservas</h2>
+              <div style={{ marginTop: 18, display: "grid", gap: 11 }}>
+                {[
+                  ["Confirmadas", porEstado.confirmada || 0, colors.green],
+                  ["Pendientes", porEstado.pendiente || 0, colors.yellow],
+                  ["Finalizadas", porEstado.finalizada || 0, "#64748b"],
+                  ["Canceladas", porEstado.cancelada || 0, colors.red],
+                ].map(([label, value, color]) => (
+                  <div key={label} style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "12px 0",
+                    borderBottom: `1px solid ${colors.border}`,
+                  }}>
+                    <span style={{ fontSize: 13 }}>{label}</span>
+                    <strong style={{ color }}>{value}</strong>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+        </div>
+      </>
+    )
+  }
+
+  function Integraciones() {
+    const conexiones = [
+      {
+        nombre: "WhatsApp",
+        descripcion: "Botón directo para que el huésped contacte al alojamiento.",
+        estado: config.whatsapp ? "Configurado" : "Pendiente",
+        color: "#25D366",
+        url: whatsappLink(),
+      },
+      {
+        nombre: "Booking.com",
+        descripcion: "Preparado para conectar extranet o futura integración de Channel Manager.",
+        estado: config.bookingUrl ? "Configurado" : "Pendiente",
+        color: "#003b95",
+        url: config.bookingUrl,
+      },
+      {
+        nombre: "Expedia",
+        descripcion: "Canal OTA preparado para futura sincronización.",
+        estado: config.expediaUrl ? "Configurado" : "Pendiente",
+        color: "#f5a623",
+        url: config.expediaUrl,
+      },
+      {
+        nombre: "Airbnb",
+        descripcion: "Canal OTA preparado para futura sincronización.",
+        estado: config.airbnbUrl ? "Configurado" : "Pendiente",
+        color: "#ff385c",
+        url: config.airbnbUrl,
+      },
+      {
+        nombre: "Despegar",
+        descripcion: "Canal OTA preparado para futura sincronización.",
+        estado: config.despegarUrl ? "Configurado" : "Pendiente",
+        color: "#ff6b00",
+        url: config.despegarUrl,
+      },
+    ]
+
+    return (
+      <>
+        <Header titulo="Integraciones" subtitulo="Canales, WhatsApp y distribución" />
+        <div style={{ padding: 30 }}>
+          <section style={cardStyle}>
+            <div style={{ marginBottom: 20 }}>
+              <h2 style={{ margin: 0, fontSize: 18 }}>Canales de venta</h2>
+              <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>
+                Centralizá los accesos y prepará la distribución multicanal.
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gap: 10 }}>
+              {conexiones.map((conexion) => (
+                <div key={conexion.nombre} style={{
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: 10,
+                  padding: 17,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 14,
+                }}>
+                  <div style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 9,
+                    background: conexion.color,
+                    color: "#fff",
+                    display: "grid",
+                    placeItems: "center",
+                    fontWeight: 800,
+                    fontSize: 12,
+                  }}>
+                    {conexion.nombre.slice(0, 2).toUpperCase()}
+                  </div>
+
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 800, fontSize: 14 }}>{conexion.nombre}</div>
+                    <div style={{ color: colors.muted, fontSize: 11, marginTop: 4 }}>{conexion.descripcion}</div>
+                  </div>
+
+                  <span style={{
+                    color: conexion.estado === "Configurado" ? colors.green : colors.muted,
+                    background: conexion.estado === "Configurado" ? colors.greenSoft : "#f3f4f6",
+                    borderRadius: 99,
+                    padding: "5px 9px",
+                    fontSize: 10,
+                    fontWeight: 800,
+                  }}>
+                    {conexion.estado}
+                  </span>
+
+                  {conexion.url && (
+                    <a href={conexion.url} target="_blank" rel="noreferrer" style={{
+                      ...secondaryButton,
+                      textDecoration: "none",
+                    }}>
+                      Abrir
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div style={{
+              marginTop: 20,
+              padding: 15,
+              background: colors.blueSoft,
+              color: colors.navyDark,
+              borderRadius: 9,
+              fontSize: 12,
+              lineHeight: 1.55,
+            }}>
+              <strong>Importante:</strong> esto deja preparada la interfaz, pero una sincronización real de Booking.com, Expedia, Airbnb u otras OTAs requiere las APIs/credenciales y acuerdos de conectividad de cada canal. Un Channel Manager real sincroniza tarifas, disponibilidad y reservas en ambos sentidos y evita overbookings. citeturn0search0turn0search5
+            </div>
+          </section>
+        </div>
+      </>
+    )
+  }
+
+  function Asistente() {
+    return (
+      <>
+        <Header titulo="Asistente IA" subtitulo="Consultá tu operación en lenguaje natural" />
+        <div style={{ padding: 30 }}>
+          <section style={{
+            ...cardStyle,
+            maxWidth: 850,
+            margin: "0 auto",
+            padding: 0,
+            overflow: "hidden",
+          }}>
+            <div style={{
+              padding: 20,
+              background: `linear-gradient(120deg, ${colors.navyDark}, ${colors.navy})`,
+              color: "#fff",
+            }}>
+              <div style={{ fontSize: 11, opacity: .7, letterSpacing: 1 }}>ASISTENTE HOTELERO</div>
+              <h2 style={{ margin: "5px 0", fontSize: 20 }}>Preguntale a Habitación Llena</h2>
+              <div style={{ fontSize: 12, opacity: .78 }}>
+                Reservas, ocupación, huéspedes, habitaciones y rendimiento.
+              </div>
+            </div>
+
+            <div style={{
+              minHeight: 430,
+              maxHeight: 520,
+              overflowY: "auto",
+              padding: 20,
+              background: "#f8fafc",
+            }}>
+              {assistantMessages.map((message, index) => (
+                <div key={index} style={{
+                  display: "flex",
+                  justifyContent: message.role === "user" ? "flex-end" : "flex-start",
+                  marginBottom: 12,
+                }}>
+                  <div style={{
+                    maxWidth: "82%",
+                    padding: "11px 14px",
+                    borderRadius: 12,
+                    background: message.role === "user" ? colors.blue : colors.white,
+                    color: message.role === "user" ? "#fff" : colors.text,
+                    border: message.role === "user" ? "none" : `1px solid ${colors.border}`,
+                    fontSize: 13,
+                    lineHeight: 1.5,
+                    whiteSpace: "pre-wrap",
+                  }}>
+                    {message.content}
+                  </div>
+                </div>
+              ))}
+
+              {assistantLoading && (
+                <div style={{ color: colors.muted, fontSize: 12 }}>
+                  Analizando tu operación...
+                </div>
+              )}
+            </div>
+
+            <form onSubmit={enviarPreguntaIA} style={{
+              display: "flex",
+              gap: 9,
+              padding: 14,
+              borderTop: `1px solid ${colors.border}`,
+              background: colors.white,
+            }}>
+              <input
+                value={assistantInput}
+                onChange={(e) => setAssistantInput(e.target.value)}
+                placeholder="Ej. ¿Cuántas habitaciones tengo ocupadas hoy?"
+                style={{ ...inputStyle, flex: 1 }}
+              />
+              <button type="submit" disabled={assistantLoading} style={primaryButton}>
+                Enviar
+              </button>
+            </form>
+          </section>
+        </div>
+      </>
+    )
+  }
+
+  function Configuracion() {
+    return (
+      <>
+        <Header titulo="Configuración" subtitulo="Identidad y datos comerciales del alojamiento" />
+        <div style={{ padding: 30 }}>
+          <section style={{ ...cardStyle, maxWidth: 900 }}>
+            <h2 style={{ margin: 0, fontSize: 18 }}>Marca</h2>
+            <div style={{ color: colors.muted, fontSize: 12, marginTop: 4, marginBottom: 20 }}>
+              Esta configuración se guarda en este navegador por ahora.
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+              <Field label="Nombre de marca">
+                <input value={config.nombreMarca} onChange={(e) => setConfig({ ...config, nombreMarca: e.target.value })} style={inputStyle} />
+              </Field>
+
+              <Field label="WhatsApp con código de país">
+                <input value={config.whatsapp} onChange={(e) => setConfig({ ...config, whatsapp: e.target.value })} placeholder="549..." style={inputStyle} />
+              </Field>
+
+              <Field label="Logo">
+                <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={handleLogoUpload} style={{ ...inputStyle, padding: 9 }} />
+              </Field>
+
+              <Field label="URL de tu web">
+                <input value={config.webUrl} onChange={(e) => setConfig({ ...config, webUrl: e.target.value })} placeholder="https://..." style={inputStyle} />
+              </Field>
+            </div>
+
+            {config.logo && (
+              <div style={{
+                marginTop: 18,
+                padding: 16,
+                background: "#f8fafc",
+                borderRadius: 10,
+                display: "flex",
+                alignItems: "center",
+                gap: 15,
+              }}>
+                <img src={config.logo} alt="Logo" style={{ maxWidth: 180, maxHeight: 70, objectFit: "contain" }} />
+                <span style={{ color: colors.muted, fontSize: 12 }}>Vista previa del logo</span>
+              </div>
+            )}
+
+            <h2 style={{ margin: "30px 0 18px", fontSize: 18 }}>Accesos a canales</h2>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+              <Field label="Booking.com">
+                <input value={config.bookingUrl} onChange={(e) => setConfig({ ...config, bookingUrl: e.target.value })} placeholder="URL de la extranet o página" style={inputStyle} />
+              </Field>
+
+              <Field label="Expedia">
+                <input value={config.expediaUrl} onChange={(e) => setConfig({ ...config, expediaUrl: e.target.value })} placeholder="URL de acceso" style={inputStyle} />
+              </Field>
+
+              <Field label="Airbnb">
+                <input value={config.airbnbUrl} onChange={(e) => setConfig({ ...config, airbnbUrl: e.target.value })} placeholder="URL del anuncio" style={inputStyle} />
+              </Field>
+
+              <Field label="Despegar">
+                <input value={config.despegarUrl} onChange={(e) => setConfig({ ...config, despegarUrl: e.target.value })} placeholder="URL de acceso" style={inputStyle} />
+              </Field>
+            </div>
+
+            <div style={{ marginTop: 22, display: "flex", alignItems: "center", gap: 12 }}>
+              <button onClick={guardarConfiguracion} style={primaryButton}>
+                Guardar configuración
+              </button>
+              {configGuardada && <span style={{ color: colors.green, fontSize: 12, fontWeight: 700 }}>Configuración guardada ✓</span>}
+            </div>
+
+            <div style={{
+              marginTop: 25,
+              padding: 14,
+              background: "#fff8e8",
+              border: "1px solid #f3dfad",
+              borderRadius: 9,
+              color: "#72520a",
+              fontSize: 12,
+              lineHeight: 1.5,
+            }}>
+              Para un SaaS real multi-hotel, estos datos deberían pasar de localStorage a una tabla de configuración por alojamiento/usuario en Supabase. Así cada cliente tendría su logo, WhatsApp y conexiones separados.
+            </div>
+          </section>
+        </div>
+      </>
     )
   }
 
@@ -1097,7 +1669,7 @@ export default function Home() {
           background: "transparent",
           fontSize: 23,
         }}>☰</button>
-        <strong>Habitación Llena</strong>
+        <strong>{config.nombreMarca || "Habitación Llena"}</strong>
         <button onClick={() => { limpiarFormulario(); setVista("reservas") }} style={{
           border: "none",
           background: colors.blue,
@@ -1126,7 +1698,7 @@ export default function Home() {
             <div style={{ fontWeight: 800, fontSize: 20, padding: 12, marginBottom: 20 }}>
               Habitación Llena
             </div>
-            {["dashboard", "reservas", "calendario", "alojamientos", "habitaciones"].map((id) => (
+            {["dashboard", "reservas", "calendario", "alojamientos", "habitaciones", "ventas", "integraciones", "asistente", "configuracion"].map((id) => (
               <button key={id} onClick={() => { setVista(id); setMenuAbierto(false) }} style={{
                 width: "100%",
                 padding: 13,
@@ -1140,7 +1712,11 @@ export default function Home() {
                 {id === "dashboard" ? "▦  Inicio" :
                  id === "reservas" ? "▣  Reservas" :
                  id === "calendario" ? "▤  Calendario" :
-                 id === "alojamientos" ? "⌂  Alojamientos" : "▥  Habitaciones"}
+                 id === "alojamientos" ? "⌂  Alojamientos" :
+                 id === "habitaciones" ? "▥  Habitaciones" :
+                 id === "ventas" ? "◫  Ventas" :
+                 id === "integraciones" ? "↔  Integraciones" :
+                 id === "asistente" ? "✦  Asistente IA" : "⚙  Configuración"}
               </button>
             ))}
           </div>
@@ -1153,6 +1729,10 @@ export default function Home() {
         {vista === "calendario" && <CalendarioVista />}
         {vista === "alojamientos" && <Alojamientos />}
         {vista === "habitaciones" && <Habitaciones />}
+        {vista === "ventas" && <Ventas />}
+        {vista === "integraciones" && <Integraciones />}
+        {vista === "asistente" && <Asistente />}
+        {vista === "configuracion" && <Configuracion />}
       </main>
 
       {reservaSeleccionada && (
