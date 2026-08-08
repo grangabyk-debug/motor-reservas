@@ -1,6 +1,6 @@
 "use client"
 import { useEffect, useMemo, useState } from "react"
-import { supabase } from "../lib/supabase"
+import { supabase } from "../../lib/supabase"
 
 const colors = {
   navy: "#003b95",
@@ -1106,7 +1106,7 @@ export default function Home() {
               fontSize: 12,
               lineHeight: 1.55,
             }}>
-              <strong>Importante:</strong> esto deja preparada la interfaz, pero una sincronización real de Booking.com, Expedia, Airbnb u otras OTAs requiere las APIs/credenciales y acuerdos de conectividad de cada canal. Un Channel Manager real sincroniza tarifas, disponibilidad y reservas en ambos sentidos y evita overbookings. citeturn0search0turn0search5
+              <strong>Importante:</strong> esto deja preparada la interfaz, pero una sincronización real de Booking.com, Expedia, Airbnb u otras OTAs requiere las APIs/credenciales y acuerdos de conectividad de cada canal. Un Channel Manager real sincroniza tarifas, disponibilidad y reservas en ambos sentidos y evita overbookings.
             </div>
           </section>
         </div>
