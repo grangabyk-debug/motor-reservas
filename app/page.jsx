@@ -792,7 +792,18 @@ export default function Home() {
     </main>
   )
 }
+const sectionStyle = {
+  background: "#fff",
+  border: "1px solid #e5e5e5",
+  borderRadius: "16px",
+  padding: "28px",
+  marginBottom: "30px",
+}
 
+const titleStyle = {
+  marginTop: 0,
+  marginBottom: "20px",
+}
 const inputStyle = {
   width: "100%",
   boxSizing: "border-box",
