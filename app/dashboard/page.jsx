@@ -98,6 +98,7 @@ export default function Home() {
     earlyCheckin: { tipo: "monto", valor: 0 },
     lateCheckout: { tipo: "monto", valor: 0 },
     tipoCambioUSD: 1,
+    vehiculosTarifas: { auto: 0, camioneta: 0 },
   })
 
   const logoHabitacionLlena = "/logo-habitacion-llena.png"
@@ -134,6 +135,7 @@ export default function Home() {
   const [assistantLoading, setAssistantLoading] = useState(false)
   const [configGuardada, setConfigGuardada] = useState(false)
   const [configSubvista, setConfigSubvista] = useState("general")
+  const [vehiculosConfig, setVehiculosConfig] = useState({ auto: 0, camioneta: 0 })
   const [fechaCalendario, setFechaCalendario] = useState(fechaLocal(0))
   const [busquedaReserva, setBusquedaReserva] = useState("")
   const [earlyCheckin, setEarlyCheckin] = useState(false)
@@ -180,6 +182,7 @@ export default function Home() {
   const [cargando, setCargando] = useState(false)
   const [enviandoEmail, setEnviandoEmail] = useState(false)
   const [habitacionEstados, setHabitacionEstados] = useState([])
+  const [estadosHousekeepingPendientes, setEstadosHousekeepingPendientes] = useState({})
   const [bloqueos, setBloqueos] = useState([])
   const [pagos, setPagos] = useState([])
   const [pagoMonto, setPagoMonto] = useState("")
@@ -428,6 +431,11 @@ export default function Home() {
         estado: h.estado || "libre",
       }))
     )
+    setEstadosHousekeepingPendientes(
+      Object.fromEntries(
+        habitacionesFinal.map((h) => [String(h.id), h.estado || "libre"])
+      )
+    )
     setBloqueos(bloqueosData || [])
     setPagos(pagosData || [])
 
@@ -493,12 +501,16 @@ export default function Home() {
   ]
 
   function estadoHabitacionManual(id) {
+    const pendiente = estadosHousekeepingPendientes[String(id)]
+    if (pendiente) return pendiente
     return habitaciones.find((h) => String(h.id) === String(id))?.estado || "libre"
   }
 
   function estadoHabitacionVisual(habitacion) {
     const manual = estadoHabitacionManual(habitacion.id)
     if (manual === "fuera_servicio") return "fuera_servicio"
+    if (manual === "sucia") return "sucia"
+    if (manual === "en_limpieza") return "en_limpieza"
     const hoy = fechaLocal(0)
     const ocupada = reservas.some((r) => String(r.habitacion_id) === String(habitacion.id) && r.estado !== "cancelada" && !r.no_show && r.fecha_entrada <= hoy && r.fecha_salida > hoy)
     if (ocupada) return "ocupada"
@@ -511,15 +523,51 @@ export default function Home() {
     return estadosHabitacion.find((e) => e.key === estado) || estadosHabitacion[0]
   }
 
-  async function cambiarEstadoHabitacion(habitacionId, estado) {
-    const { error } = await supabase.from("habitaciones").update({ estado }).eq("id", Number(habitacionId)).eq("user_id", user.id)
+  function seleccionarEstadoHousekeeping(habitacionId, estado) {
+    setEstadosHousekeepingPendientes((actuales) => ({
+      ...actuales,
+      [String(habitacionId)]: estado,
+    }))
+  }
+
+  async function cambiarEstadoHabitacion(habitacionId, estado = null) {
+    const id = String(habitacionId)
+    const estadoAGuardar = estado || estadosHousekeepingPendientes[id] || "libre"
+
+    const { data, error } = await supabase
+      .from("habitaciones")
+      .update({ estado: estadoAGuardar })
+      .eq("id", Number(habitacionId))
+      .select("id, estado")
+      .maybeSingle()
+
     if (error) {
       console.error(error)
-      alert("No se pudo actualizar el estado. Verificá la migración PMS.")
-      return
+      alert("No se pudo guardar el estado de la habitación. Verificá los permisos de la tabla habitaciones.")
+      return false
     }
-    setHabitaciones((actuales) => actuales.map((h) => String(h.id) === String(habitacionId) ? { ...h, estado } : h))
+
+    if (!data) {
+      alert("No se pudo guardar el estado. La habitación no está disponible para este usuario.")
+      return false
+    }
+
+    setHabitaciones((actuales) =>
+      actuales.map((h) =>
+        String(h.id) === id ? { ...h, estado: estadoAGuardar } : h
+      )
+    )
+    setHabitacionEstados((actuales) =>
+      actuales.map((h) =>
+        String(h.habitacion_id) === id ? { ...h, estado: estadoAGuardar } : h
+      )
+    )
+    setEstadosHousekeepingPendientes((actuales) => ({
+      ...actuales,
+      [id]: estadoAGuardar,
+    }))
     await cargarDatos()
+    return true
   }
 
   function bloquesSeCruzan(inicioA, finA, inicioB, finB) {
@@ -3032,6 +3080,61 @@ export default function Home() {
         </div>
       </>
     )
+    if (configSubvista === "vehiculos") return (
+      <>
+        <Header titulo="Configuración · Vehículos" subtitulo="Tipos de vehículos y valores de cochera" />
+        <div style={{ padding: 30 }}>
+          <div style={{ ...cardStyle, marginBottom: 18 }}>
+            <button onClick={() => setConfigSubvista("general")} style={secondaryButton}>← Volver a configuración</button>
+          </div>
+          <section style={{ ...cardStyle, maxWidth: 900 }}>
+            <h2 style={{ margin: 0, fontSize: 18 }}>Vehículos</h2>
+            <div style={{ color: colors.muted, fontSize: 12, marginTop: 5, marginBottom: 20 }}>
+              Configurá el valor por noche de cochera según el tipo de vehículo.
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              <Field label="Auto · valor por noche">
+                <input
+                  type="number"
+                  min="0"
+                  value={vehiculosConfig.auto}
+                  onChange={(e) => setVehiculosConfig((v) => ({ ...v, auto: e.target.value }))}
+                  style={inputStyle}
+                />
+              </Field>
+              <Field label="Camioneta · valor por noche">
+                <input
+                  type="number"
+                  min="0"
+                  value={vehiculosConfig.camioneta}
+                  onChange={(e) => setVehiculosConfig((v) => ({ ...v, camioneta: e.target.value }))}
+                  style={inputStyle}
+                />
+              </Field>
+            </div>
+            <div style={{ marginTop: 20 }}>
+              <button
+                onClick={() => {
+                  const actualizado = {
+                    ...config,
+                    vehiculosTarifas: {
+                      auto: Number(vehiculosConfig.auto) || 0,
+                      camioneta: Number(vehiculosConfig.camioneta) || 0,
+                    },
+                  }
+                  setConfig(actualizado)
+                  guardarConfiguracion(actualizado)
+                }}
+                style={primaryButton}
+              >
+                Guardar vehículos
+              </button>
+            </div>
+          </section>
+        </div>
+      </>
+    )
+
     if (configSubvista === "habitaciones") return (
       <>
         <Header titulo="Configuración · Habitaciones" subtitulo="Unidades de tus alojamientos" />
@@ -3053,6 +3156,7 @@ export default function Home() {
               <button onClick={() => setConfigSubvista("general")} style={configSubvista === "general" ? primaryButton : secondaryButton}>General</button>
               <button onClick={() => setConfigSubvista("alojamientos")} style={secondaryButton}>Alojamientos</button>
               <button onClick={() => setConfigSubvista("habitaciones")} style={secondaryButton}>Habitaciones</button>
+              <button onClick={() => setConfigSubvista("vehiculos")} style={secondaryButton}>Vehículos</button>
             </div>
             <h2 style={{ margin: 0, fontSize: 18 }}>Marca</h2>
             <div style={{ color: colors.muted, fontSize: 12, marginTop: 4, marginBottom: 20 }}>
