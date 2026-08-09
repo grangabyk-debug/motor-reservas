@@ -3688,6 +3688,61 @@ export default function Home() {
             }}>
               Para un SaaS real multi-hotel, estos datos deberían pasar de localStorage a una tabla de configuración por alojamiento/usuario en Supabase. Así cada cliente tendría su logo, WhatsApp y conexiones separados.
             </div>
+
+
+          <section style={{ ...cardStyle, marginTop: 18 }}>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:12 }}>
+              <div>
+                <h2 style={{ margin:0 }}>💵 Caja</h2>
+                <p style={{ margin:"5px 0 0", color:colors.muted, fontSize:12 }}>Configuración propia de este alojamiento.</p>
+              </div>
+              <button onClick={guardarConfiguracionCaja} style={primaryButton}>Guardar configuración</button>
+            </div>
+
+            <div style={{ display:"flex", gap:7, marginTop:16, borderBottom:`1px solid ${colors.border}`, paddingBottom:8 }}>
+              {[
+                ["turnos","Turnos"],
+                ["cierre","Apertura y cierre"],
+                ["medios","Medios de pago"],
+              ].map(([key,label]) => (
+                <button key={key} onClick={() => setConfiguracionCaja(key)} style={configuracionCaja===key ? primaryButton : secondaryButton}>{label}</button>
+              ))}
+            </div>
+
+            {configuracionCaja === "turnos" && (
+              <div style={{ marginTop:14 }}>
+                {(configCaja.turnos || []).map(t => (
+                  <div key={t.id} style={{ display:"grid", gridTemplateColumns:"1.3fr 110px 110px 90px auto", gap:8, alignItems:"center", marginBottom:8 }}>
+                    <input value={t.nombre} onChange={e=>actualizarTurnoCaja(t.id,"nombre",e.target.value)} style={inputStyle} placeholder="Nombre del turno"/>
+                    <input type="time" value={t.inicio} onChange={e=>actualizarTurnoCaja(t.id,"inicio",e.target.value)} style={inputStyle}/>
+                    <input type="time" value={t.fin} onChange={e=>actualizarTurnoCaja(t.id,"fin",e.target.value)} style={inputStyle}/>
+                    <label style={{display:"flex",gap:5,alignItems:"center",fontSize:11,fontWeight:700}}><input type="checkbox" checked={!!t.activo} onChange={e=>actualizarTurnoCaja(t.id,"activo",e.target.checked)}/> Activo</label>
+                    <button onClick={()=>eliminarTurnoCaja(t.id)} style={{...secondaryButton,color:colors.red}}>Eliminar</button>
+                  </div>
+                ))}
+                <button onClick={agregarTurnoCaja} style={secondaryButton}>+ Agregar turno</button>
+              </div>
+            )}
+
+            {configuracionCaja === "cierre" && (
+              <div style={{ display:"grid", gap:10, marginTop:14 }}>
+                <label style={{fontSize:12,fontWeight:700}}><input type="checkbox" checked={!!configCaja.efectivoInicialObligatorio} onChange={e=>guardarConfigCajaLocal({...configCaja,efectivoInicialObligatorio:e.target.checked})}/> Efectivo inicial obligatorio al abrir</label>
+                <label style={{fontSize:12,fontWeight:700}}><input type="checkbox" checked={!!configCaja.efectivoContadoObligatorio} onChange={e=>guardarConfigCajaLocal({...configCaja,efectivoContadoObligatorio:e.target.checked})}/> Efectivo contado obligatorio al cerrar</label>
+                <label style={{fontSize:12,fontWeight:700}}><input type="checkbox" checked={!!configCaja.exigirConfirmacionCierre} onChange={e=>guardarConfigCajaLocal({...configCaja,exigirConfirmacionCierre:e.target.checked})}/> Exigir confirmación antes del cierre</label>
+              </div>
+            )}
+
+            {configuracionCaja === "medios" && (
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(2,minmax(0,1fr))", gap:10, marginTop:14 }}>
+                {Object.entries(configCaja.medios || {}).map(([medio,activo]) => (
+                  <label key={medio} style={{fontSize:12,fontWeight:700,textTransform:"capitalize"}}>
+                    <input type="checkbox" checked={!!activo} onChange={e=>guardarConfigCajaLocal({...configCaja, medios:{...configCaja.medios,[medio]:e.target.checked}})}/>
+                    {" "}{medio === "mercadopago" ? "Mercado Pago" : medio}
+                  </label>
+                ))}
+              </div>
+            )}
+          </section>
           </section>
         </div>
       </>
@@ -5058,59 +5113,7 @@ export default function Home() {
           </div>
         </div>
 
-          <section style={{ ...cardStyle, marginTop: 18 }}>
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:12 }}>
-              <div>
-                <h2 style={{ margin:0 }}>💵 Caja</h2>
-                <p style={{ margin:"5px 0 0", color:colors.muted, fontSize:12 }}>Configuración propia de este alojamiento.</p>
-              </div>
-              <button onClick={guardarConfiguracionCaja} style={primaryButton}>Guardar configuración</button>
-            </div>
 
-            <div style={{ display:"flex", gap:7, marginTop:16, borderBottom:`1px solid ${colors.border}`, paddingBottom:8 }}>
-              {[
-                ["turnos","Turnos"],
-                ["cierre","Apertura y cierre"],
-                ["medios","Medios de pago"],
-              ].map(([key,label]) => (
-                <button key={key} onClick={() => setConfiguracionCaja(key)} style={configuracionCaja===key ? primaryButton : secondaryButton}>{label}</button>
-              ))}
-            </div>
-
-            {configuracionCaja === "turnos" && (
-              <div style={{ marginTop:14 }}>
-                {(configCaja.turnos || []).map(t => (
-                  <div key={t.id} style={{ display:"grid", gridTemplateColumns:"1.3fr 110px 110px 90px auto", gap:8, alignItems:"center", marginBottom:8 }}>
-                    <input value={t.nombre} onChange={e=>actualizarTurnoCaja(t.id,"nombre",e.target.value)} style={inputStyle} placeholder="Nombre del turno"/>
-                    <input type="time" value={t.inicio} onChange={e=>actualizarTurnoCaja(t.id,"inicio",e.target.value)} style={inputStyle}/>
-                    <input type="time" value={t.fin} onChange={e=>actualizarTurnoCaja(t.id,"fin",e.target.value)} style={inputStyle}/>
-                    <label style={{display:"flex",gap:5,alignItems:"center",fontSize:11,fontWeight:700}}><input type="checkbox" checked={!!t.activo} onChange={e=>actualizarTurnoCaja(t.id,"activo",e.target.checked)}/> Activo</label>
-                    <button onClick={()=>eliminarTurnoCaja(t.id)} style={{...secondaryButton,color:colors.red}}>Eliminar</button>
-                  </div>
-                ))}
-                <button onClick={agregarTurnoCaja} style={secondaryButton}>+ Agregar turno</button>
-              </div>
-            )}
-
-            {configuracionCaja === "cierre" && (
-              <div style={{ display:"grid", gap:10, marginTop:14 }}>
-                <label style={{fontSize:12,fontWeight:700}}><input type="checkbox" checked={!!configCaja.efectivoInicialObligatorio} onChange={e=>guardarConfigCajaLocal({...configCaja,efectivoInicialObligatorio:e.target.checked})}/> Efectivo inicial obligatorio al abrir</label>
-                <label style={{fontSize:12,fontWeight:700}}><input type="checkbox" checked={!!configCaja.efectivoContadoObligatorio} onChange={e=>guardarConfigCajaLocal({...configCaja,efectivoContadoObligatorio:e.target.checked})}/> Efectivo contado obligatorio al cerrar</label>
-                <label style={{fontSize:12,fontWeight:700}}><input type="checkbox" checked={!!configCaja.exigirConfirmacionCierre} onChange={e=>guardarConfigCajaLocal({...configCaja,exigirConfirmacionCierre:e.target.checked})}/> Exigir confirmación antes del cierre</label>
-              </div>
-            )}
-
-            {configuracionCaja === "medios" && (
-              <div style={{ display:"grid", gridTemplateColumns:"repeat(2,minmax(0,1fr))", gap:10, marginTop:14 }}>
-                {Object.entries(configCaja.medios || {}).map(([medio,activo]) => (
-                  <label key={medio} style={{fontSize:12,fontWeight:700,textTransform:"capitalize"}}>
-                    <input type="checkbox" checked={!!activo} onChange={e=>guardarConfigCajaLocal({...configCaja, medios:{...configCaja.medios,[medio]:e.target.checked}})}/>
-                    {" "}{medio === "mercadopago" ? "Mercado Pago" : medio}
-                  </label>
-                ))}
-              </div>
-            )}
-          </section>
 
       )}
 
