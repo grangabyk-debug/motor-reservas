@@ -1674,17 +1674,6 @@ export default function Home() {
                     </div>
                     <div style={{ fontSize: 9, color: colors.muted }}>{nombreMes(fecha)}</div>
 
-                    <div style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      padding: "5px 5px 0",
-                      fontSize: 7,
-                      fontWeight: 850,
-                      color: "#94a3b8",
-                    }}>
-                      <span>10 OUT</span>
-                      <span style={{ color: colors.blue }}>14 IN</span>
-                    </div>
                   </div>
                 )
               })}
@@ -1799,57 +1788,9 @@ export default function Home() {
                             overflow: "hidden",
                           }}
                         >
-                          {/* Franja de recambio: 10:00 → 14:00 */}
-                          <div style={{
-                            position: "absolute",
-                            top: 0,
-                            bottom: 0,
-                            left: `${FRACCION_CHECKOUT * 100}%`,
-                            width: `${(FRACCION_CHECKIN - FRACCION_CHECKOUT) * 100}%`,
-                            background: "rgba(245,158,11,.035)",
-                            borderLeft: "1px dashed rgba(148,163,184,.28)",
-                            borderRight: "1px dashed rgba(148,163,184,.28)",
-                            pointerEvents: "none",
-                          }} />
-
-                          {/* Línea 10:00 */}
-                          <div style={{
-                            position: "absolute",
-                            top: 0,
-                            bottom: 0,
-                            left: `${FRACCION_CHECKOUT * 100}%`,
-                            width: 1,
-                            background: "rgba(148,163,184,.34)",
-                            pointerEvents: "none",
-                          }} />
-
-                          {/* Línea 14:00 */}
-                          <div style={{
-                            position: "absolute",
-                            top: 0,
-                            bottom: 0,
-                            left: `${FRACCION_CHECKIN * 100}%`,
-                            width: 1,
-                            background: "rgba(22,119,232,.24)",
-                            pointerEvents: "none",
-                          }} />
                         </div>
                       )
                     })}
-
-                    {calendarioDias.includes(hoy) && (
-                      <div style={{
-                        position: "absolute",
-                        top: 0,
-                        bottom: 0,
-                        left: `calc(${calendarioDias.indexOf(hoy)} * ${anchoDia}px)`,
-                        width: 2,
-                        background: colors.blue,
-                        opacity: .65,
-                        zIndex: 1,
-                        pointerEvents: "none",
-                      }} />
-                    )}
 
                     {bloqueos
                       .filter((b) =>
@@ -3062,78 +3003,6 @@ export default function Home() {
               </div>
             )}
 
-            <h2 style={{ margin: "30px 0 18px", fontSize: 18 }}>Tipos de habitación</h2>
-            <div style={{ color: colors.muted, fontSize: 12, marginBottom: 16 }}>
-              Los precios se configuran en cada habitación. Acá solamente definís los tipos disponibles para que después aparezcan como opciones en un menú desplegable.
-            </div>
-
-            <div style={{ display: "flex", gap: 9, flexWrap: "wrap", marginBottom: 14 }}>
-              {tiposHabitacionDisponibles.map((tipo) => {
-                const esPredeterminado = ["simple", "doble", "triple", "cuádruple", "otro"].includes(tipo.toLowerCase())
-                return (
-                  <div key={tipo} style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "8px 10px",
-                    border: `1px solid ${colors.border}`,
-                    borderRadius: 999,
-                    background: "#fff",
-                    fontSize: 12,
-                    fontWeight: 700,
-                  }}>
-                    <span>{tipo}</span>
-                    {!esPredeterminado && (
-                      <button
-                        type="button"
-                        onClick={() => eliminarTipoHabitacionConfiguracion(tipo)}
-                        style={{
-                          border: "none",
-                          background: "transparent",
-                          color: colors.red,
-                          cursor: "pointer",
-                          fontWeight: 900,
-                          padding: 0,
-                        }}
-                        title="Eliminar tipo"
-                      >
-                        ×
-                      </button>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-
-            <div style={{ display: "flex", gap: 9, maxWidth: 520 }}>
-              <input
-                value={nuevoTipoConfiguracion}
-                onChange={(e) => setNuevoTipoConfiguracion(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault()
-                    agregarTipoHabitacionConfiguracion()
-                  }
-                }}
-                placeholder="Ej. Suite, Cabaña, Monoambiente..."
-                style={{ ...inputStyle, flex: 1 }}
-              />
-              <button type="button" onClick={agregarTipoHabitacionConfiguracion} style={secondaryButton}>
-                + Agregar tipo
-              </button>
-            </div>
-
-            <div style={{
-              marginTop: 18,
-              padding: 13,
-              background: colors.blueSoft,
-              borderRadius: 9,
-              fontSize: 12,
-              color: colors.navyDark,
-            }}>
-              <strong>Importante:</strong> el precio por noche, cochera y cargos de early check-in / late check-out ahora se cargan individualmente dentro de cada habitación.
-            </div>
-
             <h2 style={{ margin: "30px 0 18px", fontSize: 18 }}>Accesos a canales</h2>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
@@ -3749,6 +3618,67 @@ export default function Home() {
                 style={primaryButton}
               >
                 + Agregar habitación
+              </button>
+            </div>
+
+            <h2 style={{ margin: "30px 0 18px", fontSize: 18 }}>Tipos de habitación</h2>
+            <div style={{ color: colors.muted, fontSize: 12, marginBottom: 16 }}>
+              Definí los tipos de habitación que vas a usar. Después aparecerán como opciones en el menú desplegable al crear o editar una habitación.
+            </div>
+
+            <div style={{ display: "flex", gap: 9, flexWrap: "wrap", marginBottom: 14 }}>
+              {tiposHabitacionDisponibles.map((tipo) => {
+                const esPredeterminado = ["simple", "doble", "triple", "cuádruple", "otro"].includes(tipo.toLowerCase())
+                return (
+                  <div key={tipo} style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "8px 10px",
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: 999,
+                    background: "#fff",
+                    fontSize: 12,
+                    fontWeight: 700,
+                  }}>
+                    <span>{tipo}</span>
+                    {!esPredeterminado && (
+                      <button
+                        type="button"
+                        onClick={() => eliminarTipoHabitacionConfiguracion(tipo)}
+                        style={{
+                          border: "none",
+                          background: "transparent",
+                          color: colors.red,
+                          cursor: "pointer",
+                          fontWeight: 900,
+                          padding: 0,
+                        }}
+                        title="Eliminar tipo"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <div style={{ display: "flex", gap: 9, maxWidth: 520 }}>
+              <input
+                value={nuevoTipoConfiguracion}
+                onChange={(e) => setNuevoTipoConfiguracion(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault()
+                    agregarTipoHabitacionConfiguracion()
+                  }
+                }}
+                placeholder="Ej. Suite, Cabaña, Monoambiente..."
+                style={{ ...inputStyle, flex: 1 }}
+              />
+              <button type="button" onClick={agregarTipoHabitacionConfiguracion} style={secondaryButton}>
+                + Agregar tipo
               </button>
             </div>
 
