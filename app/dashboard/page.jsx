@@ -3,21 +3,21 @@ import { useEffect, useMemo, useState } from "react"
 import { supabase } from "../../lib/supabase"
 
 const colors = {
-  navy: "#0b4aa2",
-  navyDark: "#082f6b",
-  blue: "#1677e8",
-  blueSoft: "#e8f1ff",
-  green: "#00875a",
-  greenSoft: "#e8f7f0",
-  yellow: "#b78103",
-  yellowSoft: "#fff7dc",
-  red: "#c62828",
-  redSoft: "#fff0f0",
-  text: "#1f2937",
-  muted: "#6b7280",
-  border: "#e5e7eb",
-  bg: "#f3f6fb",
-  white: "#ffffff",
+  navy: "var(--hl-navy)",
+  navyDark: "var(--hl-navy-dark)",
+  blue: "var(--hl-blue)",
+  blueSoft: "var(--hl-blue-soft)",
+  green: "var(--hl-green)",
+  greenSoft: "var(--hl-green-soft)",
+  yellow: "var(--hl-yellow)",
+  yellowSoft: "var(--hl-yellow-soft)",
+  red: "var(--hl-red)",
+  redSoft: "var(--hl-red-soft)",
+  text: "var(--hl-text)",
+  muted: "var(--hl-muted)",
+  border: "var(--hl-border)",
+  bg: "var(--hl-bg)",
+  white: "var(--hl-white)",
 }
 
 const inputStyle = {
@@ -72,6 +72,7 @@ export default function Home() {
 
   const [vista, setVista] = useState("dashboard")
   const [menuAbierto, setMenuAbierto] = useState(false)
+  const [modoOscuro, setModoOscuro] = useState(false)
 
   const [config, setConfig] = useState({
     logo: "",
@@ -100,6 +101,21 @@ export default function Home() {
   })
 
   const logoHabitacionLlena = "/logo-habitacion-llena.png"
+
+  useEffect(() => {
+    const guardado = localStorage.getItem("habitacion_llena_modo_oscuro")
+    if (guardado === "true") setModoOscuro(true)
+  }, [])
+
+  useEffect(() => {
+    localStorage.setItem("habitacion_llena_modo_oscuro", String(modoOscuro))
+    document.documentElement.dataset.hlTheme = modoOscuro ? "dark" : "light"
+    document.body.dataset.hlTheme = modoOscuro ? "dark" : "light"
+  }, [modoOscuro])
+
+  function alternarModoOscuro() {
+    setModoOscuro((actual) => !actual)
+  }
 
   function saludoSegunHorario() {
     const hora = new Date().getHours()
@@ -185,11 +201,6 @@ export default function Home() {
     tipo: "",
     alojamiento_id: "",
     precio: 0,
-    cochera: 0,
-    earlyTipo: "monto",
-    earlyValor: 0,
-    lateTipo: "monto",
-    lateValor: 0,
   })
   const [nuevoTipoConfiguracion, setNuevoTipoConfiguracion] = useState("")
 
@@ -2222,6 +2233,15 @@ export default function Home() {
               <span>⚙</span> Config
             </button>
           )}
+          <button
+            type="button"
+            onClick={alternarModoOscuro}
+            title={modoOscuro ? "Cambiar a modo día" : "Cambiar a modo noche"}
+            aria-label={modoOscuro ? "Cambiar a modo día" : "Cambiar a modo noche"}
+            style={{ ...topActionButton, display: "flex", alignItems: "center", gap: 7 }}
+          >
+            <span>{modoOscuro ? "☀" : "☾"}</span> {modoOscuro ? "Modo día" : "Modo noche"}
+          </button>
           <div className="user-chip" style={{ display: "flex", alignItems: "center", gap: 9, marginLeft: 5, padding: "5px 9px 5px 5px", border: `1px solid ${colors.border}`, borderRadius: 999, background: "#fff" }}>
             <div style={{ width: 30, height: 30, borderRadius: "50%", display: "grid", placeItems: "center", background: colors.blueSoft, color: colors.navy, fontWeight: 800, fontSize: 12 }}>{inicial}</div>
             <div style={{ lineHeight: 1.05 }}>
@@ -2811,11 +2831,6 @@ export default function Home() {
       tipo: habitacion.tipo || tiposHabitacionDisponibles[0] || "",
       alojamiento_id: String(habitacion.alojamiento_id || ""),
       precio: tarifa.precio,
-      cochera: tarifa.cochera,
-      earlyTipo: tarifa.earlyTipo,
-      earlyValor: tarifa.earlyValor,
-      lateTipo: tarifa.lateTipo,
-      lateValor: tarifa.lateValor,
     })
     setMostrarHabitacion(false)
   }
@@ -2827,11 +2842,6 @@ export default function Home() {
       tipo: "",
       alojamiento_id: "",
       precio: 0,
-      cochera: 0,
-      earlyTipo: "monto",
-      earlyValor: 0,
-      lateTipo: "monto",
-      lateValor: 0,
     })
   }
 
@@ -2863,12 +2873,8 @@ export default function Home() {
       habitacionesTarifas: {
         ...(config.habitacionesTarifas || {}),
         [String(habitacionEditando)]: {
+          ...(config.habitacionesTarifas?.[String(habitacionEditando)] || {}),
           precio: Number(habitacionForm.precio) || 0,
-          cochera: Number(habitacionForm.cochera) || 0,
-          earlyTipo: habitacionForm.earlyTipo,
-          earlyValor: Number(habitacionForm.earlyValor) || 0,
-          lateTipo: habitacionForm.lateTipo,
-          lateValor: Number(habitacionForm.lateValor) || 0,
         },
       },
     }
@@ -3812,78 +3818,18 @@ export default function Home() {
                             borderTop: `1px solid ${colors.border}`,
                           }}>
                             <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 10 }}>
-                              Tarifas de esta habitación
+                              Tarifa de esta habitación
                             </div>
-
-                            <div style={{
-                              display: "grid",
-                              gridTemplateColumns: "repeat(2, 1fr)",
-                              gap: 12,
-                            }}>
-                              <Field label="Precio por noche">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={habitacionForm.precio}
-                                  onChange={(e) => setHabitacionForm((v) => ({ ...v, precio: e.target.value }))}
-                                  style={inputStyle}
-                                />
-                              </Field>
-
-                              <Field label="Cochera / vehículo por noche">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={habitacionForm.cochera}
-                                  onChange={(e) => setHabitacionForm((v) => ({ ...v, cochera: e.target.value }))}
-                                  style={inputStyle}
-                                />
-                              </Field>
-
-                              <Field label="Early check-in">
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                                  <select
-                                    value={habitacionForm.earlyTipo}
-                                    onChange={(e) => setHabitacionForm((v) => ({ ...v, earlyTipo: e.target.value }))}
-                                    style={inputStyle}
-                                  >
-                                    <option value="monto">Monto fijo</option>
-                                    <option value="porcentaje">Porcentaje</option>
-                                  </select>
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    value={habitacionForm.earlyValor}
-                                    onChange={(e) => setHabitacionForm((v) => ({ ...v, earlyValor: e.target.value }))}
-                                    style={inputStyle}
-                                  />
-                                </div>
-                              </Field>
-
-                              <Field label="Late check-out">
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                                  <select
-                                    value={habitacionForm.lateTipo}
-                                    onChange={(e) => setHabitacionForm((v) => ({ ...v, lateTipo: e.target.value }))}
-                                    style={inputStyle}
-                                  >
-                                    <option value="monto">Monto fijo</option>
-                                    <option value="porcentaje">Porcentaje</option>
-                                  </select>
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    value={habitacionForm.lateValor}
-                                    onChange={(e) => setHabitacionForm((v) => ({ ...v, lateValor: e.target.value }))}
-                                    style={inputStyle}
-                                  />
-                                </div>
-                              </Field>
-                            </div>
+                            <Field label="Precio por noche">
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={habitacionForm.precio}
+                                onChange={(e) => setHabitacionForm((v) => ({ ...v, precio: e.target.value }))}
+                                style={inputStyle}
+                              />
+                            </Field>
                           </div>
 
                           <div style={{
@@ -4007,7 +3953,7 @@ export default function Home() {
   }
 
   return (
-    <div style={{
+    <div className={modoOscuro ? "hl-app hl-dark" : "hl-app"} style={{
       minHeight: "100vh",
       background: colors.bg,
       color: colors.text,
@@ -4258,13 +4204,61 @@ export default function Home() {
       )}
 
       <style jsx global>{`
+        :root {
+          --hl-navy: #0b4aa2;
+          --hl-navy-dark: #082f6b;
+          --hl-blue: #1677e8;
+          --hl-blue-soft: #e8f1ff;
+          --hl-green: #00875a;
+          --hl-green-soft: #e8f7f0;
+          --hl-yellow: #b78103;
+          --hl-yellow-soft: #fff7dc;
+          --hl-red: #c62828;
+          --hl-red-soft: #fff0f0;
+          --hl-text: #1f2937;
+          --hl-muted: #6b7280;
+          --hl-border: #e5e7eb;
+          --hl-bg: #f3f6fb;
+          --hl-white: #ffffff;
+          --hl-panel: #ffffff;
+          --hl-input: #ffffff;
+        }
+        :root[data-hl-theme="dark"], body[data-hl-theme="dark"] {
+          --hl-navy: #5fa4ff;
+          --hl-navy-dark: #d9e9ff;
+          --hl-blue: #4d9cff;
+          --hl-blue-soft: #172b45;
+          --hl-green: #39d39a;
+          --hl-green-soft: #12382d;
+          --hl-yellow: #f0b83f;
+          --hl-yellow-soft: #3b2e12;
+          --hl-red: #ff6b6b;
+          --hl-red-soft: #3b1818;
+          --hl-text: #f3f4f6;
+          --hl-muted: #a7b0bf;
+          --hl-border: #303846;
+          --hl-bg: #090d13;
+          --hl-white: #111722;
+          --hl-panel: #111722;
+          --hl-input: #0d131d;
+        }
         * { box-sizing: border-box; }
-        html { background: ${colors.bg}; }
-        body { margin: 0; background: ${colors.bg}; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+        html { background: var(--hl-bg); }
+        body { margin: 0; background: var(--hl-bg); color: var(--hl-text); -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+        .hl-app { min-height: 100vh; }
+        .hl-app, .hl-app * { color-scheme: light; }
+        .hl-dark, .hl-dark * { color-scheme: dark; }
+        .hl-dark img { border-color: #303846 !important; }
+        .hl-dark .app-header { background: rgba(17,23,34,.94) !important; }
+        .hl-dark .desktop-sidebar { background: #07111f !important; }
+        .hl-dark input, .hl-dark select, .hl-dark textarea { background: var(--hl-input) !important; color: var(--hl-text) !important; }
         button, input, select, textarea { font-family: inherit; }
         button { transition: opacity .15s, transform .15s, box-shadow .15s, background .15s; }
         button:hover { opacity: .96; transform: translateY(-1px); }
         input:focus, select:focus, textarea:focus { border-color: ${colors.blue} !important; box-shadow: 0 0 0 3px rgba(22,119,232,.10); }
+        .hl-dark [style*="background: #fff"], .hl-dark [style*="background:#fff"], .hl-dark [style*="background: rgb(255, 255, 255)"] { background: var(--hl-white) !important; }
+        .hl-dark [style*="background: #f8fafc"], .hl-dark [style*="background:#f8fafc"] { background: #0d131d !important; }
+        .hl-dark [style*="border-color: #f5c2c2"], .hl-dark [style*="border-color: #f2caca"] { border-color: #6b2a2a !important; }
         .app-header { box-shadow: 0 1px 0 rgba(15,23,42,.02), 0 8px 24px rgba(15,23,42,.025); }
         .user-chip { white-space: nowrap; }
         @media (max-width: 900px) {
