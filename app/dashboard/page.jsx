@@ -179,6 +179,15 @@ export default function Home() {
 
   const [reservaSeleccionada, setReservaSeleccionada] = useState(null)
   const [confirmarCheckoutReserva, setConfirmarCheckoutReserva] = useState(null)
+  const [recepcionSeccion, setRecepcionSeccion] = useState("panel")
+  const [cajaDiaria, setCajaDiaria] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("hl_caja_diaria") || "null") || { abierta:false, apertura:null, movimientos:[], cierres:[] } }
+    catch { return { abierta:false, apertura:null, movimientos:[], cierres:[] } }
+  })
+  const [cajaMontoInicial, setCajaMontoInicial] = useState("")
+  const [cajaMovimiento, setCajaMovimiento] = useState({ tipo:"ingreso", medio:"efectivo", concepto:"", monto:"", referencia:"" })
+  const [cajaEfectivoContado, setCajaEfectivoContado] = useState("")
+  const [cajaModal, setCajaModal] = useState(null)
   const [modoEdicion, setModoEdicion] = useState(false)
   const [mensaje, setMensaje] = useState("")
   const [cargando, setCargando] = useState(false)
@@ -1172,8 +1181,83 @@ export default function Home() {
     imprimirHTML(`Housekeeping ${formatearFecha(fecha)}`, `<h1>${config.nombreMarca || "Habitación Llena"}</h1><h2>Housekeeping · ${formatearFecha(fecha)}</h2><h3>OUT del día (${outs.length})</h3><table><tr><th>Habitación</th><th>Huésped</th><th>Nº reserva</th><th>Pasajeros</th><th>Late check-out</th><th>Notas</th></tr>${outs.map(r=>`<tr><td>${nombreHabitacion(r.habitacion_id)}</td><td>${r.nombre_huesped||""}</td><td>${r.numero_reserva||"—"}</td><td>${r.cantidad_huespedes||1}</td><td>${r.late_checkout?"Sí":"No"}</td><td>${r.notas||""}</td></tr>`).join("")}</table><h3>IN del día (${ins.length})</h3><table><tr><th>Habitación</th><th>Huésped</th><th>Nº reserva</th><th>Pasajeros</th><th>Early check-in</th></tr>${ins.map(r=>`<tr><td>${nombreHabitacion(r.habitacion_id)}</td><td>${r.nombre_huesped||""}</td><td>${r.numero_reserva||"—"}</td><td>${r.cantidad_huespedes||1}</td><td>${r.early_checkin?"Sí":"No"}</td></tr>`).join("")}</table>`)
   }
 
+  function nochesEntre(fechaInicio, fechaFin) {
+    if (!fechaInicio || !fechaFin) return 0
+    return Math.max(0, Math.round((new Date(`${fechaFin}T12:00:00`) - new Date(`${fechaInicio}T12:00:00`)) / 86400000))
+  }
+
+  function calcularPresupuestoInicial() {
+    const habitacion = habitacionesDisponibles.find(h => String(h.id) === String(habitacionSeleccionada))
+    const noches = nochesEntre(fechaEntrada, fechaSalida)
+    const precio = Number(habitacion?.precio_noche ?? habitacion?.tarifa ?? habitacion?.precio ?? habitacion?.valor_noche ?? 0)
+    if (!habitacion || noches <= 0 || precio <= 0) return null
+    return { habitacion, noches, precio, total: precio * noches }
+  }
+
+  function guardarCajaLocal(caja) {
+    setCajaDiaria(caja)
+    try { localStorage.setItem("hl_caja_diaria", JSON.stringify(caja)) } catch {}
+  }
+
+  function abrirCajaDiaria() {
+    const monto = Number(cajaMontoInicial)
+    if (!Number.isFinite(monto) || monto < 0) return alert("Ingresá un efectivo inicial válido.")
+    guardarCajaLocal({
+      ...cajaDiaria, abierta:true,
+      apertura:{ id: String(Date.now()), fecha:new Date().toISOString(), usuario:user?.email || user?.id || "usuario", montoInicial:monto },
+      movimientos:[]
+    })
+    setCajaMontoInicial("")
+    setCajaModal(null)
+  }
+
+  function totalesCaja() {
+    const movimientos = cajaDiaria.movimientos || []
+    const ingresos = movimientos.filter(m => m.tipo === "ingreso").reduce((s,m) => s + Number(m.monto || 0), 0)
+    const egresos = movimientos.filter(m => m.tipo === "egreso").reduce((s,m) => s + Number(m.monto || 0), 0)
+    const inicial = Number(cajaDiaria.apertura?.montoInicial || 0)
+    return { inicial, ingresos, egresos, esperado: inicial + ingresos - egresos }
+  }
+
+  function agregarMovimientoCaja(e) {
+    e?.preventDefault?.()
+    const monto = Number(cajaMovimiento.monto)
+    if (!cajaDiaria.abierta) return alert("Primero tenés que abrir la caja.")
+    if (!Number.isFinite(monto) || monto <= 0) return alert("Ingresá un importe válido.")
+    if (!cajaMovimiento.concepto.trim()) return alert("Ingresá un concepto.")
+    const movimiento = { id:String(Date.now()), fecha:new Date().toISOString(), usuario:user?.email || user?.id || "usuario", ...cajaMovimiento, monto }
+    guardarCajaLocal({ ...cajaDiaria, movimientos:[movimiento, ...(cajaDiaria.movimientos || [])] })
+    setCajaMovimiento({ tipo:"ingreso", medio:"efectivo", concepto:"", monto:"", referencia:"" })
+  }
+
+  function cerrarCajaDiaria() {
+    const contado = Number(cajaEfectivoContado)
+    if (!cajaDiaria.abierta) return
+    if (!Number.isFinite(contado) || contado < 0) return alert("Ingresá el efectivo contado.")
+    const t = totalesCaja()
+    const cierre = { id:String(Date.now()), fechaApertura:cajaDiaria.apertura?.fecha, fechaCierre:new Date().toISOString(), usuarioApertura:cajaDiaria.apertura?.usuario, usuarioCierre:user?.email || user?.id || "usuario", ...t, contado, diferencia:contado-t.esperado, movimientos:cajaDiaria.movimientos || [] }
+    guardarCajaLocal({ abierta:false, apertura:null, movimientos:[], cierres:[cierre, ...(cajaDiaria.cierres || [])] })
+    setCajaEfectivoContado(""); setCajaModal(null)
+  }
+
+  function imprimirCierreCaja(cierre) {
+    const filas = (cierre.movimientos || []).map(m => `<tr><td>${new Date(m.fecha).toLocaleString("es-AR")}</td><td>${m.concepto}</td><td>${m.medio}</td><td>${m.tipo}</td><td>$${Number(m.monto).toLocaleString("es-AR")}</td><td>${m.usuario}</td></tr>`).join("")
+    const win = window.open("", "_blank", "width=900,height=700")
+    if (!win) return
+    win.document.write(`<html><head><title>Cierre de caja</title><style>body{font-family:Arial;padding:28px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:7px;font-size:12px}</style></head><body><h1>Habitación Llena · Caja diaria</h1><p>Cierre: ${new Date(cierre.fechaCierre).toLocaleString("es-AR")}</p><p>Inicial: $${cierre.inicial.toLocaleString("es-AR")} · Ingresos: $${cierre.ingresos.toLocaleString("es-AR")} · Egresos: $${cierre.egresos.toLocaleString("es-AR")} · Esperado: $${cierre.esperado.toLocaleString("es-AR")} · Contado: $${cierre.contado.toLocaleString("es-AR")} · Diferencia: $${cierre.diferencia.toLocaleString("es-AR")}</p><table><thead><tr><th>Fecha</th><th>Concepto</th><th>Medio</th><th>Tipo</th><th>Monto</th><th>Usuario</th></tr></thead><tbody>${filas}</tbody></table><script>window.print()</script></body></html>`)
+    win.document.close()
+  }
+
   async function guardarReserva(e) {
     e.preventDefault()
+    if (!alojamientoSeleccionado || !habitacionSeleccionada || !fechaEntrada || !fechaSalida) {
+      alert("Completá alojamiento, habitación, fecha de entrada y fecha de salida para continuar.")
+      return
+    }
+    if (fechaSalida <= fechaEntrada) {
+      alert("La fecha de salida debe ser posterior a la fecha de entrada.")
+      return
+    }
     setMensaje("")
 
     if (!alojamientoSeleccionado || !habitacionSeleccionada || !nombre.trim()) {
@@ -2279,10 +2363,10 @@ export default function Home() {
       "huespedes", "comunicaciones", "asistente", "asistencia", "bandeja",
     ],
     housekeeping: [
-      "dashboard", "calendario", "housekeeping", "asistencia",
+      "dashboard", "reservas", "recepcion", "calendario", "housekeeping", "asistencia",
     ],
     admin: [
-      "dashboard", "reservas", "calendario", "huespedes",
+      "dashboard", "reservas", "recepcion", "calendario", "huespedes",
       "caja", "ventas", "comunicaciones", "asistente", "asistencia", "bandeja",
     ],
   }
@@ -2383,6 +2467,7 @@ export default function Home() {
         <div style={{ fontSize: 10, opacity: .5, padding: "0 10px 7px" }}>GESTIÓN</div>
         {navButton("dashboard", "▦", "Inicio")}
         {navButton("reservas", "▣", "Reservas")}
+        {navButton("recepcion", "▣", "Recepción")}
         {navButton("calendario", "▤", "Calendario")}
 
         {grupoOperacion.some(([id]) => puedeVer(id)) && <>
@@ -3698,6 +3783,173 @@ export default function Home() {
     )
   }
 
+  function Recepcion() {
+    const q = calcularPresupuestoInicial()
+    return (
+      <>
+        <Header titulo="Recepción" subtitulo="Operación diaria del alojamiento" />
+        <div style={{ padding: 30 }}>
+          <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:16 }}>
+            {[
+              ["panel","🏠 Panel"],
+              ["presupuesto","🧮 Presupuestar"],
+              ["caja","💵 Caja diaria"],
+            ].map(([key,label]) => (
+              <button key={key} onClick={() => setRecepcionSeccion(key)} style={recepcionSeccion===key ? primaryButton : secondaryButton}>{label}</button>
+            ))}
+          </div>
+
+          {recepcionSeccion === "panel" && (
+            <section style={cardStyle}>
+              <h2 style={{marginTop:0}}>Recepción</h2>
+              <p style={{color:colors.muted}}>Accesos rápidos para la operación diaria.</p>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:12}}>
+                <button onClick={() => setVista("reservas")} style={secondaryButton}>➕ Cargar reserva</button>
+                <button onClick={() => setRecepcionSeccion("presupuesto")} style={secondaryButton}>🧮 Presupuestar</button>
+                <button onClick={() => setRecepcionSeccion("caja")} style={secondaryButton}>💵 Caja diaria</button>
+              </div>
+            </section>
+          )}
+
+          {recepcionSeccion === "presupuesto" && (
+            <section style={cardStyle}>
+              <h2 style={{marginTop:0}}>Presupuesto rápido</h2>
+              <p style={{color:colors.muted}}>Completá los cuatro datos para calcular cuánto costaría la estadía.</p>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:10}}>
+                <select required value={alojamientoSeleccionado} onChange={e=>{setAlojamientoSeleccionado(e.target.value);setHabitacionSeleccionada("")}} style={inputStyle}><option value="">Alojamiento</option>{alojamientos.map(a=><option key={a.id} value={a.id}>{a.nombre}</option>)}</select>
+                <select required value={habitacionSeleccionada} onChange={e=>setHabitacionSeleccionada(e.target.value)} style={inputStyle}><option value="">Habitación</option>{habitacionesDisponibles.map(h=><option key={h.id} value={h.id}>{h.nombre}{h.tipo?` · ${h.tipo}`:""}</option>)}</select>
+                <input required type="date" value={fechaEntrada} onChange={e=>setFechaEntrada(e.target.value)} style={inputStyle}/>
+                <input required type="date" value={fechaSalida} onChange={e=>setFechaSalida(e.target.value)} style={inputStyle}/>
+              </div>
+              {q ? (
+                <div style={{marginTop:16,padding:"15px 18px",borderRadius:12,border:`1px solid ${colors.blue}`,background:colors.blueSoft,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div><div style={{fontSize:11,fontWeight:900,color:colors.blue}}>PRESUPUESTO DE ESTADÍA</div><div style={{fontSize:13,fontWeight:700,marginTop:4}}>{q.habitacion.nombre} · {q.noches} {q.noches===1?"noche":"noches"}</div><div style={{fontSize:11,color:colors.muted}}>${q.precio.toLocaleString("es-AR")} por noche</div></div>
+                  <div style={{textAlign:"right"}}><div style={{fontSize:11,color:colors.muted}}>Total estimado</div><div style={{fontSize:27,fontWeight:900,color:colors.blue}}>${q.total.toLocaleString("es-AR")}</div></div>
+                </div>
+              ) : <div style={{marginTop:12,fontSize:12,color:colors.muted}}>Completá alojamiento, habitación, entrada y salida.</div>}
+            </section>
+          )}
+
+          {recepcionSeccion === "caja" && (
+            <section style={cardStyle}>
+              <div style={sectionHeader}>
+                <div><h2 style={{margin:0}}>💵 Caja diaria</h2><div style={{fontSize:12,color:colors.muted,marginTop:4}}>Apertura, movimientos y cierre de turno.</div></div>
+                {cajaDiaria.abierta ? <button onClick={()=>setCajaModal("cerrar")} style={{...primaryButton,background:colors.red}}>🔒 Cerrar turno</button> : <button onClick={()=>setCajaModal("abrir")} style={primaryButton}>Abrir caja</button>}
+              </div>
+              {cajaDiaria.abierta && <>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginTop:16}}>
+                  {Object.entries(totalesCaja()).map(([k,v])=><div key={k} style={{border:`1px solid ${colors.border}`,borderRadius:10,padding:13}}><div style={{fontSize:11,color:colors.muted}}>{({inicial:"Inicial",ingresos:"Ingresos",egresos:"Egresos",esperado:"Esperado"})[k]}</div><strong style={{fontSize:20}}>${Number(v).toLocaleString("es-AR")}</strong></div>)}
+                </div>
+                <form onSubmit={agregarMovimientoCaja} style={{display:"grid",gridTemplateColumns:"130px 150px 1fr 140px 140px auto",gap:8,marginTop:16}}>
+                  <select value={cajaMovimiento.tipo} onChange={e=>setCajaMovimiento({...cajaMovimiento,tipo:e.target.value})} style={inputStyle}><option value="ingreso">Ingreso</option><option value="egreso">Egreso</option></select>
+                  <select value={cajaMovimiento.medio} onChange={e=>setCajaMovimiento({...cajaMovimiento,medio:e.target.value})} style={inputStyle}><option value="efectivo">Efectivo</option><option value="tarjeta">Tarjeta</option><option value="transferencia">Transferencia</option><option value="mercadopago">Mercado Pago</option><option value="otro">Otro</option></select>
+                  <input value={cajaMovimiento.concepto} onChange={e=>setCajaMovimiento({...cajaMovimiento,concepto:e.target.value})} placeholder="Concepto" style={inputStyle}/>
+                  <input type="number" min="0" step="0.01" value={cajaMovimiento.monto} onChange={e=>setCajaMovimiento({...cajaMovimiento,monto:e.target.value})} placeholder="Monto" style={inputStyle}/>
+                  <input value={cajaMovimiento.referencia} onChange={e=>setCajaMovimiento({...cajaMovimiento,referencia:e.target.value})} placeholder="Referencia" style={inputStyle}/>
+                  <button style={primaryButton}>Agregar</button>
+                </form>
+                <div style={{marginTop:18,overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}><thead><tr>{["Hora","Concepto","Medio","Tipo","Monto","Usuario"].map(h=><th key={h} style={{textAlign:"left",padding:9,borderBottom:`1px solid ${colors.border}`}}>{h}</th>)}</tr></thead><tbody>{(cajaDiaria.movimientos||[]).map(m=><tr key={m.id}>{[new Date(m.fecha).toLocaleString("es-AR"),m.concepto,m.medio,m.tipo,`$${Number(m.monto).toLocaleString("es-AR")}`,m.usuario].map((v,i)=><td key={i} style={{padding:9,borderBottom:`1px solid ${colors.border}`}}>{v}</td>)}</tr>)}</tbody></table></div>
+              </>}
+              <div style={{marginTop:22}}><h3>Historial de cierres</h3>{(cajaDiaria.cierres||[]).map(c=><div key={c.id} style={{border:`1px solid ${colors.border}`,borderRadius:10,padding:12,marginTop:8,display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><strong>{new Date(c.fechaCierre).toLocaleString("es-AR")}</strong><div style={{fontSize:11,color:colors.muted}}>Esperado ${Number(c.esperado).toLocaleString("es-AR")} · Contado ${Number(c.contado).toLocaleString("es-AR")} · Diferencia ${Number(c.diferencia).toLocaleString("es-AR")}</div></div><button onClick={()=>imprimirCierreCaja(c)} style={secondaryButton}>🖨️ Imprimir</button></div>)}</div>
+            </section>
+          )}
+
+          {cajaModal === "abrir" && <div style={modalOverlay}><div style={modalCard}><h3>Abrir caja</h3><p style={{fontSize:12,color:colors.muted}}>Efectivo inicial del turno</p><input type="number" min="0" step="0.01" value={cajaMontoInicial} onChange={e=>setCajaMontoInicial(e.target.value)} style={inputStyle}/><div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:14}}><button onClick={()=>setCajaModal(null)} style={secondaryButton}>Cancelar</button><button onClick={abrirCajaDiaria} style={primaryButton}>Abrir caja</button></div></div></div>}
+          {cajaModal === "cerrar" && <div style={modalOverlay}><div style={modalCard}><h3>🔒 Cerrar turno</h3><p style={{fontSize:12,color:colors.muted}}>Efectivo esperado: ${totalesCaja().esperado.toLocaleString("es-AR")}</p><input type="number" min="0" step="0.01" value={cajaEfectivoContado} onChange={e=>setCajaEfectivoContado(e.target.value)} placeholder="Efectivo contado" style={inputStyle}/><div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:14}}><button onClick={()=>setCajaModal(null)} style={secondaryButton}>Cancelar</button><button onClick={cerrarCajaDiaria} style={{...primaryButton,background:colors.red}}>Confirmar cierre</button></div></div></div>}
+        </div>
+      </>
+    )
+  }
+
+  function Reservas() {
+    return (
+      <>
+        <Header
+          titulo={modoEdicion ? "Editar reserva" : "Reservas"}
+          subtitulo={modoEdicion ? "Modificá los datos y guardá los cambios" : "Crear y administrar reservas"}
+        />
+
+        <div className="hl-reserva-form"><div style={{ padding: 30 }}>
+          <section style={cardStyle}>
+            <div style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 20,
+            }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: 18 }}>
+                  {modoEdicion ? "Editar reserva" : "Nueva reserva"}
+                </h2>
+                <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>
+                  Los datos se guardan directamente en el sistema.
+                </div>
+              </div>
+
+              {modoEdicion && (
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <button type="submit" form="form-reserva-principal" disabled={cargando} style={{ ...primaryButton, opacity: cargando ? .65 : 1 }}>
+                    {cargando ? "Guardando..." : "Guardar cambios"}
+                  </button>
+<button onClick={() => setVista("recepcion")} style={linkButton}>Ver todas</button>
+              </div>
+
+              <div style={{ display: "grid", gap: 10, marginTop: 18 }}>
+                {recientes.length === 0 ? (
+                  <div style={{ color: colors.muted, padding: 25, textAlign: "center" }}>
+                    Todavía no hay reservas.
+                  </div>
+                ) : recientes.map((r) => ReservaCard({ reserva: r }))}
+              </div>
+            </section>
+
+            <section style={{
+              background: colors.white,
+              border: `1px solid ${colors.border}`,
+              borderRadius: 12,
+              padding: 22,
+              height: "fit-content",
+            }}>
+              <h2 style={{ margin: 0, fontSize: 18 }}>Ocupación</h2>
+              <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>
+                Estado actual de las habitaciones
+              </div>
+
+              <div style={{ marginTop: 22 }}>
+                {habitacionesActivas.map((h) => {
+                  const ocupada = reservasHoy.some(
+                    (r) => String(r.habitacion_id) === String(h.id)
+                  )
+                  return (
+                    <div key={h.id} style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "12px 0",
+                      borderBottom: `1px solid ${colors.border}`,
+                    }}>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 13 }}>{h.nombre}</div>
+                        <div style={{ color: colors.muted, fontSize: 11 }}>{nombreAlojamiento(h.alojamiento_id)}</div>
+                      </div>
+                      <span style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: ocupada ? colors.blue : colors.green,
+                      }}>
+                        {ocupada ? "Ocupada" : "Disponible"}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
+          </div>
+        </div>
+      </>
+    )
+  }
+
   function Reservas() {
     return (
       <>
@@ -3742,8 +3994,9 @@ export default function Home() {
                 gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
                 gap: 14,
               }}>
-                <Field label="Alojamiento">
+                <Field label="Alojamiento *">
                   <select
+                    required
                     value={alojamientoSeleccionado}
                     onChange={(e) => {
                       setAlojamientoSeleccionado(e.target.value)
@@ -3758,8 +4011,9 @@ export default function Home() {
                   </select>
                 </Field>
 
-                <Field label="Habitación">
+                <Field label="Habitación *">
                   <select
+                    required
                     value={habitacionSeleccionada}
                     onChange={(e) => setHabitacionSeleccionada(e.target.value)}
                     style={inputStyle}
@@ -3774,12 +4028,12 @@ export default function Home() {
                   </select>
                 </Field>
 
-                <Field label="Fecha de entrada">
-                  <input type="date" value={fechaEntrada} onChange={(e) => setFechaEntrada(e.target.value)} style={inputStyle} />
+                <Field label="Fecha de entrada *">
+                  <input required type="date" value={fechaEntrada} onChange={(e) => setFechaEntrada(e.target.value)} style={inputStyle} />
                 </Field>
 
-                <Field label="Fecha de salida">
-                  <input type="date" value={fechaSalida} onChange={(e) => setFechaSalida(e.target.value)} style={inputStyle} />
+                <Field label="Fecha de salida *">
+                  <input required type="date" value={fechaSalida} onChange={(e) => setFechaSalida(e.target.value)} style={inputStyle} />
                 </Field>
 
                 <Field label="Nombre del huésped principal">
@@ -4630,6 +4884,7 @@ export default function Home() {
       <main style={{ marginLeft: 220, minHeight: "100vh" }}>
         {vista === "dashboard" && Dashboard()}
         {vista === "reservas" && Reservas()}
+        {vista === "recepcion" && Recepcion()}
         {vista === "calendario" && CalendarioVista()}
         {vista === "housekeeping" && Housekeeping()}
         {vista === "bloqueos" && Bloqueos()}
