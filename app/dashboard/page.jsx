@@ -317,10 +317,10 @@ export default function Home() {
     if (bloqueosError) console.warn("No se pudieron cargar los bloqueos. Ejecutá la migración PMS.", bloqueosError)
     if (pagosError) console.warn("No se pudieron cargar los pagos. Ejecutá la migración PMS.", pagosError)
 
-    // Compatibilidad entre el PMS legacy y el modelo nuevo (properties/units/reservations).
-    // Antes el dashboard usaba el modelo nuevo solo como "fallback" cuando no había
-    // datos legacy. Eso hacía que, si existía хотя sea una reserva legacy, las reservas
-    // nuevas no aparecieran en el calendario. Acá unificamos ambos modelos.
+    // La interfaz actual todavía trabaja con las tablas antiguas
+    // alojamientos/habitaciones/reservas. Para que owner y reception
+    // puedan usar la misma interfaz, filtramos esas tablas según los
+    // alojamientos a los que el usuario tiene acceso.
     const propiedadesAccesibles = propertiesData || []
     const nombresAccesibles = new Set(
       propiedadesAccesibles
@@ -333,48 +333,33 @@ export default function Home() {
       return nombresAccesibles.has(nombre) || String(a.user_id) === String(user.id)
     })
 
-    const alojamientoPorNombre = new Map(
-      alojamientosData.map((a) => [String(a.nombre || "").trim().toLowerCase(), a])
-    )
-
-    const propertyToAlojamiento = new Map()
-    propiedadesAccesibles.forEach((p) => {
-      const nombre = String(p.name || "").trim().toLowerCase()
-      const legacy = alojamientoPorNombre.get(nombre)
-      propertyToAlojamiento.set(String(p.id), legacy ? legacy.id : p.id)
-    })
-
     const alojamientoIds = new Set(alojamientosData.map((a) => String(a.id)))
 
-    let alojamientosFinal = [...alojamientosData]
+    const habitacionesData = (habitacionesLegacy || []).filter((h) =>
+      alojamientoIds.has(String(h.alojamiento_id))
+    )
+
+    const reservasData = (reservasLegacy || []).filter((r) =>
+      alojamientoIds.has(String(r.alojamiento_id))
+    )
+
+    // Si todavía no existe la fila legacy correspondiente, usamos
+    // properties/units/reservations como respaldo para que el acceso
+    // nuevo siga funcionando.
+    let alojamientosFinal = alojamientosData
+    let habitacionesFinal = habitacionesData
+    let reservasFinal = reservasData
+
     if (!alojamientosFinal.length && propiedadesAccesibles.length) {
       alojamientosFinal = propiedadesAccesibles.map((p) => ({
         id: p.id,
         nombre: p.name,
         user_id: p.owner_id,
       }))
-    } else {
-      // Si existe una property nueva que todavía no tiene fila legacy equivalente,
-      // la agregamos para que sus unidades/reservas también tengan nombre visible.
-      propiedadesAccesibles.forEach((p) => {
-        const existe = alojamientosFinal.some((a) => String(a.id) === String(p.id)) ||
-          alojamientosFinal.some((a) => String(a.nombre || "").trim().toLowerCase() === String(p.name || "").trim().toLowerCase())
-        if (!existe) {
-          alojamientosFinal.push({ id: p.id, nombre: p.name, user_id: p.owner_id })
-        }
-      })
     }
 
-    const habitacionesData = (habitacionesLegacy || []).filter((h) =>
-      alojamientoIds.has(String(h.alojamiento_id))
-    )
-
-    // Cargamos SIEMPRE units cuando hay properties accesibles. Si una unit nueva
-    // representa una habitación legacy con el mismo nombre dentro del mismo alojamiento,
-    // la vinculamos al id legacy para que las reservas de ambos modelos caigan en la misma fila.
-    let unitsData = []
-    if (propertyIds.length) {
-      const { data, error: unitsError } = await supabase
+    if (!habitacionesFinal.length && propertyIds.length) {
+      const { data: unitsData, error: unitsError } = await supabase
         .from("units")
         .select("*")
         .in("property_id", propertyIds)
@@ -383,57 +368,53 @@ export default function Home() {
       if (unitsError) {
         console.error("No se pudieron cargar las unidades:", unitsError)
       } else {
-        unitsData = data || []
-      }
-    }
-
-    const habitacionesFinal = [...habitacionesData]
-    const unitToHabitacion = new Map()
-
-    unitsData.forEach((u) => {
-      const alojamientoId = propertyToAlojamiento.get(String(u.property_id)) || u.property_id
-      const nombreUnidad = String(u.name || "").trim().toLowerCase()
-      const legacy = habitacionesData.find((h) =>
-        String(h.alojamiento_id) === String(alojamientoId) &&
-        String(h.nombre || "").trim().toLowerCase() === nombreUnidad
-      )
-
-      if (legacy) {
-        unitToHabitacion.set(String(u.id), legacy.id)
-        return
-      }
-
-      const yaAgregada = habitacionesFinal.some((h) =>
-        String(h.id) === String(u.id) ||
-        (String(h.alojamiento_id) === String(alojamientoId) && String(h.nombre || "").trim().toLowerCase() === nombreUnidad)
-      )
-
-      if (!yaAgregada) {
-        habitacionesFinal.push({
+        habitacionesFinal = (unitsData || []).map((u) => ({
           id: u.id,
           nombre: u.name,
-          tipo: u.type || "",
+          tipo: "",
           capacidad: u.capacity,
           precio: u.price,
           activa: u.active !== false,
-          alojamiento_id: alojamientoId,
+          alojamiento_id: u.property_id,
           user_id: user.id,
           estado: "libre",
-        })
+        }))
       }
-    })
+    }
 
-    const habitacionesIdsAccesibles = new Set(habitacionesFinal.map((h) => String(h.id)))
-
-    // Reservas legacy.
-    const reservasLegacyNormalizadas = (reservasData || []).map((r) => ({
-      ...r,
-      origen_reserva: "legacy",
-    }))
-
-    // Reservas nuevas. Las cargamos aunque existan reservas legacy.
-    let reservasNuevasNormalizadas = []
+    // El modelo nuevo (reservations/units) puede convivir con el modelo legacy.
+    // IMPORTANTE: no reemplazamos los datos legacy cuando existen; solamente
+    // incorporamos las reservas nuevas que todavía no están representadas.
     if (propertyIds.length) {
+      const { data: unitsCompat, error: unitsCompatError } = await supabase
+        .from("units")
+        .select("id, property_id, name")
+        .in("property_id", propertyIds)
+
+      if (unitsCompatError) {
+        console.warn("No se pudieron consultar units para sincronizar el calendario:", unitsCompatError)
+      }
+
+      const alojamientoPorNombre = new Map(
+        alojamientosData.map((a) => [String(a.nombre || "").trim().toLowerCase(), a])
+      )
+      const propertyToLegacy = new Map()
+      ;(propiedadesAccesibles || []).forEach((p) => {
+        const legacy = alojamientoPorNombre.get(String(p.name || "").trim().toLowerCase())
+        propertyToLegacy.set(String(p.id), legacy?.id || p.id)
+      })
+
+      const unitToLegacy = new Map()
+      ;(unitsCompat || []).forEach((u) => {
+        const alojamientoId = propertyToLegacy.get(String(u.property_id)) || u.property_id
+        const nombreUnit = String(u.name || "").trim().toLowerCase()
+        const legacy = habitacionesData.find((h) =>
+          String(h.alojamiento_id) === String(alojamientoId) &&
+          String(h.nombre || "").trim().toLowerCase() === nombreUnit
+        )
+        if (legacy) unitToLegacy.set(String(u.id), legacy.id)
+      })
+
       const { data: reservationsData, error: reservationsError } = await supabase
         .from("reservations")
         .select("*")
@@ -441,12 +422,12 @@ export default function Home() {
         .order("created_at", { ascending: false })
 
       if (reservationsError) {
-        console.error("No se pudieron cargar las reservas nuevas:", reservationsError)
+        console.warn("No se pudieron cargar las reservas nuevas para el calendario:", reservationsError)
       } else {
-        reservasNuevasNormalizadas = (reservationsData || []).map((r) => ({
+        const nuevas = (reservationsData || []).map((r) => ({
           id: r.id,
-          alojamiento_id: propertyToAlojamiento.get(String(r.property_id)) || r.property_id,
-          habitacion_id: unitToHabitacion.get(String(r.unit_id)) || r.unit_id,
+          alojamiento_id: propertyToLegacy.get(String(r.property_id)) || r.property_id,
+          habitacion_id: unitToLegacy.get(String(r.unit_id)) || r.unit_id,
           nombre_huesped: r.guest_name,
           dni_huesped: r.guest_document || "",
           email_huesped: r.guest_email,
@@ -464,38 +445,32 @@ export default function Home() {
           no_show: false,
           origen_reserva: "reservations",
           reservation_source_id: r.id,
-        }))
+        })).filter((r) => r.habitacion_id)
+
+        const clavesExistentes = new Set(
+          reservasFinal.map((r) => [
+            String(r.nombre_huesped || "").trim().toLowerCase(),
+            String(r.fecha_entrada || ""),
+            String(r.fecha_salida || ""),
+            String(r.habitacion_id || ""),
+          ].join("|"))
+        )
+
+        const nuevasSinDuplicar = nuevas.filter((r) => {
+          const clave = [
+            String(r.nombre_huesped || "").trim().toLowerCase(),
+            String(r.fecha_entrada || ""),
+            String(r.fecha_salida || ""),
+            String(r.habitacion_id || ""),
+          ].join("|")
+          if (clavesExistentes.has(clave)) return false
+          clavesExistentes.add(clave)
+          return true
+        })
+
+        reservasFinal = [...reservasFinal, ...nuevasSinDuplicar]
       }
     }
-
-    // Evitamos duplicar una misma reserva si existe en ambos modelos. La prioridad
-    // visual es legacy cuando coinciden número + huésped + fechas + habitación.
-    const clavesLegacy = new Set(
-      reservasLegacyNormalizadas.map((r) => [
-        String(r.numero_reserva || "").trim().toLowerCase(),
-        String(r.nombre_huesped || "").trim().toLowerCase(),
-        String(r.fecha_entrada || ""),
-        String(r.fecha_salida || ""),
-        String(r.habitacion_id || ""),
-      ].join("|"))
-    )
-
-    const reservasFinal = [
-      ...reservasLegacyNormalizadas,
-      ...reservasNuevasNormalizadas.filter((r) => {
-        const clave = [
-          String(r.numero_reserva || "").trim().toLowerCase(),
-          String(r.nombre_huesped || "").trim().toLowerCase(),
-          String(r.fecha_entrada || ""),
-          String(r.fecha_salida || ""),
-          String(r.habitacion_id || ""),
-        ].join("|")
-        return !clavesLegacy.has(clave)
-      }),
-    ].filter((r) => {
-      if (!r.habitacion_id) return false
-      return habitacionesIdsAccesibles.has(String(r.habitacion_id))
-    })
 
     setAlojamientos(alojamientosFinal)
     setHabitaciones(habitacionesFinal)
@@ -1738,19 +1713,11 @@ export default function Home() {
           : r
       )))
 
-      const esReservaNueva = reserva.origen_reserva === "reservations"
-      const resultado = esReservaNueva
-        ? await supabase.from("reservations").update({
-            unit_id: nuevaHabitacionId,
-            check_in: nuevaEntrada,
-            check_out: nuevaSalida,
-          }).eq("id", reserva.reservation_source_id || reserva.id)
-        : await supabase.from("reservas").update({
-            habitacion_id: nuevaHabitacionId,
-            fecha_entrada: nuevaEntrada,
-            fecha_salida: nuevaSalida,
-          }).eq("id", reserva.id)
-      const error = resultado.error
+      const { error } = await supabase.from("reservas").update({
+        habitacion_id: nuevaHabitacionId,
+        fecha_entrada: nuevaEntrada,
+        fecha_salida: nuevaSalida,
+      }).eq("id", reserva.id)
 
       if (error) {
         console.error(error)
