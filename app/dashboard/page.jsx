@@ -167,6 +167,8 @@ export default function Home() {
   const [garantiaTipo, setGarantiaTipo] = useState("")
   const [garantiaMarca, setGarantiaMarca] = useState("")
   const [garantiaUltimos4, setGarantiaUltimos4] = useState("")
+  const [garantiaNumeroTarjeta, setGarantiaNumeroTarjeta] = useState("")
+  const [garantiaCCV, setGarantiaCCV] = useState("")
   const [garantiaVencimiento, setGarantiaVencimiento] = useState("")
   const [garantiaReferencia, setGarantiaReferencia] = useState("")
 
@@ -188,6 +190,11 @@ export default function Home() {
   const [bloqueoMotivo, setBloqueoMotivo] = useState("Mantenimiento")
   const [bloqueoDetalle, setBloqueoDetalle] = useState("")
   const [checklistHousekeeping, setChecklistHousekeeping] = useState({})
+  const [filtroTipoCalendario, setFiltroTipoCalendario] = useState("General")
+  const [mostrarAumentoPrecios, setMostrarAumentoPrecios] = useState(false)
+  const [porcentajeAumento, setPorcentajeAumento] = useState("")
+  const [menuOperativoAbierto, setMenuOperativoAbierto] = useState(false)
+  const [menuAdministracionAbierto, setMenuAdministracionAbierto] = useState(false)
 
   const [mostrarAlojamiento, setMostrarAlojamiento] = useState(false)
   const [nuevoAlojamiento, setNuevoAlojamiento] = useState("")
@@ -509,6 +516,7 @@ export default function Home() {
       alert("No se pudo actualizar el estado. Verificá la migración PMS.")
       return
     }
+    setHabitaciones((actuales) => actuales.map((h) => String(h.id) === String(habitacionId) ? { ...h, estado } : h))
     await cargarDatos()
   }
 
@@ -668,6 +676,8 @@ export default function Home() {
     setGarantiaTipo("")
     setGarantiaMarca("")
     setGarantiaUltimos4("")
+    setGarantiaNumeroTarjeta("")
+    setGarantiaCCV("")
     setGarantiaVencimiento("")
     setGarantiaReferencia("")
     setReservaSeleccionada(null)
@@ -675,7 +685,8 @@ export default function Home() {
   }
 
   function editarReserva(reserva) {
-    setReservaSeleccionada(reserva)
+    // Cerramos el panel lateral inmediatamente al pasar a edición.
+    setReservaSeleccionada(null)
     setModoEdicion(true)
     setAlojamientoSeleccionado(String(reserva.alojamiento_id))
     setHabitacionSeleccionada(String(reserva.habitacion_id))
@@ -720,6 +731,8 @@ export default function Home() {
     setGarantiaTipo(reserva.garantia_tipo || "")
     setGarantiaMarca(reserva.garantia_marca || "")
     setGarantiaUltimos4(reserva.garantia_ultimos4 || "")
+    setGarantiaNumeroTarjeta("")
+    setGarantiaCCV("")
     setGarantiaVencimiento(reserva.garantia_vencimiento || "")
     setGarantiaReferencia(reserva.garantia_referencia || "")
     setDocumentoArchivo(null)
@@ -991,6 +1004,47 @@ export default function Home() {
     setTimeout(() => ventana.print(), 250)
   }
 
+  async function realizarCheckIn(reserva) {
+    if (!reserva?.id || reserva.estado === "cancelada" || reserva.no_show) return
+    const { data, error } = await supabase
+      .from("reservas")
+      .update({ estado: "alojado" })
+      .eq("id", reserva.id)
+      .eq("user_id", user.id)
+      .select("*")
+      .single()
+    if (error) {
+      console.error(error)
+      alert("No se pudo realizar el check-in.")
+      return
+    }
+    setReservas((actuales) => actuales.map((r) => String(r.id) === String(reserva.id) ? data : r))
+    setReservaSeleccionada(data)
+  }
+
+  async function realizarCheckOut(reserva) {
+    if (!reserva?.id || reserva.estado === "cancelada" || reserva.no_show) return
+    const saldo = saldoReserva(reserva)
+    if (saldo > 0.01) {
+      alert(`No se puede realizar el check-out. La cuenta tiene un saldo pendiente de ${reserva.moneda === "USD" ? "US$ " : "$"}${saldo.toLocaleString("es-AR", { minimumFractionDigits: reserva.moneda === "USD" ? 2 : 0 })}. Registrá el pago pendiente antes de continuar.`)
+      return
+    }
+    const { data, error } = await supabase
+      .from("reservas")
+      .update({ estado: "finalizada" })
+      .eq("id", reserva.id)
+      .eq("user_id", user.id)
+      .select("*")
+      .single()
+    if (error) {
+      console.error(error)
+      alert("No se pudo realizar el check-out.")
+      return
+    }
+    setReservas((actuales) => actuales.map((r) => String(r.id) === String(reserva.id) ? data : r))
+    setReservaSeleccionada(data)
+  }
+
   function imprimirReserva(reserva) {
     const pasajeros = obtenerListaPasajeros(reserva)
     imprimirHTML(`Reserva ${reserva.numero_reserva || ""}`, `
@@ -1045,7 +1099,7 @@ export default function Home() {
       .select("*")
       .eq("habitacion_id", habitacionSeleccionada)
       .neq("estado", "cancelada")
-      .neq("id", reservaSeleccionada?.id || 0)
+      .neq("id", reservaSeleccionada?.id ?? -1)
 
     if (errorBusqueda) {
       console.error(errorBusqueda)
@@ -1099,9 +1153,9 @@ export default function Home() {
       descuento_valor: Number(descuentoValor) || 0,
       garantia_tipo: garantiaTipo || null,
       garantia_marca: garantiaMarca || null,
-      garantia_ultimos4: garantiaUltimos4 || null,
+      garantia_ultimos4: (garantiaNumeroTarjeta ? garantiaNumeroTarjeta.slice(-4) : garantiaUltimos4) || null,
       garantia_vencimiento: garantiaVencimiento || null,
-      garantia_referencia: garantiaReferencia || null,
+      garantia_referencia: garantiaTipo === "Tarjeta" ? null : (garantiaReferencia || null),
     }
 
     let error
@@ -1289,6 +1343,7 @@ export default function Home() {
   function estadoBadge(estadoActual) {
     const map = {
       confirmada: { bg: colors.greenSoft, color: colors.green, label: "Confirmada" },
+      alojado: { bg: colors.greenSoft, color: colors.green, label: "Alojado" },
       finalizada: { bg: "#eef2f7", color: "#475569", label: "Finalizada" },
       pendiente: { bg: colors.yellowSoft, color: colors.yellow, label: "Pendiente" },
       cancelada: { bg: colors.redSoft, color: colors.red, label: "Cancelada" },
@@ -1500,6 +1555,7 @@ export default function Home() {
     const anchoHabitaciones = 220
     const gridTemplate = `${anchoHabitaciones}px repeat(${diasVista}, ${anchoDia}px)`
     const totalNoches = reservasActivas.reduce((s, r) => s + diasEntre(r.fecha_entrada, r.fecha_salida), 0)
+    const habitacionesCalendario = habitacionesActivas.filter((h) => filtroTipoCalendario === "General" || String(h.tipo || "").toLowerCase() === String(filtroTipoCalendario || "").toLowerCase())
 
     return (
       <div style={{ display: "grid", gap: 16 }}>
@@ -1512,6 +1568,7 @@ export default function Home() {
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <h2 style={{ margin: 0, fontSize: 20, letterSpacing: -.3 }}>Plano de ocupación</h2>
+
               {guardandoMovimiento && (
                 <span style={{
                   background: colors.blueSoft,
@@ -1646,8 +1703,16 @@ export default function Home() {
                 background: "#f8fafc",
                 borderRight: `1px solid ${colors.border}`,
               }}>
-                <div style={{ fontSize: 11, fontWeight: 850 }}>HABITACIONES</div>
-                <div style={{ color: colors.muted, fontSize: 10, marginTop: 3 }}>Disponibilidad en tiempo real</div>
+                <select
+                  value={filtroTipoCalendario}
+                  onChange={(e) => setFiltroTipoCalendario(e.target.value)}
+                  style={{ ...inputStyle, width: "100%", padding: "7px 9px", fontSize: 12, fontWeight: 850 }}
+                  aria-label="Filtrar habitaciones por tipo"
+                >
+                  <option value="General">Habitaciones · General</option>
+                  {tiposHabitacionDisponibles.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}
+                </select>
+                <div style={{ color: colors.muted, fontSize: 10, marginTop: 4 }}>Disponibilidad en tiempo real</div>
               </div>
 
               {calendarioDias.map((fecha) => {
@@ -1690,7 +1755,7 @@ export default function Home() {
               })}
             </div>
 
-            {habitacionesActivas.map((habitacion) => {
+            {habitacionesCalendario.map((habitacion) => {
               const reservasHabitacion = reservasActivas.filter((r) =>
                 String(r.habitacion_id) === String(habitacion.id) &&
                 r.fecha_salida > calendarioDias[0] &&
@@ -2103,91 +2168,103 @@ export default function Home() {
   }, [rolActivo, vista])
 
   function Sidebar() {
-    const items = [
-      ["dashboard", "▦", "Inicio"],
-      ["reservas", "▣", "Reservas"],
-      ["calendario", "▤", "Calendario"],
+    const navButton = (id, icon, label) => {
+      if (!puedeVer(id)) return null
+      return (
+        <button
+          key={id}
+          onClick={() => { setVista(id); setMenuAbierto(false) }}
+          style={{
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            border: "none",
+            background: vista === id ? "rgba(255,255,255,.14)" : "transparent",
+            boxShadow: vista === id ? "inset 3px 0 0 #fff" : "none",
+            color: "#fff",
+            padding: "10px 12px",
+            borderRadius: 9,
+            marginBottom: 3,
+            cursor: "pointer",
+            textAlign: "left",
+            fontSize: 14,
+            fontWeight: vista === id ? 700 : 500,
+          }}
+        >
+          <span style={{ width: 20, textAlign: "center", opacity: .9 }}>{icon}</span>
+          {label}
+        </button>
+      )
+    }
+
+    const grupoOperacion = [
       ["housekeeping", "🧹", "Housekeeping"],
       ["bloqueos", "🚫", "Bloqueos"],
       ["huespedes", "👤", "Huéspedes"],
+    ]
+    const grupoAdministracion = [
       ["caja", "💰", "Caja y pagos"],
       ["ventas", "◫", "Ventas"],
+    ]
+    const grupoComunicacion = [
       ["comunicaciones", "✉", "Comunicaciones"],
       ["integraciones", "↔", "Integraciones"],
       ["asistente", "✦", "Asistente IA"],
     ]
 
+    const grupoActivo = (grupo) => grupo.some(([id]) => id === vista)
+
     return (
       <aside style={{
-        width: 245,
+        width: 220,
         background: `linear-gradient(180deg, ${colors.navyDark} 0%, #06275b 100%)`,
         color: "#fff",
         height: "100vh",
-  maxHeight: "100vh",
+        maxHeight: "100vh",
         position: "fixed",
         left: 0,
         top: 0,
         bottom: 0,
         zIndex: 20,
-        padding: "24px 13px",
+        padding: "20px 11px",
         boxShadow: "8px 0 28px rgba(3,32,77,.08)",
         boxSizing: "border-box",
+        overflowY: "auto",
       }}>
-        <div style={{ padding: "6px 12px 30px" }}>
-          <div style={{ fontSize: 10, letterSpacing: 2.5, opacity: .75 }}>PLATAFORMA HOTELERA</div>
-          <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 9 }}>
-            <img
-              src={config.logo || logoHabitacionLlena}
-              alt="Habitación Llena"
-              style={{ width: 38, height: 38, objectFit: "contain", borderRadius: 8, background: "#fff" }}
-            />
-            <div style={{ fontSize: 21, fontWeight: 850, letterSpacing: -.45, lineHeight: 1.05 }}>{config.nombreMarca || "Habitación Llena"}</div>
+        <div style={{ padding: "6px 10px 22px" }}>
+          <div style={{ fontSize: 9, letterSpacing: 2.2, opacity: .7 }}>PLATAFORMA HOTELERA</div>
+          <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8 }}>
+            <img src={config.logo || logoHabitacionLlena} alt="Habitación Llena" style={{ width: 34, height: 34, objectFit: "contain", borderRadius: 7, background: "#fff" }} />
+            <div style={{ fontSize: 19, fontWeight: 850, letterSpacing: -.4, lineHeight: 1.05 }}>{config.nombreMarca || "Habitación Llena"}</div>
           </div>
         </div>
 
-        <div style={{ fontSize: 11, opacity: .55, padding: "0 12px 8px" }}>GESTIÓN</div>
+        <div style={{ fontSize: 10, opacity: .5, padding: "0 10px 7px" }}>GESTIÓN</div>
+        {navButton("dashboard", "▦", "Inicio")}
+        {navButton("reservas", "▣", "Reservas")}
+        {navButton("calendario", "▤", "Calendario")}
 
-        {items.filter(([id]) => puedeVer(id)).map(([id, icon, label]) => (
-          <button
-            key={id}
-            onClick={() => {
-              setVista(id)
-              setMenuAbierto(false)
-            }}
-            style={{
-              width: "100%",
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              border: "none",
-              background: vista === id ? "rgba(255,255,255,.14)" : "transparent",
-              boxShadow: vista === id ? "inset 3px 0 0 #fff" : "none",
-              color: "#fff",
-              padding: "11px 12px",
-              borderRadius: 10,
-              marginBottom: 4,
-              cursor: "pointer",
-              textAlign: "left",
-              fontSize: 14,
-              fontWeight: vista === id ? 700 : 500,
-            }}
-          >
-            <span style={{ width: 20, textAlign: "center", opacity: .9 }}>{icon}</span>
-            {label}
+        {grupoOperacion.some(([id]) => puedeVer(id)) && <>
+          <button type="button" onClick={() => setMenuOperativoAbierto(!menuOperativoAbierto)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", border: "none", background: grupoActivo(grupoOperacion) ? "rgba(255,255,255,.09)" : "transparent", color: "#fff", padding: "10px 12px", borderRadius: 9, margin: "3px 0", cursor: "pointer", textAlign: "left", fontSize: 14, fontWeight: 700 }}>
+            <span>🧹 Operación</span><span style={{ opacity: .7 }}>{menuOperativoAbierto || grupoActivo(grupoOperacion) ? "⌃" : "⌄"}</span>
           </button>
-        ))}
+          {(menuOperativoAbierto || grupoActivo(grupoOperacion)) && <div style={{ paddingLeft: 8 }}>{grupoOperacion.map(([id, icon, label]) => navButton(id, icon, label))}</div>}
+        </>}
 
-        <div style={{
-          position: "absolute",
-          bottom: 18,
-          left: 26,
-          right: 26,
-          fontSize: 10,
-          opacity: .5,
-          textAlign: "center",
-        }}>
-          Habitación Llena · MVP
-        </div>
+        {grupoAdministracion.some(([id]) => puedeVer(id)) && <>
+          <button type="button" onClick={() => setMenuAdministracionAbierto(!menuAdministracionAbierto)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", border: "none", background: grupoActivo(grupoAdministracion) ? "rgba(255,255,255,.09)" : "transparent", color: "#fff", padding: "10px 12px", borderRadius: 9, margin: "3px 0", cursor: "pointer", textAlign: "left", fontSize: 14, fontWeight: 700 }}>
+            <span>💼 Administración</span><span style={{ opacity: .7 }}>{menuAdministracionAbierto || grupoActivo(grupoAdministracion) ? "⌃" : "⌄"}</span>
+          </button>
+          {(menuAdministracionAbierto || grupoActivo(grupoAdministracion)) && <div style={{ paddingLeft: 8 }}>{grupoAdministracion.map(([id, icon, label]) => navButton(id, icon, label))}</div>}
+        </>}
+
+        {grupoComunicacion.some(([id]) => puedeVer(id)) && <>
+          <div style={{ fontSize: 10, opacity: .5, padding: "12px 10px 5px" }}>HERRAMIENTAS</div>
+          {grupoComunicacion.map(([id, icon, label]) => navButton(id, icon, label))}
+        </>}
+
+        <div style={{ position: "absolute", bottom: 14, left: 20, right: 20, fontSize: 9, opacity: .45, textAlign: "center" }}>Habitación Llena · MVP</div>
       </aside>
     )
   }
@@ -3206,7 +3283,7 @@ export default function Home() {
           subtitulo={modoEdicion ? "Modificá los datos y guardá los cambios" : "Crear y administrar reservas"}
         />
 
-        <div style={{ padding: 30 }}>
+        <div className="hl-reserva-form"><div style={{ padding: 30 }}>
           <section style={cardStyle}>
             <div style={{
               display: "flex",
@@ -3224,13 +3301,19 @@ export default function Home() {
               </div>
 
               {modoEdicion && (
-                <button onClick={limpiarFormulario} style={secondaryButton}>
-                  Cancelar edición
-                </button>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <button type="submit" form="form-reserva-principal" disabled={cargando} style={{ ...primaryButton, opacity: cargando ? .65 : 1 }}>
+                    {cargando ? "Guardando..." : "Guardar cambios"}
+                  </button>
+                  <button type="button" onClick={limpiarFormulario} style={{ ...secondaryButton, color: colors.red, borderColor: "#f2caca" }}>
+                    Cancelar edición
+                  </button>
+                  <button type="button" onClick={() => imprimirReserva(reservaSeleccionada)} style={secondaryButton}>🖨 Imprimir reserva</button>
+                </div>
               )}
             </div>
 
-            <form onSubmit={guardarReserva}>
+            <form id="form-reserva-principal" onSubmit={guardarReserva}>
               <div style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
@@ -3305,9 +3388,46 @@ export default function Home() {
                   </div>
                 </Field>
 
-                <Field label="Vehículos con cochera">
-                  <input type="number" min="0" value={vehiculos} onChange={(e) => setVehiculos(e.target.value)} style={inputStyle} />
-                </Field>
+                <div style={{
+              display: "grid",
+              gridTemplateColumns: "90px 1fr 1fr",
+              gap: 10,
+              alignItems: "end",
+              marginTop: 14,
+            }}>
+              <Field label="Vehículos">
+                <input
+                  type="number"
+                  min="0"
+                  max="9"
+                  value={cantidadVehiculos}
+                  onChange={(e) => setCantidadVehiculos(e.target.value)}
+                  style={{ ...inputStyle, width: "90px", boxSizing: "border-box" }}
+                />
+              </Field>
+
+              <Field label="Tipo">
+                <select
+                  value={tipoVehiculo}
+                  onChange={(e) => setTipoVehiculo(e.target.value)}
+                  style={inputStyle}
+                >
+                  <option value="">Seleccionar</option>
+                  <option value="auto">Auto</option>
+                  <option value="camioneta">Camioneta</option>
+                </select>
+              </Field>
+
+              <Field label="Dominio">
+                <input
+                  value={dominioVehiculo}
+                  onChange={(e) => setDominioVehiculo(e.target.value.toUpperCase())}
+                  placeholder="AB 123 CD"
+                  style={inputStyle}
+                  maxLength={10}
+                />
+              </Field>
+            </div>
 
                 <Field label="Extra de la reserva">
                   <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 8 }}>
@@ -3379,9 +3499,25 @@ export default function Home() {
                     </select>
                     {garantiaTipo === "Tarjeta" && <>
                       <input value={garantiaMarca} onChange={e => setGarantiaMarca(e.target.value)} placeholder="Marca (Visa, Mastercard...)" style={inputStyle} />
-                      <input value={garantiaUltimos4} onChange={e => setGarantiaUltimos4(e.target.value.replace(/\D/g, "").slice(-4))} placeholder="Últimos 4 dígitos" maxLength={4} style={inputStyle} />
+                      <input
+                        value={garantiaNumeroTarjeta}
+                        onChange={e => setGarantiaNumeroTarjeta(e.target.value.replace(/\D/g, "").slice(0, 16))}
+                        placeholder="Número de tarjeta (16 dígitos)"
+                        inputMode="numeric"
+                        autoComplete="cc-number"
+                        maxLength={16}
+                        style={inputStyle}
+                      />
                       <input type="month" value={garantiaVencimiento} onChange={e => setGarantiaVencimiento(e.target.value)} style={inputStyle} />
-                      <input value={garantiaReferencia} onChange={e => setGarantiaReferencia(e.target.value)} placeholder="Referencia / token de autorización" style={inputStyle} />
+                      <input
+                        value={garantiaCCV}
+                        onChange={e => setGarantiaCCV(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                        placeholder="CCV"
+                        inputMode="numeric"
+                        autoComplete="cc-csc"
+                        maxLength={4}
+                        style={inputStyle}
+                      />
                     </>}
                     {garantiaTipo && garantiaTipo !== "Tarjeta" && (
                       <input value={garantiaReferencia} onChange={e => setGarantiaReferencia(e.target.value)} placeholder="Referencia / comprobante" style={inputStyle} />
@@ -3389,7 +3525,7 @@ export default function Home() {
                   </div>
                   {garantiaTipo === "Tarjeta" && (
                     <div style={{ marginTop: 8, padding: 9, borderRadius: 8, background: "#fff8e8", color: "#72520a", fontSize: 11 }}>
-                      Por seguridad, no guardamos el número completo de la tarjeta ni el CVV. Solo marca, últimos 4, vencimiento y referencia/token.
+                      El número completo y el CCV se usan solo en este formulario y no se guardan en Supabase. Para producción, estos datos deben procesarse mediante un proveedor de pagos/tokenización.
                     </div>
                   )}
                 </Field>
@@ -3446,13 +3582,11 @@ export default function Home() {
                 </div>
               )}
 
-              <button type="submit" disabled={cargando} style={{
-                ...primaryButton,
-                marginTop: 18,
-                opacity: cargando ? .65 : 1,
-              }}>
-                {cargando ? "Guardando..." : modoEdicion ? "Guardar cambios" : "Crear reserva"}
-              </button>
+              {!modoEdicion && (
+                <button type="submit" disabled={cargando} style={{ ...primaryButton, marginTop: 18, opacity: cargando ? .65 : 1 }}>
+                  {cargando ? "Guardando..." : "Crear reserva"}
+                </button>
+              )}
             </form>
           </section>
 
@@ -3489,6 +3623,7 @@ export default function Home() {
             </div>
           </section>
         </div>
+      </div>
       </>
     )
   }
@@ -3603,6 +3738,29 @@ export default function Home() {
     )
   }
 
+  function aumentarPreciosMasivamente() {
+    const porcentaje = Number(porcentajeAumento)
+    if (!Number.isFinite(porcentaje) || porcentaje === 0) {
+      alert("Ingresá un porcentaje válido distinto de 0.")
+      return
+    }
+    if (!confirm(`¿Aplicar un aumento del ${porcentaje}% a ${habitaciones.length} habitaciones?`)) return
+
+    const tarifas = { ...(config.habitacionesTarifas || {}) }
+    habitaciones.forEach((h) => {
+      const actual = datosTarifaHabitacion(h.id).precio
+      tarifas[String(h.id)] = {
+        ...(tarifas[String(h.id)] || {}),
+        precio: Math.round(actual * (1 + porcentaje / 100) * 100) / 100,
+      }
+    })
+    const configuracionActualizada = { ...config, habitacionesTarifas: tarifas }
+    setConfig(configuracionActualizada)
+    if (user?.id) localStorage.setItem(`habitacion_llena_config_${user.id}`, JSON.stringify(configuracionActualizada))
+    setMostrarAumentoPrecios(false)
+    setPorcentajeAumento("")
+  }
+
   function Habitaciones({ embedded = false } = {}) {
     return (
       <>
@@ -3616,16 +3774,33 @@ export default function Home() {
                   {habitacionesActivas.length} activas · {habitaciones.length} totales
                 </div>
               </div>
-              <button
-                onClick={() => {
-                  cancelarEdicionHabitacion()
-                  setMostrarHabitacion(!mostrarHabitacion)
-                }}
-                style={primaryButton}
-              >
-                + Agregar habitación
-              </button>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button type="button" onClick={() => setMostrarAumentoPrecios(true)} style={secondaryButton}>↑ Aumentar precios</button>
+                <button
+                  onClick={() => {
+                    cancelarEdicionHabitacion()
+                    setMostrarHabitacion(!mostrarHabitacion)
+                  }}
+                  style={primaryButton}
+                >
+                  + Agregar habitación
+                </button>
+              </div>
             </div>
+
+            {mostrarAumentoPrecios && (
+              <div style={{ marginTop: 16, marginBottom: 18, padding: 16, border: `1px solid ${colors.border}`, borderRadius: 12, background: colors.blueSoft }}>
+                <div style={{ fontWeight: 850, fontSize: 14 }}>Aumentar precios</div>
+                <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>Aplicá un porcentaje a la tarifa por noche de todas las habitaciones. Las reservas existentes no se modifican.</div>
+                <div style={{ display: "flex", gap: 9, alignItems: "end", marginTop: 12, flexWrap: "wrap" }}>
+                  <Field label="Porcentaje">
+                    <input type="number" step="0.1" value={porcentajeAumento} onChange={(e) => setPorcentajeAumento(e.target.value)} placeholder="10" style={{ ...inputStyle, width: 120 }} />
+                  </Field>
+                  <button type="button" onClick={aumentarPreciosMasivamente} style={primaryButton}>Aplicar aumento</button>
+                  <button type="button" onClick={() => { setMostrarAumentoPrecios(false); setPorcentajeAumento("") }} style={secondaryButton}>Cancelar</button>
+                </div>
+              </div>
+            )}
 
             <h2 style={{ margin: "30px 0 18px", fontSize: 18 }}>Tipos de habitación</h2>
             <div style={{ color: colors.muted, fontSize: 12, marginBottom: 16 }}>
@@ -3989,60 +4164,30 @@ export default function Home() {
       </div>
 
       {menuAbierto && (
-        <div style={{
-          position: "fixed",
-          inset: 0,
-          background: "rgba(0,0,0,.35)",
-          zIndex: 30,
-        }} onClick={() => setMenuAbierto(false)}>
-          <div onClick={(e) => e.stopPropagation()} style={{
-            width: 250,
-            background: colors.navyDark,
-            height: "100%",
-            color: "#fff",
-            padding: 15,
-            boxSizing: "border-box",
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, fontWeight: 800, fontSize: 20, padding: 12, marginBottom: 20 }}>
-              <img
-                src={config.logo || logoHabitacionLlena}
-                alt="Habitación Llena"
-                style={{ width: 34, height: 34, objectFit: "contain", borderRadius: 7, background: "#fff" }}
-              />
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.35)", zIndex: 30 }} onClick={() => setMenuAbierto(false)}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: 250, background: colors.navyDark, height: "100%", color: "#fff", padding: 15, boxSizing: "border-box", overflowY: "auto" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, fontWeight: 800, fontSize: 20, padding: 12, marginBottom: 16 }}>
+              <img src={config.logo || logoHabitacionLlena} alt="Habitación Llena" style={{ width: 34, height: 34, objectFit: "contain", borderRadius: 7, background: "#fff" }} />
               Habitación Llena
             </div>
-            {["dashboard", "reservas", "calendario", "housekeeping", "bloqueos", "huespedes", "caja", "ventas", "comunicaciones", "integraciones", "asistente", "configuracion"].filter((id) => puedeVer(id)).map((id) => (
-              <button key={id} onClick={() => { setVista(id); setMenuAbierto(false) }} style={{
-                width: "100%",
-                padding: 13,
-                border: "none",
-                borderRadius: 8,
-                marginBottom: 5,
-                textAlign: "left",
-                color: "#fff",
-                background: vista === id ? "rgba(255,255,255,.14)" : "transparent",
-              boxShadow: vista === id ? "inset 3px 0 0 #fff" : "none",
-              }}>
-                {id === "dashboard" ? "▦  Inicio" :
-                 id === "reservas" ? "▣  Reservas" :
-                 id === "calendario" ? "▤  Calendario" :
-                 id === "housekeeping" ? "🧹  Housekeeping" :
-                 id === "bloqueos" ? "🚫  Bloqueos" :
-                 id === "huespedes" ? "👤  Huéspedes" :
-                 id === "caja" ? "💰  Caja y pagos" :
-                 id === "alojamientos" ? "⌂  Alojamientos" :
-                 id === "habitaciones" ? "▥  Habitaciones" :
-                 id === "ventas" ? "◫  Ventas" :
-                 id === "comunicaciones" ? "✉  Comunicaciones" :
-                 id === "integraciones" ? "↔  Integraciones" :
-                 id === "asistente" ? "✦  Asistente IA" : "⚙  Configuración"}
-              </button>
-            ))}
+            {[
+              ["dashboard", "▦", "Inicio"], ["reservas", "▣", "Reservas"], ["calendario", "▤", "Calendario"]
+            ].map(([id, icon, label]) => puedeVer(id) && <button key={id} onClick={() => { setVista(id); setMenuAbierto(false) }} style={{ width: "100%", padding: 11, border: "none", borderRadius: 8, marginBottom: 4, textAlign: "left", color: "#fff", background: vista === id ? "rgba(255,255,255,.14)" : "transparent", fontWeight: vista === id ? 700 : 500 }}>{icon} {label}</button>)}
+
+            {[["housekeeping","🧹","Housekeeping"],["bloqueos","🚫","Bloqueos"],["huespedes","👤","Huéspedes"]].some(([id]) => puedeVer(id)) && <div style={{ marginTop: 8 }}>
+              <div style={{ padding: "8px 11px", fontSize: 12, fontWeight: 800, opacity: .8 }}>🧹 Operación</div>
+              {[['housekeeping','🧹','Housekeeping'],['bloqueos','🚫','Bloqueos'],['huespedes','👤','Huéspedes']].filter(([id]) => puedeVer(id)).map(([id,icon,label]) => <button key={id} onClick={() => { setVista(id); setMenuAbierto(false) }} style={{ width: "100%", padding: 10, border: "none", borderRadius: 8, marginBottom: 3, textAlign: "left", color: "#fff", background: vista === id ? "rgba(255,255,255,.14)" : "transparent" }}>{icon} {label}</button>)}
+            </div>}
+            {[["caja","💰","Caja y pagos"],["ventas","◫","Ventas"]].some(([id]) => puedeVer(id)) && <div style={{ marginTop: 8 }}>
+              <div style={{ padding: "8px 11px", fontSize: 12, fontWeight: 800, opacity: .8 }}>💼 Administración</div>
+              {[['caja','💰','Caja y pagos'],['ventas','◫','Ventas']].filter(([id]) => puedeVer(id)).map(([id,icon,label]) => <button key={id} onClick={() => { setVista(id); setMenuAbierto(false) }} style={{ width: "100%", padding: 10, border: "none", borderRadius: 8, marginBottom: 3, textAlign: "left", color: "#fff", background: vista === id ? "rgba(255,255,255,.14)" : "transparent" }}>{icon} {label}</button>)}
+            </div>}
+            {[["comunicaciones","✉","Comunicaciones"],["integraciones","↔","Integraciones"],["asistente","✦","Asistente IA"]].filter(([id]) => puedeVer(id)).map(([id,icon,label]) => <button key={id} onClick={() => { setVista(id); setMenuAbierto(false) }} style={{ width: "100%", padding: 11, border: "none", borderRadius: 8, marginTop: 4, textAlign: "left", color: "#fff", background: vista === id ? "rgba(255,255,255,.14)" : "transparent" }}>{icon} {label}</button>)}
           </div>
         </div>
       )}
 
-      <main style={{ marginLeft: 245, minHeight: "100vh" }}>
+      <main style={{ marginLeft: 220, minHeight: "100vh" }}>
         {vista === "dashboard" && Dashboard()}
         {vista === "reservas" && Reservas()}
         {vista === "calendario" && CalendarioVista()}
@@ -4097,6 +4242,25 @@ export default function Home() {
                 cursor: "pointer",
               }}>×</button>
             </div>
+
+            {reservaSeleccionada.estado !== "cancelada" && (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9, marginTop: 18 }}>
+                <button
+                  onClick={() => realizarCheckIn(reservaSeleccionada)}
+                  disabled={reservaSeleccionada.estado === "alojado" || reservaSeleccionada.estado === "finalizada"}
+                  style={{ ...primaryButton, background: colors.green, opacity: reservaSeleccionada.estado === "alojado" || reservaSeleccionada.estado === "finalizada" ? .55 : 1 }}
+                >
+                  ✓ Check-in
+                </button>
+                <button
+                  onClick={() => realizarCheckOut(reservaSeleccionada)}
+                  disabled={reservaSeleccionada.estado === "finalizada"}
+                  style={{ ...primaryButton, background: colors.red, opacity: reservaSeleccionada.estado === "finalizada" ? .55 : 1 }}
+                >
+                  ✓ Check-out
+                </button>
+              </div>
+            )}
 
             <div style={{
               marginTop: 25,
@@ -4160,6 +4324,12 @@ export default function Home() {
               {pagos.filter(p=>String(p.reserva_id)===String(reservaSeleccionada.id)).length>0 && <div style={{ marginTop: 12, display:"grid",gap:6 }}>{pagos.filter(p=>String(p.reserva_id)===String(reservaSeleccionada.id)).map(p=><div key={p.id} style={{fontSize:11,padding:8,background:"#f8fafc",borderRadius:7}}>{p.moneda === "USD" ? "US$ " : "$"}{Number(p.monto||0).toLocaleString("es-AR")} · {p.metodo} · {p.created_at ? new Date(p.created_at).toLocaleDateString("es-AR") : ""}</div>)}</div>}
             </section>
 
+            {saldoReserva(reservaSeleccionada) > 0.01 && reservaSeleccionada.estado !== "cancelada" && (
+              <div style={{ marginTop: 14, padding: 12, borderRadius: 9, background: colors.redSoft, color: colors.red, fontSize: 12, fontWeight: 700 }}>
+                ⚠️ Deuda pendiente: {reservaSeleccionada.moneda === "USD" ? "US$ " : "$"}{saldoReserva(reservaSeleccionada).toLocaleString("es-AR", { minimumFractionDigits: reservaSeleccionada.moneda === "USD" ? 2 : 0 })}. Registrá el pago antes del check-out.
+              </div>
+            )}
+
             <div style={{ display: "grid", gap: 9, marginTop: 28 }}>
               {reservaSeleccionada.email_huesped && (
                 <button onClick={() => enviarResumenPorEmail(reservaSeleccionada)} style={primaryButton}>
@@ -4181,7 +4351,6 @@ export default function Home() {
                   📄 Ver documento
                 </button>
               )}
-              <button onClick={() => imprimirReserva(reservaSeleccionada)} style={secondaryButton}>🖨 Imprimir reserva</button>
               <button onClick={() => agregarNoches(reservaSeleccionada, 1)} style={secondaryButton}>＋ Agregar 1 noche</button>
               <button onClick={() => editarReserva(reservaSeleccionada)} style={secondaryButton}>
                 Editar reserva
@@ -4204,6 +4373,20 @@ export default function Home() {
       )}
 
       <style jsx global>{`
+    .hl-reserva-form label {
+      font-weight: 700 !important;
+      color: var(--hl-form-label, inherit) !important;
+    }
+    .hl-reserva-form h2 {
+      font-weight: 850 !important;
+      letter-spacing: -0.2px;
+    }
+    .hl-reserva-form input,
+    .hl-reserva-form select,
+    .hl-reserva-form textarea {
+      font-size: 14px !important;
+    }
+
         :root {
           --hl-navy: #0b4aa2;
           --hl-navy-dark: #082f6b;
