@@ -1268,145 +1268,345 @@ export default function Home() {
   }
 
   function Calendario() {
-    return (
-      <div style={{ overflowX: "auto" }}>
-        <div style={{
-          minWidth: 1220,
-          border: `1px solid ${colors.border}`,
-          borderRadius: 10,
-          overflow: "hidden",
-        }}>
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "210px repeat(38, 1fr)",
-            background: "#f8fafc",
-          }}>
-            <div style={{ padding: 12, fontWeight: 700, fontSize: 12, borderBottom: `1px solid ${colors.border}` }}>
-              Habitación
-            </div>
+    const [diasVista, setDiasVista] = useState(14)
+    const [dragReservaId, setDragReservaId] = useState(null)
+    const [dropTarget, setDropTarget] = useState(null)
+    const [guardandoMovimiento, setGuardandoMovimiento] = useState(false)
 
-            {diasCalendario.map((fecha) => (
-              <div key={fecha} style={{
-                textAlign: "center",
-                background: fecha === fechaLocal(0) ? colors.blueSoft : "#f8fafc",
-                padding: "7px 2px",
-                borderLeft: `1px solid ${colors.border}`,
-                borderBottom: `1px solid ${colors.border}`,
-                fontSize: 10,
-              }}>
-                <div style={{ color: colors.muted }}>{nombreMes(fecha)}</div>
-                <strong>{fecha.slice(8)}</strong>
-              </div>
-            ))}
+    const calendarioDias = useMemo(() => {
+      const base = new Date(`${fechaCalendario}T12:00:00`)
+      return Array.from({ length: diasVista }, (_, i) => {
+        const fecha = new Date(base)
+        fecha.setDate(fecha.getDate() + i)
+        const año = fecha.getFullYear()
+        const mes = String(fecha.getMonth() + 1).padStart(2, "0")
+        const dia = String(fecha.getDate()).padStart(2, "0")
+        return `${año}-${mes}-${dia}`
+      })
+    }, [fechaCalendario, diasVista])
+
+    function moverFechaCalendario(cantidad) {
+      const d = new Date(`${fechaCalendario}T12:00:00`)
+      d.setDate(d.getDate() + cantidad)
+      setFechaCalendario(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`)
+    }
+
+    function prepararNuevaReserva(fecha, habitacion) {
+      const salida = new Date(`${fecha}T12:00:00`)
+      salida.setDate(salida.getDate() + 1)
+      const salidaTexto = `${salida.getFullYear()}-${String(salida.getMonth() + 1).padStart(2, "0")}-${String(salida.getDate()).padStart(2, "0")}`
+      setReservaSeleccionada(null)
+      setModoEdicion(false)
+      setMensaje("")
+      setAlojamientoSeleccionado(String(habitacion.alojamiento_id))
+      setHabitacionSeleccionada(String(habitacion.id))
+      setFechaEntrada(fecha)
+      setFechaSalida(salidaTexto)
+      setNombre("")
+      setDni("")
+      setEmail("")
+      setTelefono("")
+      setPasajerosExtra([])
+      setVista("reservas")
+      setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 50)
+    }
+
+    function arrastrarReserva(e, reserva) {
+      setDragReservaId(String(reserva.id))
+      e.dataTransfer.effectAllowed = "move"
+      e.dataTransfer.setData("text/plain", String(reserva.id))
+      e.currentTarget.style.opacity = "0.55"
+    }
+
+    function terminarArrastre(e) {
+      e.currentTarget.style.opacity = "1"
+      setDragReservaId(null)
+      setDropTarget(null)
+    }
+
+    async function moverReserva(reserva, nuevaHabitacionId, nuevaEntrada) {
+      if (guardandoMovimiento) return
+
+      const noches = diasEntre(reserva.fecha_entrada, reserva.fecha_salida)
+      const salidaDate = new Date(`${nuevaEntrada}T12:00:00`)
+      salidaDate.setDate(salidaDate.getDate() + noches)
+      const nuevaSalida = `${salidaDate.getFullYear()}-${String(salidaDate.getMonth() + 1).padStart(2, "0")}-${String(salidaDate.getDate()).padStart(2, "0")}`
+
+      const mismoDestino = String(reserva.habitacion_id) === String(nuevaHabitacionId) && reserva.fecha_entrada === nuevaEntrada
+      if (mismoDestino) return
+
+      const conflictoLocal = reservas.some((otra) => (
+        String(otra.id) !== String(reserva.id) &&
+        otra.estado !== "cancelada" &&
+        !otra.no_show &&
+        String(otra.habitacion_id) === String(nuevaHabitacionId) &&
+        bloquesSeCruzan(nuevaEntrada, nuevaSalida, otra.fecha_entrada, otra.fecha_salida)
+      ))
+
+      if (conflictoLocal) {
+        alert("No se puede mover la reserva: la habitación ya está ocupada en esas fechas.")
+        return
+      }
+
+      const bloqueo = bloqueoParaHabitacion(nuevaHabitacionId, nuevaEntrada, nuevaSalida)
+      if (bloqueo) {
+        alert(`No se puede mover la reserva: la habitación está bloqueada del ${formatearFecha(bloqueo.fecha_desde)} al ${formatearFecha(bloqueo.fecha_hasta)}.`)
+        return
+      }
+
+      setGuardandoMovimiento(true)
+      const anterior = reserva
+      setReservas((actuales) => actuales.map((r) => (
+        String(r.id) === String(reserva.id)
+          ? { ...r, habitacion_id: nuevaHabitacionId, fecha_entrada: nuevaEntrada, fecha_salida: nuevaSalida, noches }
+          : r
+      )))
+
+      const { error } = await supabase
+        .from("reservas")
+        .update({
+          habitacion_id: nuevaHabitacionId,
+          fecha_entrada: nuevaEntrada,
+          fecha_salida: nuevaSalida,
+        })
+        .eq("id", reserva.id)
+
+      if (error) {
+        console.error(error)
+        setReservas((actuales) => actuales.map((r) => (
+          String(r.id) === String(anterior.id) ? anterior : r
+        )))
+        alert("No se pudo mover la reserva. Verificá los permisos de Supabase para esa operación.")
+      }
+
+      setGuardandoMovimiento(false)
+      setDragReservaId(null)
+      setDropTarget(null)
+    }
+
+    function soltarEnCelda(e, habitacion, fecha) {
+      e.preventDefault()
+      const id = e.dataTransfer.getData("text/plain") || dragReservaId
+      if (!id) return
+      const reserva = reservas.find((r) => String(r.id) === String(id))
+      if (!reserva) return
+      moverReserva(reserva, habitacion.id, fecha)
+    }
+
+    const hoy = fechaLocal(0)
+    const anchoDia = diasVista === 30 ? 78 : diasVista === 14 ? 104 : 138
+    const gridTemplate = `220px repeat(${diasVista}, ${anchoDia}px)`
+    const totalNoches = reservasActivas.reduce((s, r) => s + diasEntre(r.fecha_entrada, r.fecha_salida), 0)
+
+    return (
+      <div style={{ display: "grid", gap: 16 }}>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "1fr auto",
+          gap: 16,
+          alignItems: "center",
+        }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <h2 style={{ margin: 0, fontSize: 20, letterSpacing: -.3 }}>Planificador de reservas</h2>
+              {guardandoMovimiento && <span style={{ background: colors.blueSoft, color: colors.blue, padding: "5px 9px", borderRadius: 999, fontSize: 11, fontWeight: 800 }}>Guardando movimiento…</span>}
+            </div>
+            <div style={{ color: colors.muted, fontSize: 12, marginTop: 5 }}>
+              Arrastrá una reserva para cambiar fecha o habitación. Hacé click en una celda libre para crear una reserva.
+            </div>
           </div>
 
-          {habitacionesActivas.map((habitacion) => {
-            const reservasHabitacion = reservasActivas.filter(
-              (r) =>
-                String(r.habitacion_id) === String(habitacion.id) &&
-                r.fecha_salida > diasCalendario[0] &&
-                r.fecha_entrada <= diasCalendario[diasCalendario.length - 1]
-            )
+          <div style={{ display: "flex", gap: 7, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+            <button type="button" onClick={() => setFechaCalendario(hoy)} style={secondaryButton}>Hoy</button>
+            <button type="button" onClick={() => moverFechaCalendario(-diasVista)} style={secondaryButton}>←</button>
+            <input type="date" value={fechaCalendario} onChange={(e) => setFechaCalendario(e.target.value)} style={{ ...inputStyle, width: 145 }} />
+            <button type="button" onClick={() => moverFechaCalendario(diasVista)} style={secondaryButton}>→</button>
+            {[7, 14, 30].map((cantidad) => (
+              <button key={cantidad} type="button" onClick={() => setDiasVista(cantidad)} style={diasVista === cantidad ? primaryButton : secondaryButton}>
+                {cantidad} días
+              </button>
+            ))}
+          </div>
+        </div>
 
-            return (
-              <div key={habitacion.id} style={{
-                display: "grid",
-                gridTemplateColumns: "210px 1fr",
-                minHeight: 64,
-              }}>
-                <div style={{
-                  padding: 12,
-                  borderBottom: `1px solid ${colors.border}`,
-                  background: colors.white,
-                }}>
-                  <div style={{ fontWeight: 700, fontSize: 12 }}>{habitacion.nombre}</div>
-                  <div style={{ color: colors.muted, fontSize: 11, marginTop: 4 }}>
-                    {nombreAlojamiento(habitacion.alojamiento_id)}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+          gap: 10,
+        }}>
+          {[
+            ["Habitaciones", habitacionesActivas.length, "unidades activas", colors.navy],
+            ["Ocupadas hoy", reservasHoy.length, `${habitacionesActivas.length ? Math.round(reservasHoy.length / habitacionesActivas.length * 100) : 0}% ocupación`, colors.blue],
+            ["Entradas", entradasHoy.length, "check-in hoy", colors.green],
+            ["Noches en agenda", totalNoches, "estadías activas", "#7c3aed"],
+          ].map(([label, value, detail, color]) => (
+            <div key={label} style={{
+              background: colors.white,
+              border: `1px solid ${colors.border}`,
+              borderRadius: 12,
+              padding: "13px 15px",
+              boxShadow: "0 5px 18px rgba(15,23,42,.035)",
+            }}>
+              <div style={{ color: colors.muted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: .5 }}>{label}</div>
+              <div style={{ fontSize: 23, fontWeight: 850, color, marginTop: 4 }}>{value}</div>
+              <div style={{ color: colors.muted, fontSize: 10, marginTop: 2 }}>{detail}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center", fontSize: 11, fontWeight: 700 }}>
+          <span><i style={{ display: "inline-block", width: 9, height: 9, borderRadius: 3, background: colors.green, marginRight: 5 }} />Alojado</span>
+          <span><i style={{ display: "inline-block", width: 9, height: 9, borderRadius: 3, background: "#7c3aed", marginRight: 5 }} />Confirmada / futura</span>
+          <span><i style={{ display: "inline-block", width: 9, height: 9, borderRadius: 3, background: colors.yellow, marginRight: 5 }} />Pendiente</span>
+          <span><i style={{ display: "inline-block", width: 9, height: 9, borderRadius: 3, background: colors.red, marginRight: 5 }} />Salida</span>
+          <span style={{ color: colors.muted }}>↔ Arrastrá para mover</span>
+          <span style={{ color: colors.muted }}>＋ Click en una celda para reservar</span>
+        </div>
+
+        <div style={{ overflowX: "auto", border: `1px solid ${colors.border}`, borderRadius: 14, background: colors.white, boxShadow: "0 10px 35px rgba(15,23,42,.055)" }}>
+          <div style={{ minWidth: 220 + diasVista * anchoDia }}>
+            <div style={{ display: "grid", gridTemplateColumns: gridTemplate, position: "sticky", top: 0, zIndex: 8, background: "rgba(248,250,252,.97)", backdropFilter: "blur(12px)", borderBottom: `1px solid ${colors.border}` }}>
+              <div style={{ position: "sticky", left: 0, zIndex: 10, padding: "13px 15px", background: "#f8fafc", borderRight: `1px solid ${colors.border}` }}>
+                <div style={{ fontSize: 11, fontWeight: 850 }}>HABITACIONES</div>
+                <div style={{ color: colors.muted, fontSize: 10, marginTop: 3 }}>Disponibilidad en tiempo real</div>
+              </div>
+              {calendarioDias.map((fecha) => {
+                const date = new Date(`${fecha}T12:00:00`)
+                const diaSemana = date.toLocaleDateString("es-AR", { weekday: "short" }).replace(".", "")
+                const esHoy = fecha === hoy
+                const finDeSemana = [0, 6].includes(date.getDay())
+                return (
+                  <div key={fecha} style={{ textAlign: "center", padding: "9px 3px", borderLeft: `1px solid ${colors.border}`, background: esHoy ? colors.blueSoft : finDeSemana ? "#fafbfe" : "#f8fafc" }}>
+                    <div style={{ fontSize: 9, textTransform: "uppercase", color: esHoy ? colors.blue : colors.muted, fontWeight: 800 }}>{diaSemana}</div>
+                    <div style={{ fontSize: 18, lineHeight: 1.1, fontWeight: 850, color: esHoy ? colors.blue : colors.text, marginTop: 2 }}>{fecha.slice(8)}</div>
+                    <div style={{ fontSize: 9, color: colors.muted }}>{nombreMes(fecha)}</div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {habitacionesActivas.map((habitacion) => {
+              const reservasHabitacion = reservasActivas.filter((r) => String(r.habitacion_id) === String(habitacion.id) && r.fecha_salida > calendarioDias[0] && r.fecha_entrada <= calendarioDias[calendarioDias.length - 1])
+              const estado = estadoHabitacionVisual(habitacion)
+              const info = infoEstadoHabitacion(estado)
+              const ocupada = reservasHoy.some((r) => String(r.habitacion_id) === String(habitacion.id))
+
+              return (
+                <div key={habitacion.id} style={{ display: "grid", gridTemplateColumns: gridTemplate, minHeight: 78, borderBottom: `1px solid ${colors.border}` }}>
+                  <div style={{ position: "sticky", left: 0, zIndex: 5, background: colors.white, borderRight: `1px solid ${colors.border}`, padding: "11px 13px", cursor: "pointer" }} onDoubleClick={() => { setVista("reservas"); setHabitacionSeleccionada(String(habitacion.id)); setAlojamientoSeleccionado(String(habitacion.alojamiento_id)) }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 6, alignItems: "center" }}>
+                      <strong style={{ fontSize: 12 }}>{habitacion.nombre}</strong>
+                      <span style={{ width: 7, height: 7, borderRadius: 99, background: ocupada ? colors.blue : info.color, flexShrink: 0 }} />
+                    </div>
+                    <div style={{ color: colors.muted, fontSize: 9, marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nombreAlojamiento(habitacion.alojamiento_id)}</div>
+                    <div style={{ color: info.color, fontSize: 9, fontWeight: 800, marginTop: 6 }}>{info.label}</div>
+                  </div>
+
+                  <div style={{ position: "relative", minHeight: 78, display: "grid", gridTemplateColumns: `repeat(${diasVista}, ${anchoDia}px)`, background: "#fff" }}>
+                    {calendarioDias.map((fecha) => {
+                      const esHoy = fecha === hoy
+                      const esFinDeSemana = [0, 6].includes(new Date(`${fecha}T12:00:00`).getDay())
+                      const isDrop = dropTarget === `${habitacion.id}-${fecha}`
+                      return (
+                        <div
+                          key={fecha}
+                          onClick={() => prepararNuevaReserva(fecha, habitacion)}
+                          onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDropTarget(`${habitacion.id}-${fecha}`) }}
+                          onDragLeave={() => setDropTarget(null)}
+                          onDrop={(e) => { setDropTarget(null); soltarEnCelda(e, habitacion, fecha) }}
+                          style={{
+                            borderLeft: `1px solid ${colors.border}`,
+                            background: isDrop ? "#dbeafe" : esHoy ? "rgba(22,119,232,.045)" : esFinDeSemana ? "#fcfcfe" : "#fff",
+                            minHeight: 78,
+                            cursor: "crosshair",
+                            transition: "background .12s",
+                          }}
+                        />
+                      )
+                    })}
+
+                    {calendarioDias.includes(hoy) && (
+                      <div style={{ position: "absolute", top: 0, bottom: 0, left: `calc(${calendarioDias.indexOf(hoy)} * ${anchoDia}px)`, width: 2, background: colors.blue, opacity: .65, zIndex: 1, pointerEvents: "none" }} />
+                    )}
+
+                    {bloqueos.filter((b) => String(b.habitacion_id) === String(habitacion.id) && b.fecha_hasta > calendarioDias[0] && b.fecha_desde <= calendarioDias[calendarioDias.length - 1]).map((bloqueo) => {
+                      let inicio = calendarioDias.findIndex((f) => f >= bloqueo.fecha_desde)
+                      let fin = calendarioDias.findIndex((f) => f >= bloqueo.fecha_hasta)
+                      if (inicio < 0) inicio = 0
+                      if (fin < 0) fin = calendarioDias.length
+                      if (fin <= inicio) return null
+                      return (
+                        <div key={`bloqueo-${bloqueo.id}`} title={`Bloqueo: ${bloqueo.motivo || "Sin motivo"}`} style={{ position: "absolute", left: inicio * anchoDia + 4, width: Math.max(20, (fin - inicio) * anchoDia - 8), top: 10, height: 58, borderRadius: 9, background: "repeating-linear-gradient(135deg,#334155 0,#334155 8px,#1e293b 8px,#1e293b 16px)", color: "#fff", display: "flex", alignItems: "center", padding: "0 9px", boxSizing: "border-box", fontSize: 10, fontWeight: 800, overflow: "hidden", zIndex: 3, boxShadow: "0 3px 8px rgba(15,23,42,.12)" }}>
+                          🔒 {bloqueo.motivo || "Bloqueada"}
+                        </div>
+                      )
+                    })}
+
+                    {reservasHabitacion.map((reserva) => {
+                      let inicio = calendarioDias.findIndex((f) => f >= reserva.fecha_entrada)
+                      let fin = calendarioDias.findIndex((f) => f >= reserva.fecha_salida)
+                      if (inicio < 0) inicio = 0
+                      if (fin < 0) fin = calendarioDias.length
+                      if (fin <= inicio) return null
+
+                      const estadoVisual = hoy < reserva.fecha_entrada ? "futura" : hoy >= reserva.fecha_salida ? "out" : "in"
+                      const pendiente = reserva.estado === "pendiente"
+                      const colorReserva = estadoVisual === "in" ? colors.green : estadoVisual === "out" ? colors.red : pendiente ? colors.yellow : "#7c3aed"
+                      const anchoReserva = Math.max(62, (fin - inicio) * anchoDia - 8)
+
+                      return (
+                        <div
+                          key={reserva.id}
+                          draggable
+                          onDragStart={(e) => arrastrarReserva(e, reserva)}
+                          onDragEnd={terminarArrastre}
+                          onClick={(e) => { e.stopPropagation(); setReservaSeleccionada(reserva) }}
+                          onDoubleClick={(e) => { e.stopPropagation(); editarReserva(reserva) }}
+                          title={`${reserva.nombre_huesped} · ${formatearFecha(reserva.fecha_entrada)} → ${formatearFecha(reserva.fecha_salida)} · ${reserva.cantidad_huespedes || 1} pax\nArrastrá para mover`}
+                          style={{
+                            position: "absolute",
+                            left: inicio * anchoDia + 4,
+                            width: anchoReserva,
+                            top: 12,
+                            height: 54,
+                            borderRadius: 10,
+                            background: `linear-gradient(135deg, ${colorReserva}, ${colorReserva}dd)`,
+                            color: "#fff",
+                            padding: "7px 9px",
+                            boxSizing: "border-box",
+                            fontSize: 10,
+                            fontWeight: 700,
+                            overflow: "hidden",
+                            cursor: dragReservaId === String(reserva.id) ? "grabbing" : "grab",
+                            zIndex: 4,
+                            boxShadow: "0 4px 12px rgba(15,23,42,.16)",
+                            border: pendiente ? "1px dashed rgba(255,255,255,.8)" : "1px solid rgba(255,255,255,.18)",
+                            userSelect: "none",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
+                            <span style={{ opacity: .85, fontSize: 9 }}>⋮⋮</span>
+                            <strong style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{reserva.nombre_huesped || "Sin nombre"}</strong>
+                          </div>
+                          <div style={{ opacity: .82, marginTop: 4, fontSize: 9, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {reserva.numero_reserva || "Reserva"} · {reserva.cantidad_huespedes || 1} pax
+                          </div>
+                          <div style={{ position: "absolute", right: 7, bottom: 6, fontSize: 8, opacity: .75 }}>
+                            {diasEntre(reserva.fecha_entrada, reserva.fecha_salida)} n
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
+              )
+            })}
+          </div>
+        </div>
 
-                <div style={{
-                  position: "relative",
-                  display: "grid",
-                  gridTemplateColumns: "repeat(38, 1fr)",
-                  minHeight: 64,
-                  borderBottom: `1px solid ${colors.border}`,
-                }}>
-                  {diasCalendario.map((fecha) => (
-                    <div key={fecha} style={{
-                      borderLeft: `1px solid ${colors.border}`,
-                      background: "#fff",
-                    }} />
-                  ))}
-
-                  {bloqueos.filter((b) => String(b.habitacion_id) === String(habitacion.id) && b.fecha_hasta > diasCalendario[0] && b.fecha_desde <= diasCalendario[diasCalendario.length - 1]).map((bloqueo) => {
-                    let inicio = diasCalendario.findIndex((f) => f >= bloqueo.fecha_desde)
-                    let fin = diasCalendario.findIndex((f) => f >= bloqueo.fecha_hasta)
-                    if (inicio < 0) inicio = 0
-                    if (fin < 0) fin = diasCalendario.length
-                    if (fin <= inicio) return null
-                    return (
-                      <div key={`bloqueo-${bloqueo.id}`} title={`Bloqueo: ${bloqueo.motivo || "Sin motivo"}`} style={{ position: "absolute", left: `calc(${inicio} * (100% / 38) + 3px)`, width: `calc(${fin-inicio} * (100% / 38) - 6px)`, top: 6, height: 50, borderRadius: 7, background: "#111827", color: "#fff", opacity: .82, display: "flex", alignItems: "center", padding: "0 8px", fontSize: 10, fontWeight: 800, overflow: "hidden", zIndex: 1 }}>
-                        🚫 {bloqueo.motivo || "Bloqueada"}
-                      </div>
-                    )
-                  })}
-
-                  {reservasHabitacion.map((reserva) => {
-                    let inicio = diasCalendario.findIndex((f) => f >= reserva.fecha_entrada)
-                    let fin = diasCalendario.findIndex((f) => f >= reserva.fecha_salida)
-                    if (inicio < 0) inicio = 0
-                    if (fin < 0) fin = diasCalendario.length
-                    if (fin <= inicio) return null
-
-                    const hoy = fechaLocal(0)
-                    const estadoVisual = hoy < reserva.fecha_entrada
-                      ? "futura"
-                      : hoy >= reserva.fecha_salida
-                        ? "out"
-                        : "in"
-
-                    const colorReserva = estadoVisual === "in"
-                      ? colors.green
-                      : estadoVisual === "out"
-                        ? colors.red
-                        : "#7c3aed"
-
-                    return (
-                      <div
-                        key={reserva.id}
-                        onClick={() => setReservaSeleccionada(reserva)}
-                        title={`${reserva.nombre_huesped} · ${formatearFecha(reserva.fecha_entrada)} - ${formatearFecha(reserva.fecha_salida)}`}
-                        style={{
-                          position: "absolute",
-                          left: `calc(${inicio} * (100% / 38) + 3px)`,
-                          width: `calc(${fin - inicio} * (100% / 38) - 6px)`,
-                          top: 10,
-                          height: 42,
-                          borderRadius: 7,
-                          background: colorReserva,
-                          color: "#fff",
-                          display: "flex",
-                          alignItems: "center",
-                          padding: "0 9px",
-                          boxSizing: "border-box",
-                          fontSize: 11,
-                          fontWeight: 700,
-                          overflow: "hidden",
-                          whiteSpace: "nowrap",
-                          textOverflow: "ellipsis",
-                          cursor: "pointer",
-                          zIndex: 2,
-                        }}
-                      >
-                        {reserva.nombre_huesped}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )
-          })}
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", color: colors.muted, fontSize: 11 }}>
+          <span>💡 Tip: arrastrá una reserva hasta otra habitación o fecha. El sistema conserva automáticamente la cantidad de noches.</span>
+          <span>Click = nueva reserva · Click en reserva = acciones · Doble click = editar</span>
         </div>
       </div>
     )
@@ -2768,7 +2968,7 @@ export default function Home() {
   function CalendarioVista() {
     return (
       <>
-        <Header titulo="Calendario" subtitulo={`Semana alrededor de ${formatearFecha(fechaCalendario)}`} />
+        <Header titulo="Calendario" subtitulo={`Planificación visual · ${formatearFecha(fechaCalendario)}`} />
         <div style={{ padding: 30 }}>
           <section style={cardStyle}>
             <div style={{ marginBottom: 18 }}>
