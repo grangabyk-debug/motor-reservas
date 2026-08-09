@@ -5128,7 +5128,8 @@ export default function Home() {
             display: "flex",
             justifyContent: "flex-end",
             alignItems: "flex-end",
-            padding: "0 18px",
+            padding: "0 18px 46px",
+            boxSizing: "border-box",
             boxSizing: "border-box",
           }}
         >
@@ -5140,6 +5141,7 @@ export default function Home() {
               background: colors.white,
               height: "min(78vh, 760px)",
               minHeight: 560,
+              maxHeight: "calc(100vh - 58px)",
               padding: "20px 28px 18px",
               boxSizing: "border-box",
               overflow: "hidden",
@@ -5397,6 +5399,7 @@ export default function Home() {
         .reservation-sheet-actions button { min-height: 40px; }
         @media (max-width: 1100px) {
           .reservation-sheet-grid { grid-template-columns: 1fr 1fr !important; overflow-y: auto !important; }
+          .reservation-sheet-actions { margin-bottom: 4px !important; }
           .reservation-sheet-actions { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
         }
         @media (max-width: 760px) {
