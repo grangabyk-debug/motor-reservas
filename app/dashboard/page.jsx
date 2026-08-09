@@ -76,18 +76,20 @@ export default function Home() {
     logo: "",
     nombreMarca: "Habitación Llena",
     whatsapp: "",
-    email: "",
-    telefono: "",
-    direccion: "",
-    ciudad: "",
-    descripcion: "",
-    checkIn: "14:00",
-    checkOut: "10:00",
     bookingUrl: "",
     expediaUrl: "",
     airbnbUrl: "",
     despegarUrl: "",
     webUrl: "",
+    tarifas: {
+      simple: 0,
+      doble: 0,
+      triple: 0,
+      cuadruple: 0,
+      otro: 0,
+      cochera: 0,
+      extra: 0,
+    },
   })
 
   const [assistantMessages, setAssistantMessages] = useState([
@@ -103,6 +105,9 @@ export default function Home() {
   const [alojamientoSeleccionado, setAlojamientoSeleccionado] = useState("")
   const [habitacionSeleccionada, setHabitacionSeleccionada] = useState("")
   const [nombre, setNombre] = useState("")
+  const [dni, setDni] = useState("")
+  const [esMenor, setEsMenor] = useState(false)
+  const [pasajerosExtra, setPasajerosExtra] = useState([])
   const [email, setEmail] = useState("")
   const [telefono, setTelefono] = useState("")
   const [fechaEntrada, setFechaEntrada] = useState("")
@@ -110,11 +115,14 @@ export default function Home() {
   const [cantidadHuespedes, setCantidadHuespedes] = useState("1")
   const [estado, setEstado] = useState("pendiente")
   const [notas, setNotas] = useState("")
+  const [vehiculos, setVehiculos] = useState("0")
+  const [extraReserva, setExtraReserva] = useState("0")
 
   const [reservaSeleccionada, setReservaSeleccionada] = useState(null)
   const [modoEdicion, setModoEdicion] = useState(false)
   const [mensaje, setMensaje] = useState("")
   const [cargando, setCargando] = useState(false)
+  const [enviandoEmail, setEnviandoEmail] = useState(false)
 
   const [mostrarAlojamiento, setMostrarAlojamiento] = useState(false)
   const [nuevoAlojamiento, setNuevoAlojamiento] = useState("")
@@ -123,8 +131,8 @@ export default function Home() {
   const [nuevoTipo, setNuevoTipo] = useState("")
   const [nuevoAlojamientoHabitacion, setNuevoAlojamientoHabitacion] = useState("")
 
-  const proximos30Dias = useMemo(
-    () => Array.from({ length: 30 }, (_, i) => fechaLocal(i)),
+  const diasCalendario = useMemo(
+    () => Array.from({ length: 38 }, (_, i) => fechaLocal(i - 7)),
     []
   )
 
@@ -171,24 +179,8 @@ export default function Home() {
 
     iniciarSesion()
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!mounted) return
-
-      if (session?.user) {
-        setUser(session.user)
-        setAuthLoading(false)
-      } else {
-        setUser(null)
-        setAuthLoading(false)
-        window.location.href = "/login"
-      }
-    })
-
     return () => {
       mounted = false
-      subscription.unsubscribe()
     }
   }, [])
 
@@ -252,6 +244,9 @@ export default function Home() {
     setAlojamientoSeleccionado("")
     setHabitacionSeleccionada("")
     setNombre("")
+    setDni("")
+    setEsMenor(false)
+    setPasajerosExtra([])
     setEmail("")
     setTelefono("")
     setFechaEntrada("")
@@ -259,6 +254,8 @@ export default function Home() {
     setCantidadHuespedes("1")
     setEstado("pendiente")
     setNotas("")
+    setVehiculos("0")
+    setExtraReserva(String(config.tarifas?.extra ?? 0))
     setReservaSeleccionada(null)
     setModoEdicion(false)
   }
@@ -269,15 +266,182 @@ export default function Home() {
     setAlojamientoSeleccionado(String(reserva.alojamiento_id))
     setHabitacionSeleccionada(String(reserva.habitacion_id))
     setNombre(reserva.nombre_huesped || "")
+    setDni(reserva.dni_huesped || "")
+    setEsMenor(Boolean(reserva.es_menor))
     setEmail(reserva.email_huesped || "")
     setTelefono(reserva.telefono_huesped || "")
+
+    let extras = []
+    try {
+      const lista = Array.isArray(reserva.pasajeros)
+        ? reserva.pasajeros
+        : typeof reserva.pasajeros === "string"
+          ? JSON.parse(reserva.pasajeros)
+          : []
+      extras = Array.isArray(lista)
+        ? lista.filter((p) => p && p.principal !== true).map((p) => ({
+            nombre: p.nombre || "",
+            dni: p.dni || "",
+            menor: Boolean(p.menor),
+          }))
+        : []
+    } catch (error) {
+      console.warn("No se pudieron leer los pasajeros adicionales", error)
+    }
+    setPasajerosExtra(extras)
     setFechaEntrada(reserva.fecha_entrada || "")
     setFechaSalida(reserva.fecha_salida || "")
     setCantidadHuespedes(String(reserva.cantidad_huespedes || 1))
     setEstado(reserva.estado || "pendiente")
     setNotas(reserva.notas || "")
+    setVehiculos(String(reserva.vehiculos ?? reserva.cochera_cantidad ?? 0))
+    setExtraReserva(String(reserva.extra ?? reserva.extras ?? 0))
     setVista("reservas")
     setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 50)
+  }
+
+  function claveTipoHabitacion(tipo) {
+    const valor = String(tipo || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    if (valor.includes("simple") || valor.includes("single") || valor.includes("individual")) return "simple"
+    if (valor.includes("doble") || valor.includes("double")) return "doble"
+    if (valor.includes("triple")) return "triple"
+    if (valor.includes("cuadruple") || valor.includes("cuadruple")) return "cuadruple"
+    return "otro"
+  }
+
+  function tarifaDeHabitacion(habitacionId) {
+    const habitacion = habitaciones.find((h) => String(h.id) === String(habitacionId))
+    const clave = claveTipoHabitacion(habitacion?.tipo)
+    return Number(config.tarifas?.[clave] || 0)
+  }
+
+  function calcularImporteReserva() {
+    if (!habitacionSeleccionada || !fechaEntrada || !fechaSalida) {
+      return { noches: 0, tarifaNoche: 0, alojamiento: 0, cochera: 0, extra: Number(extraReserva) || 0, total: Number(extraReserva) || 0 }
+    }
+
+    const noches = diasEntre(fechaEntrada, fechaSalida)
+    const tarifaNoche = tarifaDeHabitacion(habitacionSeleccionada)
+    const alojamiento = tarifaNoche * noches
+    const cochera = (Number(vehiculos) || 0) * (Number(config.tarifas?.cochera) || 0) * noches
+    const extra = Number(extraReserva) || 0
+
+    return {
+      noches,
+      tarifaNoche,
+      alojamiento,
+      cochera,
+      extra,
+      total: alojamiento + cochera + extra,
+    }
+  }
+
+  function agregarPasajeroExtra() {
+    setPasajerosExtra((actuales) => [
+      ...actuales,
+      { nombre: "", dni: "", menor: false },
+    ])
+  }
+
+  function actualizarPasajeroExtra(indice, campo, valor) {
+    setPasajerosExtra((actuales) => actuales.map((pasajero, i) => (
+      i === indice ? { ...pasajero, [campo]: valor } : pasajero
+    )))
+  }
+
+  function eliminarPasajeroExtra(indice) {
+    setPasajerosExtra((actuales) => actuales.filter((_, i) => i !== indice))
+  }
+
+  function obtenerPasajerosReserva() {
+    const principal = {
+      principal: true,
+      nombre: nombre.trim(),
+      dni: dni.trim(),
+      menor: Boolean(esMenor),
+    }
+
+    const extras = pasajerosExtra
+      .filter((p) => p.nombre.trim())
+      .map((p) => ({
+        principal: false,
+        nombre: p.nombre.trim(),
+        dni: String(p.dni || "").trim(),
+        menor: Boolean(p.menor),
+      }))
+
+    return [principal, ...extras]
+  }
+
+  function obtenerListaPasajeros(reserva) {
+    try {
+      const lista = Array.isArray(reserva?.pasajeros)
+        ? reserva.pasajeros
+        : typeof reserva?.pasajeros === "string"
+          ? JSON.parse(reserva.pasajeros)
+          : []
+
+      if (Array.isArray(lista) && lista.length) return lista
+    } catch (error) {
+      console.warn("No se pudo leer la lista de pasajeros", error)
+    }
+
+    return [{
+      principal: true,
+      nombre: reserva?.nombre_huesped || "",
+      dni: reserva?.dni_huesped || "",
+      menor: Boolean(reserva?.es_menor),
+    }]
+  }
+
+  function textoResumenReserva(reserva) {
+    const pasajeros = obtenerListaPasajeros(reserva)
+    const noches = Number(reserva?.noches) || diasEntre(reserva.fecha_entrada, reserva.fecha_salida)
+    const tarifaNoche = Number(reserva?.tarifa_noche) || 0
+    const cocheraTotal = Number(reserva?.cochera_total) || 0
+    const extra = Number(reserva?.extra) || 0
+    const total = Number(reserva?.precio_total) || 0
+
+    const detallePasajeros = pasajeros.map((p, i) =>
+      `${i + 1}. ${p.nombre || "Sin nombre"}${p.dni ? ` · DNI ${p.dni}` : ""}${p.menor ? " · Menor" : ""}`
+    ).join("\n")
+
+    return [
+      `Reserva de ${nombreAlojamiento(reserva.alojamiento_id)}`,
+      "",
+      `Huésped principal: ${reserva.nombre_huesped || "-"}`,
+      reserva.dni_huesped ? `DNI: ${reserva.dni_huesped}` : "",
+      "",
+      "Pasajeros:",
+      detallePasajeros,
+      "",
+      `Habitación: ${nombreHabitacion(reserva.habitacion_id)}`,
+      `Entrada: ${formatearFecha(reserva.fecha_entrada)}`,
+      `Salida: ${formatearFecha(reserva.fecha_salida)}`,
+      `Noches: ${noches}`,
+      `Tarifa por noche: $${tarifaNoche.toLocaleString("es-AR")}`,
+      `Cochera: $${cocheraTotal.toLocaleString("es-AR")}`,
+      `Extra: $${extra.toLocaleString("es-AR")}`,
+      `TOTAL: $${total.toLocaleString("es-AR")}`,
+      "",
+      `Estado: ${estadoBadge(reserva.estado).label}`,
+      reserva.telefono_huesped ? `Teléfono: ${reserva.telefono_huesped}` : "",
+      reserva.notas ? `Notas: ${reserva.notas}` : "",
+      "",
+      "Gracias por reservar con nosotros.",
+    ].filter(Boolean).join("\n")
+  }
+
+  function enviarResumenPorEmail(reserva) {
+    const destinatario = String(reserva?.email_huesped || "").trim()
+    if (!destinatario) {
+      alert("Esta reserva no tiene un email cargado.")
+      return
+    }
+
+    const asunto = `Resumen de reserva · ${nombreAlojamiento(reserva.alojamiento_id)}`
+    const cuerpo = textoResumenReserva(reserva)
+    window.location.href = `mailto:${encodeURIComponent(destinatario)}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`
   }
 
   async function guardarReserva(e) {
@@ -304,7 +468,6 @@ export default function Home() {
     const { data: existentes, error: errorBusqueda } = await supabase
       .from("reservas")
       .select("*")
-      .eq("user_id", user.id)
       .eq("habitacion_id", habitacionSeleccionada)
       .neq("estado", "cancelada")
       .neq("id", reservaSeleccionada?.id || 0)
@@ -326,21 +489,27 @@ export default function Home() {
       return
     }
 
+    const calculo = calcularImporteReserva()
+
     const datos = {
       alojamiento_id: Number(alojamientoSeleccionado),
       habitacion_id: Number(habitacionSeleccionada),
       nombre_huesped: nombre.trim(),
+      dni_huesped: dni.trim(),
+      es_menor: Boolean(esMenor),
+      pasajeros: obtenerPasajerosReserva(),
       email_huesped: email.trim(),
       telefono_huesped: telefono.trim(),
       fecha_entrada: fechaEntrada,
       fecha_salida: fechaSalida,
-      cantidad_huespedes: Number(cantidadHuespedes) || 1,
+      cantidad_huespedes: obtenerPasajerosReserva().length,
       estado,
       notas: notas.trim(),
       user_id: user.id,
     }
 
     let error
+    let reservaId = reservaSeleccionada?.id || null
 
     if (modoEdicion && reservaSeleccionada) {
       const resultado = await supabase
@@ -350,8 +519,13 @@ export default function Home() {
         .eq("user_id", user.id)
       error = resultado.error
     } else {
-      const resultado = await supabase.from("reservas").insert([datos])
+      const resultado = await supabase
+        .from("reservas")
+        .insert([datos])
+        .select("id")
+        .single()
       error = resultado.error
+      reservaId = resultado.data?.id || null
     }
 
     if (error) {
@@ -359,6 +533,27 @@ export default function Home() {
       setMensaje("No se pudo guardar la reserva.")
       setCargando(false)
       return
+    }
+
+    // Las columnas de tarifas se guardan si ya fueron creadas en Supabase.
+    // Si todavía no existen, la reserva base igualmente queda guardada.
+    if (reservaId) {
+      const resultadoPrecios = await supabase
+        .from("reservas")
+        .update({
+          tarifa_noche: calculo.tarifaNoche,
+          noches: calculo.noches,
+          vehiculos: Number(vehiculos) || 0,
+          cochera_total: calculo.cochera,
+          extra: calculo.extra,
+          precio_total: calculo.total,
+        })
+        .eq("id", reservaId)
+        .eq("user_id", user.id)
+
+      if (resultadoPrecios.error) {
+        console.warn("No se pudieron guardar los importes. Ejecutá la migración SQL indicada para las nuevas columnas.", resultadoPrecios.error)
+      }
     }
 
     setMensaje(modoEdicion ? "Reserva actualizada correctamente." : "Reserva creada correctamente.")
@@ -374,7 +569,6 @@ export default function Home() {
       .from("reservas")
       .update({ estado: "cancelada" })
       .eq("id", reserva.id)
-      .eq("user_id", user.id)
 
     if (error) {
       console.error(error)
@@ -488,6 +682,7 @@ export default function Home() {
           <div><div style={{ color: colors.muted }}>Entrada</div><strong>{formatearFecha(reserva.fecha_entrada)}</strong></div>
           <div><div style={{ color: colors.muted }}>Salida</div><strong>{formatearFecha(reserva.fecha_salida)}</strong></div>
           <div><div style={{ color: colors.muted }}>Huéspedes</div><strong>{reserva.cantidad_huespedes || 1}</strong></div>
+          <div><div style={{ color: colors.muted }}>DNI</div><strong>{reserva.dni_huesped || "—"}</strong></div>
         </div>
       </div>
     )
@@ -504,16 +699,17 @@ export default function Home() {
         }}>
           <div style={{
             display: "grid",
-            gridTemplateColumns: "210px repeat(30, 1fr)",
+            gridTemplateColumns: "210px repeat(38, 1fr)",
             background: "#f8fafc",
           }}>
             <div style={{ padding: 12, fontWeight: 700, fontSize: 12, borderBottom: `1px solid ${colors.border}` }}>
               Habitación
             </div>
 
-            {proximos30Dias.map((fecha) => (
+            {diasCalendario.map((fecha) => (
               <div key={fecha} style={{
                 textAlign: "center",
+                background: fecha === fechaLocal(0) ? colors.blueSoft : "#f8fafc",
                 padding: "7px 2px",
                 borderLeft: `1px solid ${colors.border}`,
                 borderBottom: `1px solid ${colors.border}`,
@@ -529,8 +725,8 @@ export default function Home() {
             const reservasHabitacion = reservasActivas.filter(
               (r) =>
                 String(r.habitacion_id) === String(habitacion.id) &&
-                r.fecha_salida > proximos30Dias[0] &&
-                r.fecha_entrada <= proximos30Dias[29]
+                r.fecha_salida > diasCalendario[0] &&
+                r.fecha_entrada <= diasCalendario[diasCalendario.length - 1]
             )
 
             return (
@@ -553,11 +749,11 @@ export default function Home() {
                 <div style={{
                   position: "relative",
                   display: "grid",
-                  gridTemplateColumns: "repeat(30, 1fr)",
+                  gridTemplateColumns: "repeat(38, 1fr)",
                   minHeight: 64,
                   borderBottom: `1px solid ${colors.border}`,
                 }}>
-                  {proximos30Dias.map((fecha) => (
+                  {diasCalendario.map((fecha) => (
                     <div key={fecha} style={{
                       borderLeft: `1px solid ${colors.border}`,
                       background: "#fff",
@@ -565,15 +761,24 @@ export default function Home() {
                   ))}
 
                   {reservasHabitacion.map((reserva) => {
-                    let inicio = proximos30Dias.findIndex((f) => f >= reserva.fecha_entrada)
-                    let fin = proximos30Dias.findIndex((f) => f >= reserva.fecha_salida)
+                    let inicio = diasCalendario.findIndex((f) => f >= reserva.fecha_entrada)
+                    let fin = diasCalendario.findIndex((f) => f >= reserva.fecha_salida)
                     if (inicio < 0) inicio = 0
-                    if (fin < 0) fin = 30
+                    if (fin < 0) fin = diasCalendario.length
                     if (fin <= inicio) return null
 
-                    const confirmada =
-                      reserva.estado === "confirmada" ||
-                      reserva.estado === "finalizada"
+                    const hoy = fechaLocal(0)
+                    const estadoVisual = hoy < reserva.fecha_entrada
+                      ? "futura"
+                      : hoy >= reserva.fecha_salida
+                        ? "out"
+                        : "in"
+
+                    const colorReserva = estadoVisual === "in"
+                      ? colors.green
+                      : estadoVisual === "out"
+                        ? colors.red
+                        : "#7c3aed"
 
                     return (
                       <div
@@ -582,12 +787,12 @@ export default function Home() {
                         title={`${reserva.nombre_huesped} · ${formatearFecha(reserva.fecha_entrada)} - ${formatearFecha(reserva.fecha_salida)}`}
                         style={{
                           position: "absolute",
-                          left: `calc(${inicio} * (100% / 30) + 3px)`,
-                          width: `calc(${fin - inicio} * (100% / 30) - 6px)`,
+                          left: `calc(${inicio} * (100% / 38) + 3px)`,
+                          width: `calc(${fin - inicio} * (100% / 38) - 6px)`,
                           top: 10,
                           height: 42,
                           borderRadius: 7,
-                          background: confirmada ? colors.blue : "#f5c542",
+                          background: colorReserva,
                           color: "#fff",
                           display: "flex",
                           alignItems: "center",
@@ -691,8 +896,7 @@ export default function Home() {
           fontSize: 11,
           opacity: .5,
         }}>
-          <div style={{ fontWeight: 700, marginBottom: 4 }}>Habitación Llena · MVP</div>
-          <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user?.email || ""}</div>
+          Habitación Llena · MVP
         </div>
       </aside>
     )
@@ -718,21 +922,6 @@ export default function Home() {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button
-            onClick={() => cargarDatos()}
-            style={{
-              border: `1px solid ${colors.border}`,
-              background: colors.white,
-              color: colors.text,
-              borderRadius: 7,
-              padding: "9px 12px",
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-            title="Actualizar datos"
-          >
-            ↻ Actualizar
-          </button>
           <button
             onClick={async () => {
               await supabase.auth.signOut()
@@ -1231,7 +1420,7 @@ export default function Home() {
           <section style={{ ...cardStyle, maxWidth: 900 }}>
             <h2 style={{ margin: 0, fontSize: 18 }}>Marca</h2>
             <div style={{ color: colors.muted, fontSize: 12, marginTop: 4, marginBottom: 20 }}>
-              Esta configuración se guarda de forma local por ahora. La base operativa (alojamientos, habitaciones y reservas) ya está vinculada a tu cuenta en Supabase.
+              Esta configuración se guarda en este navegador por ahora.
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
@@ -1267,39 +1456,23 @@ export default function Home() {
               </div>
             )}
 
-            <h2 style={{ margin: "30px 0 18px", fontSize: 18 }}>Datos del alojamiento</h2>
-            <div style={{ color: colors.muted, fontSize: 12, marginBottom: 18 }}>
-              Estos datos quedan asociados a tu cuenta en este MVP y después los llevaremos a Supabase para que puedan usarse en el motor de reservas y las automatizaciones.
-            </div>
+            <h2 style={{ margin: "30px 0 18px", fontSize: 18 }}>Tarifas</h2>
+            <div style={{ color: colors.muted, fontSize: 12, marginBottom: 16 }}>Configurá el precio por noche según el tipo de habitación. La cochera se calcula por vehículo y por noche.</div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-              <Field label="Email comercial">
-                <input value={config.email} onChange={(e) => setConfig({ ...config, email: e.target.value })} placeholder="reservas@tuhotel.com" style={inputStyle} />
-              </Field>
-
-              <Field label="Teléfono">
-                <input value={config.telefono} onChange={(e) => setConfig({ ...config, telefono: e.target.value })} placeholder="+54 9..." style={inputStyle} />
-              </Field>
-
-              <Field label="Dirección">
-                <input value={config.direccion} onChange={(e) => setConfig({ ...config, direccion: e.target.value })} placeholder="Dirección del alojamiento" style={inputStyle} />
-              </Field>
-
-              <Field label="Ciudad / localidad">
-                <input value={config.ciudad} onChange={(e) => setConfig({ ...config, ciudad: e.target.value })} placeholder="Ej. Villa General Belgrano" style={inputStyle} />
-              </Field>
-
-              <Field label="Check-in">
-                <input type="time" value={config.checkIn} onChange={(e) => setConfig({ ...config, checkIn: e.target.value })} style={inputStyle} />
-              </Field>
-
-              <Field label="Check-out">
-                <input type="time" value={config.checkOut} onChange={(e) => setConfig({ ...config, checkOut: e.target.value })} style={inputStyle} />
-              </Field>
-
-              <Field label="Descripción" wide>
-                <textarea value={config.descripcion} onChange={(e) => setConfig({ ...config, descripcion: e.target.value })} placeholder="Breve descripción del alojamiento" style={{ ...inputStyle, minHeight: 90, resize: "vertical" }} />
-              </Field>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
+              {[["simple", "Simple"], ["doble", "Doble"], ["triple", "Triple"], ["cuadruple", "Cuádruple"], ["otro", "Otro"], ["cochera", "Cochera / vehículo"], ["extra", "Extra por reserva"]].map(([clave, label]) => (
+                <Field key={clave} label={label}>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={config.tarifas?.[clave] ?? 0}
+                    onChange={(e) => setConfig({ ...config, tarifas: { ...config.tarifas, [clave]: e.target.value } })}
+                    placeholder="0"
+                    style={inputStyle}
+                  />
+                </Field>
+              ))}
             </div>
 
             <h2 style={{ margin: "30px 0 18px", fontSize: 18 }}>Accesos a canales</h2>
@@ -1369,31 +1542,6 @@ export default function Home() {
             </div>
           </div>
 
-          {alojamientos.length > 0 && (
-            <section style={{
-              ...cardStyle,
-              marginBottom: 22,
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: 18,
-              flexWrap: "wrap",
-            }}>
-              <div>
-                <div style={{ fontSize: 11, color: colors.muted, textTransform: "uppercase", letterSpacing: 1 }}>Alojamiento activo</div>
-                <div style={{ fontSize: 20, fontWeight: 800, marginTop: 5 }}>{alojamientos[0]?.nombre}</div>
-                {(config.ciudad || config.direccion) && (
-                  <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>
-                    {[config.direccion, config.ciudad].filter(Boolean).join(" · ")}
-                  </div>
-                )}
-              </div>
-              <button onClick={() => setVista("configuracion")} style={secondaryButton}>
-                Completar configuración
-              </button>
-            </section>
-          )}
-
           <div style={{
             display: "grid",
             gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
@@ -1443,7 +1591,7 @@ export default function Home() {
                   <div style={{ color: colors.muted, padding: 25, textAlign: "center" }}>
                     Todavía no hay reservas.
                   </div>
-                ) : recientes.map((r) => <ReservaCard key={r.id} reserva={r} />)}
+                ) : recientes.map((r) => ReservaCard({ reserva: r }))}
               </div>
             </section>
 
@@ -1564,8 +1712,12 @@ export default function Home() {
                   </select>
                 </Field>
 
-                <Field label="Nombre del huésped">
+                <Field label="Nombre del huésped principal">
                   <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej. Juan Pérez" style={inputStyle} />
+                </Field>
+
+                <Field label="DNI / documento">
+                  <input value={dni} onChange={(e) => setDni(e.target.value)} placeholder="Ej. 35.123.456" style={inputStyle} />
                 </Field>
 
                 <Field label="Email">
@@ -1576,8 +1728,40 @@ export default function Home() {
                   <input value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="+54 9..." style={inputStyle} />
                 </Field>
 
-                <Field label="Huéspedes">
-                  <input type="number" min="1" value={cantidadHuespedes} onChange={(e) => setCantidadHuespedes(e.target.value)} style={inputStyle} />
+                <Field label="Huésped principal">
+                  <label style={{ display: "flex", alignItems: "center", gap: 9, minHeight: 44, fontSize: 13, fontWeight: 600 }}>
+                    <input type="checkbox" checked={esMenor} onChange={(e) => setEsMenor(e.target.checked)} />
+                    Es menor de edad
+                  </label>
+                </Field>
+
+                <Field label="Cantidad de huéspedes">
+                  <input type="number" min="1" value={1 + pasajerosExtra.length} readOnly style={{ ...inputStyle, background: "#f8fafc" }} />
+                </Field>
+
+                <Field label="Pasajeros adicionales" wide>
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {pasajerosExtra.map((pasajero, indice) => (
+                      <div key={indice} style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr auto auto", gap: 8, alignItems: "center", padding: 10, background: "#f8fafc", borderRadius: 9, border: `1px solid ${colors.border}` }}>
+                        <input value={pasajero.nombre} onChange={(e) => actualizarPasajeroExtra(indice, "nombre", e.target.value)} placeholder="Nombre y apellido" style={inputStyle} />
+                        <input value={pasajero.dni} onChange={(e) => actualizarPasajeroExtra(indice, "dni", e.target.value)} placeholder="DNI" style={inputStyle} />
+                        <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>
+                          <input type="checkbox" checked={Boolean(pasajero.menor)} onChange={(e) => actualizarPasajeroExtra(indice, "menor", e.target.checked)} />
+                          Menor
+                        </label>
+                        <button type="button" onClick={() => eliminarPasajeroExtra(indice)} style={{ ...secondaryButton, padding: "8px 10px", color: colors.red }}>×</button>
+                      </div>
+                    ))}
+                    <button type="button" onClick={agregarPasajeroExtra} style={{ ...secondaryButton, width: "fit-content" }}>+ Agregar pasajero</button>
+                  </div>
+                </Field>
+
+                <Field label="Vehículos con cochera">
+                  <input type="number" min="0" value={vehiculos} onChange={(e) => setVehiculos(e.target.value)} style={inputStyle} />
+                </Field>
+
+                <Field label="Extra de la reserva">
+                  <input type="number" min="0" step="0.01" value={extraReserva} onChange={(e) => setExtraReserva(e.target.value)} style={inputStyle} />
                 </Field>
 
                 <Field label="Fecha de entrada">
@@ -1601,6 +1785,26 @@ export default function Home() {
                   <input value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="Información adicional..." style={inputStyle} />
                 </Field>
               </div>
+
+              {habitacionSeleccionada && fechaEntrada && fechaSalida && (
+                <div style={{
+                  marginTop: 18,
+                  padding: 16,
+                  borderRadius: 10,
+                  background: colors.blueSoft,
+                  border: `1px solid #cfe0ff`,
+                }}>
+                  <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 10 }}>Resumen de tarifa</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8, fontSize: 13 }}>
+                    <div>Noches: <strong>{calcularImporteReserva().noches}</strong></div>
+                    <div>Habitación / noche: <strong>${calcularImporteReserva().tarifaNoche.toLocaleString("es-AR")}</strong></div>
+                    <div>Alojamiento: <strong>${calcularImporteReserva().alojamiento.toLocaleString("es-AR")}</strong></div>
+                    <div>Cochera: <strong>${calcularImporteReserva().cochera.toLocaleString("es-AR")}</strong></div>
+                    <div>Extra: <strong>${calcularImporteReserva().extra.toLocaleString("es-AR")}</strong></div>
+                    <div>Total: <strong style={{ color: colors.navy, fontSize: 16 }}>${calcularImporteReserva().total.toLocaleString("es-AR")}</strong></div>
+                  </div>
+                </div>
+              )}
 
               {mensaje && (
                 <div style={{
@@ -1645,7 +1849,7 @@ export default function Home() {
             <div style={{ display: "grid", gap: 10 }}>
               {reservas.length === 0 ? (
                 <div style={emptyStyle}>Todavía no hay reservas cargadas.</div>
-              ) : reservas.map((r) => <ReservaCard key={r.id} reserva={r} />)}
+              ) : reservas.map((r) => ReservaCard({ reserva: r }))}
             </div>
           </section>
         </div>
@@ -1656,13 +1860,18 @@ export default function Home() {
   function CalendarioVista() {
     return (
       <>
-        <Header titulo="Calendario" subtitulo="Vista de ocupación de los próximos 30 días" />
+        <Header titulo="Calendario" subtitulo="Últimos 7 días + próximos 30 días" />
         <div style={{ padding: 30 }}>
           <section style={cardStyle}>
             <div style={{ marginBottom: 18 }}>
               <h2 style={{ margin: 0, fontSize: 18 }}>Calendario de ocupación</h2>
               <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>
                 Hacé click sobre una reserva para editarla.
+              </div>
+              <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 12, fontSize: 11, fontWeight: 700 }}>
+                <span style={{ color: colors.green }}>● IN · Alojado</span>
+                <span style={{ color: colors.red }}>● OUT · Ya salió</span>
+                <span style={{ color: "#7c3aed" }}>● FUTURA · Aún no llegó</span>
               </div>
             </div>
             {habitacionesActivas.length === 0 ? (
@@ -1850,7 +2059,7 @@ export default function Home() {
       fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
     }}>
       <div className="desktop-sidebar">
-        <Sidebar />
+        {Sidebar()}
       </div>
 
       <div className="mobile-topbar">
@@ -1914,15 +2123,15 @@ export default function Home() {
       )}
 
       <main style={{ marginLeft: 235, minHeight: "100vh" }}>
-        {vista === "dashboard" && <Dashboard />}
-        {vista === "reservas" && <Reservas />}
-        {vista === "calendario" && <CalendarioVista />}
-        {vista === "alojamientos" && <Alojamientos />}
-        {vista === "habitaciones" && <Habitaciones />}
-        {vista === "ventas" && <Ventas />}
-        {vista === "integraciones" && <Integraciones />}
-        {vista === "asistente" && <Asistente />}
-        {vista === "configuracion" && <Configuracion />}
+        {vista === "dashboard" && Dashboard()}
+        {vista === "reservas" && Reservas()}
+        {vista === "calendario" && CalendarioVista()}
+        {vista === "alojamientos" && Alojamientos()}
+        {vista === "habitaciones" && Habitaciones()}
+        {vista === "ventas" && Ventas()}
+        {vista === "integraciones" && Integraciones()}
+        {vista === "asistente" && Asistente()}
+        {vista === "configuracion" && Configuracion()}
       </main>
 
       {reservaSeleccionada && (
@@ -1977,9 +2186,24 @@ export default function Home() {
               <Info label="Salida" value={formatearFecha(reservaSeleccionada.fecha_salida)} />
               <Info label="Noches" value={diasEntre(reservaSeleccionada.fecha_entrada, reservaSeleccionada.fecha_salida)} />
               <Info label="Huéspedes" value={reservaSeleccionada.cantidad_huespedes || 1} />
+              {reservaSeleccionada.precio_total != null && <Info label="Total" value={`$${Number(reservaSeleccionada.precio_total || 0).toLocaleString("es-AR")}`} />}
+              {reservaSeleccionada.vehiculos != null && <Info label="Vehículos" value={reservaSeleccionada.vehiculos} />}
               <Info label="Estado" value={estadoBadge(reservaSeleccionada.estado).label} />
               {reservaSeleccionada.email_huesped && <Info label="Email" value={reservaSeleccionada.email_huesped} />}
               {reservaSeleccionada.telefono_huesped && <Info label="Teléfono" value={reservaSeleccionada.telefono_huesped} />}
+            </div>
+
+            <div style={{ marginTop: 20 }}>
+              <div style={{ color: colors.muted, fontSize: 12, marginBottom: 8 }}>Pasajeros</div>
+              <div style={{ display: "grid", gap: 7 }}>
+                {obtenerListaPasajeros(reservaSeleccionada).map((pasajero, indice) => (
+                  <div key={indice} style={{ padding: "9px 11px", background: "#f8fafc", borderRadius: 8, fontSize: 13 }}>
+                    <strong>{indice + 1}. {pasajero.nombre}</strong>
+                    {pasajero.dni ? ` · DNI ${pasajero.dni}` : ""}
+                    {pasajero.menor ? " · Menor" : ""}
+                  </div>
+                ))}
+              </div>
             </div>
 
             {reservaSeleccionada.notas && (
@@ -1992,7 +2216,12 @@ export default function Home() {
             )}
 
             <div style={{ display: "grid", gap: 9, marginTop: 28 }}>
-              <button onClick={() => editarReserva(reservaSeleccionada)} style={primaryButton}>
+              {reservaSeleccionada.email_huesped && (
+                <button onClick={() => enviarResumenPorEmail(reservaSeleccionada)} style={primaryButton}>
+                  ✉ Enviar resumen por email
+                </button>
+              )}
+              <button onClick={() => editarReserva(reservaSeleccionada)} style={secondaryButton}>
                 Editar reserva
               </button>
               {reservaSeleccionada.estado !== "cancelada" && (
@@ -2019,8 +2248,6 @@ export default function Home() {
         button:hover { opacity: .92; }
         @media (max-width: 900px) {
           .desktop-sidebar { display: none; }
-          header { padding: 0 16px !important; }
-          header > div:first-child { min-width: 0; }
           .mobile-topbar { display: flex !important; }
           main { margin-left: 0 !important; padding-top: 58px; }
         }
