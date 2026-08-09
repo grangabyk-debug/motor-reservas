@@ -179,6 +179,7 @@ export default function Home() {
 
   const [reservaSeleccionada, setReservaSeleccionada] = useState(null)
   const [confirmarCheckoutReserva, setConfirmarCheckoutReserva] = useState(null)
+  const [confirmarCheckinNuevaReserva, setConfirmarCheckinNuevaReserva] = useState(null)
   const [recepcionSeccion, setRecepcionSeccion] = useState("panel")
   const [cajaDiaria, setCajaDiaria] = useState(() => {
     try { return JSON.parse(localStorage.getItem("hl_caja_diaria") || "null") || { abierta:false, apertura:null, movimientos:[], cierres:[] } }
@@ -188,6 +189,29 @@ export default function Home() {
   const [cajaMovimiento, setCajaMovimiento] = useState({ tipo:"ingreso", medio:"efectivo", concepto:"", monto:"", referencia:"" })
   const [cajaEfectivoContado, setCajaEfectivoContado] = useState("")
   const [cajaModal, setCajaModal] = useState(null)
+  const [configCaja, setConfigCaja] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("hl_config_caja") || "null") || {
+        turnos: [
+          { id: "manana", nombre: "Mañana", inicio: "07:00", fin: "15:00", activo: true },
+          { id: "tarde", nombre: "Tarde", inicio: "15:00", fin: "23:00", activo: true },
+          { id: "noche", nombre: "Noche", inicio: "23:00", fin: "07:00", activo: true },
+        ],
+        efectivoInicialObligatorio: true,
+        efectivoContadoObligatorio: true,
+        exigirConfirmacionCierre: true,
+        medios: {
+          efectivo: true, tarjeta: true, transferencia: true, mercadopago: true, otro: true,
+        },
+      }
+    } catch {
+      return { turnos: [], efectivoInicialObligatorio: true, efectivoContadoObligatorio: true, exigirConfirmacionCierre: true, medios: { efectivo:true, tarjeta:true, transferencia:true, mercadopago:true, otro:true } }
+    }
+  })
+  const [configCajaEditando, setConfigCajaEditando] = useState(null)
+  const [configuracionCaja, setConfiguracionCaja] = useState("turnos")
+  const [cajaBarraVisible, setCajaBarraVisible] = useState(true)
+
   const [modoEdicion, setModoEdicion] = useState(false)
   const [mensaje, setMensaje] = useState("")
   const [cargando, setCargando] = useState(false)
@@ -1181,10 +1205,43 @@ export default function Home() {
     imprimirHTML(`Housekeeping ${formatearFecha(fecha)}`, `<h1>${config.nombreMarca || "Habitación Llena"}</h1><h2>Housekeeping · ${formatearFecha(fecha)}</h2><h3>OUT del día (${outs.length})</h3><table><tr><th>Habitación</th><th>Huésped</th><th>Nº reserva</th><th>Pasajeros</th><th>Late check-out</th><th>Notas</th></tr>${outs.map(r=>`<tr><td>${nombreHabitacion(r.habitacion_id)}</td><td>${r.nombre_huesped||""}</td><td>${r.numero_reserva||"—"}</td><td>${r.cantidad_huespedes||1}</td><td>${r.late_checkout?"Sí":"No"}</td><td>${r.notas||""}</td></tr>`).join("")}</table><h3>IN del día (${ins.length})</h3><table><tr><th>Habitación</th><th>Huésped</th><th>Nº reserva</th><th>Pasajeros</th><th>Early check-in</th></tr>${ins.map(r=>`<tr><td>${nombreHabitacion(r.habitacion_id)}</td><td>${r.nombre_huesped||""}</td><td>${r.numero_reserva||"—"}</td><td>${r.cantidad_huespedes||1}</td><td>${r.early_checkin?"Sí":"No"}</td></tr>`).join("")}</table>`)
   }
 
+
+
+  function confirmarCheckinNuevaReservaAhora() {
+    const reserva = confirmarCheckinNuevaReserva
+    if (!reserva) return
+    // Reuse the existing check-in path when available.
+    if (typeof realizarCheckIn === "function") {
+      realizarCheckIn(reserva)
+    } else {
+      // Fallback: update the local reservation state and reload data.
+      const nueva = { ...reserva, estado: "alojado" }
+      setReservas(prev => prev.map(r => String(r.id) === String(nueva.id) ? nueva : r))
+      try {
+        const stored = JSON.parse(localStorage.getItem("hl_reservas") || "[]")
+        localStorage.setItem("hl_reservas", JSON.stringify(stored.map(r => String(r.id) === String(nueva.id) ? nueva : r)))
+      } catch {}
+      if (typeof cargarDatos === "function") cargarDatos()
+    }
+    setConfirmarCheckinNuevaReserva(null)
+  }
+
+  function colorReservaCalendario(reserva) {
+    const estado = String(reserva?.estado || "").toLowerCase()
+    if (["alojado", "check-in", "checkin", "in_house"].includes(estado)) return colors.green || "#16a34a"
+    if (["finalizada", "checkout", "check-out"].includes(estado)) return colors.red || "#dc2626"
+    return "#7c3aed" // violeta para pendiente, confirmada y futuras
+  }
+
   function nochesEntre(fechaInicio, fechaFin) {
     if (!fechaInicio || !fechaFin) return 0
     return Math.max(0, Math.round((new Date(`${fechaFin}T12:00:00`) - new Date(`${fechaInicio}T12:00:00`)) / 86400000))
   }
+
+
+  useEffect(() => {
+    cargarConfigCajaPorAlojamiento(alojamientoSeleccionado)
+  }, [alojamientoSeleccionado])
 
   function calcularPresupuestoInicial() {
     const habitacion = habitacionesDisponibles.find(h => String(h.id) === String(habitacionSeleccionada))
@@ -1228,6 +1285,54 @@ export default function Home() {
     const movimiento = { id:String(Date.now()), fecha:new Date().toISOString(), usuario:user?.email || user?.id || "usuario", ...cajaMovimiento, monto }
     guardarCajaLocal({ ...cajaDiaria, movimientos:[movimiento, ...(cajaDiaria.movimientos || [])] })
     setCajaMovimiento({ tipo:"ingreso", medio:"efectivo", concepto:"", monto:"", referencia:"" })
+  }
+
+
+  function cajaConfigKey() {
+    return `hl_config_caja_${alojamientoSeleccionado || "sin-alojamiento"}`
+  }
+
+  function guardarConfigCajaLocal(config) {
+    setConfigCaja(config)
+    try { localStorage.setItem(cajaConfigKey(), JSON.stringify(config)) } catch {}
+  }
+
+  function guardarReservaYRefrescarCajaLocal(caja) {
+    guardarCajaLocal(caja)
+  }
+
+  function agregarTurnoCaja() {
+    const id = `turno_${Date.now()}`
+    guardarConfigCajaLocal({
+      ...configCaja,
+      turnos: [...(configCaja.turnos || []), { id, nombre:"Nuevo turno", inicio:"00:00", fin:"00:00", activo:true }],
+    })
+  }
+
+  function actualizarTurnoCaja(id, campo, valor) {
+    guardarConfigCajaLocal({
+      ...configCaja,
+      turnos: (configCaja.turnos || []).map(t => t.id === id ? { ...t, [campo]: valor } : t),
+    })
+  }
+
+  function eliminarTurnoCaja(id) {
+    guardarConfigCajaLocal({
+      ...configCaja,
+      turnos: (configCaja.turnos || []).filter(t => t.id !== id),
+    })
+  }
+
+  function guardarConfiguracionCaja() {
+    guardarConfigCajaLocal(configCaja)
+  }
+
+  function cargarConfigCajaPorAlojamiento(id) {
+    try {
+      const key = `hl_config_caja_${id || "sin-alojamiento"}`
+      const guardada = JSON.parse(localStorage.getItem(key) || "null")
+      if (guardada) setConfigCaja(guardada)
+    } catch {}
   }
 
   function cerrarCajaDiaria() {
@@ -1322,7 +1427,7 @@ export default function Home() {
       fecha_entrada: fechaEntrada,
       fecha_salida: fechaSalida,
       cantidad_huespedes: obtenerPasajerosReserva().length,
-      estado: (!modoEdicion && fechaEntrada === fechaLocal(0) && fechaSalida > fechaLocal(0)) ? "alojado" : estado,
+      estado: modoEdicion ? estado : "pendiente",
       no_show: Boolean(noShow),
       early_checkin: Boolean(earlyCheckin),
       late_checkout: Boolean(lateCheckout),
@@ -1433,6 +1538,18 @@ export default function Home() {
     if (reservaCreadaEsNueva) {
       setFechaCalendario(fechaParaCalendario || fechaLocal(0))
       setVista("calendario")
+      if (fechaParaCalendario === fechaLocal(0)) {
+        const reservaParaCheckin = {
+          id: reservaId,
+          alojamiento_id: alojamientoSeleccionado,
+          habitacion_id: habitacionSeleccionada,
+          fecha_entrada: fechaEntrada,
+          fecha_salida: fechaSalida,
+          estado: "pendiente",
+          nombre_huesped: nombre,
+        }
+        setConfirmarCheckinNuevaReserva(reservaParaCheckin)
+      }
     }
     setCargando(false)
   }
@@ -4758,6 +4875,7 @@ export default function Home() {
     return (
       <div style={{
         minHeight: "100vh",
+    paddingBottom: 52,
         display: "grid",
         placeItems: "center",
         background: colors.bg,
@@ -4845,7 +4963,62 @@ export default function Home() {
         {vista === "asistencia" && AsistenciaHumana()}
         {vista === "bandeja" && BandejaEntrada()}
         {vista === "configuracion" && Configuracion()}
-      </main>
+      
+      <div id="barra-caja-diaria" style={{
+        position: "fixed",
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 9998,
+        minHeight: 34,
+        background: cajaDiaria.abierta ? "#0f172a" : "#334155",
+        color: "#fff",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 12,
+        padding: "7px 18px",
+        fontSize: 11,
+        boxShadow: "0 -3px 16px rgba(0,0,0,.12)",
+      }}>
+        <div style={{ display:"flex", alignItems:"center", gap:10, minWidth:0 }}>
+          <span style={{ width:8, height:8, borderRadius:99, background:cajaDiaria.abierta ? "#22c55e" : "#94a3b8", flexShrink:0 }} />
+          <strong>{cajaDiaria.abierta ? "Caja abierta" : "Caja cerrada"}</strong>
+          {cajaDiaria.abierta && <>
+            <span style={{ opacity:.65 }}>|</span>
+            <span>Usuario: {cajaDiaria.apertura?.usuario || "—"}</span>
+            <span style={{ opacity:.65 }}>|</span>
+            <span>Inicial: ${Number(cajaDiaria.apertura?.montoInicial || 0).toLocaleString("es-AR")}</span>
+            <span style={{ opacity:.65 }}>|</span>
+            <span>Esperado: ${Number(totalesCaja().esperado || 0).toLocaleString("es-AR")}</span>
+            <span style={{ opacity:.65 }}>|</span>
+            <span>Apertura: {cajaDiaria.apertura?.fecha ? new Date(cajaDiaria.apertura.fecha).toLocaleString("es-AR") : "—"}</span>
+          </>}
+        </div>
+        <button type="button" onClick={() => { setVista("recepcion"); setRecepcionSeccion("caja") }} style={{
+          border:"1px solid rgba(255,255,255,.25)", background:"rgba(255,255,255,.08)",
+          color:"#fff", borderRadius:7, padding:"5px 10px", fontWeight:800, cursor:"pointer",
+        }}>Ver caja</button>
+      </div>
+
+
+      {confirmarCheckinNuevaReserva && (
+        <div style={modalOverlay}>
+          <div style={{ ...modalCard, maxWidth: 460 }}>
+            <div style={{ fontSize: 12, color: colors.green || "#16a34a", fontWeight: 900, textTransform:"uppercase" }}>Reserva creada</div>
+            <h3 style={{ marginBottom: 6 }}>¿Querés realizar el check-in ahora?</h3>
+            <p style={{ color: colors.muted, fontSize: 13, lineHeight:1.5 }}>
+              La reserva quedó creada. Si el huésped está ingresando en este momento, podés realizar el check-in ahora. Si no, permanecerá como reserva pendiente/futura.
+            </p>
+            <div style={{ display:"flex", justifyContent:"flex-end", gap:8, marginTop:18 }}>
+              <button type="button" onClick={() => setConfirmarCheckinNuevaReserva(null)} style={secondaryButton}>No, después</button>
+              <button type="button" onClick={confirmarCheckinNuevaReservaAhora} style={{ ...primaryButton, background: colors.green || "#16a34a" }}>Sí, realizar check-in</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+</main>
 
       {confirmarCheckoutReserva && (
         <div
@@ -4884,6 +5057,61 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+          <section style={{ ...cardStyle, marginTop: 18 }}>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:12 }}>
+              <div>
+                <h2 style={{ margin:0 }}>💵 Caja</h2>
+                <p style={{ margin:"5px 0 0", color:colors.muted, fontSize:12 }}>Configuración propia de este alojamiento.</p>
+              </div>
+              <button onClick={guardarConfiguracionCaja} style={primaryButton}>Guardar configuración</button>
+            </div>
+
+            <div style={{ display:"flex", gap:7, marginTop:16, borderBottom:`1px solid ${colors.border}`, paddingBottom:8 }}>
+              {[
+                ["turnos","Turnos"],
+                ["cierre","Apertura y cierre"],
+                ["medios","Medios de pago"],
+              ].map(([key,label]) => (
+                <button key={key} onClick={() => setConfiguracionCaja(key)} style={configuracionCaja===key ? primaryButton : secondaryButton}>{label}</button>
+              ))}
+            </div>
+
+            {configuracionCaja === "turnos" && (
+              <div style={{ marginTop:14 }}>
+                {(configCaja.turnos || []).map(t => (
+                  <div key={t.id} style={{ display:"grid", gridTemplateColumns:"1.3fr 110px 110px 90px auto", gap:8, alignItems:"center", marginBottom:8 }}>
+                    <input value={t.nombre} onChange={e=>actualizarTurnoCaja(t.id,"nombre",e.target.value)} style={inputStyle} placeholder="Nombre del turno"/>
+                    <input type="time" value={t.inicio} onChange={e=>actualizarTurnoCaja(t.id,"inicio",e.target.value)} style={inputStyle}/>
+                    <input type="time" value={t.fin} onChange={e=>actualizarTurnoCaja(t.id,"fin",e.target.value)} style={inputStyle}/>
+                    <label style={{display:"flex",gap:5,alignItems:"center",fontSize:11,fontWeight:700}}><input type="checkbox" checked={!!t.activo} onChange={e=>actualizarTurnoCaja(t.id,"activo",e.target.checked)}/> Activo</label>
+                    <button onClick={()=>eliminarTurnoCaja(t.id)} style={{...secondaryButton,color:colors.red}}>Eliminar</button>
+                  </div>
+                ))}
+                <button onClick={agregarTurnoCaja} style={secondaryButton}>+ Agregar turno</button>
+              </div>
+            )}
+
+            {configuracionCaja === "cierre" && (
+              <div style={{ display:"grid", gap:10, marginTop:14 }}>
+                <label style={{fontSize:12,fontWeight:700}}><input type="checkbox" checked={!!configCaja.efectivoInicialObligatorio} onChange={e=>guardarConfigCajaLocal({...configCaja,efectivoInicialObligatorio:e.target.checked})}/> Efectivo inicial obligatorio al abrir</label>
+                <label style={{fontSize:12,fontWeight:700}}><input type="checkbox" checked={!!configCaja.efectivoContadoObligatorio} onChange={e=>guardarConfigCajaLocal({...configCaja,efectivoContadoObligatorio:e.target.checked})}/> Efectivo contado obligatorio al cerrar</label>
+                <label style={{fontSize:12,fontWeight:700}}><input type="checkbox" checked={!!configCaja.exigirConfirmacionCierre} onChange={e=>guardarConfigCajaLocal({...configCaja,exigirConfirmacionCierre:e.target.checked})}/> Exigir confirmación antes del cierre</label>
+              </div>
+            )}
+
+            {configuracionCaja === "medios" && (
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(2,minmax(0,1fr))", gap:10, marginTop:14 }}>
+                {Object.entries(configCaja.medios || {}).map(([medio,activo]) => (
+                  <label key={medio} style={{fontSize:12,fontWeight:700,textTransform:"capitalize"}}>
+                    <input type="checkbox" checked={!!activo} onChange={e=>guardarConfigCajaLocal({...configCaja, medios:{...configCaja.medios,[medio]:e.target.checked}})}/>
+                    {" "}{medio === "mercadopago" ? "Mercado Pago" : medio}
+                  </label>
+                ))}
+              </div>
+            )}
+          </section>
+
       )}
 
       {reservaSeleccionada && (
@@ -5035,9 +5263,11 @@ export default function Home() {
                   📄 Ver documento
                 </button>
               )}
-              <button onClick={() => agregarNoches(reservaSeleccionada, 1)} style={secondaryButton}>＋ Agregar 1 noche</button>
-              <button onClick={() => editarReserva(reservaSeleccionada)} style={secondaryButton}>
+                            <button onClick={() => editarReserva(reservaSeleccionada)} style={secondaryButton}>
                 Editar reserva
+              </button>
+              <button onClick={() => setVista("reservas")} style={secondaryButton}>
+                Ver ficha
               </button>
               {reservaSeleccionada.estado !== "cancelada" && (
                 <button onClick={() => cancelarReserva(reservaSeleccionada)} style={{
