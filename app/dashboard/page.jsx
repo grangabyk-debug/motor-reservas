@@ -99,6 +99,7 @@ export default function Home() {
     lateCheckout: { tipo: "monto", valor: 0 },
     tipoCambioUSD: 1,
     vehiculosTarifas: { auto: 0, camioneta: 0 },
+    pisos: [],
   })
 
   const logoHabitacionLlena = "/logo-habitacion-llena.png"
@@ -190,6 +191,7 @@ export default function Home() {
   const [pagoNota, setPagoNota] = useState("")
   const [busquedaHuesped, setBusquedaHuesped] = useState("")
   const [bloqueoHabitacion, setBloqueoHabitacion] = useState("")
+  const [bloqueoHabitaciones, setBloqueoHabitaciones] = useState([])
   const [bloqueoInicio, setBloqueoInicio] = useState(fechaLocal(0))
   const [bloqueoFin, setBloqueoFin] = useState(fechaLocal(1))
   const [bloqueoMotivo, setBloqueoMotivo] = useState("Mantenimiento")
@@ -200,6 +202,11 @@ export default function Home() {
   const [porcentajeAumento, setPorcentajeAumento] = useState("")
   const [menuOperativoAbierto, setMenuOperativoAbierto] = useState(false)
   const [menuAdministracionAbierto, setMenuAdministracionAbierto] = useState(false)
+  const [bandejaConversacionActiva, setBandejaConversacionActiva] = useState(null)
+  const [bandejaRespuesta, setBandejaRespuesta] = useState("")
+  const [bandejaFiltro, setBandejaFiltro] = useState("Todos")
+  const [bandejaConversaciones, setBandejaConversaciones] = useState([])
+  const [webIntegracion, setWebIntegracion] = useState("propia")
 
   const [mostrarAlojamiento, setMostrarAlojamiento] = useState(false)
   const [nuevoAlojamiento, setNuevoAlojamiento] = useState("")
@@ -215,6 +222,7 @@ export default function Home() {
     precio: 0,
   })
   const [nuevoTipoConfiguracion, setNuevoTipoConfiguracion] = useState("")
+  const [nuevoPiso, setNuevoPiso] = useState("")
 
   const diasCalendario = useMemo(
     () => Array.from({ length: 38 }, (_, i) => {
@@ -251,12 +259,17 @@ export default function Home() {
         try {
           const claveConfig = `habitacion_llena_config_${session.user.id}`
           const guardada = localStorage.getItem(claveConfig)
+          const bandejaGuardada = localStorage.getItem(`habitacion_llena_bandeja_${session.user.id}`)
+          if (bandejaGuardada) {
+            try { setBandejaConversaciones(JSON.parse(bandejaGuardada) || []) } catch {}
+          }
 
           if (guardada) {
-            setConfig((actual) => ({
-              ...actual,
-              ...JSON.parse(guardada),
-            }))
+            setConfig((actual) => {
+              const parsed = JSON.parse(guardada)
+              if (parsed.webIntegracion) setWebIntegracion(parsed.webIntegracion)
+              return { ...actual, ...parsed }
+            })
           }
         } catch (error) {
           console.error("No se pudo cargar la configuración local:", error)
@@ -580,23 +593,27 @@ export default function Home() {
 
   async function crearBloqueo(e) {
     e.preventDefault()
-    if (!bloqueoHabitacion || !bloqueoInicio || !bloqueoFin || bloqueoFin <= bloqueoInicio) {
-      alert("Completá habitación y fechas válidas.")
+    const seleccionadas = bloqueoHabitaciones.length ? bloqueoHabitaciones : (bloqueoHabitacion ? [bloqueoHabitacion] : [])
+    if (!seleccionadas.length || !bloqueoInicio || !bloqueoFin || bloqueoFin <= bloqueoInicio) {
+      alert("Seleccioná al menos una habitación y fechas válidas.")
       return
     }
-    const { error } = await supabase.from("bloqueos").insert([{
+    const filas = seleccionadas.map((id) => ({
       user_id: user.id,
-      habitacion_id: Number(bloqueoHabitacion),
+      habitacion_id: Number(id),
       fecha_desde: bloqueoInicio,
       fecha_hasta: bloqueoFin,
       motivo: bloqueoMotivo,
       detalle: bloqueoDetalle.trim(),
-    }])
+    }))
+    const { error } = await supabase.from("bloqueos").insert(filas)
     if (error) {
       console.error(error)
       alert("No se pudo crear el bloqueo. Verificá la migración PMS.")
       return
     }
+    setBloqueoHabitaciones([])
+    setBloqueoHabitacion("")
     setBloqueoDetalle("")
     await cargarDatos()
   }
@@ -1083,20 +1100,23 @@ export default function Home() {
       alert(`No se puede realizar el check-out. La cuenta tiene un saldo pendiente de ${reserva.moneda === "USD" ? "US$ " : "$"}${saldo.toLocaleString("es-AR", { minimumFractionDigits: reserva.moneda === "USD" ? 2 : 0 })}. Registrá el pago pendiente antes de continuar.`)
       return
     }
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from("reservas")
       .update({ estado: "finalizada" })
       .eq("id", reserva.id)
       .eq("user_id", user.id)
-      .select("*")
-      .single()
+
     if (error) {
-      console.error(error)
-      alert("No se pudo realizar el check-out.")
+      console.error("Error al finalizar reserva:", error)
+      alert(`No se pudo realizar el check-out. ${error.message || "Revisá los permisos de la reserva."}`)
       return
     }
-    setReservas((actuales) => actuales.map((r) => String(r.id) === String(reserva.id) ? data : r))
-    setReservaSeleccionada(data)
+
+    // La reserva ya fue actualizada en Supabase. Actualizamos el estado local
+    // y cerramos inmediatamente el panel lateral.
+    const reservaFinalizada = { ...reserva, estado: "finalizada" }
+    setReservas((actuales) => actuales.map((r) => String(r.id) === String(reserva.id) ? reservaFinalizada : r))
+    setReservaSeleccionada(null)
   }
 
   function imprimirReserva(reserva) {
@@ -1985,13 +2005,15 @@ export default function Home() {
 
                       const pendiente = reserva.estado === "pendiente"
                       const colorReserva =
-                        estadoVisual === "in"
-                          ? colors.green
-                          : estadoVisual === "out"
-                            ? colors.red
-                            : pendiente
-                              ? colors.yellow
-                              : "#7c3aed"
+                        reserva.estado === "finalizada"
+                          ? colors.red
+                          : estadoVisual === "in"
+                            ? colors.green
+                            : estadoVisual === "out"
+                              ? colors.red
+                              : pendiente
+                                ? colors.yellow
+                                : "#7c3aed"
 
                       /*
                        * CLAVE DEL PLANO:
@@ -2154,8 +2176,39 @@ export default function Home() {
   }
 
   function Bloqueos() {
-    return (<><Header titulo="Bloqueos" subtitulo="Evitá vender habitaciones por mantenimiento, uso propietario o grupos" /><div style={{ padding: 30, display: "grid", gridTemplateColumns: ".8fr 1.2fr", gap: 18 }}>
-      <section style={cardStyle}><h2 style={{ margin: 0, fontSize: 18 }}>Nuevo bloqueo</h2><form onSubmit={crearBloqueo} style={{ display: "grid", gap: 12, marginTop: 18 }}><Field label="Habitación"><select value={bloqueoHabitacion} onChange={e => setBloqueoHabitacion(e.target.value)} style={inputStyle}><option value="">Seleccionar</option>{habitacionesActivas.map(h => <option key={h.id} value={h.id}>{h.nombre} · {nombreAlojamiento(h.alojamiento_id)}</option>)}</select></Field><Field label="Desde"><input type="date" value={bloqueoInicio} onChange={e => setBloqueoInicio(e.target.value)} style={inputStyle}/></Field><Field label="Hasta"><input type="date" value={bloqueoFin} onChange={e => setBloqueoFin(e.target.value)} style={inputStyle}/></Field><Field label="Motivo"><select value={bloqueoMotivo} onChange={e => setBloqueoMotivo(e.target.value)} style={inputStyle}><option>Mantenimiento</option><option>Uso propietario</option><option>Grupo</option><option>Otro</option></select></Field><Field label="Detalle"><textarea value={bloqueoDetalle} onChange={e => setBloqueoDetalle(e.target.value)} style={{ ...inputStyle, minHeight: 80 }} /></Field><button type="submit" style={primaryButton}>Bloquear habitación</button></form></section>
+    const seleccionadas = bloqueoHabitaciones
+    const toggleHabitacionBloqueo = (id) => {
+      setBloqueoHabitaciones((actuales) => actuales.includes(String(id))
+        ? actuales.filter((x) => x !== String(id))
+        : [...actuales, String(id)]
+      )
+    }
+    return (<><Header titulo="Bloqueos" subtitulo="Evitá vender habitaciones por mantenimiento, uso propietario o grupos" /><div style={{ padding: 30, display: "grid", gridTemplateColumns: ".9fr 1.1fr", gap: 18 }}>
+      <section style={cardStyle}><h2 style={{ margin: 0, fontSize: 18 }}>Nuevo bloqueo</h2>
+        <form onSubmit={crearBloqueo} style={{ display: "grid", gap: 12, marginTop: 18 }}>
+          <Field label="Habitaciones">
+            <div style={{ border: `1px solid ${colors.border}`, borderRadius: 10, padding: 10, maxHeight: 250, overflowY: "auto", background: colors.white }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <span style={{ fontSize: 12, color: colors.muted }}>{seleccionadas.length} seleccionada{seleccionadas.length === 1 ? "" : "s"}</span>
+                <button type="button" onClick={() => setBloqueoHabitaciones(seleccionadas.length === habitacionesActivas.length ? [] : habitacionesActivas.map(h => String(h.id)))} style={{ ...secondaryButton, padding: "6px 9px", fontSize: 11 }}>
+                  {seleccionadas.length === habitacionesActivas.length ? "Quitar todas" : "Seleccionar todas"}
+                </button>
+              </div>
+              {habitacionesActivas.map((h) => (
+                <label key={h.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 4px", borderBottom: `1px solid ${colors.border}`, cursor: "pointer", fontSize: 13 }}>
+                  <input type="checkbox" checked={seleccionadas.includes(String(h.id))} onChange={() => toggleHabitacionBloqueo(h.id)} />
+                  <span><strong>{h.nombre}</strong> · {h.tipo || "Sin tipo"} · {nombreAlojamiento(h.alojamiento_id)}</span>
+                </label>
+              ))}
+            </div>
+          </Field>
+          <Field label="Desde"><input type="date" value={bloqueoInicio} onChange={e => setBloqueoInicio(e.target.value)} style={inputStyle}/></Field>
+          <Field label="Hasta"><input type="date" value={bloqueoFin} onChange={e => setBloqueoFin(e.target.value)} style={inputStyle}/></Field>
+          <Field label="Motivo"><select value={bloqueoMotivo} onChange={e => setBloqueoMotivo(e.target.value)} style={inputStyle}><option>Mantenimiento</option><option>Uso propietario</option><option>Grupo</option><option>Otro</option></select></Field>
+          <Field label="Detalle"><textarea value={bloqueoDetalle} onChange={e => setBloqueoDetalle(e.target.value)} style={{ ...inputStyle, minHeight: 80 }} /></Field>
+          <button type="submit" style={primaryButton}>Bloquear {seleccionadas.length > 1 ? `${seleccionadas.length} habitaciones` : "habitación"}</button>
+        </form>
+      </section>
       <section style={cardStyle}><div style={sectionHeader}><h2 style={{ margin: 0, fontSize: 18 }}>Bloqueos activos</h2><span style={{ color: colors.muted, fontSize: 12 }}>{bloqueos.length}</span></div><div style={{ display: "grid", gap: 10, marginTop: 16 }}>{bloqueos.length ? bloqueos.map(b => <div key={b.id} style={{ border: `1px solid ${colors.border}`, borderRadius: 10, padding: 14, display: "flex", justifyContent: "space-between", gap: 10 }}><div><strong>{nombreHabitacion(b.habitacion_id)}</strong><div style={{ color: colors.muted, fontSize: 12 }}>{formatearFecha(b.fecha_desde)} → {formatearFecha(b.fecha_hasta)} · {b.motivo}</div>{b.detalle && <div style={{ fontSize: 12, marginTop: 5 }}>{b.detalle}</div>}</div><button onClick={() => eliminarBloqueo(b.id)} style={{ ...secondaryButton, color: colors.red }}>Eliminar</button></div>) : <div style={{ color: colors.muted, padding: 20, textAlign: "center" }}>No hay bloqueos.</div>}</div></section>
     </div></>)
   }
@@ -2183,23 +2236,23 @@ export default function Home() {
     owner: [
       "dashboard", "reservas", "calendario", "housekeeping",
       "bloqueos", "huespedes", "caja", "ventas", "comunicaciones",
-      "integraciones", "asistente", "configuracion",
+      "integraciones", "asistente", "asistencia", "bandeja", "configuracion",
     ],
     manager: [
       "dashboard", "reservas", "calendario", "housekeeping",
       "bloqueos", "huespedes", "caja", "ventas", "comunicaciones",
-      "asistente",
+      "asistente", "asistencia", "bandeja",
     ],
     reception: [
       "dashboard", "reservas", "calendario", "housekeeping",
-      "huespedes", "comunicaciones", "asistente",
+      "huespedes", "comunicaciones", "asistente", "asistencia", "bandeja",
     ],
     housekeeping: [
-      "dashboard", "calendario", "housekeeping",
+      "dashboard", "calendario", "housekeeping", "asistencia",
     ],
     admin: [
       "dashboard", "reservas", "calendario", "huespedes",
-      "caja", "ventas", "comunicaciones", "asistente",
+      "caja", "ventas", "comunicaciones", "asistente", "asistencia", "bandeja",
     ],
   }
 
@@ -2247,7 +2300,7 @@ export default function Home() {
           }}
         >
           <span style={{ width: 20, textAlign: "center", opacity: .9 }}>{icon}</span>
-          {label}
+          {label}{id === "bandeja" && bandejaConversaciones.filter(c => c.noLeida).length > 0 && <span style={{ marginLeft: "auto", minWidth: 18, height: 18, borderRadius: 999, background: colors.red, color: "#fff", fontSize: 10, fontWeight: 900, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{bandejaConversaciones.filter(c => c.noLeida).length}</span>}
         </button>
       )
     }
@@ -2262,9 +2315,11 @@ export default function Home() {
       ["ventas", "◫", "Ventas"],
     ]
     const grupoComunicacion = [
+      ["bandeja", "📥", "Bandeja de entrada"],
       ["comunicaciones", "✉", "Comunicaciones"],
       ["integraciones", "↔", "Integraciones"],
       ["asistente", "✦", "Asistente IA"],
+      ["asistencia", "🆘", "Asistencia humana"],
     ]
 
     const grupoActivo = (grupo) => grupo.some(([id]) => id === vista)
@@ -2408,6 +2463,21 @@ export default function Home() {
         </div>
       </header>
     )
+  }
+
+  function guardarBandeja(conversaciones) {
+    setBandejaConversaciones(conversaciones)
+    if (user?.id) localStorage.setItem(`habitacion_llena_bandeja_${user.id}`, JSON.stringify(conversaciones))
+  }
+
+  function abrirAsistenciaHumana() {
+    const numero = String(process.env.NEXT_PUBLIC_HL_SUPPORT_WHATSAPP || "").replace(/\D/g, "")
+    if (!numero) {
+      alert("Todavía no está configurado el WhatsApp de asistencia. Definí NEXT_PUBLIC_HL_SUPPORT_WHATSAPP en el entorno de la aplicación.")
+      return
+    }
+    const mensaje = encodeURIComponent(`Hola, necesito asistencia con Habitación Llena. Alojamiento: ${nombreAlojamientoActivo}. Necesito ayuda con:`)
+    window.open(`https://wa.me/${numero}?text=${mensaje}`, "_blank", "noopener,noreferrer")
   }
 
   function guardarConfiguracion(valorConfig = config) {
@@ -2748,7 +2818,16 @@ export default function Home() {
       <>
         <Header titulo="Integraciones" subtitulo="Canales, WhatsApp y distribución" />
         <div style={{ padding: 30 }}>
-          <section style={cardStyle}>
+          <section style={{ ...cardStyle, marginBottom: 18 }}>
+          <div style={sectionHeader}><div><h2 style={{ margin: 0, fontSize: 18 }}>🌐 Página web + motor de reservas</h2><div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>Primer paso de la integración: definí de dónde viene la web del alojamiento.</div></div><span style={{ padding: "5px 9px", borderRadius: 999, background: colors.blueSoft, color: colors.blue, fontSize: 11, fontWeight: 800 }}>PREPARADO PARA CONECTAR</span></div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 16 }}>
+            <label style={{ border: `1px solid ${webIntegracion === "propia" ? colors.blue : colors.border}`, borderRadius: 10, padding: 15, cursor: "pointer", background: webIntegracion === "propia" ? colors.blueSoft : colors.white }}><input type="radio" checked={webIntegracion === "propia"} onChange={()=>setWebIntegracion("propia")} /> <strong>Ya tengo una página web</strong><div style={{ color: colors.muted, fontSize: 12, marginTop: 5 }}>La web existente se conectará al motor de reservas de Habitación Llena.</div></label>
+            <label style={{ border: `1px solid ${webIntegracion === "habitacion_llena" ? colors.blue : colors.border}`, borderRadius: 10, padding: 15, cursor: "pointer", background: webIntegracion === "habitacion_llena" ? colors.blueSoft : colors.white }}><input type="radio" checked={webIntegracion === "habitacion_llena"} onChange={()=>setWebIntegracion("habitacion_llena")} /> <strong>Quiero una web de Habitación Llena</strong><div style={{ color: colors.muted, fontSize: 12, marginTop: 5 }}>La página y el motor de reservas quedarán preparados para trabajar con el PMS.</div></label>
+          </div>
+          <div style={{ marginTop: 16, padding: 14, borderRadius: 10, background: colors.bg, border: `1px solid ${colors.border}` }}><strong>Cómo funcionará</strong><div style={{ color: colors.muted, fontSize: 12, lineHeight: 1.6, marginTop: 5 }}>Página web → Motor de reservas → disponibilidad del calendario → reserva confirmada → PMS. En esta primera etapa dejamos configurado el origen de la web; la conexión real con disponibilidad y reservas la hacemos en el siguiente paso.</div></div>
+          <button type="button" onClick={()=>{ const actualizado={...config, webIntegracion}; setConfig(actualizado); guardarConfiguracion(actualizado) }} style={{ ...primaryButton, marginTop: 14 }}>Guardar integración web</button>
+        </section>
+        <section style={cardStyle}>
             <div style={{ marginBottom: 20 }}>
               <h2 style={{ margin: 0, fontSize: 18 }}>Canales de venta</h2>
               <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>
@@ -2953,6 +3032,41 @@ export default function Home() {
     }))
   }
 
+  const pisosConfigurados = Array.isArray(config.pisos) ? config.pisos : []
+
+  function agregarPisoConfiguracion() {
+    const nombre = nuevoPiso.trim()
+    if (!nombre) return
+    if (pisosConfigurados.some((p) => String(p).toLowerCase() === nombre.toLowerCase())) {
+      alert("Ese piso ya existe.")
+      return
+    }
+    const actualizado = { ...config, pisos: [...pisosConfigurados, nombre] }
+    setConfig(actualizado)
+    guardarConfiguracion(actualizado)
+    setNuevoPiso("")
+  }
+
+  function eliminarPisoConfiguracion(piso) {
+    const asignadas = habitaciones.filter((h) => String(config.habitacionesPisos?.[String(h.id)] || "") === String(piso))
+    if (asignadas.length) {
+      alert(`No podés eliminar ${piso} porque tiene ${asignadas.length} habitación(es) asignada(s). Reasignalas primero.`)
+      return
+    }
+    const actualizado = { ...config, pisos: pisosConfigurados.filter((p) => String(p) !== String(piso)) }
+    setConfig(actualizado)
+    guardarConfiguracion(actualizado)
+  }
+
+  function asignarPisoHabitacion(habitacionId, piso) {
+    const mapa = { ...(config.habitacionesPisos || {}) }
+    if (piso) mapa[String(habitacionId)] = piso
+    else delete mapa[String(habitacionId)]
+    const actualizado = { ...config, habitacionesPisos: mapa }
+    setConfig(actualizado)
+    guardarConfiguracion(actualizado)
+  }
+
   function iniciarEdicionHabitacion(habitacion) {
     const tarifa = datosTarifaHabitacion(habitacion.id)
 
@@ -3066,6 +3180,66 @@ export default function Home() {
     }
 
     await cargarDatos()
+  }
+
+  function AsistenciaHumana() {
+    return (<>
+      <Header titulo="Asistencia humana" subtitulo="Contactá directamente al equipo de soporte" />
+      <div style={{ padding: 30 }}>
+        <section style={{ ...cardStyle, maxWidth: 760, margin: "0 auto", textAlign: "center", padding: 36 }}>
+          <div style={{ width: 64, height: 64, margin: "0 auto 16px", borderRadius: 18, display: "grid", placeItems: "center", background: "#dff7ea", color: "#168a4a", fontSize: 30 }}>🆘</div>
+          <h2 style={{ margin: 0, fontSize: 22 }}>¿Necesitás hablar con una persona?</h2>
+          <p style={{ color: colors.muted, lineHeight: 1.6, maxWidth: 560, margin: "10px auto 22px" }}>Para consultas que no pueda resolver el Asistente IA o para asistencia sobre tu cuenta, escribinos directamente por WhatsApp.</p>
+          <button onClick={abrirAsistenciaHumana} style={{ ...primaryButton, background: "#1fa855", padding: "13px 20px", borderRadius: 10 }}>💬 Abrir WhatsApp de asistencia</button>
+        </section>
+      </div>
+    </>)
+  }
+
+  function BandejaEntrada() {
+    const canales = ["Todos", "WhatsApp", "Instagram", "Web", "Email"]
+    const filtradas = bandejaConversaciones.filter((c) => bandejaFiltro === "Todos" || c.canal === bandejaFiltro)
+    const activa = filtradas.find((c) => c.id === bandejaConversacionActiva) || filtradas[0]
+
+    function seleccionarConversacion(c) {
+      setBandejaConversacionActiva(c.id)
+      if (c.noLeida) {
+        const actualizadas = bandejaConversaciones.map((x) => x.id === c.id ? { ...x, noLeida: false } : x)
+        guardarBandeja(actualizadas)
+      }
+    }
+
+    function responder(e) {
+      e.preventDefault()
+      const texto = bandejaRespuesta.trim()
+      if (!texto || !activa) return
+      const actualizadas = bandejaConversaciones.map((c) => c.id === activa.id ? { ...c, mensajes: [...(c.mensajes || []), { autor: "hotel", texto, fecha: new Date().toISOString() }] } : c)
+      guardarBandeja(actualizadas)
+      setBandejaRespuesta("")
+    }
+
+    return (<><Header titulo="Bandeja de entrada" subtitulo="Consultas de WhatsApp, Instagram, web y email en un solo lugar" />
+      <div style={{ padding: 30 }}>
+        <section style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
+          <div style={{ display: "flex", gap: 8, padding: 14, borderBottom: `1px solid ${colors.border}`, flexWrap: "wrap" }}>
+            {canales.map((canal) => <button key={canal} onClick={() => setBandejaFiltro(canal)} style={bandejaFiltro === canal ? primaryButton : secondaryButton}>{canal}</button>)}
+            <span style={{ marginLeft: "auto", color: colors.muted, fontSize: 12, alignSelf: "center" }}>La IA está preparada, pero desactivada.</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", minHeight: 520 }}>
+            <div style={{ borderRight: `1px solid ${colors.border}`, overflowY: "auto" }}>
+              {filtradas.length ? filtradas.map((c) => <button key={c.id} onClick={() => seleccionarConversacion(c)} style={{ width: "100%", border: "none", borderBottom: `1px solid ${colors.border}`, background: activa?.id === c.id ? colors.blueSoft : colors.white, padding: 14, textAlign: "left", cursor: "pointer" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}><strong>{c.nombre || "Consulta"}</strong><span style={{ fontSize: 10, color: colors.muted }}>{c.canal}</span></div>
+                <div style={{ color: colors.muted, fontSize: 12, marginTop: 5 }}>{c.mensajes?.[c.mensajes.length - 1]?.texto || "Sin mensajes"}</div>
+                {c.noLeida && <span style={{ display: "inline-block", marginTop: 7, padding: "3px 7px", borderRadius: 999, background: colors.red, color: "#fff", fontSize: 10, fontWeight: 800 }}>NUEVO</span>}
+              </button>) : <div style={{ padding: 30, color: colors.muted, textAlign: "center" }}>No hay conversaciones conectadas todavía.<div style={{ marginTop: 8, fontSize: 12 }}>Cuando conectemos WhatsApp, Instagram, web o email, van a aparecer acá.</div></div>}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+              {activa ? <><div style={{ padding: 16, borderBottom: `1px solid ${colors.border}` }}><strong>{activa.nombre}</strong><div style={{ color: colors.muted, fontSize: 11, marginTop: 3 }}>{activa.canal} · {activa.email || activa.telefono || "Sin contacto"}</div></div><div style={{ flex: 1, padding: 18, overflowY: "auto", background: colors.bg }}>{(activa.mensajes || []).map((m,i)=><div key={i} style={{ display: "flex", justifyContent: m.autor === "hotel" ? "flex-end" : "flex-start", marginBottom: 10 }}><div style={{ maxWidth: "75%", padding: "10px 12px", borderRadius: 12, background: m.autor === "hotel" ? colors.blue : colors.white, color: m.autor === "hotel" ? "#fff" : colors.text, border: m.autor === "hotel" ? "none" : `1px solid ${colors.border}`, fontSize: 13 }}>{m.texto}</div></div>)}</div><form onSubmit={responder} style={{ display: "flex", gap: 8, padding: 12, borderTop: `1px solid ${colors.border}` }}><input value={bandejaRespuesta} onChange={(e)=>setBandejaRespuesta(e.target.value)} placeholder="Escribí una respuesta..." style={{ ...inputStyle, flex: 1 }} /><button type="submit" style={primaryButton}>Responder</button></form></> : <div style={{ flex: 1, display: "grid", placeItems: "center", color: colors.muted }}>Seleccioná una conversación</div>}
+            </div>
+          </div>
+        </section>
+      </div>
+    </>)
   }
 
   function Configuracion() {
@@ -3912,6 +4086,19 @@ export default function Home() {
               </div>
             )}
 
+            <section style={{ marginTop: 24, padding: 16, border: `1px solid ${colors.border}`, borderRadius: 12, background: colors.bg }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <div><h2 style={{ margin: 0, fontSize: 16 }}>Pisos</h2><div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>Organizá las habitaciones por piso. Esto no modifica el calendario.</div></div>
+                <div style={{ display: "flex", gap: 8, maxWidth: 360, width: "100%" }}>
+                  <input value={nuevoPiso} onChange={(e) => setNuevoPiso(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); agregarPisoConfiguracion() } }} placeholder="Ej. Piso 1" style={inputStyle} />
+                  <button type="button" onClick={agregarPisoConfiguracion} style={secondaryButton}>+ Agregar piso</button>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14 }}>
+                {pisosConfigurados.length ? pisosConfigurados.map((piso) => <div key={piso} style={{ display: "flex", alignItems: "center", gap: 7, padding: "7px 10px", borderRadius: 999, border: `1px solid ${colors.border}`, background: colors.white, fontSize: 12, fontWeight: 700 }}><span>{piso}</span><button type="button" onClick={() => eliminarPisoConfiguracion(piso)} style={{ border: "none", background: "transparent", color: colors.red, cursor: "pointer", fontWeight: 900, padding: 0 }}>×</button></div>) : <span style={{ color: colors.muted, fontSize: 12 }}>Todavía no hay pisos configurados.</span>}
+              </div>
+            </section>
+
             <h2 style={{ margin: "30px 0 18px", fontSize: 18 }}>Tipos de habitación</h2>
             <div style={{ color: colors.muted, fontSize: 12, marginBottom: 16 }}>
               Definí los tipos de habitación que vas a usar. Después aparecerán como opciones en el menú desplegable al crear o editar una habitación.
@@ -4153,6 +4340,20 @@ export default function Home() {
 
                           <div>
                             <div style={{ color: colors.muted, fontSize: 10, textTransform: "uppercase", letterSpacing: .5 }}>
+                              Piso
+                            </div>
+                            <select
+                              value={config.habitacionesPisos?.[String(h.id)] || ""}
+                              onChange={(e) => asignarPisoHabitacion(h.id, e.target.value)}
+                              style={{ ...inputStyle, padding: "7px 9px", marginTop: 3, fontSize: 12 }}
+                            >
+                              <option value="">Sin asignar</option>
+                              {pisosConfigurados.map((piso) => <option key={piso} value={piso}>{piso}</option>)}
+                            </select>
+                          </div>
+
+                          <div>
+                            <div style={{ color: colors.muted, fontSize: 10, textTransform: "uppercase", letterSpacing: .5 }}>
                               Precio / noche
                             </div>
                             <div style={{ fontWeight: 800, marginTop: 3 }}>
@@ -4292,7 +4493,7 @@ export default function Home() {
               <div style={{ padding: "8px 11px", fontSize: 12, fontWeight: 800, opacity: .8 }}>💼 Administración</div>
               {[['caja','💰','Caja y pagos'],['ventas','◫','Ventas']].filter(([id]) => puedeVer(id)).map(([id,icon,label]) => <button key={id} onClick={() => { setVista(id); setMenuAbierto(false) }} style={{ width: "100%", padding: 10, border: "none", borderRadius: 8, marginBottom: 3, textAlign: "left", color: "#fff", background: vista === id ? "rgba(255,255,255,.14)" : "transparent" }}>{icon} {label}</button>)}
             </div>}
-            {[["comunicaciones","✉","Comunicaciones"],["integraciones","↔","Integraciones"],["asistente","✦","Asistente IA"]].filter(([id]) => puedeVer(id)).map(([id,icon,label]) => <button key={id} onClick={() => { setVista(id); setMenuAbierto(false) }} style={{ width: "100%", padding: 11, border: "none", borderRadius: 8, marginTop: 4, textAlign: "left", color: "#fff", background: vista === id ? "rgba(255,255,255,.14)" : "transparent" }}>{icon} {label}</button>)}
+            {[["bandeja","📥","Bandeja de entrada"],["comunicaciones","✉","Comunicaciones"],["integraciones","↔","Integraciones"],["asistente","✦","Asistente IA"],["asistencia","🆘","Asistencia humana"]].filter(([id]) => puedeVer(id)).map(([id,icon,label]) => <button key={id} onClick={() => { setVista(id); setMenuAbierto(false) }} style={{ width: "100%", padding: 11, border: "none", borderRadius: 8, marginTop: 4, textAlign: "left", color: "#fff", background: vista === id ? "rgba(255,255,255,.14)" : "transparent" }}>{icon} {label}</button>)}
           </div>
         </div>
       )}
@@ -4309,6 +4510,8 @@ export default function Home() {
         {vista === "comunicaciones" && Comunicaciones()}
         {vista === "integraciones" && Integraciones()}
         {vista === "asistente" && Asistente()}
+        {vista === "asistencia" && AsistenciaHumana()}
+        {vista === "bandeja" && BandejaEntrada()}
         {vista === "configuracion" && Configuracion()}
       </main>
 
