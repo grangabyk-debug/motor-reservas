@@ -1663,7 +1663,7 @@ export default function Home() {
                       textAlign: "center",
                       padding: "8px 3px 6px",
                       borderLeft: `1px solid ${colors.border}`,
-                      background: esHoy ? colors.blueSoft : finDeSemana ? "#fafbfe" : "#f8fafc",
+                      background: esHoy ? colors.blueSoft : colors.white,
                     }}
                   >
                     <div style={{
@@ -1919,7 +1919,7 @@ export default function Home() {
                             top: 14,
                             height: 60,
                             borderRadius: 10,
-                            background: `linear-gradient(135deg, ${colorReserva}, ${colorReserva}dd)`,
+                            background: colorReserva,
                             color: "#fff",
                             padding: "8px 10px",
                             boxSizing: "border-box",
@@ -4258,6 +4258,9 @@ export default function Home() {
         input:focus, select:focus, textarea:focus { border-color: ${colors.blue} !important; box-shadow: 0 0 0 3px rgba(22,119,232,.10); }
         .hl-dark [style*="background: #fff"], .hl-dark [style*="background:#fff"], .hl-dark [style*="background: rgb(255, 255, 255)"] { background: var(--hl-white) !important; }
         .hl-dark [style*="background: #f8fafc"], .hl-dark [style*="background:#f8fafc"] { background: #0d131d !important; }
+        .hl-dark [style*="background: #fafbfe"], .hl-dark [style*="background:#fafbfe"],
+        .hl-dark [style*="background: #fcfcfe"], .hl-dark [style*="background:#fcfcfe"] { background: var(--hl-white) !important; }
+
         .hl-dark [style*="border-color: #f5c2c2"], .hl-dark [style*="border-color: #f2caca"] { border-color: #6b2a2a !important; }
         .app-header { box-shadow: 0 1px 0 rgba(15,23,42,.02), 0 8px 24px rgba(15,23,42,.025); }
         .user-chip { white-space: nowrap; }
