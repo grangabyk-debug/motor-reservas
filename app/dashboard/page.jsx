@@ -2349,17 +2349,17 @@ export default function Home() {
 
   const permisosPorRol = {
     owner: [
-      "dashboard", "reservas", "calendario", "housekeeping",
+      "dashboard", "reservas", "recepcion", "calendario", "housekeeping",
       "bloqueos", "huespedes", "caja", "ventas", "comunicaciones",
       "integraciones", "asistente", "asistencia", "bandeja", "configuracion",
     ],
     manager: [
-      "dashboard", "reservas", "calendario", "housekeeping",
+      "dashboard", "reservas", "recepcion", "calendario", "housekeeping",
       "bloqueos", "huespedes", "caja", "ventas", "comunicaciones",
       "asistente", "asistencia", "bandeja",
     ],
     reception: [
-      "dashboard", "reservas", "calendario", "housekeeping",
+      "dashboard", "reservas", "recepcion", "calendario", "housekeeping",
       "huespedes", "comunicaciones", "asistente", "asistencia", "bandeja",
     ],
     housekeeping: [
@@ -4813,7 +4813,7 @@ export default function Home() {
               Habitación Llena
             </div>
             {[
-              ["dashboard", "▦", "Inicio"], ["reservas", "▣", "Reservas"], ["calendario", "▤", "Calendario"]
+              ["dashboard", "▦", "Inicio"], ["reservas", "▣", "Reservas"], ["recepcion", "▣", "Recepción"], ["calendario", "▤", "Calendario"]
             ].map(([id, icon, label]) => puedeVer(id) && <button key={id} onClick={() => { setVista(id); setMenuAbierto(false) }} style={{ width: "100%", padding: 11, border: "none", borderRadius: 8, marginBottom: 4, textAlign: "left", color: "#fff", background: vista === id ? "rgba(255,255,255,.14)" : "transparent", fontWeight: vista === id ? 700 : 500 }}>{icon} {label}</button>)}
 
             {[["housekeeping","🧹","Housekeeping"],["bloqueos","🚫","Bloqueos"],["huespedes","👤","Huéspedes"]].some(([id]) => puedeVer(id)) && <div style={{ marginTop: 8 }}>
