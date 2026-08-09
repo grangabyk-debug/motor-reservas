@@ -196,7 +196,7 @@ export default function UsuariosPage() {
           body: JSON.stringify({
             email: email.trim(),
             fullName: nombre.trim(),
-            role,
+            role: rol,
             propertyId: property.id,
           }),
         }
