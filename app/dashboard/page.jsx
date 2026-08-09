@@ -65,7 +65,6 @@ export default function Home() {
   const [user, setUser] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [rolReal, setRolReal] = useState("owner")
-  const [modoPruebaRol, setModoPruebaRol] = useState(null)
 
   const [alojamientos, setAlojamientos] = useState([])
   const [habitaciones, setHabitaciones] = useState([])
@@ -352,10 +351,7 @@ export default function Home() {
       }
     }
 
-    // Las reservas nuevas son la fuente principal de verdad.
-    // La interfaz las adapta al formato interno para no tener que
-    // cambiar todas las vistas del dashboard.
-    if (propertyIds.length) {
+    if (!reservasFinal.length && propertyIds.length) {
       const { data: reservationsData, error: reservationsError } = await supabase
         .from("reservations")
         .select("*")
@@ -370,9 +366,8 @@ export default function Home() {
           alojamiento_id: r.property_id,
           habitacion_id: r.unit_id,
           nombre_huesped: r.guest_name,
-          dni_huesped: r.guest_dni || "",
-          email_huesped: r.guest_email || "",
-          telefono_huesped: r.guest_phone || "",
+          email_huesped: r.guest_email,
+          telefono_huesped: r.guest_phone,
           fecha_entrada: r.check_in,
           fecha_salida: r.check_out,
           cantidad_huespedes: r.guests || 1,
@@ -382,9 +377,7 @@ export default function Home() {
             r.status === "cancelled" ? "cancelada" :
             r.status === "completed" ? "finalizada" :
             r.status || "pendiente",
-          no_show: Boolean(r.no_show),
-          numero_reserva: r.reservation_number || r.numero_reserva || "",
-          notas: r.notes || "",
+          no_show: false,
         }))
       }
     }
@@ -993,30 +986,22 @@ export default function Home() {
 
     setCargando(true)
 
-    // IMPORTANTE: las reservas nuevas están en public.reservations.
-    // Antes este chequeo consultaba la tabla vieja "reservas", por eso
-    // al editar una reserva aparecía "No se pudo verificar la disponibilidad".
-    let consultaDisponibilidad = supabase
-      .from("reservations")
-      .select("id, unit_id, check_in, check_out, status")
-      .eq("unit_id", habitacionSeleccionada)
-      .neq("status", "cancelada")
-
-    if (modoEdicion && reservaSeleccionada?.id) {
-      consultaDisponibilidad = consultaDisponibilidad.neq("id", reservaSeleccionada.id)
-    }
-
-    const { data: existentes, error: errorBusqueda } = await consultaDisponibilidad
+    const { data: existentes, error: errorBusqueda } = await supabase
+      .from("reservas")
+      .select("*")
+      .eq("habitacion_id", habitacionSeleccionada)
+      .neq("estado", "cancelada")
+      .neq("id", reservaSeleccionada?.id || 0)
 
     if (errorBusqueda) {
-      console.error("Error verificando disponibilidad en reservations:", errorBusqueda)
+      console.error(errorBusqueda)
       setMensaje("No se pudo verificar la disponibilidad.")
       setCargando(false)
       return
     }
 
     const hayCruce = (existentes || []).some(
-      (r) => fechaEntrada < r.check_out && fechaSalida > r.check_in
+      (r) => fechaEntrada < r.fecha_salida && fechaSalida > r.fecha_entrada
     )
 
     if (hayCruce) {
@@ -1034,52 +1019,119 @@ export default function Home() {
 
     const calculo = calcularImporteReserva()
 
-    // public.reservations usa nombres de columnas nuevos.
-    // Mantenemos solamente las columnas que ya sabemos que existen
-    // en esa tabla para no volver a depender de la tabla legacy.
-    const datosReserva = {
-      property_id: alojamientoSeleccionado,
-      unit_id: habitacionSeleccionada,
-      guest_name: nombre.trim(),
-      guest_email: email.trim() || null,
-      guest_phone: telefono.trim() || null,
-      check_in: fechaEntrada,
-      check_out: fechaSalida,
-      guests: obtenerPasajerosReserva().length,
-      status:
-        estado === "confirmada" ? "confirmada" :
-        estado === "cancelada" ? "cancelada" :
-        estado === "finalizada" ? "completed" :
-        estado || "pendiente",
-      total: calculo.total,
+    const datos = {
+      alojamiento_id: Number(alojamientoSeleccionado),
+      habitacion_id: Number(habitacionSeleccionada),
+      nombre_huesped: nombre.trim(),
+      dni_huesped: dni.trim(),
+      es_menor: false,
+      pasajeros: obtenerPasajerosReserva(),
+      email_huesped: email.trim(),
+      telefono_huesped: telefono.trim(),
+      fecha_entrada: fechaEntrada,
+      fecha_salida: fechaSalida,
+      cantidad_huespedes: obtenerPasajerosReserva().length,
+      estado,
+      no_show: Boolean(noShow),
+      early_checkin: Boolean(earlyCheckin),
+      late_checkout: Boolean(lateCheckout),
+      numero_reserva: modoEdicion && reservaSeleccionada?.numero_reserva ? reservaSeleccionada.numero_reserva : generarNumeroReserva(),
+      notas: notas.trim(),
+      user_id: user.id,
+      extra_descripcion: extraDescripcion.trim(),
+      moneda: monedaReserva,
+      tipo_cambio: calculo.tipoCambio,
+      descuento_tipo: descuentoTipo,
+      descuento_valor: Number(descuentoValor) || 0,
+      garantia_tipo: garantiaTipo || null,
+      garantia_marca: garantiaMarca || null,
+      garantia_ultimos4: garantiaUltimos4 || null,
+      garantia_vencimiento: garantiaVencimiento || null,
+      garantia_referencia: garantiaReferencia || null,
     }
 
-    let error = null
+    let error
     let reservaId = reservaSeleccionada?.id || null
 
     if (modoEdicion && reservaSeleccionada) {
       const resultado = await supabase
-        .from("reservations")
-        .update(datosReserva)
+        .from("reservas")
+        .update(datos)
         .eq("id", reservaSeleccionada.id)
-
+        .eq("user_id", user.id)
       error = resultado.error
     } else {
       const resultado = await supabase
-        .from("reservations")
-        .insert([datosReserva])
+        .from("reservas")
+        .insert([datos])
         .select("id")
         .single()
-
       error = resultado.error
       reservaId = resultado.data?.id || null
     }
 
     if (error) {
-      console.error("Error guardando reserva en reservations:", error)
+      console.error(error)
       setMensaje("No se pudo guardar la reserva.")
       setCargando(false)
       return
+    }
+
+    // Las columnas de tarifas se guardan si ya fueron creadas en Supabase.
+    // Si todavía no existen, la reserva base igualmente queda guardada.
+    if (reservaId) {
+      const resultadoPrecios = await supabase
+        .from("reservas")
+        .update({
+          tarifa_noche: calculo.tarifaNoche,
+          noches: calculo.noches,
+          vehiculos: Number(vehiculos) || 0,
+          cochera_total: calculo.cochera,
+          early_checkin_importe: calculo.early,
+          late_checkout_importe: calculo.late,
+          extra_descripcion: extraDescripcion.trim(),
+          extra: calculo.extra,
+          descuento_tipo: descuentoTipo,
+          descuento_valor: Number(descuentoValor) || 0,
+          descuento_importe: calculo.descuento,
+          subtotal: calculo.subtotal,
+          precio_total: calculo.total,
+          moneda: monedaReserva,
+          tipo_cambio: calculo.tipoCambio,
+          precio_total_usd: calculo.totalUSD,
+        })
+        .eq("id", reservaId)
+        .eq("user_id", user.id)
+
+      if (resultadoPrecios.error) {
+        console.warn("No se pudieron guardar los importes. Ejecutá la migración SQL indicada para las nuevas columnas.", resultadoPrecios.error)
+      }
+    }
+
+    if (reservaId && documentoArchivo) {
+      const extension = documentoArchivo.name.split(".").pop()?.toLowerCase() || "bin"
+      const path = `${user.id}/${reservaId}/${Date.now()}-documento.${extension}`
+      const subida = await supabase.storage
+        .from("reservation-documents")
+        .upload(path, documentoArchivo, { upsert: true })
+
+      if (subida.error) {
+        console.warn("La reserva se guardó, pero no se pudo subir el documento.", subida.error)
+        alert("La reserva se guardó, pero no se pudo subir el documento. Verificá el bucket privado de documentos.")
+      } else {
+        const { error: errorDocumento } = await supabase
+          .from("reservas")
+          .update({
+            documento_path: path,
+            documento_nombre: documentoArchivo.name,
+          })
+          .eq("id", reservaId)
+          .eq("user_id", user.id)
+
+        if (errorDocumento) {
+          console.warn("No se pudo guardar la referencia del documento.", errorDocumento)
+        }
+      }
     }
 
     setMensaje(modoEdicion ? "Reserva actualizada correctamente." : "Reserva creada correctamente.")
@@ -1092,8 +1144,8 @@ export default function Home() {
     if (!confirm(`¿Cancelar la reserva de ${reserva.nombre_huesped}?`)) return
 
     const { error } = await supabase
-      .from("reservations")
-      .update({ status: "cancelada" })
+      .from("reservas")
+      .update({ estado: "cancelada" })
       .eq("id", reserva.id)
 
     if (error) {
@@ -1400,7 +1452,7 @@ export default function Home() {
     return (<><Header titulo="Comunicaciones" subtitulo="Plantillas para acompañar al huésped antes, durante y después de la estadía" /><div style={{ padding: 30, display:"grid", gap:18 }}><section style={cardStyle}><div style={sectionHeader}><div><h2 style={{margin:0,fontSize:18}}>Automatizaciones preparadas</h2><div style={{color:colors.muted,fontSize:12,marginTop:4}}>La plataforma ya tiene las plantillas; el envío automático por email/WhatsApp se conecta en la próxima integración.</div></div><button onClick={()=>setVista("asistente")} style={secondaryButton}>✦ Ver asistente IA</button></div><div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:14,marginTop:18}}>{tipos.map(([key,label])=>{const texto=textoPlantillaComunicacion(key,proxima);return <div key={key} style={{border:`1px solid ${colors.border}`,borderRadius:10,padding:16}}><strong>{label}</strong><div style={{marginTop:10,padding:12,background:"#f8fafc",borderRadius:8,fontSize:12,lineHeight:1.5}}>{texto}</div><div style={{display:"flex",gap:8,marginTop:10}}><button onClick={()=>navigator.clipboard?.writeText(texto)} style={secondaryButton}>Copiar</button>{proxima?.email_huesped&&<button onClick={()=>enviarResumenPorEmail(proxima)} style={primaryButton}>Email</button>}</div></div>})}</div></section></div></>)
   }
 
-  const rolActivo = modoPruebaRol || rolReal
+  const rolActivo = rolReal
 
   const permisosPorRol = {
     owner: [
@@ -1517,46 +1569,6 @@ export default function Home() {
             {label}
           </button>
         ))}
-
-        {rolReal === "owner" && (
-          <div style={{
-            position: "absolute",
-            left: 14,
-            right: 14,
-            bottom: 52,
-            padding: 10,
-            borderRadius: 9,
-            background: "rgba(255,255,255,.08)",
-            border: "1px solid rgba(255,255,255,.12)",
-          }}>
-            <div style={{ fontSize: 9, opacity: .65, textTransform: "uppercase", letterSpacing: 1, marginBottom: 5 }}>
-              Modo prueba
-            </div>
-            <div style={{ fontSize: 11, marginBottom: 7 }}>
-              Simular: <strong>{etiquetasRol[rolActivo]}</strong>
-            </div>
-            <select
-              value={modoPruebaRol || ""}
-              onChange={(e) => setModoPruebaRol(e.target.value || null)}
-              style={{
-                width: "100%",
-                borderRadius: 6,
-                border: "1px solid rgba(255,255,255,.2)",
-                background: "#fff",
-                color: colors.text,
-                padding: "7px 8px",
-                fontSize: 11,
-              }}
-            >
-              <option value="">Mi rol real (Propietario)</option>
-              <option value="owner">Propietario</option>
-              <option value="manager">Gerente</option>
-              <option value="reception">Recepción</option>
-              <option value="housekeeping">Housekeeping</option>
-              <option value="admin">Administración</option>
-            </select>
-          </div>
-        )}
 
         <div style={{
           position: "absolute",
@@ -3024,36 +3036,6 @@ export default function Home() {
       )}
 
       <main style={{ marginLeft: 235, minHeight: "100vh" }}>
-        {modoPruebaRol && (
-          <div style={{
-            position: "sticky",
-            top: 0,
-            zIndex: 25,
-            padding: "8px 18px",
-            background: colors.yellowSoft,
-            borderBottom: `1px solid #f0d98a`,
-            color: colors.yellow,
-            fontSize: 12,
-            fontWeight: 700,
-            textAlign: "center",
-          }}>
-            MODO PRUEBA · Simulando permisos de {etiquetasRol[modoPruebaRol]}
-            <button
-              onClick={() => setModoPruebaRol(null)}
-              style={{
-                marginLeft: 10,
-                border: "none",
-                background: "transparent",
-                color: colors.yellow,
-                textDecoration: "underline",
-                fontWeight: 800,
-                cursor: "pointer",
-              }}
-            >
-              Volver a Propietario
-            </button>
-          </div>
-        )}
         {vista === "dashboard" && Dashboard()}
         {vista === "reservas" && Reservas()}
         {vista === "calendario" && CalendarioVista()}
