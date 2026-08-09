@@ -1613,7 +1613,7 @@ export default function Home() {
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {mostrarUsuarios && (
             <button
-              onClick={() => { window.location.href = "/configuracion/usuarios" }}
+              onClick={() => { window.location.href = "/dashboard/usuarios" }}
               style={{ ...topActionButton, display: "flex", alignItems: "center", gap: 7 }}
             >
               <span>♙</span> Usuarios
