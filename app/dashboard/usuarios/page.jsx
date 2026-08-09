@@ -88,33 +88,73 @@ export default function UsuariosPage() {
   }
 
   async function cargarUsuarios(propertyId) {
-    const { data, error: usersError } =
-      await supabase
+    setError("")
+
+    try {
+      const {
+        data: members,
+        error: membersError,
+      } = await supabase
         .from("property_members")
-        .select(`
-          user_id,
-          role,
-          created_at,
-          profiles (
-            full_name
-          )
-        `)
+        .select("user_id, role, created_at")
         .eq("property_id", propertyId)
         .order("created_at", {
           ascending: true,
         })
 
-    if (usersError) {
-      console.error(usersError)
+      if (membersError) {
+        console.error("ERROR PROPERTY_MEMBERS:", membersError)
+        throw new Error(
+          `property_members: ${membersError.message}`
+        )
+      }
 
-      setError(
-        "No se pudieron cargar los usuarios del alojamiento."
+      if (!members || members.length === 0) {
+        setUsuarios([])
+        return
+      }
+
+      const userIds = members.map(
+        (member) => member.user_id
       )
 
-      return
-    }
+      const {
+        data: profiles,
+        error: profilesError,
+      } = await supabase
+        .from("profiles")
+        .select("id, full_name, role")
+        .in("id", userIds)
 
-    setUsuarios(data || [])
+      if (profilesError) {
+        console.error("ERROR PROFILES:", profilesError)
+        throw new Error(
+          `profiles: ${profilesError.message}`
+        )
+      }
+
+      const usuariosCompletos = members.map(
+        (member) => {
+          const profile = profiles?.find(
+            (p) => p.id === member.user_id
+          )
+
+          return {
+            ...member,
+            profiles: profile || null,
+          }
+        }
+      )
+
+      setUsuarios(usuariosCompletos)
+    } catch (err) {
+      console.error("ERROR CARGANDO USUARIOS:", err)
+      setUsuarios([])
+      setError(
+        err.message ||
+          "No se pudieron cargar los usuarios del alojamiento."
+      )
+    }
   }
 
   async function invitarUsuario(e) {
