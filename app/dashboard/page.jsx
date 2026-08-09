@@ -88,8 +88,10 @@ export default function Home() {
       cuadruple: 0,
       otro: 0,
       cochera: 0,
-      extra: 0,
     },
+    earlyCheckin: { tipo: "monto", valor: 0 },
+    lateCheckout: { tipo: "monto", valor: 0 },
+    tipoCambioUSD: 1,
   })
 
   const logoHabitacionLlena = "/logo-habitacion-llena.png"
@@ -125,7 +127,6 @@ export default function Home() {
   const [habitacionSeleccionada, setHabitacionSeleccionada] = useState("")
   const [nombre, setNombre] = useState("")
   const [dni, setDni] = useState("")
-  const [esMenor, setEsMenor] = useState(false)
   const [pasajerosExtra, setPasajerosExtra] = useState([])
   const [email, setEmail] = useState("")
   const [telefono, setTelefono] = useState("")
@@ -135,7 +136,18 @@ export default function Home() {
   const [estado, setEstado] = useState("pendiente")
   const [notas, setNotas] = useState("")
   const [vehiculos, setVehiculos] = useState("0")
+  const [extraDescripcion, setExtraDescripcion] = useState("")
   const [extraReserva, setExtraReserva] = useState("0")
+  const [descuentoTipo, setDescuentoTipo] = useState("monto")
+  const [descuentoValor, setDescuentoValor] = useState("0")
+  const [monedaReserva, setMonedaReserva] = useState("ARS")
+  const [tipoCambioReserva, setTipoCambioReserva] = useState("")
+  const [documentoArchivo, setDocumentoArchivo] = useState(null)
+  const [garantiaTipo, setGarantiaTipo] = useState("")
+  const [garantiaMarca, setGarantiaMarca] = useState("")
+  const [garantiaUltimos4, setGarantiaUltimos4] = useState("")
+  const [garantiaVencimiento, setGarantiaVencimiento] = useState("")
+  const [garantiaReferencia, setGarantiaReferencia] = useState("")
 
   const [reservaSeleccionada, setReservaSeleccionada] = useState(null)
   const [modoEdicion, setModoEdicion] = useState(false)
@@ -387,12 +399,18 @@ export default function Home() {
     await cargarDatos()
   }
 
-  function totalPagado(reservaId) {
-    return pagos.filter((p) => String(p.reserva_id) === String(reservaId)).reduce((s, p) => s + Number(p.monto || 0), 0)
+  function totalPagado(reservaId, moneda = "ARS") {
+    return pagos
+      .filter((p) => String(p.reserva_id) === String(reservaId) && String(p.moneda || "ARS") === String(moneda))
+      .reduce((s, p) => s + Number(p.monto || 0), 0)
   }
 
   function saldoReserva(reserva) {
-    return Math.max(0, Number(reserva?.precio_total || 0) - totalPagado(reserva?.id))
+    const moneda = reserva?.moneda || "ARS"
+    const total = moneda === "USD"
+      ? Number(reserva?.precio_total_usd || 0)
+      : Number(reserva?.precio_total || 0)
+    return Math.max(0, total - totalPagado(reserva?.id, moneda))
   }
 
   async function registrarPago(reserva) {
@@ -410,6 +428,7 @@ export default function Home() {
       reserva_id: reserva.id,
       monto,
       metodo: pagoMetodo,
+      moneda: reserva.moneda || "ARS",
       nota: pagoNota.trim(),
       created_at: new Date().toISOString(),
     }])
@@ -472,7 +491,6 @@ export default function Home() {
     setHabitacionSeleccionada("")
     setNombre("")
     setDni("")
-    setEsMenor(false)
     setPasajerosExtra([])
     setEmail("")
     setTelefono("")
@@ -482,10 +500,21 @@ export default function Home() {
     setEstado("pendiente")
     setNotas("")
     setVehiculos("0")
-    setExtraReserva(String(config.tarifas?.extra ?? 0))
+    setExtraDescripcion("")
+    setExtraReserva("0")
+    setDescuentoTipo("monto")
+    setDescuentoValor("0")
+    setMonedaReserva("ARS")
+    setTipoCambioReserva("")
     setEarlyCheckin(false)
     setLateCheckout(false)
     setNoShow(false)
+    setDocumentoArchivo(null)
+    setGarantiaTipo("")
+    setGarantiaMarca("")
+    setGarantiaUltimos4("")
+    setGarantiaVencimiento("")
+    setGarantiaReferencia("")
     setReservaSeleccionada(null)
     setModoEdicion(false)
   }
@@ -497,7 +526,6 @@ export default function Home() {
     setHabitacionSeleccionada(String(reserva.habitacion_id))
     setNombre(reserva.nombre_huesped || "")
     setDni(reserva.dni_huesped || "")
-    setEsMenor(Boolean(reserva.es_menor))
     setEmail(reserva.email_huesped || "")
     setTelefono(reserva.telefono_huesped || "")
 
@@ -528,7 +556,18 @@ export default function Home() {
     setLateCheckout(Boolean(reserva.late_checkout))
     setNotas(reserva.notas || "")
     setVehiculos(String(reserva.vehiculos ?? reserva.cochera_cantidad ?? 0))
+    setExtraDescripcion(reserva.extra_descripcion || "")
     setExtraReserva(String(reserva.extra ?? reserva.extras ?? 0))
+    setDescuentoTipo(reserva.descuento_tipo || "monto")
+    setDescuentoValor(String(reserva.descuento_valor ?? 0))
+    setMonedaReserva(reserva.moneda || "ARS")
+    setTipoCambioReserva(String(reserva.tipo_cambio || ""))
+    setGarantiaTipo(reserva.garantia_tipo || "")
+    setGarantiaMarca(reserva.garantia_marca || "")
+    setGarantiaUltimos4(reserva.garantia_ultimos4 || "")
+    setGarantiaVencimiento(reserva.garantia_vencimiento || "")
+    setGarantiaReferencia(reserva.garantia_referencia || "")
+    setDocumentoArchivo(null)
     setVista("reservas")
     setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 50)
   }
@@ -548,25 +587,33 @@ export default function Home() {
     return Number(config.tarifas?.[clave] || 0)
   }
 
+  function calcularRecargoServicio(base, configuracion) {
+    const valor = Number(configuracion?.valor || 0)
+    if (!valor) return 0
+    return configuracion?.tipo === "porcentaje" ? base * valor / 100 : valor
+  }
+
   function calcularImporteReserva() {
     if (!habitacionSeleccionada || !fechaEntrada || !fechaSalida) {
-      return { noches: 0, tarifaNoche: 0, alojamiento: 0, cochera: 0, extra: Number(extraReserva) || 0, total: Number(extraReserva) || 0 }
+      const extra = Number(extraReserva) || 0
+      return { noches: 0, tarifaNoche: 0, alojamiento: 0, cochera: 0, early: 0, late: 0, extra, descuento: 0, subtotal: extra, total: extra, totalUSD: 0, tipoCambio: Number(tipoCambioReserva || config.tipoCambioUSD || 1) || 1 }
     }
 
     const noches = diasEntre(fechaEntrada, fechaSalida)
     const tarifaNoche = tarifaDeHabitacion(habitacionSeleccionada)
     const alojamiento = tarifaNoche * noches
     const cochera = (Number(vehiculos) || 0) * (Number(config.tarifas?.cochera) || 0) * noches
+    const early = earlyCheckin ? calcularRecargoServicio(tarifaNoche, config.earlyCheckin) : 0
+    const late = lateCheckout ? calcularRecargoServicio(tarifaNoche, config.lateCheckout) : 0
     const extra = Number(extraReserva) || 0
+    const subtotal = alojamiento + cochera + early + late + extra
+    const descuento = descuentoTipo === "porcentaje"
+      ? subtotal * (Number(descuentoValor) || 0) / 100
+      : Number(descuentoValor) || 0
+    const total = Math.max(0, subtotal - descuento)
+    const tipoCambio = Number(tipoCambioReserva || config.tipoCambioUSD || 1) || 1
 
-    return {
-      noches,
-      tarifaNoche,
-      alojamiento,
-      cochera,
-      extra,
-      total: alojamiento + cochera + extra,
-    }
+    return { noches, tarifaNoche, alojamiento, cochera, early, late, extra, descuento, subtotal, total, totalUSD: total / tipoCambio, tipoCambio }
   }
 
   function agregarPasajeroExtra() {
@@ -591,7 +638,7 @@ export default function Home() {
       principal: true,
       nombre: nombre.trim(),
       dni: dni.trim(),
-      menor: Boolean(esMenor),
+      menor: false,
     }
 
     const extras = pasajerosExtra
@@ -623,7 +670,7 @@ export default function Home() {
       principal: true,
       nombre: reserva?.nombre_huesped || "",
       dni: reserva?.dni_huesped || "",
-      menor: Boolean(reserva?.es_menor),
+      menor: false,
     }]
   }
 
@@ -654,8 +701,9 @@ export default function Home() {
       `Noches: ${noches}`,
       `Tarifa por noche: $${tarifaNoche.toLocaleString("es-AR")}`,
       `Cochera: $${cocheraTotal.toLocaleString("es-AR")}`,
-      `Extra: $${extra.toLocaleString("es-AR")}`,
-      `TOTAL: $${total.toLocaleString("es-AR")}`,
+      `Extra${reserva.extra_descripcion ? ` (${reserva.extra_descripcion})` : ""}: $${extra.toLocaleString("es-AR")}`,
+      reserva.descuento_valor ? `Descuento: ${reserva.descuento_tipo === "porcentaje" ? `${reserva.descuento_valor}%` : `$${Number(reserva.descuento_valor).toLocaleString("es-AR")}`}` : "",
+      `TOTAL: ${reserva.moneda === "USD" ? `US$ ${Number(reserva.precio_total_usd || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `$${total.toLocaleString("es-AR")}`}`,
       "",
       `Estado: ${estadoBadge(reserva.estado).label}`,
       reserva.telefono_huesped ? `Teléfono: ${reserva.telefono_huesped}` : "",
@@ -716,7 +764,15 @@ export default function Home() {
     const cocheraPorNoche = Number(config.tarifas?.cochera || 0)
     const vehiculosReserva = Number(reserva.vehiculos || 0)
     const extra = Number(reserva.extra || 0)
-    const precioTotal = tarifaNoche * noches + cocheraPorNoche * vehiculosReserva * noches + extra
+    const early = Number(reserva.early_checkin_importe || 0)
+    const late = Number(reserva.late_checkout_importe || 0)
+    const subtotal = tarifaNoche * noches + cocheraPorNoche * vehiculosReserva * noches + early + late + extra
+    const descuento = reserva.descuento_tipo === "porcentaje"
+      ? subtotal * Number(reserva.descuento_valor || 0) / 100
+      : Number(reserva.descuento_valor || 0)
+    const precioTotal = Math.max(0, subtotal - descuento)
+    const tipoCambio = Number(reserva.tipo_cambio || config.tipoCambioUSD || 1) || 1
+    const precioTotalUSD = precioTotal / tipoCambio
 
     const { error } = await supabase
       .from("reservas")
@@ -724,7 +780,10 @@ export default function Home() {
         fecha_salida: nuevaSalida,
         noches,
         precio_total: precioTotal,
+        precio_total_usd: precioTotalUSD,
         cochera_total: cocheraPorNoche * vehiculosReserva * noches,
+        subtotal,
+        descuento_importe: descuento,
       })
       .eq("id", reserva.id)
       .eq("user_id", user.id)
@@ -838,7 +897,7 @@ export default function Home() {
       habitacion_id: Number(habitacionSeleccionada),
       nombre_huesped: nombre.trim(),
       dni_huesped: dni.trim(),
-      es_menor: Boolean(esMenor),
+      es_menor: false,
       pasajeros: obtenerPasajerosReserva(),
       email_huesped: email.trim(),
       telefono_huesped: telefono.trim(),
@@ -852,6 +911,16 @@ export default function Home() {
       numero_reserva: modoEdicion && reservaSeleccionada?.numero_reserva ? reservaSeleccionada.numero_reserva : generarNumeroReserva(),
       notas: notas.trim(),
       user_id: user.id,
+      extra_descripcion: extraDescripcion.trim(),
+      moneda: monedaReserva,
+      tipo_cambio: calculo.tipoCambio,
+      descuento_tipo: descuentoTipo,
+      descuento_valor: Number(descuentoValor) || 0,
+      garantia_tipo: garantiaTipo || null,
+      garantia_marca: garantiaMarca || null,
+      garantia_ultimos4: garantiaUltimos4 || null,
+      garantia_vencimiento: garantiaVencimiento || null,
+      garantia_referencia: garantiaReferencia || null,
     }
 
     let error
@@ -891,14 +960,50 @@ export default function Home() {
           noches: calculo.noches,
           vehiculos: Number(vehiculos) || 0,
           cochera_total: calculo.cochera,
+          early_checkin_importe: calculo.early,
+          late_checkout_importe: calculo.late,
+          extra_descripcion: extraDescripcion.trim(),
           extra: calculo.extra,
+          descuento_tipo: descuentoTipo,
+          descuento_valor: Number(descuentoValor) || 0,
+          descuento_importe: calculo.descuento,
+          subtotal: calculo.subtotal,
           precio_total: calculo.total,
+          moneda: monedaReserva,
+          tipo_cambio: calculo.tipoCambio,
+          precio_total_usd: calculo.totalUSD,
         })
         .eq("id", reservaId)
         .eq("user_id", user.id)
 
       if (resultadoPrecios.error) {
         console.warn("No se pudieron guardar los importes. Ejecutá la migración SQL indicada para las nuevas columnas.", resultadoPrecios.error)
+      }
+    }
+
+    if (reservaId && documentoArchivo) {
+      const extension = documentoArchivo.name.split(".").pop()?.toLowerCase() || "bin"
+      const path = `${user.id}/${reservaId}/${Date.now()}-documento.${extension}`
+      const subida = await supabase.storage
+        .from("reservation-documents")
+        .upload(path, documentoArchivo, { upsert: true })
+
+      if (subida.error) {
+        console.warn("La reserva se guardó, pero no se pudo subir el documento.", subida.error)
+        alert("La reserva se guardó, pero no se pudo subir el documento. Verificá el bucket privado de documentos.")
+      } else {
+        const { error: errorDocumento } = await supabase
+          .from("reservas")
+          .update({
+            documento_path: path,
+            documento_nombre: documentoArchivo.name,
+          })
+          .eq("id", reservaId)
+          .eq("user_id", user.id)
+
+        if (errorDocumento) {
+          console.warn("No se pudo guardar la referencia del documento.", errorDocumento)
+        }
       }
     }
 
@@ -1241,7 +1346,8 @@ export default function Home() {
         width: 235,
         background: colors.navyDark,
         color: "#fff",
-        minHeight: "100vh",
+        height: "100vh",
+  maxHeight: "100vh",
         position: "fixed",
         left: 0,
         top: 0,
@@ -1381,6 +1487,23 @@ export default function Home() {
       console.error(error)
       alert("No se pudo guardar la configuración.")
     }
+  }
+
+  function handleDocumentoUpload(e) {
+    const file = e.target.files?.[0] || null
+    if (!file) {
+      setDocumentoArchivo(null)
+      return
+    }
+
+    if (file.size > 8 * 1024 * 1024) {
+      alert("El documento debe pesar menos de 8 MB.")
+      e.target.value = ""
+      setDocumentoArchivo(null)
+      return
+    }
+
+    setDocumentoArchivo(file)
   }
 
   function handleLogoUpload(e) {
@@ -1919,23 +2042,51 @@ export default function Home() {
               </div>
             )}
 
-            <h2 style={{ margin: "30px 0 18px", fontSize: 18 }}>Tarifas</h2>
-            <div style={{ color: colors.muted, fontSize: 12, marginBottom: 16 }}>Configurá el precio por noche según el tipo de habitación. La cochera se calcula por vehículo y por noche.</div>
+            <h2 style={{ margin: "30px 0 18px", fontSize: 18 }}>Tarifas y cargos</h2>
+            <div style={{ color: colors.muted, fontSize: 12, marginBottom: 16 }}>
+              Configurá el precio por noche y los cargos especiales. Early check-in y late check-out pueden ser un monto fijo o un porcentaje de la tarifa de la primera noche.
+            </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
-              {[["simple", "Simple"], ["doble", "Doble"], ["triple", "Triple"], ["cuadruple", "Cuádruple"], ["otro", "Otro"], ["cochera", "Cochera / vehículo"], ["extra", "Extra por reserva"]].map(([clave, label]) => (
+              {[["simple", "Simple"], ["doble", "Doble"], ["triple", "Triple"], ["cuadruple", "Cuádruple"], ["otro", "Otro"], ["cochera", "Cochera / vehículo"]].map(([clave, label]) => (
                 <Field key={clave} label={label}>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={config.tarifas?.[clave] ?? 0}
+                  <input type="number" min="0" step="0.01" value={config.tarifas?.[clave] ?? 0}
                     onChange={(e) => setConfig({ ...config, tarifas: { ...config.tarifas, [clave]: e.target.value } })}
-                    placeholder="0"
-                    style={inputStyle}
-                  />
+                    placeholder="0" style={inputStyle} />
                 </Field>
               ))}
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 18 }}>
+              <div style={{ border: `1px solid ${colors.border}`, borderRadius: 10, padding: 14 }}>
+                <strong style={{ fontSize: 13 }}>Early check-in</strong>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 10 }}>
+                  <select value={config.earlyCheckin?.tipo || "monto"} onChange={e => setConfig({ ...config, earlyCheckin: { ...config.earlyCheckin, tipo: e.target.value } })} style={inputStyle}>
+                    <option value="monto">Monto fijo</option>
+                    <option value="porcentaje">Porcentaje</option>
+                  </select>
+                  <input type="number" min="0" step="0.01" value={config.earlyCheckin?.valor ?? 0} onChange={e => setConfig({ ...config, earlyCheckin: { ...config.earlyCheckin, valor: e.target.value } })} style={inputStyle} />
+                </div>
+              </div>
+              <div style={{ border: `1px solid ${colors.border}`, borderRadius: 10, padding: 14 }}>
+                <strong style={{ fontSize: 13 }}>Late check-out</strong>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 10 }}>
+                  <select value={config.lateCheckout?.tipo || "monto"} onChange={e => setConfig({ ...config, lateCheckout: { ...config.lateCheckout, tipo: e.target.value } })} style={inputStyle}>
+                    <option value="monto">Monto fijo</option>
+                    <option value="porcentaje">Porcentaje</option>
+                  </select>
+                  <input type="number" min="0" step="0.01" value={config.lateCheckout?.valor ?? 0} onChange={e => setConfig({ ...config, lateCheckout: { ...config.lateCheckout, valor: e.target.value } })} style={inputStyle} />
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 18 }}>
+              <Field label="Tipo de cambio USD">
+                <input type="number" min="0.01" step="0.01" value={config.tipoCambioUSD ?? 1} onChange={e => setConfig({ ...config, tipoCambioUSD: e.target.value })} style={inputStyle} />
+              </Field>
+              <div style={{ padding: 12, background: colors.blueSoft, borderRadius: 9, fontSize: 12, color: colors.navyDark }}>
+                Se usa como referencia cuando una reserva se cobra en dólares. También podés cambiarlo individualmente en cada reserva.
+              </div>
             </div>
 
             <h2 style={{ margin: "30px 0 18px", fontSize: 18 }}>Accesos a canales</h2>
@@ -2213,13 +2364,6 @@ export default function Home() {
                   <input value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="+54 9..." style={inputStyle} />
                 </Field>
 
-                <Field label="Huésped principal">
-                  <label style={{ display: "flex", alignItems: "center", gap: 9, minHeight: 44, fontSize: 13, fontWeight: 600 }}>
-                    <input type="checkbox" checked={esMenor} onChange={(e) => setEsMenor(e.target.checked)} />
-                    Es menor de edad
-                  </label>
-                </Field>
-
                 <Field label="Cantidad de huéspedes">
                   <input type="number" min="1" value={1 + pasajerosExtra.length} readOnly style={{ ...inputStyle, background: "#f8fafc" }} />
                 </Field>
@@ -2246,8 +2390,34 @@ export default function Home() {
                 </Field>
 
                 <Field label="Extra de la reserva">
-                  <input type="number" min="0" step="0.01" value={extraReserva} onChange={(e) => setExtraReserva(e.target.value)} style={inputStyle} />
+                  <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 8 }}>
+                    <input value={extraDescripcion} onChange={(e) => setExtraDescripcion(e.target.value)} placeholder="Ej. Desayuno, mascota, traslado..." style={inputStyle} />
+                    <input type="number" min="0" step="0.01" value={extraReserva} onChange={(e) => setExtraReserva(e.target.value)} placeholder="Valor" style={inputStyle} />
+                  </div>
                 </Field>
+
+                <Field label="Descuento">
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    <select value={descuentoTipo} onChange={e => setDescuentoTipo(e.target.value)} style={inputStyle}>
+                      <option value="monto">Monto</option>
+                      <option value="porcentaje">Porcentaje</option>
+                    </select>
+                    <input type="number" min="0" step="0.01" value={descuentoValor} onChange={e => setDescuentoValor(e.target.value)} placeholder="0" style={inputStyle} />
+                  </div>
+                </Field>
+
+                <Field label="Moneda de cobro">
+                  <select value={monedaReserva} onChange={e => setMonedaReserva(e.target.value)} style={inputStyle}>
+                    <option value="ARS">Pesos argentinos (ARS)</option>
+                    <option value="USD">Dólares estadounidenses (USD)</option>
+                  </select>
+                </Field>
+
+                {monedaReserva === "USD" && (
+                  <Field label="Tipo de cambio de esta reserva">
+                    <input type="number" min="0.01" step="0.01" value={tipoCambioReserva || config.tipoCambioUSD || 1} onChange={e => setTipoCambioReserva(e.target.value)} style={inputStyle} />
+                  </Field>
+                )}
 
                 <Field label="Fecha de entrada">
                   <input type="date" value={fechaEntrada} onChange={(e) => setFechaEntrada(e.target.value)} style={inputStyle} />
@@ -2264,6 +2434,44 @@ export default function Home() {
                     <option value="cancelada">Cancelada</option>
                     <option value="finalizada">Finalizada</option>
                   </select>
+                </Field>
+
+                <Field label="Documento del huésped" wide>
+                  <div style={{ display: "grid", gap: 7 }}>
+                    <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf"
+                      onChange={handleDocumentoUpload}
+                      style={{ ...inputStyle, padding: 9 }} />
+                    <div style={{ color: colors.muted, fontSize: 11 }}>
+                      Foto o PDF del documento. Se guarda en un almacenamiento privado.
+                      {reservaSeleccionada?.documento_nombre ? ` Documento actual: ${reservaSeleccionada.documento_nombre}` : ""}
+                    </div>
+                  </div>
+                </Field>
+
+                <Field label="Garantía de reserva" wide>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
+                    <select value={garantiaTipo} onChange={e => setGarantiaTipo(e.target.value)} style={inputStyle}>
+                      <option value="">Sin garantía</option>
+                      <option value="Tarjeta">Tarjeta de crédito</option>
+                      <option value="Mercado Pago">Mercado Pago</option>
+                      <option value="Transferencia">Transferencia</option>
+                      <option value="Otra">Otra</option>
+                    </select>
+                    {garantiaTipo === "Tarjeta" && <>
+                      <input value={garantiaMarca} onChange={e => setGarantiaMarca(e.target.value)} placeholder="Marca (Visa, Mastercard...)" style={inputStyle} />
+                      <input value={garantiaUltimos4} onChange={e => setGarantiaUltimos4(e.target.value.replace(/\D/g, "").slice(-4))} placeholder="Últimos 4 dígitos" maxLength={4} style={inputStyle} />
+                      <input type="month" value={garantiaVencimiento} onChange={e => setGarantiaVencimiento(e.target.value)} style={inputStyle} />
+                      <input value={garantiaReferencia} onChange={e => setGarantiaReferencia(e.target.value)} placeholder="Referencia / token de autorización" style={inputStyle} />
+                    </>}
+                    {garantiaTipo && garantiaTipo !== "Tarjeta" && (
+                      <input value={garantiaReferencia} onChange={e => setGarantiaReferencia(e.target.value)} placeholder="Referencia / comprobante" style={inputStyle} />
+                    )}
+                  </div>
+                  {garantiaTipo === "Tarjeta" && (
+                    <div style={{ marginTop: 8, padding: 9, borderRadius: 8, background: "#fff8e8", color: "#72520a", fontSize: 11 }}>
+                      Por seguridad, no guardamos el número completo de la tarjeta ni el CVV. Solo marca, últimos 4, vencimiento y referencia/token.
+                    </div>
+                  )}
                 </Field>
 
                 <Field label="Condiciones especiales" wide>
@@ -2293,8 +2501,13 @@ export default function Home() {
                     <div>Habitación / noche: <strong>${calcularImporteReserva().tarifaNoche.toLocaleString("es-AR")}</strong></div>
                     <div>Alojamiento: <strong>${calcularImporteReserva().alojamiento.toLocaleString("es-AR")}</strong></div>
                     <div>Cochera: <strong>${calcularImporteReserva().cochera.toLocaleString("es-AR")}</strong></div>
-                    <div>Extra: <strong>${calcularImporteReserva().extra.toLocaleString("es-AR")}</strong></div>
-                    <div>Total: <strong style={{ color: colors.navy, fontSize: 16 }}>${calcularImporteReserva().total.toLocaleString("es-AR")}</strong></div>
+                    <div>Early check-in: <strong>${calcularImporteReserva().early.toLocaleString("es-AR")}</strong></div>
+                    <div>Late check-out: <strong>${calcularImporteReserva().late.toLocaleString("es-AR")}</strong></div>
+                    <div>Extra {extraDescripcion ? `(${extraDescripcion})` : ""}: <strong>${calcularImporteReserva().extra.toLocaleString("es-AR")}</strong></div>
+                    <div>Descuento: <strong style={{ color: colors.green }}>-${calcularImporteReserva().descuento.toLocaleString("es-AR")}</strong></div>
+                    <div>Subtotal: <strong>${calcularImporteReserva().subtotal.toLocaleString("es-AR")}</strong></div>
+                    <div>Total: <strong style={{ color: colors.navy, fontSize: 16 }}>${calcularImporteReserva().total.toLocaleString("es-AR")} ARS</strong></div>
+                    {monedaReserva === "USD" && <div>Total en dólares: <strong style={{ color: colors.navy, fontSize: 16 }}>US$ {calcularImporteReserva().totalUSD.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></div>}
                   </div>
                 </div>
               )}
@@ -2723,6 +2936,9 @@ export default function Home() {
               <Info label="Late check-out" value={reservaSeleccionada.late_checkout ? "Sí" : "No"} />
               {reservaSeleccionada.email_huesped && <Info label="Email" value={reservaSeleccionada.email_huesped} />}
               {reservaSeleccionada.telefono_huesped && <Info label="Teléfono" value={reservaSeleccionada.telefono_huesped} />}
+              {reservaSeleccionada.moneda && <Info label="Moneda" value={reservaSeleccionada.moneda === "USD" ? "Dólares (USD)" : "Pesos (ARS)"} />}
+              {reservaSeleccionada.descuento_valor > 0 && <Info label="Descuento" value={reservaSeleccionada.descuento_tipo === "porcentaje" ? `${reservaSeleccionada.descuento_valor}%` : `$${Number(reservaSeleccionada.descuento_valor).toLocaleString("es-AR")}`} />}
+              {reservaSeleccionada.garantia_tipo && <Info label="Garantía" value={`${reservaSeleccionada.garantia_tipo}${reservaSeleccionada.garantia_ultimos4 ? ` · **** ${reservaSeleccionada.garantia_ultimos4}` : ""}`} />}
             </div>
 
             <div style={{ marginTop: 20 }}>
@@ -2738,6 +2954,15 @@ export default function Home() {
               </div>
             </div>
 
+            {reservaSeleccionada.extra_descripcion && (
+              <div style={{ marginTop: 20 }}>
+                <div style={{ color: colors.muted, fontSize: 12, marginBottom: 5 }}>Extra</div>
+                <div style={{ padding: 13, background: "#f8fafc", borderRadius: 8, fontSize: 14 }}>
+                  {reservaSeleccionada.extra_descripcion} · ${Number(reservaSeleccionada.extra || 0).toLocaleString("es-AR")}
+                </div>
+              </div>
+            )}
+
             {reservaSeleccionada.notas && (
               <div style={{ marginTop: 20 }}>
                 <div style={{ color: colors.muted, fontSize: 12, marginBottom: 5 }}>Notas</div>
@@ -2748,16 +2973,31 @@ export default function Home() {
             )}
 
             <section style={{ marginTop: 22, padding: 16, border: `1px solid ${colors.border}`, borderRadius: 10 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div><strong>Cuenta del huésped</strong><div style={{ color: colors.muted, fontSize: 12, marginTop: 3 }}>Señas, pagos y saldo</div></div><strong style={{ color: saldoReserva(reservaSeleccionada) > 0 ? colors.red : colors.green }}>${saldoReserva(reservaSeleccionada).toLocaleString("es-AR")} pendiente</strong></div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 12 }}><div style={{ padding: 10, background: colors.greenSoft, borderRadius: 8 }}><div style={{ color: colors.muted, fontSize: 11 }}>Total</div><strong>${Number(reservaSeleccionada.precio_total||0).toLocaleString("es-AR")}</strong></div><div style={{ padding: 10, background: colors.blueSoft, borderRadius: 8 }}><div style={{ color: colors.muted, fontSize: 11 }}>Pagado</div><strong>${totalPagado(reservaSeleccionada.id).toLocaleString("es-AR")}</strong></div></div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div><strong>Cuenta del huésped</strong><div style={{ color: colors.muted, fontSize: 12, marginTop: 3 }}>Señas, cobros y saldo</div></div><strong style={{ color: saldoReserva(reservaSeleccionada) > 0 ? colors.red : colors.green }}>{reservaSeleccionada.moneda === "USD" ? "US$ " : "$"}{saldoReserva(reservaSeleccionada).toLocaleString("es-AR", { minimumFractionDigits: reservaSeleccionada.moneda === "USD" ? 2 : 0 })} pendiente</strong></div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 12 }}><div style={{ padding: 10, background: colors.greenSoft, borderRadius: 8 }}><div style={{ color: colors.muted, fontSize: 11 }}>Total</div><strong>{reservaSeleccionada.moneda === "USD" ? "US$ " : "$"}{Number(reservaSeleccionada.moneda === "USD" ? (reservaSeleccionada.precio_total_usd || 0) : (reservaSeleccionada.precio_total || 0)).toLocaleString("es-AR", { minimumFractionDigits: reservaSeleccionada.moneda === "USD" ? 2 : 0 })}</strong></div><div style={{ padding: 10, background: colors.blueSoft, borderRadius: 8 }}><div style={{ color: colors.muted, fontSize: 11 }}>Pagado</div><strong>{reservaSeleccionada.moneda === "USD" ? "US$ " : "$"}{totalPagado(reservaSeleccionada.id, reservaSeleccionada.moneda || "ARS").toLocaleString("es-AR", { minimumFractionDigits: reservaSeleccionada.moneda === "USD" ? 2 : 0 })}</strong></div></div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 10 }}><input type="number" min="0" step="0.01" value={pagoMonto} onChange={e=>setPagoMonto(e.target.value)} placeholder="Importe" style={inputStyle}/><select value={pagoMetodo} onChange={e=>setPagoMetodo(e.target.value)} style={inputStyle}><option>Efectivo</option><option>Transferencia</option><option>Mercado Pago</option><option>Tarjeta</option><option>Otro</option></select></div><input value={pagoNota} onChange={e=>setPagoNota(e.target.value)} placeholder="Nota del pago (opcional)" style={{ ...inputStyle, marginTop: 8 }}/><button onClick={()=>registrarPago(reservaSeleccionada)} style={{ ...primaryButton, width:"100%", marginTop:8 }} disabled={saldoReserva(reservaSeleccionada)<=0}>＋ Registrar pago</button>
-              {pagos.filter(p=>String(p.reserva_id)===String(reservaSeleccionada.id)).length>0 && <div style={{ marginTop: 12, display:"grid",gap:6 }}>{pagos.filter(p=>String(p.reserva_id)===String(reservaSeleccionada.id)).map(p=><div key={p.id} style={{fontSize:11,padding:8,background:"#f8fafc",borderRadius:7}}>${Number(p.monto||0).toLocaleString("es-AR")} · {p.metodo} · {p.created_at ? new Date(p.created_at).toLocaleDateString("es-AR") : ""}</div>)}</div>}
+              {pagos.filter(p=>String(p.reserva_id)===String(reservaSeleccionada.id)).length>0 && <div style={{ marginTop: 12, display:"grid",gap:6 }}>{pagos.filter(p=>String(p.reserva_id)===String(reservaSeleccionada.id)).map(p=><div key={p.id} style={{fontSize:11,padding:8,background:"#f8fafc",borderRadius:7}}>{p.moneda === "USD" ? "US$ " : "$"}{Number(p.monto||0).toLocaleString("es-AR")} · {p.metodo} · {p.created_at ? new Date(p.created_at).toLocaleDateString("es-AR") : ""}</div>)}</div>}
             </section>
 
             <div style={{ display: "grid", gap: 9, marginTop: 28 }}>
               {reservaSeleccionada.email_huesped && (
                 <button onClick={() => enviarResumenPorEmail(reservaSeleccionada)} style={primaryButton}>
                   ✉ Enviar resumen por email
+                </button>
+              )}
+              {reservaSeleccionada.documento_path && (
+                <button
+                  onClick={async () => {
+                    const { data, error } = await supabase.storage.from("reservation-documents").createSignedUrl(reservaSeleccionada.documento_path, 300)
+                    if (error || !data?.signedUrl) {
+                      alert("No se pudo abrir el documento.")
+                      return
+                    }
+                    window.open(data.signedUrl, "_blank", "noopener,noreferrer")
+                  }}
+                  style={secondaryButton}
+                >
+                  📄 Ver documento
                 </button>
               )}
               <button onClick={() => imprimirReserva(reservaSeleccionada)} style={secondaryButton}>🖨 Imprimir reserva</button>
