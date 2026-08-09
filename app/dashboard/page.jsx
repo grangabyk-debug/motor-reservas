@@ -244,32 +244,155 @@ export default function Home() {
   async function cargarDatos() {
     if (!user?.id) return
 
+    // El acceso al alojamiento ya no depende de que el usuario
+    // sea el dueño. Ahora se determina mediante property_members.
+    const { data: membershipsData, error: membershipsError } = await supabase
+      .from("property_members")
+      .select("property_id, role")
+      .eq("user_id", user.id)
+
+    if (membershipsError) {
+      console.error("No se pudieron cargar los accesos del usuario:", membershipsError)
+    }
+
+    const propertyIds = (membershipsData || []).map((m) => m.property_id).filter(Boolean)
+
     const [
-      { data: alojamientosData, error: alojamientosError },
-      { data: habitacionesData, error: habitacionesError },
-      { data: reservasData, error: reservasError },
+      { data: propertiesData, error: propertiesError },
+      { data: alojamientosLegacy, error: alojamientosError },
+      { data: habitacionesLegacy, error: habitacionesError },
+      { data: reservasLegacy, error: reservasError },
       { data: bloqueosData, error: bloqueosError },
       { data: pagosData, error: pagosError },
     ] = await Promise.all([
-      supabase.from("alojamientos").select("*").eq("user_id", user.id).order("id", { ascending: true }),
-      supabase.from("habitaciones").select("*").eq("user_id", user.id).order("id", { ascending: true }),
-      supabase.from("reservas").select("*").eq("user_id", user.id).order("id", { ascending: false }),
+      propertyIds.length
+        ? supabase.from("properties").select("*").in("id", propertyIds).order("created_at", { ascending: true })
+        : Promise.resolve({ data: [], error: null }),
+      supabase.from("alojamientos").select("*").order("id", { ascending: true }),
+      supabase.from("habitaciones").select("*").order("id", { ascending: true }),
+      supabase.from("reservas").select("*").order("id", { ascending: false }),
       supabase.from("bloqueos").select("*").eq("user_id", user.id).order("fecha_desde", { ascending: true }),
       supabase.from("pagos").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
     ])
 
-    if (alojamientosError) console.error(alojamientosError)
-    if (habitacionesError) console.error(habitacionesError)
-    if (reservasError) console.error(reservasError)
+    if (propertiesError) console.error("No se pudieron cargar las propiedades:", propertiesError)
+    if (alojamientosError) console.error("No se pudieron cargar los alojamientos:", alojamientosError)
+    if (habitacionesError) console.error("No se pudieron cargar las habitaciones:", habitacionesError)
+    if (reservasError) console.error("No se pudieron cargar las reservas:", reservasError)
     if (bloqueosError) console.warn("No se pudieron cargar los bloqueos. Ejecutá la migración PMS.", bloqueosError)
     if (pagosError) console.warn("No se pudieron cargar los pagos. Ejecutá la migración PMS.", pagosError)
 
-    setAlojamientos(alojamientosData || [])
-    setHabitaciones(habitacionesData || [])
-    setReservas(reservasData || [])
-    setHabitacionEstados((habitacionesData || []).map((h) => ({ habitacion_id: h.id, estado: h.estado || "libre" })))
+    // La interfaz actual todavía trabaja con las tablas antiguas
+    // alojamientos/habitaciones/reservas. Para que owner y reception
+    // puedan usar la misma interfaz, filtramos esas tablas según los
+    // alojamientos a los que el usuario tiene acceso.
+    const propiedadesAccesibles = propertiesData || []
+    const nombresAccesibles = new Set(
+      propiedadesAccesibles
+        .map((p) => String(p.name || "").trim().toLowerCase())
+        .filter(Boolean)
+    )
+
+    const alojamientosData = (alojamientosLegacy || []).filter((a) => {
+      const nombre = String(a.nombre || "").trim().toLowerCase()
+      return nombresAccesibles.has(nombre) || String(a.user_id) === String(user.id)
+    })
+
+    const alojamientoIds = new Set(alojamientosData.map((a) => String(a.id)))
+
+    const habitacionesData = (habitacionesLegacy || []).filter((h) =>
+      alojamientoIds.has(String(h.alojamiento_id))
+    )
+
+    const reservasData = (reservasLegacy || []).filter((r) =>
+      alojamientoIds.has(String(r.alojamiento_id))
+    )
+
+    // Si todavía no existe la fila legacy correspondiente, usamos
+    // properties/units/reservations como respaldo para que el acceso
+    // nuevo siga funcionando.
+    let alojamientosFinal = alojamientosData
+    let habitacionesFinal = habitacionesData
+    let reservasFinal = reservasData
+
+    if (!alojamientosFinal.length && propiedadesAccesibles.length) {
+      alojamientosFinal = propiedadesAccesibles.map((p) => ({
+        id: p.id,
+        nombre: p.name,
+        user_id: p.owner_id,
+      }))
+    }
+
+    if (!habitacionesFinal.length && propertyIds.length) {
+      const { data: unitsData, error: unitsError } = await supabase
+        .from("units")
+        .select("*")
+        .in("property_id", propertyIds)
+        .order("created_at", { ascending: true })
+
+      if (unitsError) {
+        console.error("No se pudieron cargar las unidades:", unitsError)
+      } else {
+        habitacionesFinal = (unitsData || []).map((u) => ({
+          id: u.id,
+          nombre: u.name,
+          tipo: "",
+          capacidad: u.capacity,
+          precio: u.price,
+          activa: u.active !== false,
+          alojamiento_id: u.property_id,
+          user_id: user.id,
+          estado: "libre",
+        }))
+      }
+    }
+
+    if (!reservasFinal.length && propertyIds.length) {
+      const { data: reservationsData, error: reservationsError } = await supabase
+        .from("reservations")
+        .select("*")
+        .in("property_id", propertyIds)
+        .order("created_at", { ascending: false })
+
+      if (reservationsError) {
+        console.error("No se pudieron cargar las reservas nuevas:", reservationsError)
+      } else {
+        reservasFinal = (reservationsData || []).map((r) => ({
+          id: r.id,
+          alojamiento_id: r.property_id,
+          habitacion_id: r.unit_id,
+          nombre_huesped: r.guest_name,
+          email_huesped: r.guest_email,
+          telefono_huesped: r.guest_phone,
+          fecha_entrada: r.check_in,
+          fecha_salida: r.check_out,
+          cantidad_huespedes: r.guests || 1,
+          precio_total: Number(r.total || 0),
+          estado:
+            r.status === "confirmed" ? "confirmada" :
+            r.status === "cancelled" ? "cancelada" :
+            r.status === "completed" ? "finalizada" :
+            r.status || "pendiente",
+          no_show: false,
+        }))
+      }
+    }
+
+    setAlojamientos(alojamientosFinal)
+    setHabitaciones(habitacionesFinal)
+    setReservas(reservasFinal)
+    setHabitacionEstados(
+      habitacionesFinal.map((h) => ({
+        habitacion_id: h.id,
+        estado: h.estado || "libre",
+      }))
+    )
     setBloqueos(bloqueosData || [])
     setPagos(pagosData || [])
+
+    if (!alojamientoSeleccionado && alojamientosFinal.length) {
+      setAlojamientoSeleccionado(String(alojamientosFinal[0].id))
+    }
   }
 
   const habitacionesActivas = habitaciones.filter((h) => h.activa !== false)
