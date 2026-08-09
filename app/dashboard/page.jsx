@@ -1663,23 +1663,25 @@ export default function Home() {
           >
             Salir
           </button>
-          <button
-            onClick={() => {
-              limpiarFormulario()
-              setVista("reservas")
-            }}
-          style={{
-            border: "none",
-            background: colors.blue,
-            color: "#fff",
-            borderRadius: 7,
-            padding: "10px 15px",
-            fontWeight: 700,
-            cursor: "pointer",
-          }}
-        >
-          + Nueva reserva
-        </button>
+          {["owner", "manager", "reception"].includes(rolActivo) && (
+            <button
+              onClick={() => {
+                limpiarFormulario()
+                setVista("reservas")
+              }}
+              style={{
+                background: colors.blue,
+                color: "#fff",
+                border: "none",
+                borderRadius: 8,
+                padding: "9px 14px",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              + Nueva reserva
+            </button>
+          )}
         </div>
       </header>
     )
