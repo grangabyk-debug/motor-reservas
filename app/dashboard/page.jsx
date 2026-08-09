@@ -101,6 +101,12 @@ export default function Home() {
   const [assistantInput, setAssistantInput] = useState("")
   const [assistantLoading, setAssistantLoading] = useState(false)
   const [configGuardada, setConfigGuardada] = useState(false)
+  const [configSubvista, setConfigSubvista] = useState("general")
+  const [fechaCalendario, setFechaCalendario] = useState(fechaLocal(0))
+  const [busquedaReserva, setBusquedaReserva] = useState("")
+  const [earlyCheckin, setEarlyCheckin] = useState(false)
+  const [lateCheckout, setLateCheckout] = useState(false)
+  const [noShow, setNoShow] = useState(false)
 
   const [alojamientoSeleccionado, setAlojamientoSeleccionado] = useState("")
   const [habitacionSeleccionada, setHabitacionSeleccionada] = useState("")
@@ -132,8 +138,15 @@ export default function Home() {
   const [nuevoAlojamientoHabitacion, setNuevoAlojamientoHabitacion] = useState("")
 
   const diasCalendario = useMemo(
-    () => Array.from({ length: 38 }, (_, i) => fechaLocal(i - 7)),
-    []
+    () => Array.from({ length: 38 }, (_, i) => {
+      const base = new Date(`${fechaCalendario}T12:00:00`)
+      base.setDate(base.getDate() + i - 7)
+      const año = base.getFullYear()
+      const mes = String(base.getMonth() + 1).padStart(2, "0")
+      const dia = String(base.getDate()).padStart(2, "0")
+      return `${año}-${mes}-${dia}`
+    }),
+    [fechaCalendario]
   )
 
   useEffect(() => {
@@ -220,7 +233,7 @@ export default function Home() {
       h.activa !== false
   )
 
-  const reservasActivas = reservas.filter((r) => r.estado !== "cancelada")
+  const reservasActivas = reservas.filter((r) => r.estado !== "cancelada" && !r.no_show)
 
   const reservasHoy = reservasActivas.filter(
     (r) => r.fecha_entrada <= fechaLocal(0) && r.fecha_salida > fechaLocal(0)
@@ -229,6 +242,25 @@ export default function Home() {
   const entradasProximas = reservasActivas.filter(
     (r) => r.fecha_entrada >= fechaLocal(0) && r.fecha_entrada <= fechaLocal(7)
   )
+
+  const salidasHoy = reservas.filter(
+    (r) => r.estado !== "cancelada" && r.fecha_salida === fechaLocal(0)
+  )
+
+  const entradasHoy = reservas.filter(
+    (r) => r.estado !== "cancelada" && !r.no_show && r.fecha_entrada === fechaLocal(0)
+  )
+
+  const reservasFiltradas = reservas.filter((r) => {
+    const q = busquedaReserva.trim().toLowerCase()
+    if (!q) return true
+    return [
+      r.numero_reserva,
+      r.nombre_huesped,
+      r.dni_huesped,
+      r.email_huesped,
+    ].some((valor) => String(valor || "").toLowerCase().includes(q))
+  })
 
   const nombreAlojamiento = (id) => {
     const item = alojamientos.find((a) => String(a.id) === String(id))
@@ -256,6 +288,9 @@ export default function Home() {
     setNotas("")
     setVehiculos("0")
     setExtraReserva(String(config.tarifas?.extra ?? 0))
+    setEarlyCheckin(false)
+    setLateCheckout(false)
+    setNoShow(false)
     setReservaSeleccionada(null)
     setModoEdicion(false)
   }
@@ -293,6 +328,9 @@ export default function Home() {
     setFechaSalida(reserva.fecha_salida || "")
     setCantidadHuespedes(String(reserva.cantidad_huespedes || 1))
     setEstado(reserva.estado || "pendiente")
+    setNoShow(Boolean(reserva.no_show))
+    setEarlyCheckin(Boolean(reserva.early_checkin))
+    setLateCheckout(Boolean(reserva.late_checkout))
     setNotas(reserva.notas || "")
     setVehiculos(String(reserva.vehiculos ?? reserva.cochera_cantidad ?? 0))
     setExtraReserva(String(reserva.extra ?? reserva.extras ?? 0))
@@ -407,7 +445,7 @@ export default function Home() {
     ).join("\n")
 
     return [
-      `Reserva de ${nombreAlojamiento(reserva.alojamiento_id)}`,
+      `Reserva ${reserva.numero_reserva || ""} · ${nombreAlojamiento(reserva.alojamiento_id)}`,
       "",
       `Huésped principal: ${reserva.nombre_huesped || "-"}`,
       reserva.dni_huesped ? `DNI: ${reserva.dni_huesped}` : "",
@@ -442,6 +480,108 @@ export default function Home() {
     const asunto = `Resumen de reserva · ${nombreAlojamiento(reserva.alojamiento_id)}`
     const cuerpo = textoResumenReserva(reserva)
     window.location.href = `mailto:${encodeURIComponent(destinatario)}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`
+  }
+
+  function generarNumeroReserva() {
+    const fecha = fechaLocal(0).replace(/-/g, "")
+    let numero = ""
+    do {
+      numero = `HL-${fecha}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`
+    } while (reservas.some((r) => r.numero_reserva === numero))
+    return numero
+  }
+
+  async function agregarNoches(reserva, cantidad = 1) {
+    const salidaActual = new Date(`${reserva.fecha_salida}T12:00:00`)
+    salidaActual.setDate(salidaActual.getDate() + cantidad)
+    const nuevaSalida = `${salidaActual.getFullYear()}-${String(salidaActual.getMonth()+1).padStart(2,"0")}-${String(salidaActual.getDate()).padStart(2,"0")}`
+
+    const { data: existentes, error: errorBusqueda } = await supabase
+      .from("reservas")
+      .select("id,fecha_entrada,fecha_salida")
+      .eq("habitacion_id", reserva.habitacion_id)
+      .eq("user_id", user.id)
+      .neq("id", reserva.id)
+      .neq("estado", "cancelada")
+      .eq("no_show", false)
+
+    if (errorBusqueda) {
+      alert("No se pudo verificar la disponibilidad.")
+      return
+    }
+
+    const hayCruce = (existentes || []).some((r) => reserva.fecha_salida < r.fecha_salida && nuevaSalida > r.fecha_entrada)
+    if (hayCruce) {
+      alert("No se puede agregar la noche porque la habitación ya tiene otra reserva.")
+      return
+    }
+
+    const noches = diasEntre(reserva.fecha_entrada, nuevaSalida)
+    const tarifaNoche = Number(reserva.tarifa_noche || 0)
+    const cocheraPorNoche = Number(config.tarifas?.cochera || 0)
+    const vehiculosReserva = Number(reserva.vehiculos || 0)
+    const extra = Number(reserva.extra || 0)
+    const precioTotal = tarifaNoche * noches + cocheraPorNoche * vehiculosReserva * noches + extra
+
+    const { error } = await supabase
+      .from("reservas")
+      .update({
+        fecha_salida: nuevaSalida,
+        noches,
+        precio_total: precioTotal,
+        cochera_total: cocheraPorNoche * vehiculosReserva * noches,
+      })
+      .eq("id", reserva.id)
+      .eq("user_id", user.id)
+
+    if (error) {
+      console.error(error)
+      alert("No se pudo agregar la noche.")
+      return
+    }
+
+    setReservaSeleccionada(null)
+    await cargarDatos()
+  }
+
+  function imprimirHTML(titulo, contenido) {
+    const ventana = window.open("", "_blank", "width=1000,height=800")
+    if (!ventana) {
+      alert("El navegador bloqueó la ventana de impresión. Permití ventanas emergentes para este sitio.")
+      return
+    }
+    ventana.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${titulo}</title><style>body{font-family:Arial,sans-serif;color:#222;padding:28px}h1{margin:0 0 6px}h2{margin-top:26px}table{width:100%;border-collapse:collapse;margin-top:14px}th,td{border:1px solid #ddd;padding:8px;text-align:left;font-size:12px}th{background:#f2f4f7}.muted{color:#666;font-size:12px}.total{font-size:18px;font-weight:700}.badge{display:inline-block;padding:4px 8px;border-radius:12px;background:#eee}</style></head><body>${contenido}</body></html>`)
+    ventana.document.close()
+    ventana.focus()
+    setTimeout(() => ventana.print(), 250)
+  }
+
+  function imprimirReserva(reserva) {
+    const pasajeros = obtenerListaPasajeros(reserva)
+    imprimirHTML(`Reserva ${reserva.numero_reserva || ""}`, `
+      <h1>${config.nombreMarca || "Habitación Llena"}</h1>
+      <div class="muted">Resumen de reserva</div>
+      <h2>${reserva.numero_reserva || "Reserva"} · ${reserva.nombre_huesped || ""}</h2>
+      <table><tr><th>Alojamiento</th><td>${nombreAlojamiento(reserva.alojamiento_id)}</td></tr><tr><th>Habitación</th><td>${nombreHabitacion(reserva.habitacion_id)}</td></tr><tr><th>Entrada</th><td>${formatearFecha(reserva.fecha_entrada)}</td></tr><tr><th>Salida</th><td>${formatearFecha(reserva.fecha_salida)}</td></tr><tr><th>Noches</th><td>${reserva.noches || diasEntre(reserva.fecha_entrada,reserva.fecha_salida)}</td></tr><tr><th>Estado</th><td>${estadoBadge(reserva.estado).label}${reserva.no_show ? " · NO SHOW" : ""}</td></tr></table>
+      <h2>Pasajeros</h2><table><tr><th>#</th><th>Nombre</th><th>DNI</th><th>Menor</th></tr>${pasajeros.map((p,i)=>`<tr><td>${i+1}</td><td>${p.nombre || ""}</td><td>${p.dni || ""}</td><td>${p.menor ? "Sí" : "No"}</td></tr>`).join("")}</table>
+      <h2>Importes</h2><table><tr><th>Habitación</th><td>$${Number(reserva.tarifa_noche||0).toLocaleString("es-AR")} / noche</td></tr><tr><th>Cochera</th><td>$${Number(reserva.cochera_total||0).toLocaleString("es-AR")}</td></tr><tr><th>Extra</th><td>$${Number(reserva.extra||0).toLocaleString("es-AR")}</td></tr><tr><th>Total</th><td class="total">$${Number(reserva.precio_total||0).toLocaleString("es-AR")}</td></tr></table>
+      ${reserva.notas ? `<h2>Notas</h2><p>${reserva.notas}</p>` : ""}`)
+  }
+
+  function imprimirReservas() {
+    const lista = reservasFiltradas
+    imprimirHTML("Listado de reservas", `<h1>${config.nombreMarca || "Habitación Llena"}</h1><div class="muted">Listado generado el ${formatearFecha(fechaLocal(0))}</div><table><tr><th>Nº reserva</th><th>Huésped</th><th>Habitación</th><th>Entrada</th><th>Salida</th><th>Huéspedes</th><th>Estado</th><th>Total</th></tr>${lista.map(r=>`<tr><td>${r.numero_reserva||"—"}</td><td>${r.nombre_huesped||""}</td><td>${nombreHabitacion(r.habitacion_id)}</td><td>${formatearFecha(r.fecha_entrada)}</td><td>${formatearFecha(r.fecha_salida)}</td><td>${r.cantidad_huespedes||1}</td><td>${r.no_show?"No show":estadoBadge(r.estado).label}</td><td>$${Number(r.precio_total||0).toLocaleString("es-AR")}</td></tr>`).join("")}</table>`)
+  }
+
+  function imprimirPlanillaIn(fecha = fechaLocal(0)) {
+    const lista = reservas.filter(r => r.estado !== "cancelada" && !r.no_show && r.fecha_entrada === fecha)
+    imprimirHTML(`IN ${formatearFecha(fecha)}`, `<h1>${config.nombreMarca || "Habitación Llena"}</h1><h2>Planilla de IN · ${formatearFecha(fecha)}</h2><table><tr><th>Habitación</th><th>Nº reserva</th><th>Huésped principal</th><th>Pasajeros</th><th>DNI</th><th>Teléfono</th><th>Early</th><th>Notas</th></tr>${lista.map(r=>`<tr><td>${nombreHabitacion(r.habitacion_id)}</td><td>${r.numero_reserva||"—"}</td><td>${r.nombre_huesped||""}</td><td>${r.cantidad_huespedes||1}</td><td>${r.dni_huesped||""}</td><td>${r.telefono_huesped||""}</td><td>${r.early_checkin?"Sí":"No"}</td><td>${r.notas||""}</td></tr>`).join("")}</table>`)
+  }
+
+  function imprimirHousekeeping(fecha = fechaLocal(0)) {
+    const outs = reservas.filter(r => r.estado !== "cancelada" && r.fecha_salida === fecha)
+    const ins = reservas.filter(r => r.estado !== "cancelada" && !r.no_show && r.fecha_entrada === fecha)
+    imprimirHTML(`Housekeeping ${formatearFecha(fecha)}`, `<h1>${config.nombreMarca || "Habitación Llena"}</h1><h2>Housekeeping · ${formatearFecha(fecha)}</h2><h3>OUT del día (${outs.length})</h3><table><tr><th>Habitación</th><th>Huésped</th><th>Nº reserva</th><th>Pasajeros</th><th>Late check-out</th><th>Notas</th></tr>${outs.map(r=>`<tr><td>${nombreHabitacion(r.habitacion_id)}</td><td>${r.nombre_huesped||""}</td><td>${r.numero_reserva||"—"}</td><td>${r.cantidad_huespedes||1}</td><td>${r.late_checkout?"Sí":"No"}</td><td>${r.notas||""}</td></tr>`).join("")}</table><h3>IN del día (${ins.length})</h3><table><tr><th>Habitación</th><th>Huésped</th><th>Nº reserva</th><th>Pasajeros</th><th>Early check-in</th></tr>${ins.map(r=>`<tr><td>${nombreHabitacion(r.habitacion_id)}</td><td>${r.nombre_huesped||""}</td><td>${r.numero_reserva||"—"}</td><td>${r.cantidad_huespedes||1}</td><td>${r.early_checkin?"Sí":"No"}</td></tr>`).join("")}</table>`)
   }
 
   async function guardarReserva(e) {
@@ -504,6 +644,10 @@ export default function Home() {
       fecha_salida: fechaSalida,
       cantidad_huespedes: obtenerPasajerosReserva().length,
       estado,
+      no_show: Boolean(noShow),
+      early_checkin: Boolean(earlyCheckin),
+      late_checkout: Boolean(lateCheckout),
+      numero_reserva: modoEdicion && reservaSeleccionada?.numero_reserva ? reservaSeleccionada.numero_reserva : generarNumeroReserva(),
       notas: notas.trim(),
       user_id: user.id,
     }
@@ -653,6 +797,7 @@ export default function Home() {
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
           <div>
             <div style={{ fontWeight: 700, fontSize: 16 }}>{reserva.nombre_huesped}</div>
+            <div style={{ color: colors.blue, fontSize: 11, fontWeight: 800, marginTop: 3 }}>{reserva.numero_reserva || "Sin número"}</div>
             <div style={{ color: colors.muted, fontSize: 13, marginTop: 5 }}>
               {nombreAlojamiento(reserva.alojamiento_id)} · {nombreHabitacion(reserva.habitacion_id)}
             </div>
@@ -825,8 +970,6 @@ export default function Home() {
       ["dashboard", "▦", "Inicio"],
       ["reservas", "▣", "Reservas"],
       ["calendario", "▤", "Calendario"],
-      ["alojamientos", "⌂", "Alojamientos"],
-      ["habitaciones", "▥", "Habitaciones"],
       ["ventas", "◫", "Ventas"],
       ["integraciones", "↔", "Integraciones"],
       ["asistente", "✦", "Asistente IA"],
@@ -1130,6 +1273,29 @@ export default function Home() {
       <>
         <Header titulo="Ventas y rendimiento" subtitulo="Volumen comercial y ocupación" />
         <div style={{ padding: 30 }}>
+          <section style={{ ...cardStyle, marginBottom: 22 }}>
+            <div style={sectionHeader}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: 18 }}>Operación de hoy</h2>
+                <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>{formatearFecha(fechaLocal(0))}</div>
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button onClick={() => imprimirPlanillaIn()} style={secondaryButton}>🖨 Planilla IN</button>
+                <button onClick={() => imprimirHousekeeping()} style={secondaryButton}>🧹 Housekeeping</button>
+              </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              <div style={{ padding: 14, background: "#eefaf4", borderRadius: 10 }}>
+                <div style={{ color: colors.green, fontWeight: 800, fontSize: 12 }}>IN DEL DÍA · {entradasHoy.length}</div>
+                <div style={{ marginTop: 9, display: "grid", gap: 7 }}>{entradasHoy.length ? entradasHoy.map(r => <div key={r.id} style={{ fontSize: 13 }}><strong>{nombreHabitacion(r.habitacion_id)}</strong> · {r.nombre_huesped} · {r.cantidad_huespedes || 1} pax</div>) : <span style={{ color: colors.muted, fontSize: 12 }}>Sin entradas hoy.</span>}</div>
+              </div>
+              <div style={{ padding: 14, background: "#fff0f0", borderRadius: 10 }}>
+                <div style={{ color: colors.red, fontWeight: 800, fontSize: 12 }}>OUT DEL DÍA · {salidasHoy.length}</div>
+                <div style={{ marginTop: 9, display: "grid", gap: 7 }}>{salidasHoy.length ? salidasHoy.map(r => <div key={r.id} style={{ fontSize: 13 }}><strong>{nombreHabitacion(r.habitacion_id)}</strong> · {r.nombre_huesped} · {r.cantidad_huespedes || 1} pax{r.late_checkout ? " · Late check-out" : ""}</div>) : <span style={{ color: colors.muted, fontSize: 12 }}>Sin salidas hoy.</span>}</div>
+              </div>
+            </div>
+          </section>
+
           <div style={{
             display: "grid",
             gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
@@ -1413,11 +1579,39 @@ export default function Home() {
   }
 
   function Configuracion() {
+    if (configSubvista === "alojamientos") return (
+      <>
+        <Header titulo="Configuración · Alojamientos" subtitulo="Propiedades de tu cuenta" />
+        <div style={{ padding: 30 }}>
+          <div style={{ ...cardStyle, marginBottom: 18 }}>
+            <button onClick={() => setConfigSubvista("general")} style={secondaryButton}>← Volver a configuración</button>
+          </div>
+          {Alojamientos({ embedded: true })}
+        </div>
+      </>
+    )
+    if (configSubvista === "habitaciones") return (
+      <>
+        <Header titulo="Configuración · Habitaciones" subtitulo="Unidades de tus alojamientos" />
+        <div style={{ padding: 30 }}>
+          <div style={{ ...cardStyle, marginBottom: 18 }}>
+            <button onClick={() => setConfigSubvista("general")} style={secondaryButton}>← Volver a configuración</button>
+          </div>
+          {Habitaciones({ embedded: true })}
+        </div>
+      </>
+    )
+
     return (
       <>
         <Header titulo="Configuración" subtitulo="Identidad y datos comerciales del alojamiento" />
         <div style={{ padding: 30 }}>
-          <section style={{ ...cardStyle, maxWidth: 900 }}>
+          <section style={{ ...cardStyle, maxWidth: 1000 }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24, borderBottom: `1px solid ${colors.border}`, paddingBottom: 14 }}>
+              <button onClick={() => setConfigSubvista("general")} style={configSubvista === "general" ? primaryButton : secondaryButton}>General</button>
+              <button onClick={() => setConfigSubvista("alojamientos")} style={secondaryButton}>Alojamientos</button>
+              <button onClick={() => setConfigSubvista("habitaciones")} style={secondaryButton}>Habitaciones</button>
+            </div>
             <h2 style={{ margin: 0, fontSize: 18 }}>Marca</h2>
             <div style={{ color: colors.muted, fontSize: 12, marginTop: 4, marginBottom: 20 }}>
               Esta configuración se guarda en este navegador por ahora.
@@ -1781,6 +1975,14 @@ export default function Home() {
                   </select>
                 </Field>
 
+                <Field label="Condiciones especiales" wide>
+                  <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center", minHeight: 44 }}>
+                    <label style={{ display: "flex", gap: 7, alignItems: "center", fontSize: 12, fontWeight: 700 }}><input type="checkbox" checked={earlyCheckin} onChange={(e) => setEarlyCheckin(e.target.checked)} /> Early check-in</label>
+                    <label style={{ display: "flex", gap: 7, alignItems: "center", fontSize: 12, fontWeight: 700 }}><input type="checkbox" checked={lateCheckout} onChange={(e) => setLateCheckout(e.target.checked)} /> Late check-out</label>
+                    <label style={{ display: "flex", gap: 7, alignItems: "center", fontSize: 12, fontWeight: 700, color: colors.red }}><input type="checkbox" checked={noShow} onChange={(e) => setNoShow(e.target.checked)} /> No show</label>
+                  </div>
+                </Field>
+
                 <Field label="Notas" wide>
                   <input value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="Información adicional..." style={inputStyle} />
                 </Field>
@@ -1843,13 +2045,23 @@ export default function Home() {
                   Hacé click en una reserva para ver sus acciones.
                 </div>
               </div>
-              <div style={{ color: colors.muted, fontSize: 13 }}>{reservas.length} reservas</div>
+              <div style={{ display: "flex", gap: 9, alignItems: "center", flexWrap: "wrap" }}>
+                <div style={{ color: colors.muted, fontSize: 13 }}>{reservasFiltradas.length} de {reservas.length} reservas</div>
+                <button onClick={imprimirReservas} type="button" style={secondaryButton}>🖨 Imprimir reservas</button>
+              </div>
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <input value={busquedaReserva} onChange={(e) => setBusquedaReserva(e.target.value)} placeholder="Buscar por nombre, Nº de reserva, DNI o email..." style={inputStyle} />
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+              <button type="button" onClick={() => imprimirPlanillaIn()} style={secondaryButton}>🖨 Planilla IN de hoy</button>
+              <button type="button" onClick={() => imprimirHousekeeping()} style={secondaryButton}>🧹 Housekeeping de hoy</button>
             </div>
 
             <div style={{ display: "grid", gap: 10 }}>
               {reservas.length === 0 ? (
                 <div style={emptyStyle}>Todavía no hay reservas cargadas.</div>
-              ) : reservas.map((r) => ReservaCard({ reserva: r }))}
+              ) : reservasFiltradas.map((r) => ReservaCard({ reserva: r }))}
             </div>
           </section>
         </div>
@@ -1860,13 +2072,19 @@ export default function Home() {
   function CalendarioVista() {
     return (
       <>
-        <Header titulo="Calendario" subtitulo="Últimos 7 días + próximos 30 días" />
+        <Header titulo="Calendario" subtitulo={`Semana alrededor de ${formatearFecha(fechaCalendario)}`} />
         <div style={{ padding: 30 }}>
           <section style={cardStyle}>
             <div style={{ marginBottom: 18 }}>
               <h2 style={{ margin: 0, fontSize: 18 }}>Calendario de ocupación</h2>
               <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>
                 Hacé click sobre una reserva para editarla.
+              </div>
+              <div style={{ display: "flex", gap: 9, flexWrap: "wrap", alignItems: "center", marginTop: 14 }}>
+                <button type="button" onClick={() => setFechaCalendario(fechaLocal(0))} style={secondaryButton}>Hoy</button>
+                <button type="button" onClick={() => { const d = new Date(`${fechaCalendario}T12:00:00`); d.setDate(d.getDate() - 7); setFechaCalendario(d.toISOString().slice(0,10)) }} style={secondaryButton}>← 7 días</button>
+                <input type="date" value={fechaCalendario} onChange={(e) => setFechaCalendario(e.target.value)} style={{ ...inputStyle, width: 160 }} />
+                <button type="button" onClick={() => { const d = new Date(`${fechaCalendario}T12:00:00`); d.setDate(d.getDate() + 7); setFechaCalendario(d.toISOString().slice(0,10)) }} style={secondaryButton}>7 días →</button>
               </div>
               <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 12, fontSize: 11, fontWeight: 700 }}>
                 <span style={{ color: colors.green }}>● IN · Alojado</span>
@@ -1883,10 +2101,10 @@ export default function Home() {
     )
   }
 
-  function Alojamientos() {
+  function Alojamientos({ embedded = false } = {}) {
     return (
       <>
-        <Header titulo="Alojamientos" subtitulo="Administrá tus propiedades" />
+        {!embedded && <Header titulo="Alojamientos" subtitulo="Administrá tus propiedades" />}
         <div style={{ padding: 30 }}>
           <section style={cardStyle}>
             <div style={sectionHeader}>
@@ -1961,10 +2179,10 @@ export default function Home() {
     )
   }
 
-  function Habitaciones() {
+  function Habitaciones({ embedded = false } = {}) {
     return (
       <>
-        <Header titulo="Habitaciones" subtitulo="Administrá las unidades de cada alojamiento" />
+        {!embedded && <Header titulo="Habitaciones" subtitulo="Administrá las unidades de cada alojamiento" />}
         <div style={{ padding: 30 }}>
           <section style={cardStyle}>
             <div style={sectionHeader}>
@@ -2097,7 +2315,7 @@ export default function Home() {
             <div style={{ fontWeight: 800, fontSize: 20, padding: 12, marginBottom: 20 }}>
               Habitación Llena
             </div>
-            {["dashboard", "reservas", "calendario", "alojamientos", "habitaciones", "ventas", "integraciones", "asistente", "configuracion"].map((id) => (
+            {["dashboard", "reservas", "calendario", "ventas", "integraciones", "asistente", "configuracion"].map((id) => (
               <button key={id} onClick={() => { setVista(id); setMenuAbierto(false) }} style={{
                 width: "100%",
                 padding: 13,
@@ -2126,8 +2344,6 @@ export default function Home() {
         {vista === "dashboard" && Dashboard()}
         {vista === "reservas" && Reservas()}
         {vista === "calendario" && CalendarioVista()}
-        {vista === "alojamientos" && Alojamientos()}
-        {vista === "habitaciones" && Habitaciones()}
         {vista === "ventas" && Ventas()}
         {vista === "integraciones" && Integraciones()}
         {vista === "asistente" && Asistente()}
@@ -2162,6 +2378,7 @@ export default function Home() {
               <div>
                 <div style={{ color: colors.muted, fontSize: 11, textTransform: "uppercase", letterSpacing: 1 }}>Reserva</div>
                 <h2 style={{ margin: "5px 0 0", fontSize: 24 }}>{reservaSeleccionada.nombre_huesped}</h2>
+                <div style={{ color: colors.blue, fontWeight: 800, fontSize: 12, marginTop: 4 }}>{reservaSeleccionada.numero_reserva || "Sin número"}</div>
               </div>
               <button onClick={() => setReservaSeleccionada(null)} style={{
                 border: "none",
@@ -2188,7 +2405,9 @@ export default function Home() {
               <Info label="Huéspedes" value={reservaSeleccionada.cantidad_huespedes || 1} />
               {reservaSeleccionada.precio_total != null && <Info label="Total" value={`$${Number(reservaSeleccionada.precio_total || 0).toLocaleString("es-AR")}`} />}
               {reservaSeleccionada.vehiculos != null && <Info label="Vehículos" value={reservaSeleccionada.vehiculos} />}
-              <Info label="Estado" value={estadoBadge(reservaSeleccionada.estado).label} />
+              <Info label="Estado" value={reservaSeleccionada.no_show ? "No show" : estadoBadge(reservaSeleccionada.estado).label} />
+              <Info label="Early check-in" value={reservaSeleccionada.early_checkin ? "Sí" : "No"} />
+              <Info label="Late check-out" value={reservaSeleccionada.late_checkout ? "Sí" : "No"} />
               {reservaSeleccionada.email_huesped && <Info label="Email" value={reservaSeleccionada.email_huesped} />}
               {reservaSeleccionada.telefono_huesped && <Info label="Teléfono" value={reservaSeleccionada.telefono_huesped} />}
             </div>
@@ -2221,6 +2440,8 @@ export default function Home() {
                   ✉ Enviar resumen por email
                 </button>
               )}
+              <button onClick={() => imprimirReserva(reservaSeleccionada)} style={secondaryButton}>🖨 Imprimir reserva</button>
+              <button onClick={() => agregarNoches(reservaSeleccionada, 1)} style={secondaryButton}>＋ Agregar 1 noche</button>
               <button onClick={() => editarReserva(reservaSeleccionada)} style={secondaryButton}>
                 Editar reserva
               </button>
