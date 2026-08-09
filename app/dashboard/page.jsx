@@ -82,13 +82,8 @@ export default function Home() {
     airbnbUrl: "",
     despegarUrl: "",
     webUrl: "",
-    tiposHabitacion: [
-      { id: "simple", nombre: "Simple" },
-      { id: "doble", nombre: "Doble" },
-      { id: "triple", nombre: "Triple" },
-      { id: "cuadruple", nombre: "Cuádruple" },
-    ],
-    tarifasPorTipo: { simple: 0, doble: 0, triple: 0, cuadruple: 0 },
+    // Los precios ya no se cargan por tipo en la configuración general.
+    // Se mantienen estos valores únicamente como compatibilidad con reservas/configuraciones antiguas.
     tarifas: {
       simple: 0,
       doble: 0,
@@ -97,6 +92,8 @@ export default function Home() {
       otro: 0,
       cochera: 0,
     },
+    tiposHabitacion: ["Simple", "Doble", "Triple", "Cuádruple", "Otro"],
+    habitacionesTarifas: {},
     earlyCheckin: { tipo: "monto", valor: 0 },
     lateCheckout: { tipo: "monto", valor: 0 },
     tipoCambioUSD: 1,
@@ -178,16 +175,23 @@ export default function Home() {
 
   const [mostrarAlojamiento, setMostrarAlojamiento] = useState(false)
   const [nuevoAlojamiento, setNuevoAlojamiento] = useState("")
-  const [alojamientoEditando, setAlojamientoEditando] = useState(null)
-
   const [mostrarHabitacion, setMostrarHabitacion] = useState(false)
   const [nuevaHabitacion, setNuevaHabitacion] = useState("")
   const [nuevoTipo, setNuevoTipo] = useState("")
   const [nuevoAlojamientoHabitacion, setNuevoAlojamientoHabitacion] = useState("")
-  const [nuevoTipoTarifa, setNuevoTipoTarifa] = useState("")
-  const [nuevoPrecioTarifa, setNuevoPrecioTarifa] = useState("")
-  const [tipoTarifaEditando, setTipoTarifaEditando] = useState(null)
   const [habitacionEditando, setHabitacionEditando] = useState(null)
+  const [habitacionForm, setHabitacionForm] = useState({
+    nombre: "",
+    tipo: "",
+    alojamiento_id: "",
+    precio: 0,
+    cochera: 0,
+    earlyTipo: "monto",
+    earlyValor: 0,
+    lateTipo: "monto",
+    lateValor: 0,
+  })
+  const [nuevoTipoConfiguracion, setNuevoTipoConfiguracion] = useState("")
 
   const diasCalendario = useMemo(
     () => Array.from({ length: 38 }, (_, i) => {
@@ -226,28 +230,10 @@ export default function Home() {
           const guardada = localStorage.getItem(claveConfig)
 
           if (guardada) {
-            const guardadaConfig = JSON.parse(guardada)
-            setConfig((actual) => {
-              const base = { ...actual, ...guardadaConfig }
-              const defaults = actual.tiposHabitacion || [
-                { id: "simple", nombre: "Simple" },
-                { id: "doble", nombre: "Doble" },
-                { id: "triple", nombre: "Triple" },
-                { id: "cuadruple", nombre: "Cuádruple" },
-              ]
-              const tipos = Array.isArray(guardadaConfig.tiposHabitacion) && guardadaConfig.tiposHabitacion.length
-                ? guardadaConfig.tiposHabitacion
-                : defaults
-              const legacy = guardadaConfig.tarifas || {}
-              const savedRates = guardadaConfig.tarifasPorTipo || {}
-              const tarifasPorTipo = {}
-              tipos.forEach((tipo) => {
-                const id = String(tipo.id || tipo.nombre || "").trim()
-                const clave = id.toLowerCase()
-                if (clave) tarifasPorTipo[clave] = savedRates[id] ?? savedRates[clave] ?? legacy[clave] ?? 0
-              })
-              return { ...base, tiposHabitacion: tipos, tarifasPorTipo }
-            })
+            setConfig((actual) => ({
+              ...actual,
+              ...JSON.parse(guardada),
+            }))
           }
         } catch (error) {
           console.error("No se pudo cargar la configuración local:", error)
@@ -382,39 +368,7 @@ export default function Home() {
       }
     }
 
-    // El modelo nuevo (reservations/units) puede convivir con el modelo legacy.
-    // IMPORTANTE: no reemplazamos los datos legacy cuando existen; solamente
-    // incorporamos las reservas nuevas que todavía no están representadas.
-    if (propertyIds.length) {
-      const { data: unitsCompat, error: unitsCompatError } = await supabase
-        .from("units")
-        .select("id, property_id, name")
-        .in("property_id", propertyIds)
-
-      if (unitsCompatError) {
-        console.warn("No se pudieron consultar units para sincronizar el calendario:", unitsCompatError)
-      }
-
-      const alojamientoPorNombre = new Map(
-        alojamientosData.map((a) => [String(a.nombre || "").trim().toLowerCase(), a])
-      )
-      const propertyToLegacy = new Map()
-      ;(propiedadesAccesibles || []).forEach((p) => {
-        const legacy = alojamientoPorNombre.get(String(p.name || "").trim().toLowerCase())
-        propertyToLegacy.set(String(p.id), legacy?.id || p.id)
-      })
-
-      const unitToLegacy = new Map()
-      ;(unitsCompat || []).forEach((u) => {
-        const alojamientoId = propertyToLegacy.get(String(u.property_id)) || u.property_id
-        const nombreUnit = String(u.name || "").trim().toLowerCase()
-        const legacy = habitacionesData.find((h) =>
-          String(h.alojamiento_id) === String(alojamientoId) &&
-          String(h.nombre || "").trim().toLowerCase() === nombreUnit
-        )
-        if (legacy) unitToLegacy.set(String(u.id), legacy.id)
-      })
-
+    if (!reservasFinal.length && propertyIds.length) {
       const { data: reservationsData, error: reservationsError } = await supabase
         .from("reservations")
         .select("*")
@@ -422,53 +376,26 @@ export default function Home() {
         .order("created_at", { ascending: false })
 
       if (reservationsError) {
-        console.warn("No se pudieron cargar las reservas nuevas para el calendario:", reservationsError)
+        console.error("No se pudieron cargar las reservas nuevas:", reservationsError)
       } else {
-        const nuevas = (reservationsData || []).map((r) => ({
+        reservasFinal = (reservationsData || []).map((r) => ({
           id: r.id,
-          alojamiento_id: propertyToLegacy.get(String(r.property_id)) || r.property_id,
-          habitacion_id: unitToLegacy.get(String(r.unit_id)) || r.unit_id,
+          alojamiento_id: r.property_id,
+          habitacion_id: r.unit_id,
           nombre_huesped: r.guest_name,
-          dni_huesped: r.guest_document || "",
           email_huesped: r.guest_email,
           telefono_huesped: r.guest_phone,
           fecha_entrada: r.check_in,
           fecha_salida: r.check_out,
           cantidad_huespedes: r.guests || 1,
           precio_total: Number(r.total || 0),
-          numero_reserva: r.reservation_number || r.code || `RS-${String(r.id).slice(0, 8)}`,
           estado:
             r.status === "confirmed" ? "confirmada" :
             r.status === "cancelled" ? "cancelada" :
             r.status === "completed" ? "finalizada" :
             r.status || "pendiente",
           no_show: false,
-          origen_reserva: "reservations",
-          reservation_source_id: r.id,
-        })).filter((r) => r.habitacion_id)
-
-        const clavesExistentes = new Set(
-          reservasFinal.map((r) => [
-            String(r.nombre_huesped || "").trim().toLowerCase(),
-            String(r.fecha_entrada || ""),
-            String(r.fecha_salida || ""),
-            String(r.habitacion_id || ""),
-          ].join("|"))
-        )
-
-        const nuevasSinDuplicar = nuevas.filter((r) => {
-          const clave = [
-            String(r.nombre_huesped || "").trim().toLowerCase(),
-            String(r.fecha_entrada || ""),
-            String(r.fecha_salida || ""),
-            String(r.habitacion_id || ""),
-          ].join("|")
-          if (clavesExistentes.has(clave)) return false
-          clavesExistentes.add(clave)
-          return true
-        })
-
-        reservasFinal = [...reservasFinal, ...nuevasSinDuplicar]
+        }))
       }
     }
 
@@ -798,77 +725,31 @@ export default function Home() {
     return "otro"
   }
 
-  function normalizarNombreTipo(tipo) {
-    return String(tipo || "")
-      .trim()
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "")
-  }
+  const tiposHabitacionDisponibles = useMemo(() => {
+    const base = Array.isArray(config.tiposHabitacion) && config.tiposHabitacion.length
+      ? config.tiposHabitacion
+      : ["Simple", "Doble", "Triple", "Cuádruple", "Otro"]
+    return Array.from(new Set(base.map((tipo) => String(tipo || "").trim()).filter(Boolean)))
+  }, [config.tiposHabitacion])
 
-  function tiposHabitacionDisponibles() {
-    const configurados = Array.isArray(config.tiposHabitacion) ? config.tiposHabitacion : []
-    const usados = habitaciones.map((h) => String(h.tipo || "").trim()).filter(Boolean)
-    const resultado = []
-    const vistos = new Set()
-    ;[...configurados.map((t) => t.nombre || t), ...usados].forEach((nombre) => {
-      const texto = String(nombre || "").trim()
-      const clave = normalizarNombreTipo(texto)
-      if (!texto || !clave || vistos.has(clave)) return
-      vistos.add(clave)
-      const configurado = configurados.find((t) => normalizarNombreTipo(t.nombre || t) === clave)
-      resultado.push({ id: configurado?.id || clave, nombre: configurado?.nombre || texto })
-    })
-    return resultado
-  }
+  function datosTarifaHabitacion(habitacionId) {
+    const habitacion = habitaciones.find((h) => String(h.id) === String(habitacionId))
+    const guardada = config.habitacionesTarifas?.[String(habitacionId)] || {}
+    const clave = claveTipoHabitacion(habitacion?.tipo)
+    const precioAnterior = Number(config.tarifas?.[clave] || 0)
 
-  function tarifaDeTipo(nombreTipo) {
-    const clave = normalizarNombreTipo(nombreTipo)
-    if (config.tarifasPorTipo?.[clave] !== undefined) return Number(config.tarifasPorTipo[clave]) || 0
-    return Number(config.tarifas?.[claveTipoHabitacion(nombreTipo)] || 0)
+    return {
+      precio: Number(guardada.precio ?? habitacion?.precio ?? precioAnterior ?? 0),
+      cochera: Number(guardada.cochera ?? config.tarifas?.cochera ?? 0),
+      earlyTipo: guardada.earlyTipo || "monto",
+      earlyValor: Number(guardada.earlyValor ?? config.earlyCheckin?.valor ?? 0),
+      lateTipo: guardada.lateTipo || "monto",
+      lateValor: Number(guardada.lateValor ?? config.lateCheckout?.valor ?? 0),
+    }
   }
 
   function tarifaDeHabitacion(habitacionId) {
-    const habitacion = habitaciones.find((h) => String(h.id) === String(habitacionId))
-    return tarifaDeTipo(habitacion?.tipo)
-  }
-
-  function agregarTipoTarifa() {
-    const nombreTipo = nuevoTipoTarifa.trim()
-    const id = normalizarNombreTipo(nombreTipo)
-    if (!nombreTipo || !id) return
-    if (tiposHabitacionDisponibles().some((t) => normalizarNombreTipo(t.nombre) === id)) {
-      alert("Ese tipo de habitación ya existe.")
-      return
-    }
-    setConfig((actual) => ({
-      ...actual,
-      tiposHabitacion: [...(actual.tiposHabitacion || []), { id, nombre: nombreTipo }],
-      tarifasPorTipo: { ...(actual.tarifasPorTipo || {}), [id]: Number(nuevoPrecioTarifa) || 0 },
-    }))
-    setNuevoTipoTarifa("")
-    setNuevoPrecioTarifa("")
-  }
-
-  function cambiarTarifaTipo(tipo, precio) {
-    const clave = normalizarNombreTipo(tipo.nombre || tipo)
-    setConfig((actual) => ({ ...actual, tarifasPorTipo: { ...(actual.tarifasPorTipo || {}), [clave]: precio } }))
-  }
-
-  function eliminarTipoTarifa(tipo) {
-    const clave = normalizarNombreTipo(tipo.nombre || tipo)
-    if (habitaciones.some((h) => normalizarNombreTipo(h.tipo) === clave)) {
-      alert(`No podés eliminar "${tipo.nombre}" porque hay habitaciones que usan este tipo.`)
-      return
-    }
-    if (!confirm(`¿Eliminar el tipo "${tipo.nombre}"?`)) return
-    setConfig((actual) => ({
-      ...actual,
-      tiposHabitacion: (actual.tiposHabitacion || []).filter((t) => normalizarNombreTipo(t.nombre || t) !== clave),
-      tarifasPorTipo: Object.fromEntries(Object.entries(actual.tarifasPorTipo || {}).filter(([key]) => key !== clave)),
-    }))
+    return datosTarifaHabitacion(habitacionId).precio
   }
 
   function calcularRecargoServicio(base, configuracion) {
@@ -884,11 +765,16 @@ export default function Home() {
     }
 
     const noches = diasEntre(fechaEntrada, fechaSalida)
-    const tarifaNoche = tarifaDeHabitacion(habitacionSeleccionada)
+    const tarifaHabitacion = datosTarifaHabitacion(habitacionSeleccionada)
+    const tarifaNoche = tarifaHabitacion.precio
     const alojamiento = tarifaNoche * noches
-    const cochera = (Number(vehiculos) || 0) * (Number(config.tarifas?.cochera) || 0) * noches
-    const early = earlyCheckin ? calcularRecargoServicio(tarifaNoche, config.earlyCheckin) : 0
-    const late = lateCheckout ? calcularRecargoServicio(tarifaNoche, config.lateCheckout) : 0
+    const cochera = (Number(vehiculos) || 0) * tarifaHabitacion.cochera * noches
+    const early = earlyCheckin
+      ? calcularRecargoServicio(tarifaNoche, { tipo: tarifaHabitacion.earlyTipo, valor: tarifaHabitacion.earlyValor })
+      : 0
+    const late = lateCheckout
+      ? calcularRecargoServicio(tarifaNoche, { tipo: tarifaHabitacion.lateTipo, valor: tarifaHabitacion.lateValor })
+      : 0
     const extra = Number(extraReserva) || 0
     const subtotal = alojamiento + cochera + early + late + extra
     const descuento = descuentoTipo === "porcentaje"
@@ -1336,17 +1222,26 @@ export default function Home() {
 
   async function crearHabitacion(e) {
     e.preventDefault()
-    if (!nuevaHabitacion.trim() || !nuevoAlojamientoHabitacion) return
+    const tipoFinal = nuevoTipo || tiposHabitacionDisponibles[0] || "Otro"
+
+    if (!nuevaHabitacion.trim() || !nuevoAlojamientoHabitacion) {
+      alert("Completá nombre y alojamiento.")
+      return
+    }
 
     const datos = {
       nombre: nuevaHabitacion.trim(),
-      tipo: nuevoTipo.trim(),
+      tipo: tipoFinal,
       alojamiento_id: Number(nuevoAlojamientoHabitacion),
       activa: true,
       user_id: user.id,
     }
 
-    const { error } = await supabase.from("habitaciones").insert([datos])
+    const { data, error } = await supabase
+      .from("habitaciones")
+      .insert([datos])
+      .select("id")
+      .single()
 
     if (error) {
       console.error(error)
@@ -1354,160 +1249,29 @@ export default function Home() {
       return
     }
 
+    if (data?.id) {
+      const configuracionActualizada = {
+        ...config,
+        habitacionesTarifas: {
+          ...(config.habitacionesTarifas || {}),
+          [String(data.id)]: {
+            precio: 0,
+            cochera: 0,
+            earlyTipo: "monto",
+            earlyValor: 0,
+            lateTipo: "monto",
+            lateValor: 0,
+          },
+        },
+      }
+      setConfig(configuracionActualizada)
+      guardarConfiguracion(configuracionActualizada)
+    }
+
     setNuevaHabitacion("")
     setNuevoTipo("")
     setNuevoAlojamientoHabitacion("")
     setMostrarHabitacion(false)
-    await cargarDatos()
-  }
-
-
-  function iniciarEdicionHabitacion(habitacion) {
-    setHabitacionEditando({
-      id: habitacion.id,
-      nombre: habitacion.nombre || "",
-      tipo: habitacion.tipo || "",
-      alojamiento_id: String(habitacion.alojamiento_id || ""),
-      activa: habitacion.activa !== false,
-    })
-  }
-
-  async function guardarEdicionHabitacion(e) {
-    e?.preventDefault()
-    if (!habitacionEditando?.nombre?.trim() || !habitacionEditando?.alojamiento_id) return
-
-    const { error } = await supabase
-      .from("habitaciones")
-      .update({
-        nombre: habitacionEditando.nombre.trim(),
-        tipo: habitacionEditando.tipo?.trim() || null,
-        alojamiento_id: Number(habitacionEditando.alojamiento_id),
-        activa: habitacionEditando.activa !== false,
-      })
-      .eq("id", habitacionEditando.id)
-
-    if (error) {
-      console.error(error)
-      alert("No se pudo actualizar la habitación. Verificá que tengas permisos para modificarla.")
-      return
-    }
-
-    setHabitacionEditando(null)
-    await cargarDatos()
-  }
-
-  async function eliminarHabitacion(habitacion) {
-    const confirmado = confirm(
-      `¿Querés eliminar "${habitacion.nombre}"?\n\nSi la habitación ya tiene reservas, la vamos a desactivar para no romper el historial.`
-    )
-    if (!confirmado) return
-
-    // No eliminamos físicamente una unidad que tenga historial.
-    const [{ data: reservasViejas }, { data: reservasNuevas }] = await Promise.all([
-      supabase.from("reservas").select("id").eq("habitacion_id", habitacion.id).limit(1),
-      supabase.from("reservations").select("id").eq("unit_id", habitacion.id).limit(1),
-    ])
-
-    const tieneHistorial =
-      (reservasViejas?.length || 0) > 0 ||
-      (reservasNuevas?.length || 0) > 0
-
-    if (tieneHistorial) {
-      const { error } = await supabase
-        .from("habitaciones")
-        .update({ activa: false })
-        .eq("id", habitacion.id)
-
-      if (error) {
-        console.error(error)
-        alert("No se pudo desactivar la habitación.")
-        return
-      }
-
-      await cargarDatos()
-      alert("La habitación fue desactivada porque tiene reservas asociadas. El historial quedó intacto.")
-      return
-    }
-
-    const { error } = await supabase
-      .from("habitaciones")
-      .delete()
-      .eq("id", habitacion.id)
-
-    if (error) {
-      console.error(error)
-      alert("No se pudo eliminar la habitación. Si tiene información asociada, probá desactivarla.")
-      return
-    }
-
-    await cargarDatos()
-  }
-
-  async function alternarHabitacion(habitacion) {
-    const siguiente = habitacion.activa === false
-    const { error } = await supabase
-      .from("habitaciones")
-      .update({ activa: siguiente })
-      .eq("id", habitacion.id)
-
-    if (error) {
-      console.error(error)
-      alert("No se pudo cambiar el estado de la habitación.")
-      return
-    }
-
-    await cargarDatos()
-  }
-
-  function iniciarEdicionAlojamiento(alojamiento) {
-    setAlojamientoEditando({
-      id: alojamiento.id,
-      nombre: alojamiento.nombre || "",
-    })
-  }
-
-  async function guardarEdicionAlojamiento(e) {
-    e?.preventDefault()
-    if (!alojamientoEditando?.nombre?.trim()) return
-
-    const { error } = await supabase
-      .from("alojamientos")
-      .update({ nombre: alojamientoEditando.nombre.trim() })
-      .eq("id", alojamientoEditando.id)
-
-    if (error) {
-      console.error(error)
-      alert("No se pudo actualizar el alojamiento.")
-      return
-    }
-
-    setAlojamientoEditando(null)
-    await cargarDatos()
-  }
-
-  async function eliminarAlojamiento(alojamiento) {
-    const habitacionesDelAlojamiento = habitaciones.filter(
-      (h) => String(h.alojamiento_id) === String(alojamiento.id)
-    )
-
-    if (habitacionesDelAlojamiento.length > 0) {
-      alert("No se puede eliminar este alojamiento mientras tenga habitaciones. Primero eliminá o desactivá sus habitaciones.")
-      return
-    }
-
-    if (!confirm(`¿Eliminar el alojamiento "${alojamiento.nombre}"?`)) return
-
-    const { error } = await supabase
-      .from("alojamientos")
-      .delete()
-      .eq("id", alojamiento.id)
-
-    if (error) {
-      console.error(error)
-      alert("No se pudo eliminar el alojamiento.")
-      return
-    }
-
     await cargarDatos()
   }
 
@@ -1579,14 +1343,14 @@ export default function Home() {
     const [dragReservaId, setDragReservaId] = useState(null)
     const [dropTarget, setDropTarget] = useState(null)
     const [guardandoMovimiento, setGuardandoMovimiento] = useState(false)
-    const [busquedaCalendario, setBusquedaCalendario] = useState("")
-    const [filtroTipo, setFiltroTipo] = useState("todos")
-    const [gruposColapsados, setGruposColapsados] = useState({})
 
+    // Horarios operativos del alojamiento.
+    // El calendario visualiza cada día como 24 h:
+    // CHECK-OUT 10:00 → ventana de limpieza/rotación → CHECK-IN 14:00.
     const HORA_CHECKOUT = 10
     const HORA_CHECKIN = 14
-    const FRACCION_CHECKOUT = HORA_CHECKOUT / 24
     const FRACCION_CHECKIN = HORA_CHECKIN / 24
+    const FRACCION_CHECKOUT = HORA_CHECKOUT / 24
 
     const calendarioDias = useMemo(() => {
       const base = new Date(`${fechaCalendario}T12:00:00`)
@@ -1599,41 +1363,6 @@ export default function Home() {
         return `${año}-${mes}-${dia}`
       })
     }, [fechaCalendario, diasVista])
-
-    const hoy = fechaLocal(0)
-    const anchoDia = diasVista === 30 ? 92 : diasVista === 14 ? 112 : 142
-    const anchoHabitaciones = 208
-    const gridTemplate = `${anchoHabitaciones}px repeat(${diasVista}, ${anchoDia}px)`
-
-    const grupos = useMemo(() => {
-      const q = busquedaCalendario.trim().toLowerCase()
-      const mapa = new Map()
-
-      habitacionesActivas.forEach((habitacion) => {
-        const nombreAloj = nombreAlojamiento(habitacion.alojamiento_id)
-        const clave = habitacion.tipo?.trim() || nombreAloj || "Habitaciones"
-        const reservasDeHabitacion = reservasActivas.filter((r) => String(r.habitacion_id) === String(habitacion.id))
-        const coincideHabitacion = !q || [
-          habitacion.nombre,
-          habitacion.tipo,
-          nombreAloj,
-          ...reservasDeHabitacion.map((r) => `${r.nombre_huesped || ""} ${r.numero_reserva || ""}`),
-        ].some((v) => String(v || "").toLowerCase().includes(q))
-
-        if (!coincideHabitacion) return
-        if (filtroTipo !== "todos" && clave !== filtroTipo) return
-
-        if (!mapa.has(clave)) mapa.set(clave, [])
-        mapa.get(clave).push(habitacion)
-      })
-
-      return Array.from(mapa.entries()).map(([nombre, habitaciones]) => ({ nombre, habitaciones }))
-    }, [habitacionesActivas, reservasActivas, busquedaCalendario, filtroTipo, alojamientos])
-
-    const tiposDisponibles = useMemo(() => {
-      const valores = habitacionesActivas.map((h) => h.tipo?.trim() || nombreAlojamiento(h.alojamiento_id) || "Habitaciones")
-      return Array.from(new Set(valores))
-    }, [habitacionesActivas, alojamientos])
 
     function moverFechaCalendario(cantidad) {
       const d = new Date(`${fechaCalendario}T12:00:00`)
@@ -1665,8 +1394,7 @@ export default function Home() {
       setDragReservaId(String(reserva.id))
       e.dataTransfer.effectAllowed = "move"
       e.dataTransfer.setData("text/plain", String(reserva.id))
-      e.dataTransfer.setData("application/x-habitacion-llena-reserva", String(reserva.id))
-      e.currentTarget.style.opacity = "0.42"
+      e.currentTarget.style.opacity = "0.45"
     }
 
     function terminarArrastre(e) {
@@ -1683,7 +1411,11 @@ export default function Home() {
       salidaDate.setDate(salidaDate.getDate() + noches)
       const nuevaSalida = `${salidaDate.getFullYear()}-${String(salidaDate.getMonth() + 1).padStart(2, "0")}-${String(salidaDate.getDate()).padStart(2, "0")}`
 
-      if (String(reserva.habitacion_id) === String(nuevaHabitacionId) && reserva.fecha_entrada === nuevaEntrada) return
+      const mismoDestino =
+        String(reserva.habitacion_id) === String(nuevaHabitacionId) &&
+        reserva.fecha_entrada === nuevaEntrada
+
+      if (mismoDestino) return
 
       const conflictoLocal = reservas.some((otra) => (
         String(otra.id) !== String(reserva.id) &&
@@ -1709,19 +1441,30 @@ export default function Home() {
 
       setReservas((actuales) => actuales.map((r) => (
         String(r.id) === String(reserva.id)
-          ? { ...r, habitacion_id: nuevaHabitacionId, fecha_entrada: nuevaEntrada, fecha_salida: nuevaSalida, noches }
+          ? {
+              ...r,
+              habitacion_id: nuevaHabitacionId,
+              fecha_entrada: nuevaEntrada,
+              fecha_salida: nuevaSalida,
+              noches,
+            }
           : r
       )))
 
-      const { error } = await supabase.from("reservas").update({
-        habitacion_id: nuevaHabitacionId,
-        fecha_entrada: nuevaEntrada,
-        fecha_salida: nuevaSalida,
-      }).eq("id", reserva.id)
+      const { error } = await supabase
+        .from("reservas")
+        .update({
+          habitacion_id: nuevaHabitacionId,
+          fecha_entrada: nuevaEntrada,
+          fecha_salida: nuevaSalida,
+        })
+        .eq("id", reserva.id)
 
       if (error) {
         console.error(error)
-        setReservas((actuales) => actuales.map((r) => String(r.id) === String(anterior.id) ? anterior : r))
+        setReservas((actuales) => actuales.map((r) => (
+          String(r.id) === String(anterior.id) ? anterior : r
+        )))
         alert("No se pudo mover la reserva. Verificá los permisos de Supabase para esa operación.")
       }
 
@@ -1730,231 +1473,594 @@ export default function Home() {
       setDropTarget(null)
     }
 
-    function fechaDesdeDrop(e, gridElement) {
-      const rect = gridElement.getBoundingClientRect()
-      const x = e.clientX - rect.left
-      const indice = Math.max(0, Math.min(diasVista - 1, Math.floor(x / anchoDia)))
-      return calendarioDias[indice]
-    }
-
-    function soltarEnFila(e, habitacion) {
+    function soltarEnCelda(e, habitacion, fecha) {
       e.preventDefault()
       const id = e.dataTransfer.getData("text/plain") || dragReservaId
       if (!id) return
+
       const reserva = reservas.find((r) => String(r.id) === String(id))
       if (!reserva) return
-      const grid = e.currentTarget.querySelector("[data-calendar-grid='true']")
-      if (!grid) return
-      const fecha = fechaDesdeDrop(e, grid)
+
       moverReserva(reserva, habitacion.id, fecha)
     }
 
-    function estadisticasDia(fecha) {
-      const reservasDelDia = reservasActivas.filter((r) => r.fecha_entrada <= fecha && r.fecha_salida > fecha)
-      const entradas = reservasActivas.filter((r) => r.fecha_entrada === fecha)
-      const ocupacion = habitacionesActivas.length ? Math.round((new Set(reservasDelDia.map((r) => String(r.habitacion_id))).size / habitacionesActivas.length) * 100) : 0
-      const ingreso = reservasDelDia.reduce((total, r) => {
-        const noches = Math.max(1, diasEntre(r.fecha_entrada, r.fecha_salida))
-        return total + Number(r.precio_total || 0) / noches
-      }, 0)
-      return { reservasDelDia, entradas, ocupacion, ingreso }
-    }
-
-    function estiloReserva(reserva) {
-      const estaAlojado = reserva.fecha_entrada <= hoy && reserva.fecha_salida > hoy
-      const saleHoy = reserva.fecha_salida === hoy
-      if (reserva.no_show) return { color: "#64748b", label: "No show" }
-      if (saleHoy) return { color: "#dc2626", label: "Salida hoy" }
-      if (estaAlojado) return { color: "#159a68", label: "Alojado" }
-      if (reserva.estado === "pendiente") return { color: "#c58a00", label: "Pendiente" }
-      return { color: "#6f38d7", label: "Confirmada" }
-    }
-
+    const hoy = fechaLocal(0)
+    const anchoDia = diasVista === 30 ? 82 : diasVista === 14 ? 116 : 148
+    const anchoHabitaciones = 220
+    const gridTemplate = `${anchoHabitaciones}px repeat(${diasVista}, ${anchoDia}px)`
     const totalNoches = reservasActivas.reduce((s, r) => s + diasEntre(r.fecha_entrada, r.fecha_salida), 0)
-    const reservasVisibles = reservasActivas
 
     return (
-      <div style={{ display: "grid", gap: 14 }}>
+      <div style={{ display: "grid", gap: 16 }}>
         <div style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14,
-          flexWrap: "wrap", background: "#fff", border: `1px solid ${colors.border}`,
-          borderRadius: 14, padding: "12px 14px", boxShadow: "0 8px 25px rgba(15,23,42,.045)"
+          display: "grid",
+          gridTemplateColumns: "1fr auto",
+          gap: 16,
+          alignItems: "center",
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 280 }}>
-            <div style={{ width: 34, height: 34, borderRadius: 9, display: "grid", placeItems: "center", background: colors.navy, color: "#fff", fontSize: 16 }}>▤</div>
-            <div style={{ position: "relative", flex: 1, maxWidth: 410 }}>
-              <span style={{ position: "absolute", left: 11, top: 10, color: "#94a3b8", fontSize: 14 }}>⌕</span>
-              <input
-                value={busquedaCalendario}
-                onChange={(e) => setBusquedaCalendario(e.target.value)}
-                placeholder="Buscar reservas, huéspedes y habitaciones"
-                style={{ ...inputStyle, width: "100%", paddingLeft: 32, height: 36, borderRadius: 9, background: "#f8fafc" }}
-              />
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <h2 style={{ margin: 0, fontSize: 20, letterSpacing: -.3 }}>Plano de ocupación</h2>
+              {guardandoMovimiento && (
+                <span style={{
+                  background: colors.blueSoft,
+                  color: colors.blue,
+                  padding: "5px 9px",
+                  borderRadius: 999,
+                  fontSize: 11,
+                  fontWeight: 800,
+                }}>
+                  Guardando movimiento…
+                </span>
+              )}
+            </div>
+            <div style={{ color: colors.muted, fontSize: 12, marginTop: 5 }}>
+              Las reservas se muestran desde el check-in de las 14:00 hasta el check-out de las 10:00.
             </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
-            <button type="button" onClick={() => moverFechaCalendario(-diasVista)} style={{ ...secondaryButton, width: 36 }}>‹</button>
-            <button type="button" onClick={() => setFechaCalendario(hoy)} style={{ ...secondaryButton, fontWeight: 850 }}>HOY</button>
-            <button type="button" onClick={() => moverFechaCalendario(diasVista)} style={{ ...secondaryButton, width: 36 }}>›</button>
-            <input type="date" value={fechaCalendario} onChange={(e) => setFechaCalendario(e.target.value)} style={{ ...inputStyle, height: 36, width: 140 }} />
-            <button type="button" onClick={() => habitacionesActivas[0] && prepararNuevaReserva(fechaCalendario, habitacionesActivas[0])} style={{ ...primaryButton, height: 36, padding: "0 14px" }}>＋ Nueva reserva</button>
-          </div>
-        </div>
 
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-          <div style={{ display: "flex", gap: 7, alignItems: "center", flexWrap: "wrap" }}>
-            <select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)} style={{ ...inputStyle, height: 34, width: 180, background: "#fff" }}>
-              <option value="todos">Todas las habitaciones</option>
-              {tiposDisponibles.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}
-            </select>
+          <div style={{
+            display: "flex",
+            gap: 7,
+            alignItems: "center",
+            flexWrap: "wrap",
+            justifyContent: "flex-end",
+          }}>
+            <button type="button" onClick={() => setFechaCalendario(hoy)} style={secondaryButton}>Hoy</button>
+            <button type="button" onClick={() => moverFechaCalendario(-diasVista)} style={secondaryButton}>←</button>
+            <input
+              type="date"
+              value={fechaCalendario}
+              onChange={(e) => setFechaCalendario(e.target.value)}
+              style={{ ...inputStyle, width: 145 }}
+            />
+            <button type="button" onClick={() => moverFechaCalendario(diasVista)} style={secondaryButton}>→</button>
             {[7, 14, 30].map((cantidad) => (
-              <button key={cantidad} type="button" onClick={() => setDiasVista(cantidad)} style={diasVista === cantidad ? { ...primaryButton, height: 34, padding: "0 11px" } : { ...secondaryButton, height: 34, padding: "0 11px" }}>
-                {cantidad === 7 ? "Semana" : cantidad === 14 ? "2 semanas" : "Mes"}
+              <button
+                key={cantidad}
+                type="button"
+                onClick={() => setDiasVista(cantidad)}
+                style={diasVista === cantidad ? primaryButton : secondaryButton}
+              >
+                {cantidad} días
               </button>
             ))}
           </div>
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: 10, fontWeight: 800, color: "#64748b" }}>
-            <span><i style={{ display: "inline-block", width: 9, height: 9, borderRadius: 3, background: "#159a68", marginRight: 5 }} />Alojado</span>
-            <span><i style={{ display: "inline-block", width: 9, height: 9, borderRadius: 3, background: "#6f38d7", marginRight: 5 }} />Confirmada</span>
-            <span><i style={{ display: "inline-block", width: 9, height: 9, borderRadius: 3, background: "#c58a00", marginRight: 5 }} />Pendiente</span>
-            <span><i style={{ display: "inline-block", width: 9, height: 9, borderRadius: 3, background: "#dc2626", marginRight: 5 }} />Salida hoy</span>
-          </div>
         </div>
 
         <div style={{
-          overflowX: "auto", border: "1px solid #dbe2ea", borderRadius: 15, background: "#fff",
-          boxShadow: "0 14px 40px rgba(15,23,42,.07)"
+          display: "grid",
+          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+          gap: 10,
+        }}>
+          {[
+            ["Habitaciones", habitacionesActivas.length, "unidades activas", colors.navy],
+            ["Ocupadas hoy", reservasHoy.length, `${habitacionesActivas.length ? Math.round(reservasHoy.length / habitacionesActivas.length * 100) : 0}% ocupación`, colors.blue],
+            ["Entradas", entradasHoy.length, "check-in hoy · 14:00", colors.green],
+            ["Noches en agenda", totalNoches, "estadías activas", "#7c3aed"],
+          ].map(([label, value, detail, color]) => (
+            <div key={label} style={{
+              background: colors.white,
+              border: `1px solid ${colors.border}`,
+              borderRadius: 12,
+              padding: "13px 15px",
+              boxShadow: "0 5px 18px rgba(15,23,42,.035)",
+            }}>
+              <div style={{
+                color: colors.muted,
+                fontSize: 10,
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: .5,
+              }}>
+                {label}
+              </div>
+              <div style={{ fontSize: 23, fontWeight: 850, color, marginTop: 4 }}>{value}</div>
+              <div style={{ color: colors.muted, fontSize: 10, marginTop: 2 }}>{detail}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{
+          display: "flex",
+          gap: 14,
+          flexWrap: "wrap",
+          alignItems: "center",
+          fontSize: 11,
+          fontWeight: 700,
+        }}>
+          <span>
+            <i style={{ display: "inline-block", width: 9, height: 9, borderRadius: 3, background: colors.green, marginRight: 5 }} />
+            Alojado
+          </span>
+          <span>
+            <i style={{ display: "inline-block", width: 9, height: 9, borderRadius: 3, background: "#7c3aed", marginRight: 5 }} />
+            Confirmada / futura
+          </span>
+          <span>
+            <i style={{ display: "inline-block", width: 9, height: 9, borderRadius: 3, background: colors.yellow, marginRight: 5 }} />
+            Pendiente
+          </span>
+          <span>
+            <i style={{ display: "inline-block", width: 9, height: 9, borderRadius: 3, background: colors.red, marginRight: 5 }} />
+            Salida hoy
+          </span>
+          <span style={{ color: colors.muted }}>↔ Arrastrá para mover</span>
+          <span style={{ color: colors.muted }}>＋ Click en una celda para reservar</span>
+        </div>
+
+        <div style={{
+          overflowX: "auto",
+          border: `1px solid ${colors.border}`,
+          borderRadius: 14,
+          background: colors.white,
+          boxShadow: "0 10px 35px rgba(15,23,42,.055)",
         }}>
           <div style={{ minWidth: anchoHabitaciones + diasVista * anchoDia }}>
-            <div style={{ display: "grid", gridTemplateColumns: gridTemplate, position: "sticky", top: 0, zIndex: 10, background: "#fff", borderBottom: "1px solid #dbe2ea" }}>
-              <div style={{ position: "sticky", left: 0, zIndex: 12, background: "#fff", borderRight: "1px solid #dbe2ea", padding: "10px 13px" }}>
-                <div style={{ fontSize: 10, fontWeight: 900, color: "#475569", textTransform: "uppercase" }}>Habitaciones</div>
-                <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 3 }}>Disponibilidad en tiempo real</div>
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: gridTemplate,
+              position: "sticky",
+              top: 0,
+              zIndex: 8,
+              background: "rgba(248,250,252,.98)",
+              backdropFilter: "blur(12px)",
+              borderBottom: `1px solid ${colors.border}`,
+            }}>
+              <div style={{
+                position: "sticky",
+                left: 0,
+                zIndex: 10,
+                padding: "13px 15px",
+                background: "#f8fafc",
+                borderRight: `1px solid ${colors.border}`,
+              }}>
+                <div style={{ fontSize: 11, fontWeight: 850 }}>HABITACIONES</div>
+                <div style={{ color: colors.muted, fontSize: 10, marginTop: 3 }}>Disponibilidad en tiempo real</div>
               </div>
+
               {calendarioDias.map((fecha) => {
-                const d = new Date(`${fecha}T12:00:00`)
+                const date = new Date(`${fecha}T12:00:00`)
+                const diaSemana = date.toLocaleDateString("es-AR", { weekday: "short" }).replace(".", "")
                 const esHoy = fecha === hoy
-                const finSemana = [0, 6].includes(d.getDay())
-                const stats = estadisticasDia(fecha)
-                const weekday = d.toLocaleDateString("es-AR", { weekday: "short" }).replace(".", "").toUpperCase()
+                const finDeSemana = [0, 6].includes(date.getDay())
+
                 return (
-                  <div key={fecha} style={{ minHeight: 82, textAlign: "center", borderLeft: "1px solid #e4e9ef", background: esHoy ? "#e9f3ff" : finSemana ? "#fafafa" : "#fff", paddingTop: 7 }}>
-                    <div style={{ fontSize: 8, fontWeight: 900, color: esHoy ? colors.blue : "#64748b" }}>{weekday}</div>
-                    <div style={{ fontSize: 18, lineHeight: 1, fontWeight: 900, color: esHoy ? colors.blue : "#1e293b", marginTop: 3 }}>{fecha.slice(8)}</div>
-                    <div style={{ fontSize: 8, color: "#94a3b8", marginTop: 3 }}>{nombreMes(fecha)}</div>
-                    <div style={{ display: "flex", justifyContent: "space-around", alignItems: "center", marginTop: 7, color: "#64748b", fontSize: 7, fontWeight: 800 }}>
-                      <span>{stats.reservasDelDia.length} res.</span>
-                      <span style={{ color: stats.ocupacion >= 80 ? "#dc2626" : "#64748b" }}>{stats.ocupacion}%</span>
+                  <div
+                    key={fecha}
+                    style={{
+                      textAlign: "center",
+                      padding: "8px 3px 6px",
+                      borderLeft: `1px solid ${colors.border}`,
+                      background: esHoy ? colors.blueSoft : finDeSemana ? "#fafbfe" : "#f8fafc",
+                    }}
+                  >
+                    <div style={{
+                      fontSize: 9,
+                      textTransform: "uppercase",
+                      color: esHoy ? colors.blue : colors.muted,
+                      fontWeight: 800,
+                    }}>
+                      {diaSemana}
                     </div>
-                    <div style={{ fontSize: 7, color: "#475569", marginTop: 2, fontWeight: 800 }}>
-                      {stats.ingreso > 0 ? `$${Math.round(stats.ingreso).toLocaleString("es-AR")}` : "—"}
+                    <div style={{
+                      fontSize: 18,
+                      lineHeight: 1.1,
+                      fontWeight: 850,
+                      color: esHoy ? colors.blue : colors.text,
+                      marginTop: 2,
+                    }}>
+                      {fecha.slice(8)}
+                    </div>
+                    <div style={{ fontSize: 9, color: colors.muted }}>{nombreMes(fecha)}</div>
+
+                    <div style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      padding: "5px 5px 0",
+                      fontSize: 7,
+                      fontWeight: 850,
+                      color: "#94a3b8",
+                    }}>
+                      <span>10 OUT</span>
+                      <span style={{ color: colors.blue }}>14 IN</span>
                     </div>
                   </div>
                 )
               })}
             </div>
 
-            {grupos.map((grupo) => {
-              const colapsado = Boolean(gruposColapsados[grupo.nombre])
+            {habitacionesActivas.map((habitacion) => {
+              const reservasHabitacion = reservasActivas.filter((r) =>
+                String(r.habitacion_id) === String(habitacion.id) &&
+                r.fecha_salida > calendarioDias[0] &&
+                r.fecha_entrada <= calendarioDias[calendarioDias.length - 1]
+              )
+
+              const estado = estadoHabitacionVisual(habitacion)
+              const info = infoEstadoHabitacion(estado)
+              const ocupada = reservasHoy.some((r) => String(r.habitacion_id) === String(habitacion.id))
+
               return (
-                <div key={grupo.nombre}>
-                  <div style={{ display: "grid", gridTemplateColumns: gridTemplate, height: 32, background: "#f4f6f8", borderBottom: "1px solid #dbe2ea" }}>
-                    <button type="button" onClick={() => setGruposColapsados((actual) => ({ ...actual, [grupo.nombre]: !actual[grupo.nombre] }))} style={{ position: "sticky", left: 0, zIndex: 7, border: 0, borderRight: "1px solid #dbe2ea", background: "#f4f6f8", textAlign: "left", padding: "0 12px", fontWeight: 900, color: "#334155", cursor: "pointer" }}>
-                      {colapsado ? "▸" : "▾"} {grupo.nombre} <span style={{ color: "#94a3b8", fontWeight: 700, marginLeft: 5 }}>({grupo.habitaciones.length})</span>
-                    </button>
-                    <div style={{ gridColumn: `2 / span ${diasVista}`, display: "grid", gridTemplateColumns: `repeat(${diasVista}, ${anchoDia}px)` }}>
-                      {calendarioDias.map((fecha) => <div key={fecha} style={{ borderLeft: "1px solid #e7ebef" }} />)}
+                <div
+                  key={habitacion.id}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: gridTemplate,
+                    minHeight: 88,
+                    borderBottom: `1px solid ${colors.border}`,
+                  }}
+                >
+                  <div
+                    style={{
+                      position: "sticky",
+                      left: 0,
+                      zIndex: 5,
+                      background: colors.white,
+                      borderRight: `1px solid ${colors.border}`,
+                      padding: "11px 13px",
+                      cursor: "pointer",
+                    }}
+                    onDoubleClick={() => {
+                      setVista("reservas")
+                      setHabitacionSeleccionada(String(habitacion.id))
+                      setAlojamientoSeleccionado(String(habitacion.alojamiento_id))
+                    }}
+                  >
+                    <div style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 6,
+                      alignItems: "center",
+                    }}>
+                      <strong style={{ fontSize: 12 }}>{habitacion.nombre}</strong>
+                      <span style={{
+                        width: 7,
+                        height: 7,
+                        borderRadius: 99,
+                        background: ocupada ? colors.blue : info.color,
+                        flexShrink: 0,
+                      }} />
+                    </div>
+                    <div style={{
+                      color: colors.muted,
+                      fontSize: 9,
+                      marginTop: 4,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}>
+                      {nombreAlojamiento(habitacion.alojamiento_id)}
+                    </div>
+                    <div style={{ color: info.color, fontSize: 9, fontWeight: 800, marginTop: 6 }}>
+                      {info.label}
                     </div>
                   </div>
 
-                  {!colapsado && grupo.habitaciones.map((habitacion) => {
-                    const reservasHabitacion = reservasVisibles.filter((r) => String(r.habitacion_id) === String(habitacion.id) && r.fecha_salida > calendarioDias[0] && r.fecha_entrada <= calendarioDias[calendarioDias.length - 1])
-                    const estado = estadoHabitacionVisual(habitacion)
-                    const info = infoEstadoHabitacion(estado)
-                    const ocupada = reservasHoy.some((r) => String(r.habitacion_id) === String(habitacion.id))
+                  <div style={{
+                    position: "relative",
+                    minHeight: 88,
+                    display: "grid",
+                    gridTemplateColumns: `repeat(${diasVista}, ${anchoDia}px)`,
+                    background: "#fff",
+                  }}>
+                    {calendarioDias.map((fecha) => {
+                      const esHoy = fecha === hoy
+                      const esFinDeSemana = [0, 6].includes(new Date(`${fecha}T12:00:00`).getDay())
+                      const isDrop = dropTarget === `${habitacion.id}-${fecha}`
 
-                    return (
-                      <div key={habitacion.id} style={{ display: "grid", gridTemplateColumns: gridTemplate, minHeight: 72, borderBottom: "1px solid #e4e8ed" }} onDragOver={(e) => { if (dragReservaId) { e.preventDefault(); e.dataTransfer.dropEffect = "move" } }} onDrop={(e) => soltarEnFila(e, habitacion)}>
-                        <div style={{ position: "sticky", left: 0, zIndex: 6, background: "#fff", borderRight: "1px solid #dbe2ea", padding: "9px 12px", cursor: "pointer" }} onDoubleClick={() => { setVista("reservas"); setHabitacionSeleccionada(String(habitacion.id)); setAlojamientoSeleccionado(String(habitacion.alojamiento_id)) }}>
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                            <strong style={{ fontSize: 12, color: "#1e293b" }}>{habitacion.nombre}</strong>
-                            <span style={{ width: 7, height: 7, borderRadius: 99, background: ocupada ? "#159a68" : info.color }} />
+                      return (
+                        <div
+                          key={fecha}
+                          onClick={() => prepararNuevaReserva(fecha, habitacion)}
+                          onDragOver={(e) => {
+                            e.preventDefault()
+                            e.dataTransfer.dropEffect = "move"
+                            setDropTarget(`${habitacion.id}-${fecha}`)
+                          }}
+                          onDragLeave={() => setDropTarget(null)}
+                          onDrop={(e) => {
+                            setDropTarget(null)
+                            soltarEnCelda(e, habitacion, fecha)
+                          }}
+                          style={{
+                            position: "relative",
+                            borderLeft: `1px solid ${colors.border}`,
+                            background: isDrop
+                              ? "#dbeafe"
+                              : esHoy
+                                ? "rgba(22,119,232,.045)"
+                                : esFinDeSemana
+                                  ? "#fcfcfe"
+                                  : "#fff",
+                            minHeight: 88,
+                            cursor: "crosshair",
+                            transition: "background .12s",
+                            overflow: "hidden",
+                          }}
+                        >
+                          {/* Franja de recambio: 10:00 → 14:00 */}
+                          <div style={{
+                            position: "absolute",
+                            top: 0,
+                            bottom: 0,
+                            left: `${FRACCION_CHECKOUT * 100}%`,
+                            width: `${(FRACCION_CHECKIN - FRACCION_CHECKOUT) * 100}%`,
+                            background: "rgba(245,158,11,.035)",
+                            borderLeft: "1px dashed rgba(148,163,184,.28)",
+                            borderRight: "1px dashed rgba(148,163,184,.28)",
+                            pointerEvents: "none",
+                          }} />
+
+                          {/* Línea 10:00 */}
+                          <div style={{
+                            position: "absolute",
+                            top: 0,
+                            bottom: 0,
+                            left: `${FRACCION_CHECKOUT * 100}%`,
+                            width: 1,
+                            background: "rgba(148,163,184,.34)",
+                            pointerEvents: "none",
+                          }} />
+
+                          {/* Línea 14:00 */}
+                          <div style={{
+                            position: "absolute",
+                            top: 0,
+                            bottom: 0,
+                            left: `${FRACCION_CHECKIN * 100}%`,
+                            width: 1,
+                            background: "rgba(22,119,232,.24)",
+                            pointerEvents: "none",
+                          }} />
+                        </div>
+                      )
+                    })}
+
+                    {calendarioDias.includes(hoy) && (
+                      <div style={{
+                        position: "absolute",
+                        top: 0,
+                        bottom: 0,
+                        left: `calc(${calendarioDias.indexOf(hoy)} * ${anchoDia}px)`,
+                        width: 2,
+                        background: colors.blue,
+                        opacity: .65,
+                        zIndex: 1,
+                        pointerEvents: "none",
+                      }} />
+                    )}
+
+                    {bloqueos
+                      .filter((b) =>
+                        String(b.habitacion_id) === String(habitacion.id) &&
+                        b.fecha_hasta > calendarioDias[0] &&
+                        b.fecha_desde <= calendarioDias[calendarioDias.length - 1]
+                      )
+                      .map((bloqueo) => {
+                        let inicio = calendarioDias.findIndex((f) => f >= bloqueo.fecha_desde)
+                        let fin = calendarioDias.findIndex((f) => f >= bloqueo.fecha_hasta)
+                        if (inicio < 0) inicio = 0
+                        if (fin < 0) fin = calendarioDias.length
+                        if (fin <= inicio) return null
+
+                        const left = inicio * anchoDia + 4
+                        const width = Math.max(20, (fin - inicio) * anchoDia - 8)
+
+                        return (
+                          <div
+                            key={`bloqueo-${bloqueo.id}`}
+                            title={`Bloqueo: ${bloqueo.motivo || "Sin motivo"}`}
+                            style={{
+                              position: "absolute",
+                              left,
+                              width,
+                              top: 14,
+                              height: 60,
+                              borderRadius: 10,
+                              background: "repeating-linear-gradient(135deg,#334155 0,#334155 8px,#1e293b 8px,#1e293b 16px)",
+                              color: "#fff",
+                              display: "flex",
+                              alignItems: "center",
+                              padding: "0 9px",
+                              boxSizing: "border-box",
+                              fontSize: 10,
+                              fontWeight: 800,
+                              overflow: "hidden",
+                              zIndex: 3,
+                              boxShadow: "0 3px 8px rgba(15,23,42,.12)",
+                            }}
+                          >
+                            🔒 {bloqueo.motivo || "Bloqueada"}
                           </div>
-                          <div style={{ color: "#94a3b8", fontSize: 8, marginTop: 3 }}>{habitacion.capacidad ? `${habitacion.capacidad} pax` : nombreAlojamiento(habitacion.alojamiento_id)}</div>
-                          <div style={{ color: info.color, fontSize: 8, fontWeight: 900, marginTop: 4 }}>{info.label}</div>
+                        )
+                      })}
+
+                    {reservasHabitacion.map((reserva) => {
+                      let inicio = calendarioDias.findIndex((f) => f >= reserva.fecha_entrada)
+                      let fin = calendarioDias.findIndex((f) => f >= reserva.fecha_salida)
+
+                      if (inicio < 0) inicio = 0
+                      if (fin < 0) fin = calendarioDias.length
+                      if (fin <= inicio) return null
+
+                      const noches = Math.max(1, diasEntre(reserva.fecha_entrada, reserva.fecha_salida))
+                      const estadoVisual =
+                        hoy < reserva.fecha_entrada
+                          ? "futura"
+                          : hoy >= reserva.fecha_salida
+                            ? "out"
+                            : "in"
+
+                      const pendiente = reserva.estado === "pendiente"
+                      const colorReserva =
+                        estadoVisual === "in"
+                          ? colors.green
+                          : estadoVisual === "out"
+                            ? colors.red
+                            : pendiente
+                              ? colors.yellow
+                              : "#7c3aed"
+
+                      /*
+                       * CLAVE DEL PLANO:
+                       * La reserva NO ocupa el día completo.
+                       * Empieza a las 14:00 del IN y termina a las 10:00 del OUT.
+                       *
+                       * Ejemplo 09 → 11:
+                       * 09 14:00 ───────────── 10  ───────────── 11 10:00
+                       *
+                       * Visualmente:
+                       * inicio = 58.33% del día de entrada
+                       * fin    = 41.67% del día de salida
+                       */
+                      const recorteInicio = reserva.fecha_entrada < calendarioDias[0] ? 0 : FRACCION_CHECKIN
+                      const inicioVisible = inicio * anchoDia + (reserva.fecha_entrada < calendarioDias[0] ? 0 : recorteInicio * anchoDia)
+
+                      const finVisible =
+                        reserva.fecha_salida > calendarioDias[calendarioDias.length - 1]
+                          ? diasVista * anchoDia
+                          : fin * anchoDia + FRACCION_CHECKOUT * anchoDia
+
+                      const anchoReserva = Math.max(52, finVisible - inicioVisible - 6)
+                      const salidaVisibleEnVista = reserva.fecha_salida <= calendarioDias[calendarioDias.length - 1]
+
+                      return (
+                        <div
+                          key={reserva.id}
+                          draggable
+                          onDragStart={(e) => arrastrarReserva(e, reserva)}
+                          onDragEnd={terminarArrastre}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setReservaSeleccionada(reserva)
+                          }}
+                          onDoubleClick={(e) => {
+                            e.stopPropagation()
+                            editarReserva(reserva)
+                          }}
+                          title={`${reserva.nombre_huesped} · ${formatearFecha(reserva.fecha_entrada)} 14:00 → ${formatearFecha(reserva.fecha_salida)} 10:00 · ${reserva.cantidad_huespedes || 1} pax\nArrastrá para mover`}
+                          style={{
+                            position: "absolute",
+                            left: inicioVisible + 3,
+                            width: anchoReserva,
+                            top: 14,
+                            height: 60,
+                            borderRadius: 10,
+                            background: `linear-gradient(135deg, ${colorReserva}, ${colorReserva}dd)`,
+                            color: "#fff",
+                            padding: "8px 10px",
+                            boxSizing: "border-box",
+                            fontSize: 10,
+                            fontWeight: 700,
+                            overflow: "hidden",
+                            cursor: dragReservaId === String(reserva.id) ? "grabbing" : "grab",
+                            zIndex: 4,
+                            boxShadow: "0 5px 14px rgba(15,23,42,.18)",
+                            border: pendiente
+                              ? "1px dashed rgba(255,255,255,.85)"
+                              : "1px solid rgba(255,255,255,.2)",
+                            userSelect: "none",
+                          }}
+                        >
+                          <div style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 5,
+                            minWidth: 0,
+                          }}>
+                            <span style={{ opacity: .8, fontSize: 9 }}>⋮⋮</span>
+                            <strong style={{
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}>
+                              {reserva.nombre_huesped || "Sin nombre"}
+                            </strong>
+                          </div>
+
+                          {anchoReserva > 95 && (
+                            <div style={{
+                              opacity: .86,
+                              marginTop: 4,
+                              fontSize: 9,
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}>
+                              {reserva.numero_reserva || "Reserva"} · {reserva.cantidad_huespedes || 1} pax
+                            </div>
+                          )}
+
+                          {anchoReserva > 125 && (
+                            <div style={{
+                              position: "absolute",
+                              left: 10,
+                              bottom: 7,
+                              display: "flex",
+                              gap: 8,
+                              fontSize: 8,
+                              opacity: .88,
+                              whiteSpace: "nowrap",
+                            }}>
+                              <span>IN 14:00</span>
+                              {salidaVisibleEnVista && <span>OUT 10:00</span>}
+                            </div>
+                          )}
+
+                          <div style={{
+                            position: "absolute",
+                            right: 8,
+                            bottom: 7,
+                            fontSize: 8,
+                            opacity: .78,
+                          }}>
+                            {noches}n
+                          </div>
                         </div>
-
-                        <div data-calendar-grid="true" style={{ position: "relative", minHeight: 72, display: "grid", gridTemplateColumns: `repeat(${diasVista}, ${anchoDia}px)`, background: "#fff", overflow: "hidden" }}>
-                          {calendarioDias.map((fecha) => {
-                            const esHoy = fecha === hoy
-                            const finSemana = [0, 6].includes(new Date(`${fecha}T12:00:00`).getDay())
-                            const isDrop = dropTarget === `${habitacion.id}-${fecha}`
-                            return (
-                              <div key={fecha} onClick={() => prepararNuevaReserva(fecha, habitacion)} onDragOver={(e) => { if (!dragReservaId) return; e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = "move"; setDropTarget(`${habitacion.id}-${fecha}`) }} onDrop={(e) => { e.preventDefault(); e.stopPropagation(); const id = e.dataTransfer.getData("text/plain") || dragReservaId; const reserva = reservas.find((r) => String(r.id) === String(id)); if (reserva) moverReserva(reserva, habitacion.id, fecha) }} style={{ position: "relative", borderLeft: "1px solid #e7ebef", background: isDrop ? "#dceeff" : esHoy ? "rgba(0,108,228,.035)" : finSemana ? "#fcfcfc" : "#fff", cursor: "crosshair" }}>
-                                <div style={{ position: "absolute", inset: "0 0 0 0", pointerEvents: "none", background: "linear-gradient(to right, transparent 0, transparent 41.6%, rgba(148,163,184,.055) 41.6%, rgba(148,163,184,.055) 58.3%, transparent 58.3%)" }} />
-                                <div style={{ position: "absolute", top: 0, bottom: 0, left: "41.6667%", width: 1, background: "rgba(100,116,139,.22)", pointerEvents: "none" }} />
-                                <div style={{ position: "absolute", top: 0, bottom: 0, left: "58.3333%", width: 1, background: "rgba(0,108,228,.20)", pointerEvents: "none" }} />
-                              </div>
-                            )
-                          })}
-
-                          {calendarioDias.includes(hoy) && <div style={{ position: "absolute", top: 0, bottom: 0, left: `calc(${calendarioDias.indexOf(hoy)} * ${anchoDia}px)`, width: 2, background: colors.blue, opacity: .45, zIndex: 1, pointerEvents: "none" }} />}
-
-                          {bloqueos.filter((b) => String(b.habitacion_id) === String(habitacion.id) && b.fecha_hasta > calendarioDias[0] && b.fecha_desde <= calendarioDias[calendarioDias.length - 1]).map((bloqueo) => {
-                            let inicio = calendarioDias.findIndex((f) => f >= bloqueo.fecha_desde)
-                            let fin = calendarioDias.findIndex((f) => f >= bloqueo.fecha_hasta)
-                            if (inicio < 0) inicio = 0
-                            if (fin < 0) fin = calendarioDias.length
-                            if (fin <= inicio) return null
-                            const left = inicio * anchoDia + 3
-                            const width = Math.max(30, (fin - inicio) * anchoDia - 6)
-                            return <div key={`bloqueo-${bloqueo.id}`} title={bloqueo.motivo || "Bloqueada"} style={{ position: "absolute", left, width, top: 13, height: 46, borderRadius: 8, background: "repeating-linear-gradient(135deg,#475569 0,#475569 7px,#334155 7px,#334155 14px)", color: "#fff", display: "flex", alignItems: "center", padding: "0 10px", boxSizing: "border-box", fontSize: 9, fontWeight: 850, overflow: "hidden", zIndex: 3 }}>🔒 {bloqueo.motivo || "Bloqueada"}</div>
-                          })}
-
-                          {reservasHabitacion.map((reserva) => {
-                            let inicio = calendarioDias.findIndex((f) => f >= reserva.fecha_entrada)
-                            let fin = calendarioDias.findIndex((f) => f >= reserva.fecha_salida)
-                            if (inicio < 0) inicio = 0
-                            if (fin < 0) fin = calendarioDias.length
-                            if (fin <= inicio) return null
-
-                            const noches = Math.max(1, diasEntre(reserva.fecha_entrada, reserva.fecha_salida))
-                            const inicioFuera = reserva.fecha_entrada < calendarioDias[0]
-                            const salidaFuera = reserva.fecha_salida > calendarioDias[calendarioDias.length - 1]
-                            const left = inicio * anchoDia + (inicioFuera ? 2 : FRACCION_CHECKIN * anchoDia)
-                            const right = salidaFuera ? diasVista * anchoDia : fin * anchoDia + FRACCION_CHECKOUT * anchoDia
-                            const width = Math.max(48, right - left - 5)
-                            const visual = estiloReserva(reserva)
-                            const pendientePago = saldoReserva(reserva) > 0
-                            const vip = String(reserva.notas || "").toLowerCase().includes("vip")
-
-                            return (
-                              <div key={reserva.id} draggable onDragStart={(e) => arrastrarReserva(e, reserva)} onDragEnd={terminarArrastre} onClick={(e) => { e.stopPropagation(); setReservaSeleccionada(reserva) }} onDoubleClick={(e) => { e.stopPropagation(); editarReserva(reserva) }} title={`${reserva.nombre_huesped || "Sin nombre"} · ${formatearFecha(reserva.fecha_entrada)} 14:00 → ${formatearFecha(reserva.fecha_salida)} 10:00 · ${reserva.cantidad_huespedes || 1} pax`} style={{ position: "absolute", left, width, top: 13, height: 46, borderRadius: 7, background: `linear-gradient(135deg, ${visual.color}, ${visual.color}e8)`, color: "#fff", padding: "6px 10px", boxSizing: "border-box", fontSize: 9, fontWeight: 800, overflow: "visible", cursor: dragReservaId === String(reserva.id) ? "grabbing" : "grab", zIndex: 5, boxShadow: "0 3px 8px rgba(15,23,42,.16)", clipPath: "polygon(0 0, 98% 0, 100% 50%, 98% 100%, 0 100%, 2% 50%)", userSelect: "none" }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
-                                  <span style={{ opacity: .72, fontSize: 8 }}>⋮⋮</span>
-                                  <strong style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{reserva.nombre_huesped || "Sin nombre"}</strong>
-                                  {vip && <span style={{ background: "rgba(255,255,255,.22)", borderRadius: 4, padding: "2px 4px", fontSize: 7 }}>VIP</span>}
-                                </div>
-                                {width > 115 && <div style={{ opacity: .86, marginTop: 3, fontSize: 8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{reserva.numero_reserva || "Reserva"} · {reserva.cantidad_huespedes || 1} pax</div>}
-                                {width > 150 && <div style={{ position: "absolute", left: 10, bottom: 5, display: "flex", gap: 8, fontSize: 7, opacity: .9 }}><span>IN 14:00</span><span>{noches}n</span><span>{salidaFuera ? "" : "OUT 10:00"}</span></div>}
-                                {pendientePago && <span title="Saldo pendiente" style={{ position: "absolute", right: 9, top: 4, width: 6, height: 6, borderRadius: 99, background: "#fbbf24", border: "1px solid rgba(255,255,255,.7)" }} />}
-                                {!salidaFuera && <span title="Salida" style={{ position: "absolute", right: 5, top: "50%", transform: "translateY(-50%)", width: 6, height: 6, borderRadius: 99, background: "#ef4444", border: "1px solid rgba(255,255,255,.85)" }} />}
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )
-                  })}
+                      )
+                    })}
+                  </div>
                 </div>
               )
             })}
           </div>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center", padding: "0 2px", color: "#64748b", fontSize: 10 }}>
-          <span><strong>10:00</strong> salida · <span style={{ color: "#c58a00" }}>10:00–14:00 recambio</span> · <strong style={{ color: colors.blue }}>14:00</strong> entrada.</span>
-          <span>Arrastrá una reserva para cambiar fecha o habitación · click libre = nueva reserva · doble click = editar.</span>
+        <div style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+          color: colors.muted,
+          fontSize: 11,
+        }}>
+          <span>
+            💡 <strong>10:00</strong> salida · <strong>10:00–14:00</strong> recambio · <strong>14:00</strong> entrada.
+          </span>
+          <span>
+            Arrastrá una reserva para cambiar fecha o habitación · Click libre = nueva reserva · Doble click = editar
+          </span>
         </div>
       </div>
     )
@@ -2212,7 +2318,7 @@ export default function Home() {
     )
   }
 
-  function guardarConfiguracion() {
+  function guardarConfiguracion(valorConfig = config) {
     try {
       if (!user?.id) {
         alert("No hay una sesión activa.")
@@ -2220,7 +2326,7 @@ export default function Home() {
       }
 
       const claveConfig = `habitacion_llena_config_${user.id}`
-      localStorage.setItem(claveConfig, JSON.stringify(config))
+      localStorage.setItem(claveConfig, JSON.stringify(valorConfig))
       setConfigGuardada(true)
       setTimeout(() => setConfigGuardada(false), 2500)
     } catch (error) {
@@ -2710,6 +2816,180 @@ export default function Home() {
     )
   }
 
+  function agregarTipoHabitacionConfiguracion() {
+    const nombre = nuevoTipoConfiguracion.trim()
+    if (!nombre) return
+
+    const existe = tiposHabitacionDisponibles.some(
+      (tipo) => tipo.toLowerCase() === nombre.toLowerCase()
+    )
+    if (existe) {
+      alert("Ese tipo de habitación ya existe.")
+      return
+    }
+
+    setConfig((actual) => ({
+      ...actual,
+      tiposHabitacion: [...tiposHabitacionDisponibles, nombre],
+    }))
+    setNuevoTipoConfiguracion("")
+  }
+
+  function eliminarTipoHabitacionConfiguracion(tipo) {
+    const usado = habitaciones.some(
+      (h) => String(h.tipo || "").trim().toLowerCase() === String(tipo).trim().toLowerCase()
+    )
+
+    if (usado) {
+      alert("No podés eliminar este tipo porque hay habitaciones que lo están usando.")
+      return
+    }
+
+    const esPredeterminado = ["simple", "doble", "triple", "cuádruple", "otro"].includes(
+      String(tipo).trim().toLowerCase()
+    )
+    if (esPredeterminado) {
+      alert("Los tipos predeterminados no se eliminan. Podés dejarlos sin usar.")
+      return
+    }
+
+    setConfig((actual) => ({
+      ...actual,
+      tiposHabitacion: tiposHabitacionDisponibles.filter(
+        (item) => item.toLowerCase() !== String(tipo).toLowerCase()
+      ),
+    }))
+  }
+
+  function iniciarEdicionHabitacion(habitacion) {
+    const tarifa = datosTarifaHabitacion(habitacion.id)
+
+    setHabitacionEditando(habitacion.id)
+    setHabitacionForm({
+      nombre: habitacion.nombre || "",
+      tipo: habitacion.tipo || tiposHabitacionDisponibles[0] || "",
+      alojamiento_id: String(habitacion.alojamiento_id || ""),
+      precio: tarifa.precio,
+      cochera: tarifa.cochera,
+      earlyTipo: tarifa.earlyTipo,
+      earlyValor: tarifa.earlyValor,
+      lateTipo: tarifa.lateTipo,
+      lateValor: tarifa.lateValor,
+    })
+    setMostrarHabitacion(false)
+  }
+
+  function cancelarEdicionHabitacion() {
+    setHabitacionEditando(null)
+    setHabitacionForm({
+      nombre: "",
+      tipo: "",
+      alojamiento_id: "",
+      precio: 0,
+      cochera: 0,
+      earlyTipo: "monto",
+      earlyValor: 0,
+      lateTipo: "monto",
+      lateValor: 0,
+    })
+  }
+
+  async function guardarEdicionHabitacion(e) {
+    e.preventDefault()
+    if (!habitacionEditando || !habitacionForm.nombre.trim() || !habitacionForm.tipo || !habitacionForm.alojamiento_id) {
+      alert("Completá nombre, tipo y alojamiento.")
+      return
+    }
+
+    const { error } = await supabase
+      .from("habitaciones")
+      .update({
+        nombre: habitacionForm.nombre.trim(),
+        tipo: habitacionForm.tipo,
+        alojamiento_id: Number(habitacionForm.alojamiento_id),
+      })
+      .eq("id", habitacionEditando)
+      .eq("user_id", user.id)
+
+    if (error) {
+      console.error(error)
+      alert("No se pudo actualizar la habitación.")
+      return
+    }
+
+    const configuracionActualizada = {
+      ...config,
+      habitacionesTarifas: {
+        ...(config.habitacionesTarifas || {}),
+        [String(habitacionEditando)]: {
+          precio: Number(habitacionForm.precio) || 0,
+          cochera: Number(habitacionForm.cochera) || 0,
+          earlyTipo: habitacionForm.earlyTipo,
+          earlyValor: Number(habitacionForm.earlyValor) || 0,
+          lateTipo: habitacionForm.lateTipo,
+          lateValor: Number(habitacionForm.lateValor) || 0,
+        },
+      },
+    }
+
+    setConfig(configuracionActualizada)
+    guardarConfiguracion(configuracionActualizada)
+    cancelarEdicionHabitacion()
+    await cargarDatos()
+  }
+
+  async function eliminarHabitacion(habitacion) {
+    const tieneReservas = reservas.some(
+      (r) => String(r.habitacion_id) === String(habitacion.id)
+    )
+
+    if (tieneReservas) {
+      alert("Esta habitación tiene reservas asociadas. No se puede eliminar sin perder el historial. Podés desactivarla.")
+      return
+    }
+
+    if (!confirm(`¿Eliminar la habitación "${habitacion.nombre}"?`)) return
+
+    const { error } = await supabase
+      .from("habitaciones")
+      .delete()
+      .eq("id", habitacion.id)
+      .eq("user_id", user.id)
+
+    if (error) {
+      console.error(error)
+      alert("No se pudo eliminar la habitación.")
+      return
+    }
+
+    const tarifas = { ...(config.habitacionesTarifas || {}) }
+    delete tarifas[String(habitacion.id)]
+    const configuracionActualizada = { ...config, habitacionesTarifas: tarifas }
+    setConfig(configuracionActualizada)
+    guardarConfiguracion(configuracionActualizada)
+
+    cancelarEdicionHabitacion()
+    await cargarDatos()
+  }
+
+  async function alternarHabitacion(habitacion) {
+    const nuevaActiva = habitacion.activa === false
+
+    const { error } = await supabase
+      .from("habitaciones")
+      .update({ activa: nuevaActiva })
+      .eq("id", habitacion.id)
+      .eq("user_id", user.id)
+
+    if (error) {
+      console.error(error)
+      alert("No se pudo cambiar el estado de la habitación.")
+      return
+    }
+
+    await cargarDatos()
+  }
+
   function Configuracion() {
     if (configSubvista === "alojamientos") return (
       <>
@@ -2782,11 +3062,76 @@ export default function Home() {
               </div>
             )}
 
-            <div style={{ marginTop: 28, padding: 16, borderRadius: 12, background: colors.blueSoft, border: `1px solid #cfe0f7`, color: colors.navyDark }}>
-              <strong>Tarifas y tipos de habitación</strong>
-              <div style={{ fontSize: 12, lineHeight: 1.5, marginTop: 5 }}>
-                Se administran desde <strong>Configuración → Habitaciones</strong>, donde cada tipo tiene su precio por noche.
-              </div>
+            <h2 style={{ margin: "30px 0 18px", fontSize: 18 }}>Tipos de habitación</h2>
+            <div style={{ color: colors.muted, fontSize: 12, marginBottom: 16 }}>
+              Los precios se configuran en cada habitación. Acá solamente definís los tipos disponibles para que después aparezcan como opciones en un menú desplegable.
+            </div>
+
+            <div style={{ display: "flex", gap: 9, flexWrap: "wrap", marginBottom: 14 }}>
+              {tiposHabitacionDisponibles.map((tipo) => {
+                const esPredeterminado = ["simple", "doble", "triple", "cuádruple", "otro"].includes(tipo.toLowerCase())
+                return (
+                  <div key={tipo} style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "8px 10px",
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: 999,
+                    background: "#fff",
+                    fontSize: 12,
+                    fontWeight: 700,
+                  }}>
+                    <span>{tipo}</span>
+                    {!esPredeterminado && (
+                      <button
+                        type="button"
+                        onClick={() => eliminarTipoHabitacionConfiguracion(tipo)}
+                        style={{
+                          border: "none",
+                          background: "transparent",
+                          color: colors.red,
+                          cursor: "pointer",
+                          fontWeight: 900,
+                          padding: 0,
+                        }}
+                        title="Eliminar tipo"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <div style={{ display: "flex", gap: 9, maxWidth: 520 }}>
+              <input
+                value={nuevoTipoConfiguracion}
+                onChange={(e) => setNuevoTipoConfiguracion(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault()
+                    agregarTipoHabitacionConfiguracion()
+                  }
+                }}
+                placeholder="Ej. Suite, Cabaña, Monoambiente..."
+                style={{ ...inputStyle, flex: 1 }}
+              />
+              <button type="button" onClick={agregarTipoHabitacionConfiguracion} style={secondaryButton}>
+                + Agregar tipo
+              </button>
+            </div>
+
+            <div style={{
+              marginTop: 18,
+              padding: 13,
+              background: colors.blueSoft,
+              borderRadius: 9,
+              fontSize: 12,
+              color: colors.navyDark,
+            }}>
+              <strong>Importante:</strong> el precio por noche, cochera y cargos de early check-in / late check-out ahora se cargan individualmente dentro de cada habitación.
             </div>
 
             <h2 style={{ margin: "30px 0 18px", fontSize: 18 }}>Accesos a canales</h2>
@@ -3277,14 +3622,29 @@ export default function Home() {
     return (
       <>
         <Header titulo="Calendario" subtitulo={`Planificación visual · ${formatearFecha(fechaCalendario)}`} />
-        <div style={{ padding: 22 }}>
-          {habitacionesActivas.length === 0 ? (
-            <section style={cardStyle}>
+        <div style={{ padding: 30 }}>
+          <section style={cardStyle}>
+            <div style={{ marginBottom: 18 }}>
+              <h2 style={{ margin: 0, fontSize: 18 }}>Calendario de ocupación</h2>
+              <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>
+                Hacé click sobre una reserva para editarla.
+              </div>
+              <div style={{ display: "flex", gap: 9, flexWrap: "wrap", alignItems: "center", marginTop: 14 }}>
+                <button type="button" onClick={() => setFechaCalendario(fechaLocal(0))} style={secondaryButton}>Hoy</button>
+                <button type="button" onClick={() => { const d = new Date(`${fechaCalendario}T12:00:00`); d.setDate(d.getDate() - 7); setFechaCalendario(d.toISOString().slice(0,10)) }} style={secondaryButton}>← 7 días</button>
+                <input type="date" value={fechaCalendario} onChange={(e) => setFechaCalendario(e.target.value)} style={{ ...inputStyle, width: 160 }} />
+                <button type="button" onClick={() => { const d = new Date(`${fechaCalendario}T12:00:00`); d.setDate(d.getDate() + 7); setFechaCalendario(d.toISOString().slice(0,10)) }} style={secondaryButton}>7 días →</button>
+              </div>
+              <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 12, fontSize: 11, fontWeight: 700 }}>
+                <span style={{ color: colors.green }}>● IN · Alojado</span>
+                <span style={{ color: colors.red }}>● OUT · Ya salió</span>
+                <span style={{ color: "#7c3aed" }}>● FUTURA · Aún no llegó</span>
+              </div>
+            </div>
+            {habitacionesActivas.length === 0 ? (
               <div style={emptyStyle}>No hay habitaciones activas cargadas.</div>
-            </section>
-          ) : (
-            <Calendario />
-          )}
+            ) : <Calendario />}
+          </section>
         </div>
       </>
     )
@@ -3298,10 +3658,8 @@ export default function Home() {
           <section style={cardStyle}>
             <div style={sectionHeader}>
               <div>
-                <h2 style={{ margin: 0, fontSize: 18 }}>Tus alojamientos</h2>
-                <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>
-                  {alojamientos.length} propiedad{alojamientos.length === 1 ? "" : "es"} configurada{alojamientos.length === 1 ? "" : "s"}
-                </div>
+                <h2 style={{ margin: 0, fontSize: 18 }}>Mis alojamientos</h2>
+                <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>{alojamientos.length} propiedades</div>
               </div>
               <button onClick={() => setMostrarAlojamiento(!mostrarAlojamiento)} style={primaryButton}>
                 + Agregar alojamiento
@@ -3312,12 +3670,11 @@ export default function Home() {
               <form onSubmit={crearAlojamiento} style={{
                 background: "#f8fafc",
                 border: `1px solid ${colors.border}`,
-                borderRadius: 12,
+                borderRadius: 10,
                 padding: 16,
                 marginBottom: 18,
                 display: "flex",
                 gap: 10,
-                alignItems: "center",
               }}>
                 <input
                   autoFocus
@@ -3333,57 +3690,34 @@ export default function Home() {
 
             <div style={{ display: "grid", gap: 10 }}>
               {alojamientos.map((a) => {
-                const cantidad = habitaciones.filter(
+                const cantidad = habitacionesActivas.filter(
                   (h) => String(h.alojamiento_id) === String(a.id)
                 ).length
-
                 return (
                   <div key={a.id} style={{
                     border: `1px solid ${colors.border}`,
-                    borderRadius: 14,
+                    borderRadius: 10,
                     padding: 17,
-                    background: "#fff",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
                   }}>
-                    {alojamientoEditando?.id === a.id ? (
-                      <form onSubmit={guardarEdicionAlojamiento} style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                        <input
-                          autoFocus
-                          value={alojamientoEditando.nombre}
-                          onChange={(e) => setAlojamientoEditando({ ...alojamientoEditando, nombre: e.target.value })}
-                          style={{ ...inputStyle, flex: 1 }}
-                        />
-                        <button type="submit" style={primaryButton}>Guardar</button>
-                        <button type="button" onClick={() => setAlojamientoEditando(null)} style={secondaryButton}>Cancelar</button>
-                      </form>
-                    ) : (
-                      <div style={{ display: "flex", justifyContent: "space-between", gap: 18, alignItems: "center", flexWrap: "wrap" }}>
-                        <div>
-                          <div style={{ fontWeight: 800, fontSize: 15 }}>{a.nombre}</div>
-                          <div style={{ color: colors.muted, fontSize: 12, marginTop: 5 }}>
-                            {cantidad} habitación{cantidad === 1 ? "" : "es"}
-                          </div>
-                        </div>
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                          <button onClick={() => iniciarEdicionAlojamiento(a)} style={secondaryButton}>Editar</button>
-                          <button
-                            onClick={() => {
-                              setNuevoAlojamientoHabitacion(String(a.id))
-                              setVista("habitaciones")
-                              setMostrarHabitacion(true)
-                            }}
-                            style={secondaryButton}
-                          >
-                            + Habitación
-                          </button>
-                          <button
-                            onClick={() => eliminarAlojamiento(a)}
-                            style={{ ...secondaryButton, color: colors.red, borderColor: "#f2caca" }}
-                          >
-                            Eliminar
-                          </button>
-                        </div>
+                    <div>
+                      <div style={{ fontWeight: 700 }}>{a.nombre}</div>
+                      <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>
+                        {cantidad} habitación{cantidad === 1 ? "" : "es"} activa{cantidad === 1 ? "" : "s"}
                       </div>
-                    )}
+                    </div>
+                    <button
+                      onClick={() => {
+                        setNuevoAlojamientoHabitacion(String(a.id))
+                        setVista("habitaciones")
+                        setMostrarHabitacion(true)
+                      }}
+                      style={secondaryButton}
+                    >
+                      + Habitación
+                    </button>
                   </div>
                 )
               })}
@@ -3397,7 +3731,7 @@ export default function Home() {
   function Habitaciones({ embedded = false } = {}) {
     return (
       <>
-        {!embedded && <Header titulo="Habitaciones" subtitulo="Administrá las unidades de cada alojamiento" />}
+        {!embedded && <Header titulo="Habitaciones" subtitulo="Administrá las unidades y sus tarifas" />}
         <div style={{ padding: 30 }}>
           <section style={cardStyle}>
             <div style={sectionHeader}>
@@ -3407,204 +3741,318 @@ export default function Home() {
                   {habitacionesActivas.length} activas · {habitaciones.length} totales
                 </div>
               </div>
-              <button onClick={() => {
-                setHabitacionEditando(null)
-                setMostrarHabitacion(!mostrarHabitacion)
-              }} style={primaryButton}>
+              <button
+                onClick={() => {
+                  cancelarEdicionHabitacion()
+                  setMostrarHabitacion(!mostrarHabitacion)
+                }}
+                style={primaryButton}
+              >
                 + Agregar habitación
               </button>
             </div>
 
             {mostrarHabitacion && (
               <form onSubmit={crearHabitacion} style={{
-                background: "#f8fafc",
-                border: `1px solid ${colors.border}`,
+                background: colors.blueSoft,
+                border: "1px solid #cfe0ff",
                 borderRadius: 12,
                 padding: 16,
                 marginBottom: 18,
                 display: "grid",
-                gridTemplateColumns: "1.1fr 1fr 1.1fr auto auto",
+                gridTemplateColumns: "1.2fr 1fr 1.2fr auto auto",
                 gap: 10,
+                alignItems: "end",
               }}>
-                <input value={nuevaHabitacion} onChange={(e) => setNuevaHabitacion(e.target.value)} placeholder="Nombre / número" style={inputStyle} />
-                <select value={nuevoTipo} onChange={(e) => setNuevoTipo(e.target.value)} style={inputStyle}>
-                  <option value="">Tipo de habitación</option>
-                  {tiposHabitacionDisponibles().map((tipo) => <option key={tipo.id} value={tipo.nombre}>{tipo.nombre}</option>)}
-                </select>
-                <select value={nuevoAlojamientoHabitacion} onChange={(e) => setNuevoAlojamientoHabitacion(e.target.value)} style={inputStyle}>
-                  <option value="">Alojamiento</option>
-                  {alojamientos.map((a) => <option key={a.id} value={a.id}>{a.nombre}</option>)}
-                </select>
-                <button type="submit" style={primaryButton}>Guardar</button>
-                <button type="button" onClick={() => setMostrarHabitacion(false)} style={secondaryButton}>Cancelar</button>
-              </form>
-            )}
-
-            {habitacionEditando && (
-              <form onSubmit={guardarEdicionHabitacion} style={{
-                background: "#eef6ff",
-                border: `1px solid #cfe0f7`,
-                borderRadius: 12,
-                padding: 16,
-                marginBottom: 18,
-              }}>
-                <div style={{ fontWeight: 800, marginBottom: 10 }}>Editar habitación</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr 1.1fr auto auto", gap: 10 }}>
+                <Field label="Nombre">
                   <input
-                    autoFocus
-                    value={habitacionEditando.nombre}
-                    onChange={(e) => setHabitacionEditando({ ...habitacionEditando, nombre: e.target.value })}
-                    placeholder="Nombre / número"
+                    value={nuevaHabitacion}
+                    onChange={(e) => setNuevaHabitacion(e.target.value)}
+                    placeholder="Ej. 301"
                     style={inputStyle}
                   />
+                </Field>
+
+                <Field label="Tipo">
                   <select
-                    value={habitacionEditando.tipo}
-                    onChange={(e) => setHabitacionEditando({ ...habitacionEditando, tipo: e.target.value })}
+                    value={nuevoTipo}
+                    onChange={(e) => setNuevoTipo(e.target.value)}
                     style={inputStyle}
                   >
-                    <option value="">Tipo de habitación</option>
-                    {tiposHabitacionDisponibles().map((tipo) => <option key={tipo.id} value={tipo.nombre}>{tipo.nombre}</option>)}
+                    <option value="">Seleccionar tipo</option>
+                    {tiposHabitacionDisponibles.map((tipo) => (
+                      <option key={tipo} value={tipo}>{tipo}</option>
+                    ))}
                   </select>
+                </Field>
+
+                <Field label="Alojamiento">
                   <select
-                    value={habitacionEditando.alojamiento_id}
-                    onChange={(e) => setHabitacionEditando({ ...habitacionEditando, alojamiento_id: e.target.value })}
+                    value={nuevoAlojamientoHabitacion}
+                    onChange={(e) => setNuevoAlojamientoHabitacion(e.target.value)}
                     style={inputStyle}
                   >
-                    <option value="">Alojamiento</option>
-                    {alojamientos.map((a) => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+                    <option value="">Seleccionar alojamiento</option>
+                    {alojamientos.map((a) => (
+                      <option key={a.id} value={a.id}>{a.nombre}</option>
+                    ))}
                   </select>
-                  <button type="submit" style={primaryButton}>Guardar cambios</button>
-                  <button type="button" onClick={() => setHabitacionEditando(null)} style={secondaryButton}>Cancelar</button>
-                </div>
+                </Field>
+
+                <button type="submit" style={primaryButton}>Guardar</button>
+                <button
+                  type="button"
+                  onClick={() => setMostrarHabitacion(false)}
+                  style={secondaryButton}
+                >
+                  Cancelar
+                </button>
               </form>
             )}
 
-            <section style={{ marginBottom: 20, padding: 18, border: `1px solid ${colors.border}`, borderRadius: 14, background: "#fbfdff" }}>
-              <h3 style={{ margin: 0, fontSize: 16 }}>Tipos y tarifas</h3>
-              <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>
-                Los tipos que aparecen acá son los que después podés elegir en cada habitación.
-              </div>
-              <div style={{ display: "grid", gap: 8, marginTop: 14 }}>
-                {tiposHabitacionDisponibles().map((tipo) => {
-                  const clave = normalizarNombreTipo(tipo.nombre)
-                  const precio = config.tarifasPorTipo?.[clave] ?? 0
-                  const editando = tipoTarifaEditando === clave
+            {habitaciones.length === 0 ? (
+              <div style={emptyStyle}>Todavía no hay habitaciones cargadas.</div>
+            ) : (
+              <div style={{ display: "grid", gap: 10 }}>
+                {habitaciones.map((h) => {
+                  const tarifa = datosTarifaHabitacion(h.id)
+                  const editando = String(habitacionEditando) === String(h.id)
+
                   return (
-                    <div key={tipo.id} style={{ display: "grid", gridTemplateColumns: "1fr 180px auto", gap: 10, alignItems: "center", padding: 10, border: `1px solid ${colors.border}`, borderRadius: 10, background: "#fff" }}>
-                      <div>
-                        <div style={{ fontWeight: 800, fontSize: 13 }}>{tipo.nombre}</div>
-                        <div style={{ color: colors.muted, fontSize: 11, marginTop: 2 }}>
-                          {habitaciones.filter((h) => normalizarNombreTipo(h.tipo) === clave).length} habitación(es)
+                    <div key={h.id} style={{
+                      border: `1px solid ${editando ? "#b8d4ff" : colors.border}`,
+                      borderRadius: 12,
+                      padding: 16,
+                      background: editando ? "#f7fbff" : colors.white,
+                    }}>
+                      {editando ? (
+                        <form onSubmit={guardarEdicionHabitacion}>
+                          <div style={{
+                            fontWeight: 800,
+                            fontSize: 14,
+                            marginBottom: 14,
+                            color: colors.navyDark,
+                          }}>
+                            Editar habitación
+                          </div>
+
+                          <div style={{
+                            display: "grid",
+                            gridTemplateColumns: "1fr 1fr 1.2fr",
+                            gap: 10,
+                          }}>
+                            <Field label="Nombre">
+                              <input
+                                value={habitacionForm.nombre}
+                                onChange={(e) => setHabitacionForm((v) => ({ ...v, nombre: e.target.value }))}
+                                style={inputStyle}
+                              />
+                            </Field>
+
+                            <Field label="Tipo">
+                              <select
+                                value={habitacionForm.tipo}
+                                onChange={(e) => setHabitacionForm((v) => ({ ...v, tipo: e.target.value }))}
+                                style={inputStyle}
+                              >
+                                <option value="">Seleccionar tipo</option>
+                                {tiposHabitacionDisponibles.map((tipo) => (
+                                  <option key={tipo} value={tipo}>{tipo}</option>
+                                ))}
+                              </select>
+                            </Field>
+
+                            <Field label="Alojamiento">
+                              <select
+                                value={habitacionForm.alojamiento_id}
+                                onChange={(e) => setHabitacionForm((v) => ({ ...v, alojamiento_id: e.target.value }))}
+                                style={inputStyle}
+                              >
+                                <option value="">Seleccionar alojamiento</option>
+                                {alojamientos.map((a) => (
+                                  <option key={a.id} value={a.id}>{a.nombre}</option>
+                                ))}
+                              </select>
+                            </Field>
+                          </div>
+
+                          <div style={{
+                            marginTop: 16,
+                            paddingTop: 16,
+                            borderTop: `1px solid ${colors.border}`,
+                          }}>
+                            <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 10 }}>
+                              Tarifas de esta habitación
+                            </div>
+
+                            <div style={{
+                              display: "grid",
+                              gridTemplateColumns: "repeat(2, 1fr)",
+                              gap: 12,
+                            }}>
+                              <Field label="Precio por noche">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={habitacionForm.precio}
+                                  onChange={(e) => setHabitacionForm((v) => ({ ...v, precio: e.target.value }))}
+                                  style={inputStyle}
+                                />
+                              </Field>
+
+                              <Field label="Cochera / vehículo por noche">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={habitacionForm.cochera}
+                                  onChange={(e) => setHabitacionForm((v) => ({ ...v, cochera: e.target.value }))}
+                                  style={inputStyle}
+                                />
+                              </Field>
+
+                              <Field label="Early check-in">
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                                  <select
+                                    value={habitacionForm.earlyTipo}
+                                    onChange={(e) => setHabitacionForm((v) => ({ ...v, earlyTipo: e.target.value }))}
+                                    style={inputStyle}
+                                  >
+                                    <option value="monto">Monto fijo</option>
+                                    <option value="porcentaje">Porcentaje</option>
+                                  </select>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={habitacionForm.earlyValor}
+                                    onChange={(e) => setHabitacionForm((v) => ({ ...v, earlyValor: e.target.value }))}
+                                    style={inputStyle}
+                                  />
+                                </div>
+                              </Field>
+
+                              <Field label="Late check-out">
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                                  <select
+                                    value={habitacionForm.lateTipo}
+                                    onChange={(e) => setHabitacionForm((v) => ({ ...v, lateTipo: e.target.value }))}
+                                    style={inputStyle}
+                                  >
+                                    <option value="monto">Monto fijo</option>
+                                    <option value="porcentaje">Porcentaje</option>
+                                  </select>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={habitacionForm.lateValor}
+                                    onChange={(e) => setHabitacionForm((v) => ({ ...v, lateValor: e.target.value }))}
+                                    style={inputStyle}
+                                  />
+                                </div>
+                              </Field>
+                            </div>
+                          </div>
+
+                          <div style={{
+                            display: "flex",
+                            justifyContent: "flex-end",
+                            gap: 9,
+                            marginTop: 16,
+                            flexWrap: "wrap",
+                          }}>
+                            <button type="submit" style={primaryButton}>Guardar cambios</button>
+                            <button type="button" onClick={cancelarEdicionHabitacion} style={secondaryButton}>Cancelar</button>
+                          </div>
+                        </form>
+                      ) : (
+                        <div style={{
+                          display: "grid",
+                          gridTemplateColumns: "1.2fr .8fr .8fr auto",
+                          alignItems: "center",
+                          gap: 14,
+                        }}>
+                          <div>
+                            <div style={{ fontWeight: 800, fontSize: 15 }}>{h.nombre}</div>
+                            <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>
+                              {nombreAlojamiento(h.alojamiento_id)}
+                            </div>
+                          </div>
+
+                          <div>
+                            <div style={{ color: colors.muted, fontSize: 10, textTransform: "uppercase", letterSpacing: .5 }}>
+                              Tipo
+                            </div>
+                            <div style={{ fontWeight: 700, marginTop: 3 }}>
+                              {h.tipo || "Sin tipo definido"}
+                            </div>
+                          </div>
+
+                          <div>
+                            <div style={{ color: colors.muted, fontSize: 10, textTransform: "uppercase", letterSpacing: .5 }}>
+                              Precio / noche
+                            </div>
+                            <div style={{ fontWeight: 800, marginTop: 3 }}>
+                              ${tarifa.precio.toLocaleString("es-AR")}
+                            </div>
+                          </div>
+
+                          <div style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "flex-end",
+                            gap: 7,
+                            flexWrap: "wrap",
+                          }}>
+                            <span style={{
+                              padding: "5px 9px",
+                              borderRadius: 999,
+                              background: h.activa === false ? colors.redSoft : colors.greenSoft,
+                              color: h.activa === false ? colors.red : colors.green,
+                              fontSize: 11,
+                              fontWeight: 800,
+                            }}>
+                              {h.activa === false ? "Inactiva" : "Activa"}
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={() => iniciarEdicionHabitacion(h)}
+                              style={secondaryButton}
+                            >
+                              Editar
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => alternarHabitacion(h)}
+                              style={{
+                                ...secondaryButton,
+                                color: h.activa === false ? colors.green : colors.yellow,
+                              }}
+                            >
+                              {h.activa === false ? "Activar" : "Desactivar"}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => eliminarHabitacion(h)}
+                              style={{
+                                ...secondaryButton,
+                                color: colors.red,
+                                borderColor: "#f5c2c2",
+                              }}
+                            >
+                              Eliminar
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                      <div>
-                        <div style={{ color: colors.muted, fontSize: 10, marginBottom: 4 }}>PRECIO POR NOCHE</div>
-                        {editando ? (
-                          <input autoFocus type="number" min="0" step="0.01" value={precio} onChange={(e) => cambiarTarifaTipo(tipo, e.target.value)} style={inputStyle} />
-                        ) : <div style={{ fontWeight: 800 }}>${Number(precio || 0).toLocaleString("es-AR")}</div>}
-                      </div>
-                      <div style={{ display: "flex", gap: 7 }}>
-                        <button type="button" onClick={() => setTipoTarifaEditando(editando ? null : clave)} style={secondaryButton}>{editando ? "Listo" : "Editar precio"}</button>
-                        <button type="button" onClick={() => eliminarTipoTarifa(tipo)} style={{ ...secondaryButton, color: colors.red, borderColor: "#f2caca" }}>Eliminar</button>
-                      </div>
+                      )}
                     </div>
                   )
                 })}
-              </div>
-              <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 180px auto", gap: 10, paddingTop: 12, borderTop: `1px solid ${colors.border}` }}>
-                <input value={nuevoTipoTarifa} onChange={(e) => setNuevoTipoTarifa(e.target.value)} placeholder="Nuevo tipo (ej. Suite)" style={inputStyle} />
-                <input type="number" min="0" step="0.01" value={nuevoPrecioTarifa} onChange={(e) => setNuevoPrecioTarifa(e.target.value)} placeholder="Precio por noche" style={inputStyle} />
-                <button type="button" onClick={agregarTipoTarifa} style={primaryButton}>+ Agregar tipo</button>
-              </div>
-            </section>
-
-            <section style={{ marginBottom: 20, padding: 18, border: `1px solid ${colors.border}`, borderRadius: 14, background: "#fff" }}>
-              <h3 style={{ margin: 0, fontSize: 16 }}>Cargos especiales</h3>
-              <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>Cochera, early check-in y late check-out.</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginTop: 14 }}>
-                <Field label="Cochera / vehículo por noche">
-                  <input type="number" min="0" step="0.01" value={config.tarifas?.cochera ?? 0} onChange={(e) => setConfig({ ...config, tarifas: { ...config.tarifas, cochera: e.target.value } })} style={inputStyle} />
-                </Field>
-                <Field label="Early check-in">
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                    <select value={config.earlyCheckin?.tipo || "monto"} onChange={e => setConfig({ ...config, earlyCheckin: { ...config.earlyCheckin, tipo: e.target.value } })} style={inputStyle}><option value="monto">Monto fijo</option><option value="porcentaje">Porcentaje</option></select>
-                    <input type="number" min="0" step="0.01" value={config.earlyCheckin?.valor ?? 0} onChange={e => setConfig({ ...config, earlyCheckin: { ...config.earlyCheckin, valor: e.target.value } })} style={inputStyle} />
-                  </div>
-                </Field>
-                <Field label="Late check-out">
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                    <select value={config.lateCheckout?.tipo || "monto"} onChange={e => setConfig({ ...config, lateCheckout: { ...config.lateCheckout, tipo: e.target.value } })} style={inputStyle}><option value="monto">Monto fijo</option><option value="porcentaje">Porcentaje</option></select>
-                    <input type="number" min="0" step="0.01" value={config.lateCheckout?.valor ?? 0} onChange={e => setConfig({ ...config, lateCheckout: { ...config.lateCheckout, valor: e.target.value } })} style={inputStyle} />
-                  </div>
-                </Field>
-              </div>
-            </section>
-
-            <div style={{ display: "grid", gap: 10 }}>
-              {habitaciones.map((h) => (
-                <div key={h.id} style={{
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: 14,
-                  padding: 16,
-                  background: "#fff",
-                  display: "grid",
-                  gridTemplateColumns: "minmax(180px,1.2fr) minmax(130px,.8fr) auto auto",
-                  gap: 16,
-                  alignItems: "center",
-                }}>
-                  <div>
-                    <div style={{ fontWeight: 800 }}>{h.nombre}</div>
-                    <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>
-                      {nombreAlojamiento(h.alojamiento_id)}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div style={{ color: colors.muted, fontSize: 11, marginBottom: 4 }}>TIPO</div>
-                    <div style={{ fontWeight: 700, fontSize: 13 }}>{h.tipo || "Sin tipo definido"}</div>
-                  </div>
-
-                  <span style={{
-                    textAlign: "center",
-                    padding: "6px 10px",
-                    borderRadius: 999,
-                    background: h.activa === false ? colors.redSoft : colors.greenSoft,
-                    color: h.activa === false ? colors.red : colors.green,
-                    fontSize: 11,
-                    fontWeight: 800,
-                  }}>
-                    {h.activa === false ? "Inactiva" : "Activa"}
-                  </span>
-
-                  <div style={{ display: "flex", gap: 7, justifyContent: "flex-end", flexWrap: "wrap" }}>
-                    <button onClick={() => iniciarEdicionHabitacion(h)} style={secondaryButton}>Editar</button>
-                    <button
-                      onClick={() => alternarHabitacion(h)}
-                      style={{ ...secondaryButton, color: h.activa === false ? colors.green : colors.yellow }}
-                    >
-                      {h.activa === false ? "Activar" : "Desactivar"}
-                    </button>
-                    <button
-                      onClick={() => eliminarHabitacion(h)}
-                      style={{ ...secondaryButton, color: colors.red, borderColor: "#f2caca" }}
-                    >
-                      Eliminar
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {habitaciones.length === 0 && (
-              <div style={{
-                marginTop: 12,
-                padding: 28,
-                textAlign: "center",
-                color: colors.muted,
-                background: "#f8fafc",
-                borderRadius: 12,
-              }}>
-                Todavía no tenés habitaciones configuradas.
               </div>
             )}
           </section>
