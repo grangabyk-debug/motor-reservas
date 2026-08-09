@@ -3,22 +3,18 @@ import { createClient } from "@supabase/supabase-js"
 
 export async function POST(request) {
   try {
-    const authHeader = request.headers.get("authorization")
-    const token = authHeader?.replace("Bearer ", "")
+    const body = await request.json()
 
-    if (!token) {
+    const email = body.email
+    const fullName = body.fullName
+    const role = body.role
+    const propertyId = body.propertyId
+
+    if (!email || !propertyId || !role) {
       return NextResponse.json(
-        { error: "No estás autenticado." },
-        { status: 401 }
-      )
-    }
-
-    const { email, fullName, role, propertyId } =
-      await request.json()
-
-    if (!email || !role || !propertyId) {
-      return NextResponse.json(
-        { error: "Faltan datos obligatorios." },
+        {
+          error: "Faltan datos obligatorios.",
+        },
         { status: 400 }
       )
     }
@@ -32,7 +28,9 @@ export async function POST(request) {
 
     if (!rolesPermitidos.includes(role)) {
       return NextResponse.json(
-        { error: "El rol seleccionado no es válido." },
+        {
+          error: `Rol no válido: ${role}`,
+        },
         { status: 400 }
       )
     }
@@ -64,33 +62,39 @@ export async function POST(request) {
       )
     }
 
-    // Cliente usando la sesión del usuario actual
+    // Cliente con la sesión del usuario actual
     const userClient = createClient(
       supabaseUrl,
       publishableKey,
       {
         global: {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: request.headers.get(
+              "authorization"
+            ),
           },
         },
       }
     )
 
     const {
-      data: { user: currentUser },
+      data: {
+        user: currentUser,
+      },
       error: userError,
     } = await userClient.auth.getUser()
 
     if (userError || !currentUser) {
       return NextResponse.json(
-        { error: "La sesión no es válida." },
+        {
+          error: "La sesión no es válida.",
+        },
         { status: 401 }
       )
     }
 
     // Cliente administrativo.
-    // Esta clave SOLO existe en el servidor.
+    // SUPABASE_SECRET_KEY SOLO se usa en el servidor.
     const adminClient = createClient(
       supabaseUrl,
       secretKey,
@@ -102,22 +106,32 @@ export async function POST(request) {
       }
     )
 
-    // Buscar el alojamiento
-    const { data: property, error: propertyError } =
-      await adminClient
-        .from("properties")
-        .select("id, name, owner_id")
-        .eq("id", propertyId)
-        .single()
+    // Comprobar el alojamiento
+    const {
+      data: property,
+      error: propertyError,
+    } = await adminClient
+      .from("properties")
+      .select("id, name, owner_id")
+      .eq("id", propertyId)
+      .single()
 
     if (propertyError || !property) {
+      console.error(
+        "PROPERTY ERROR:",
+        propertyError
+      )
+
       return NextResponse.json(
-        { error: "No se encontró el alojamiento." },
+        {
+          error:
+            "No se encontró el alojamiento.",
+        },
         { status: 404 }
       )
     }
 
-    // Solo el propietario puede invitar usuarios
+    // Solo el propietario puede invitar
     if (property.owner_id !== currentUser.id) {
       return NextResponse.json(
         {
@@ -129,7 +143,7 @@ export async function POST(request) {
     }
 
     const emailNormalizado =
-      email.trim().toLowerCase()
+      String(email).trim().toLowerCase()
 
     // Buscar si el usuario ya existe
     const {
@@ -143,7 +157,7 @@ export async function POST(request) {
 
     if (usersError) {
       console.error(
-        "Error buscando usuarios:",
+        "USERS ERROR:",
         usersError
       )
 
@@ -168,8 +182,10 @@ export async function POST(request) {
     if (usuarioExistente) {
       userId = usuarioExistente.id
 
+      // Comprobar si ya pertenece al alojamiento
       const {
         data: membershipExistente,
+        error: membershipCheckError,
       } = await adminClient
         .from("property_members")
         .select(
@@ -178,6 +194,21 @@ export async function POST(request) {
         .eq("property_id", propertyId)
         .eq("user_id", userId)
         .maybeSingle()
+
+      if (membershipCheckError) {
+        console.error(
+          "MEMBERSHIP CHECK ERROR:",
+          membershipCheckError
+        )
+
+        return NextResponse.json(
+          {
+            error:
+              "No se pudo comprobar el acceso del usuario.",
+          },
+          { status: 500 }
+        )
+      }
 
       if (membershipExistente) {
         return NextResponse.json(
@@ -200,7 +231,7 @@ export async function POST(request) {
 
       if (inviteError) {
         console.error(
-          "Error invitando usuario:",
+          "INVITE ERROR:",
           inviteError
         )
 
@@ -217,24 +248,25 @@ export async function POST(request) {
       userId = inviteData.user.id
     }
 
-    // Crear o actualizar perfil
-    const { error: profileError } =
-      await adminClient
-        .from("profiles")
-        .upsert(
-          {
-            id: userId,
-            full_name: fullName || "",
-            role,
-          },
-          {
-            onConflict: "id",
-          }
-        )
+    // Crear perfil
+    const {
+      error: profileError,
+    } = await adminClient
+      .from("profiles")
+      .upsert(
+        {
+          id: userId,
+          full_name: fullName || "",
+          role: role,
+        },
+        {
+          onConflict: "id",
+        }
+      )
 
     if (profileError) {
       console.error(
-        "Error creando perfil:",
+        "PROFILE ERROR:",
         profileError
       )
 
@@ -248,25 +280,26 @@ export async function POST(request) {
     }
 
     // Asociar usuario al alojamiento
-    const { error: memberError } =
-      await adminClient
-        .from("property_members")
-        .insert({
-          property_id: propertyId,
-          user_id: userId,
-          role,
-        })
+    const {
+      error: memberError,
+    } = await adminClient
+      .from("property_members")
+      .insert({
+        property_id: propertyId,
+        user_id: userId,
+        role: role,
+      })
 
     if (memberError) {
       console.error(
-        "Error creando membership:",
+        "MEMBER ERROR:",
         memberError
       )
 
       return NextResponse.json(
         {
           error:
-            "El usuario fue creado, pero no se pudo asignar el alojamiento.",
+            "El usuario fue creado, pero no se pudo asignar al alojamiento.",
         },
         { status: 500 }
       )
@@ -282,13 +315,14 @@ export async function POST(request) {
     })
   } catch (error) {
     console.error(
-      "Error invitando usuario:",
+      "INVITATION ERROR:",
       error
     )
 
     return NextResponse.json(
       {
         error:
+          error?.message ||
           "Ocurrió un error inesperado.",
       },
       { status: 500 }
