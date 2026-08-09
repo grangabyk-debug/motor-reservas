@@ -178,6 +178,7 @@ export default function Home() {
   const [garantiaReferencia, setGarantiaReferencia] = useState("")
 
   const [reservaSeleccionada, setReservaSeleccionada] = useState(null)
+  const [confirmarCheckoutReserva, setConfirmarCheckoutReserva] = useState(null)
   const [modoEdicion, setModoEdicion] = useState(false)
   const [mensaje, setMensaje] = useState("")
   const [cargando, setCargando] = useState(false)
@@ -1093,13 +1094,19 @@ export default function Home() {
     setReservaSeleccionada(data)
   }
 
-  async function realizarCheckOut(reserva) {
+  async function confirmarYRealizarCheckOut(reserva) {
     if (!reserva?.id || reserva.estado === "cancelada" || reserva.no_show) return
     const saldo = saldoReserva(reserva)
     if (saldo > 0.01) {
       alert(`No se puede realizar el check-out. La cuenta tiene un saldo pendiente de ${reserva.moneda === "USD" ? "US$ " : "$"}${saldo.toLocaleString("es-AR", { minimumFractionDigits: reserva.moneda === "USD" ? 2 : 0 })}. Registrá el pago pendiente antes de continuar.`)
       return
     }
+    setConfirmarCheckoutReserva(reserva)
+  }
+
+  async function realizarCheckOutConfirmado(reserva) {
+    if (!reserva?.id || reserva.estado === "cancelada" || reserva.no_show) return
+
     const { error } = await supabase
       .from("reservas")
       .update({ estado: "finalizada" })
@@ -1112,10 +1119,28 @@ export default function Home() {
       return
     }
 
-    // La reserva ya fue actualizada en Supabase. Actualizamos el estado local
-    // y cerramos inmediatamente el panel lateral.
+    // Después del check-out la habitación pasa automáticamente a SUCIA.
+    const { error: errorLimpieza } = await supabase
+      .from("habitaciones")
+      .update({ estado: "sucia" })
+      .eq("id", Number(reserva.habitacion_id))
+      .eq("user_id", user.id)
+
+    if (errorLimpieza) {
+      console.error("La reserva finalizó, pero no se pudo marcar la habitación como sucia:", errorLimpieza)
+      alert("El check-out se realizó, pero no se pudo marcar la habitación como sucia. Revisá los permisos de habitaciones.")
+    }
+
     const reservaFinalizada = { ...reserva, estado: "finalizada" }
     setReservas((actuales) => actuales.map((r) => String(r.id) === String(reserva.id) ? reservaFinalizada : r))
+    setHabitaciones((actuales) => actuales.map((h) =>
+      String(h.id) === String(reserva.habitacion_id) ? { ...h, estado: "sucia" } : h
+    ))
+    setEstadosHousekeepingPendientes((actuales) => ({
+      ...actuales,
+      [String(reserva.habitacion_id)]: "sucia",
+    }))
+    setConfirmarCheckoutReserva(null)
     setReservaSeleccionada(null)
   }
 
@@ -1213,7 +1238,7 @@ export default function Home() {
       fecha_entrada: fechaEntrada,
       fecha_salida: fechaSalida,
       cantidad_huespedes: obtenerPasajerosReserva().length,
-      estado,
+      estado: (!modoEdicion && fechaEntrada === fechaLocal(0) && fechaSalida > fechaLocal(0)) ? "alojado" : estado,
       no_show: Boolean(noShow),
       early_checkin: Boolean(earlyCheckin),
       late_checkout: Boolean(lateCheckout),
@@ -1316,9 +1341,15 @@ export default function Home() {
       }
     }
 
+    const reservaCreadaEsNueva = !modoEdicion
+    const fechaParaCalendario = fechaEntrada
     setMensaje(modoEdicion ? "Reserva actualizada correctamente." : "Reserva creada correctamente.")
     limpiarFormulario()
     await cargarDatos()
+    if (reservaCreadaEsNueva) {
+      setFechaCalendario(fechaParaCalendario || fechaLocal(0))
+      setVista("calendario")
+    }
     setCargando(false)
   }
 
@@ -2187,7 +2218,7 @@ export default function Home() {
       <section style={cardStyle}><h2 style={{ margin: 0, fontSize: 18 }}>Nuevo bloqueo</h2>
         <form onSubmit={crearBloqueo} style={{ display: "grid", gap: 12, marginTop: 18 }}>
           <Field label="Habitaciones">
-            <div style={{ border: `1px solid ${colors.border}`, borderRadius: 10, padding: 10, maxHeight: 250, overflowY: "auto", background: colors.white }}>
+            <div style={{ border: `1px solid ${colors.border}`, borderRadius: 10, padding: 10, maxHeight: 280, overflowY: "auto", overscrollBehavior: "contain", scrollbarWidth: "thin", background: colors.white }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                 <span style={{ fontSize: 12, color: colors.muted }}>{seleccionadas.length} seleccionada{seleccionadas.length === 1 ? "" : "s"}</span>
                 <button type="button" onClick={() => setBloqueoHabitaciones(seleccionadas.length === habitacionesActivas.length ? [] : habitacionesActivas.map(h => String(h.id)))} style={{ ...secondaryButton, padding: "6px 9px", fontSize: 11 }}>
@@ -2476,7 +2507,7 @@ export default function Home() {
       alert("Todavía no está configurado el WhatsApp de asistencia. Definí NEXT_PUBLIC_HL_SUPPORT_WHATSAPP en el entorno de la aplicación.")
       return
     }
-    const mensaje = encodeURIComponent(`Hola, necesito asistencia con Habitación Llena. Alojamiento: ${nombreAlojamientoActivo}. Necesito ayuda con:`)
+    const mensaje = encodeURIComponent(`Hola, necesito asistencia con Habitación Llena. Alojamiento: ${nombreAlojamientoActivo}. Usuario: ${user?.email || user?.id || "sin identificar"}. Necesito ayuda con:`)
     window.open(`https://wa.me/${numero}?text=${mensaje}`, "_blank", "noopener,noreferrer")
   }
 
@@ -2610,7 +2641,7 @@ export default function Home() {
       const response = await fetch("/api/assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: pregunta, context: contexto }),
+        body: JSON.stringify({ question: pregunta, context: { ...contexto, plataforma: "Habitación Llena PMS", instruccionesAyuda: "Respondé también preguntas sobre cómo usar la plataforma. Explicá paso a paso dónde debe tocar el usuario para crear habitaciones, configurar tarifas, hacer reservas, bloquear habitaciones, usar housekeeping, check-in/check-out, configurar integraciones, bandeja de entrada y asistencia humana. No inventes funciones que no existan. Si la consulta requiere una conexión externa todavía no implementada, indicá que debe configurarse en la etapa de integración correspondiente." } }),
       })
 
       const data = await response.json()
@@ -2779,10 +2810,24 @@ export default function Home() {
     const conexiones = [
       {
         nombre: "WhatsApp",
-        descripcion: "Botón directo para que el huésped contacte al alojamiento.",
+        descripcion: "Canal de consultas del alojamiento. La conexión API real se completará en una etapa posterior.",
         estado: config.whatsapp ? "Configurado" : "Pendiente",
         color: "#25D366",
         url: whatsappLink(),
+      },
+      {
+        nombre: "Instagram",
+        descripcion: "Preparado para recibir consultas de Instagram en la bandeja omnicanal.",
+        estado: config.instagram ? "Configurado" : "Pendiente",
+        color: "#E1306C",
+        url: config.instagram || "",
+      },
+      {
+        nombre: "Email",
+        descripcion: "Preparado para centralizar consultas recibidas por email.",
+        estado: config.emailSoporte ? "Configurado" : "Pendiente",
+        color: "#475569",
+        url: config.emailSoporte || "",
       },
       {
         nombre: "Booking.com",
@@ -2826,6 +2871,35 @@ export default function Home() {
           </div>
           <div style={{ marginTop: 16, padding: 14, borderRadius: 10, background: colors.bg, border: `1px solid ${colors.border}` }}><strong>Cómo funcionará</strong><div style={{ color: colors.muted, fontSize: 12, lineHeight: 1.6, marginTop: 5 }}>Página web → Motor de reservas → disponibilidad del calendario → reserva confirmada → PMS. En esta primera etapa dejamos configurado el origen de la web; la conexión real con disponibilidad y reservas la hacemos en el siguiente paso.</div></div>
           <button type="button" onClick={()=>{ const actualizado={...config, webIntegracion}; setConfig(actualizado); guardarConfiguracion(actualizado) }} style={{ ...primaryButton, marginTop: 14 }}>Guardar integración web</button>
+        </section>
+        <section style={{ ...cardStyle, marginBottom: 18 }}>
+          <div style={sectionHeader}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: 18 }}>🔗 Centro de conexiones</h2>
+              <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>Conectá cada canal desde un único lugar. Las autorizaciones oficiales de Meta y otros proveedores se completarán paso a paso.</div>
+            </div>
+            <span style={{ padding: "5px 9px", borderRadius: 999, background: colors.blueSoft, color: colors.blue, fontSize: 11, fontWeight: 800 }}>FÁCIL DE CONFIGURAR</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 12, marginTop: 16 }}>
+            {[
+              ["Instagram", "📸", "Conectar cuenta"],
+              ["WhatsApp", "🟢", "Conectar canal"],
+              ["Página web", "🌐", "Configurar motor"],
+              ["Email", "✉️", "Conectar correo"],
+            ].map(([nombre, icono, accion]) => (
+              <div key={nombre} style={{ border: `1px solid ${colors.border}`, borderRadius: 12, padding: 15, display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: colors.bg, display: "grid", placeItems: "center", fontSize: 20 }}>{icono}</div>
+                <div style={{ flex: 1 }}>
+                  <strong>{nombre}</strong>
+                  <div style={{ color: colors.muted, fontSize: 11, marginTop: 3 }}>Configuración sencilla, sin tokens técnicos visibles.</div>
+                </div>
+                <button type="button" onClick={() => {
+                  if (nombre === "Página web") return setWebIntegracion("propia")
+                  alert(`${nombre}: conexión real disponible en la próxima etapa de integración. Por ahora dejamos el flujo preparado.`)
+                }} style={secondaryButton}>{accion}</button>
+              </div>
+            ))}
+          </div>
         </section>
         <section style={cardStyle}>
             <div style={{ marginBottom: 20 }}>
@@ -2924,8 +2998,11 @@ export default function Home() {
               <div style={{ fontSize: 11, opacity: .7, letterSpacing: 1 }}>ASISTENTE HOTELERO</div>
               <h2 style={{ margin: "5px 0", fontSize: 20 }}>Preguntale a Habitación Llena</h2>
               <div style={{ fontSize: 12, opacity: .78 }}>
-                Reservas, ocupación, huéspedes, habitaciones y rendimiento.
+                Reservas, ocupación, huéspedes, habitaciones y rendimiento. También podés preguntarme cómo usar cualquier parte de la plataforma.
               </div>
+              <button type="button" onClick={() => setVista("asistencia")} style={{ marginTop: 12, border: "1px solid rgba(255,255,255,.25)", background: "rgba(255,255,255,.1)", color: "#fff", borderRadius: 8, padding: "8px 11px", fontWeight: 700, cursor: "pointer" }}>
+                🆘 Necesito asistencia humana
+              </button>
             </div>
 
             <div style={{
@@ -3416,7 +3493,10 @@ export default function Home() {
   }
 
   function Dashboard() {
-    const recientes = reservas.filter((r) => r.estado !== "cancelada").slice(0, 5)
+    const recientes = reservas
+      .filter((r) => r.estado !== "cancelada" && r.estado !== "finalizada" && r.fecha_entrada >= fechaLocal(0))
+      .sort((a, b) => String(a.fecha_entrada).localeCompare(String(b.fecha_entrada)))
+      .slice(0, 5)
 
     return (
       <>
@@ -3455,6 +3535,31 @@ export default function Home() {
             </div>
           </div>
 
+          {(habitacionesActivas.length === 0 || !config.nombreMarca || alojamientos.length === 0) && (
+            <section style={{ ...cardStyle, marginBottom: 18, border: `1px solid ${colors.blue}` }}>
+              <div style={sectionHeader}>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: 18 }}>🚀 Configuración inicial</h2>
+                  <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>Cada alojamiento nuevo comienza con su propio espacio y puede completar estos pasos.</div>
+                </div>
+                <button onClick={() => setVista("configuracion")} style={primaryButton}>Completar configuración</button>
+              </div>
+              <div style={{ display: "grid", gap: 8, marginTop: 14 }}>
+                {[
+                  ["Datos del alojamiento", Boolean(config.nombreMarca && alojamientos.length)],
+                  ["Habitaciones", habitacionesActivas.length > 0],
+                  ["Canales e integraciones", Boolean(config.whatsapp || config.webUrl)],
+                  ["Bandeja de entrada", true],
+                ].map(([label, ok]) => (
+                  <div key={label} style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 12 }}>
+                    <span style={{ color: ok ? colors.green : colors.muted, fontWeight: 900 }}>{ok ? "✓" : "○"}</span>
+                    <span style={{ fontWeight: ok ? 700 : 500 }}>{label}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
           <div style={{
             display: "grid",
             gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
@@ -3482,6 +3587,40 @@ export default function Home() {
 
           <section style={{ ...cardStyle, marginBottom: 18 }}><div style={sectionHeader}><div><h2 style={{ margin: 0, fontSize: 18 }}>Operación de hoy</h2><div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>{formatearFecha(fechaLocal(0))}</div></div><div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><button onClick={() => imprimirPlanillaIn()} style={secondaryButton}>🖨 Planilla IN</button><button onClick={() => imprimirHousekeeping()} style={secondaryButton}>🧹 Housekeeping</button></div></div><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 15 }}><div style={{ padding: 14, background: colors.greenSoft, borderRadius: 10 }}><div style={{ color: colors.green, fontWeight: 800, fontSize: 12 }}>IN DEL DÍA · {entradasHoy.length}</div>{entradasHoy.length ? entradasHoy.map(r => <div key={r.id} style={{ marginTop: 7, fontSize: 13 }}><strong>{nombreHabitacion(r.habitacion_id)}</strong> · {r.nombre_huesped} · {r.cantidad_huespedes || 1} pax</div>) : <div style={{ color: colors.muted, marginTop: 7, fontSize: 12 }}>Sin entradas hoy.</div>}</div><div style={{ padding: 14, background: colors.redSoft, borderRadius: 10 }}><div style={{ color: colors.red, fontWeight: 800, fontSize: 12 }}>OUT DEL DÍA · {salidasHoy.length}</div>{salidasHoy.length ? salidasHoy.map(r => <div key={r.id} style={{ marginTop: 7, fontSize: 13 }}><strong>{nombreHabitacion(r.habitacion_id)}</strong> · {r.nombre_huesped} · {r.cantidad_huespedes || 1} pax{r.late_checkout ? " · Late check-out" : ""}</div>) : <div style={{ color: colors.muted, marginTop: 7, fontSize: 12 }}>Sin salidas hoy.</div>}</div></div></section>
 
+          <section style={{ ...cardStyle, marginBottom: 18 }}>
+            <div style={sectionHeader}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: 18 }}>📥 Bandeja de entrada</h2>
+                <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>Consultas que todavía requieren atención</div>
+              </div>
+              <button onClick={() => setVista("bandeja")} style={linkButton}>Ver bandeja →</button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10, marginTop: 15 }}>
+              {["WhatsApp","Instagram","Web","Email"].map((canal) => {
+                const pendientes = bandejaConversaciones.filter((c) => c.noLeida && c.canal === canal).length
+                return (
+                  <button key={canal} onClick={() => setVista("bandeja")} style={{
+                    border: `1px solid ${pendientes ? colors.red : colors.border}`,
+                    background: pendientes ? colors.redSoft : colors.bg,
+                    borderRadius: 10,
+                    padding: 12,
+                    textAlign: "left",
+                    cursor: "pointer",
+                  }}>
+                    <div style={{ color: colors.muted, fontSize: 11 }}>{canal}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 6 }}>
+                      <strong style={{ fontSize: 20, color: pendientes ? colors.red : colors.text }}>{pendientes}</strong>
+                      <span style={{ color: colors.muted, fontSize: 11 }}>{pendientes === 1 ? "pendiente" : "pendientes"}</span>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+            {bandejaConversaciones.filter(c => c.noLeida).length === 0 && (
+              <div style={{ marginTop: 12, color: colors.green, fontSize: 12, fontWeight: 700 }}>✓ Todo al día. No hay mensajes pendientes.</div>
+            )}
+          </section>
+
           <section style={{ ...cardStyle, marginBottom: 18 }}><div style={sectionHeader}><div><h2 style={{ margin: 0, fontSize: 18 }}>Estado de habitaciones</h2><div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>Vista rápida de housekeeping</div></div><button onClick={() => setVista("housekeeping")} style={secondaryButton}>Abrir housekeeping</button></div><div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 10, marginTop: 15 }}>{habitacionesActivas.slice(0,8).map(h=>{const st=estadoHabitacionVisual(h);const inf=infoEstadoHabitacion(st);return <button key={h.id} onClick={()=>setVista("housekeeping")} style={{border:`1px solid ${colors.border}`,background:inf.bg,borderRadius:10,padding:12,textAlign:"left",cursor:"pointer"}}><strong style={{fontSize:13}}>{h.nombre}</strong><div style={{color:inf.color,fontWeight:800,fontSize:11,marginTop:5}}>{inf.label}</div></button>})}</div></section>
 
           <div style={{
@@ -3498,7 +3637,7 @@ export default function Home() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <h2 style={{ margin: 0, fontSize: 18 }}>Próximas reservas</h2>
-                  <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>Actividad más reciente</div>
+                  <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>Solo reservas futuras</div>
                 </div>
                 <button onClick={() => setVista("reservas")} style={linkButton}>Ver todas</button>
               </div>
@@ -3635,6 +3774,14 @@ export default function Home() {
                   </select>
                 </Field>
 
+                <Field label="Fecha de entrada">
+                  <input type="date" value={fechaEntrada} onChange={(e) => setFechaEntrada(e.target.value)} style={inputStyle} />
+                </Field>
+
+                <Field label="Fecha de salida">
+                  <input type="date" value={fechaSalida} onChange={(e) => setFechaSalida(e.target.value)} style={inputStyle} />
+                </Field>
+
                 <Field label="Nombre del huésped principal">
                   <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej. Juan Pérez" style={inputStyle} />
                 </Field>
@@ -3643,20 +3790,11 @@ export default function Home() {
                   <input value={dni} onChange={(e) => setDni(e.target.value)} placeholder="Ej. 35.123.456" style={inputStyle} />
                 </Field>
 
-                <Field label="Email">
-                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="huésped@email.com" style={inputStyle} />
-                </Field>
-
-                <Field label="Teléfono">
-                  <input value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="+54 9..." style={inputStyle} />
-                </Field>
-
-                <Field label="Cantidad de huéspedes">
-                  <input type="number" min="1" value={1 + pasajerosExtra.length} readOnly style={{ ...inputStyle, background: "#f8fafc" }} />
-                </Field>
-
                 <Field label="Pasajeros adicionales" wide>
                   <div style={{ display: "grid", gap: 10 }}>
+                    <div style={{ padding: "8px 10px", borderRadius: 8, background: colors.blueSoft, color: colors.blue, fontSize: 11, fontWeight: 700 }}>
+                      Huéspedes: {1 + pasajerosExtra.length}
+                    </div>
                     {pasajerosExtra.map((pasajero, indice) => (
                       <div key={indice} style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr auto auto", gap: 8, alignItems: "center", padding: 10, background: "#f8fafc", borderRadius: 9, border: `1px solid ${colors.border}` }}>
                         <input value={pasajero.nombre} onChange={(e) => actualizarPasajeroExtra(indice, "nombre", e.target.value)} placeholder="Nombre y apellido" style={inputStyle} />
@@ -3670,6 +3808,14 @@ export default function Home() {
                     ))}
                     <button type="button" onClick={agregarPasajeroExtra} style={{ ...secondaryButton, width: "fit-content" }}>+ Agregar pasajero</button>
                   </div>
+                </Field>
+
+                <Field label="Email">
+                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="huésped@email.com" style={inputStyle} />
+                </Field>
+
+                <Field label="Teléfono">
+                  <input value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="+54 9..." style={inputStyle} />
                 </Field>
 
                 <div style={{
@@ -3742,23 +3888,6 @@ export default function Home() {
                     <input type="number" min="0.01" step="0.01" value={tipoCambioReserva || config.tipoCambioUSD || 1} onChange={e => setTipoCambioReserva(e.target.value)} style={inputStyle} />
                   </Field>
                 )}
-
-                <Field label="Fecha de entrada">
-                  <input type="date" value={fechaEntrada} onChange={(e) => setFechaEntrada(e.target.value)} style={inputStyle} />
-                </Field>
-
-                <Field label="Fecha de salida">
-                  <input type="date" value={fechaSalida} onChange={(e) => setFechaSalida(e.target.value)} style={inputStyle} />
-                </Field>
-
-                <Field label="Estado">
-                  <select value={estado} onChange={(e) => setEstado(e.target.value)} style={inputStyle}>
-                    <option value="pendiente">Pendiente</option>
-                    <option value="confirmada">Confirmada</option>
-                    <option value="cancelada">Cancelada</option>
-                    <option value="finalizada">Finalizada</option>
-                  </select>
-                </Field>
 
                 <Field label="Documento del huésped" wide>
                   <div style={{ display: "grid", gap: 7 }}>
@@ -4515,6 +4644,45 @@ export default function Home() {
         {vista === "configuracion" && Configuracion()}
       </main>
 
+      {confirmarCheckoutReserva && (
+        <div
+          onClick={() => setConfirmarCheckoutReserva(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15,23,42,.52)",
+            zIndex: 150,
+            display: "grid",
+            placeItems: "center",
+            padding: 20,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "min(430px, 100%)",
+              background: colors.white,
+              borderRadius: 16,
+              padding: 24,
+              boxShadow: "0 24px 70px rgba(0,0,0,.25)",
+            }}
+          >
+            <div style={{ fontSize: 30, marginBottom: 8 }}>⚠️</div>
+            <h3 style={{ margin: 0, fontSize: 20 }}>¿Estás seguro de realizar el check-out?</h3>
+            <p style={{ color: colors.muted, lineHeight: 1.5, fontSize: 13, margin: "10px 0 20px" }}>
+              La reserva de <strong>{confirmarCheckoutReserva.nombre_huesped}</strong> pasará a finalizada
+              y la habitación <strong>{nombreHabitacion(confirmarCheckoutReserva.habitacion_id)}</strong> quedará marcada como sucia.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 9 }}>
+              <button onClick={() => setConfirmarCheckoutReserva(null)} style={secondaryButton}>No, cancelar</button>
+              <button onClick={() => realizarCheckOutConfirmado(confirmarCheckoutReserva)} style={{ ...primaryButton, background: colors.red }}>
+                Sí, realizar check-out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {reservaSeleccionada && (
         <div
           onClick={() => setReservaSeleccionada(null)}
@@ -4566,7 +4734,7 @@ export default function Home() {
                   ✓ Check-in
                 </button>
                 <button
-                  onClick={() => realizarCheckOut(reservaSeleccionada)}
+                  onClick={() => confirmarYRealizarCheckOut(reservaSeleccionada)}
                   disabled={reservaSeleccionada.estado === "finalizada"}
                   style={{ ...primaryButton, background: colors.red, opacity: reservaSeleccionada.estado === "finalizada" ? .55 : 1 }}
                 >
