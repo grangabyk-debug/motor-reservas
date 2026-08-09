@@ -3891,7 +3891,7 @@ export default function Home() {
               borderRadius: 12,
               padding: 22,
             }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0, paddingBottom: 10 }}>
                 <div>
                   <h2 style={{ margin: 0, fontSize: 18 }}>Próximas reservas</h2>
                   <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>Solo reservas futuras</div>
@@ -5127,18 +5127,26 @@ export default function Home() {
             zIndex: 100,
             display: "flex",
             justifyContent: "flex-end",
+            alignItems: "flex-end",
+            padding: "0 18px",
+            boxSizing: "border-box",
           }}
         >
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              width: "min(430px, 100%)",
+              width: "100%",
+              maxWidth: "100%",
               background: colors.white,
-              height: "100%",
-              padding: 28,
+              height: "min(78vh, 760px)",
+              minHeight: 560,
+              padding: "20px 28px 18px",
               boxSizing: "border-box",
-              overflowY: "auto",
-              boxShadow: "-8px 0 30px rgba(0,0,0,.15)",
+              overflow: "hidden",
+              borderRadius: "18px 18px 0 0",
+              boxShadow: "0 -10px 35px rgba(0,0,0,.18)",
+              display: "flex",
+              flexDirection: "column",
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -5178,10 +5186,20 @@ export default function Home() {
             )}
 
             <div style={{
-              marginTop: 25,
+              display: "grid",
+              gridTemplateColumns: "minmax(280px, 1.05fr) minmax(260px, .95fr) minmax(340px, 1.25fr)",
+              gap: 16,
+              alignItems: "start",
+              flex: 1,
+              minHeight: 0,
+              overflow: "hidden",
+              marginTop: 8,
+            }} className="reservation-sheet-grid">
+            <div style={{
               padding: 16,
               borderRadius: 10,
               background: colors.bg,
+              minWidth: 0,
             }}>
               <Info label="Alojamiento" value={nombreAlojamiento(reservaSeleccionada.alojamiento_id)} />
               <Info label="Habitación" value={nombreHabitacion(reservaSeleccionada.habitacion_id)} />
@@ -5245,7 +5263,9 @@ export default function Home() {
               </div>
             )}
 
-            <div style={{ display: "grid", gap: 9, marginTop: 28 }}>
+            </div>
+
+            <div style={{ display: "grid", gap: 9, marginTop: 10, gridColumn: "1 / -1", gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }} className="reservation-sheet-actions">
               {reservaSeleccionada.email_huesped && (
                 <button onClick={() => enviarResumenPorEmail(reservaSeleccionada)} style={primaryButton}>
                   ✉ Enviar resumen por email
@@ -5374,7 +5394,15 @@ export default function Home() {
         @media (min-width: 901px) {
           .mobile-topbar { display: none !important; }
         }
+        .reservation-sheet-actions button { min-height: 40px; }
+        @media (max-width: 1100px) {
+          .reservation-sheet-grid { grid-template-columns: 1fr 1fr !important; overflow-y: auto !important; }
+          .reservation-sheet-actions { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+        }
         @media (max-width: 760px) {
+          .reservation-sheet-grid { grid-template-columns: 1fr !important; overflow-y: auto !important; }
+          .reservation-sheet-actions { grid-template-columns: 1fr !important; }
+
           form > div { grid-template-columns: 1fr !important; }
           section { max-width: 100%; }
         }
