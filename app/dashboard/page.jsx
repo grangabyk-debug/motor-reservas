@@ -64,6 +64,8 @@ function nombreMes(fecha) {
 export default function Home() {
   const [user, setUser] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
+  const [rolReal, setRolReal] = useState("owner")
+  const [modoPruebaRol, setModoPruebaRol] = useState(null)
 
   const [alojamientos, setAlojamientos] = useState([])
   const [habitaciones, setHabitaciones] = useState([])
@@ -256,6 +258,9 @@ export default function Home() {
     }
 
     const propertyIds = (membershipsData || []).map((m) => m.property_id).filter(Boolean)
+
+    const rolDetectado = membershipsData?.[0]?.role || "owner"
+    setRolReal(rolDetectado)
 
     const [
       { data: propertiesData, error: propertiesError },
@@ -1448,6 +1453,50 @@ export default function Home() {
     return (<><Header titulo="Comunicaciones" subtitulo="Plantillas para acompañar al huésped antes, durante y después de la estadía" /><div style={{ padding: 30, display:"grid", gap:18 }}><section style={cardStyle}><div style={sectionHeader}><div><h2 style={{margin:0,fontSize:18}}>Automatizaciones preparadas</h2><div style={{color:colors.muted,fontSize:12,marginTop:4}}>La plataforma ya tiene las plantillas; el envío automático por email/WhatsApp se conecta en la próxima integración.</div></div><button onClick={()=>setVista("asistente")} style={secondaryButton}>✦ Ver asistente IA</button></div><div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:14,marginTop:18}}>{tipos.map(([key,label])=>{const texto=textoPlantillaComunicacion(key,proxima);return <div key={key} style={{border:`1px solid ${colors.border}`,borderRadius:10,padding:16}}><strong>{label}</strong><div style={{marginTop:10,padding:12,background:"#f8fafc",borderRadius:8,fontSize:12,lineHeight:1.5}}>{texto}</div><div style={{display:"flex",gap:8,marginTop:10}}><button onClick={()=>navigator.clipboard?.writeText(texto)} style={secondaryButton}>Copiar</button>{proxima?.email_huesped&&<button onClick={()=>enviarResumenPorEmail(proxima)} style={primaryButton}>Email</button>}</div></div>})}</div></section></div></>)
   }
 
+  const rolActivo = modoPruebaRol || rolReal
+
+  const permisosPorRol = {
+    owner: [
+      "dashboard", "reservas", "calendario", "housekeeping",
+      "bloqueos", "huespedes", "caja", "ventas", "comunicaciones",
+      "integraciones", "asistente", "configuracion",
+    ],
+    manager: [
+      "dashboard", "reservas", "calendario", "housekeeping",
+      "bloqueos", "huespedes", "caja", "ventas", "comunicaciones",
+      "asistente",
+    ],
+    reception: [
+      "dashboard", "reservas", "calendario", "housekeeping",
+      "huespedes", "comunicaciones", "asistente",
+    ],
+    housekeeping: [
+      "dashboard", "calendario", "housekeeping",
+    ],
+    admin: [
+      "dashboard", "reservas", "calendario", "huespedes",
+      "caja", "ventas", "comunicaciones", "asistente",
+    ],
+  }
+
+  const etiquetasRol = {
+    owner: "Propietario",
+    manager: "Gerente",
+    reception: "Recepción",
+    housekeeping: "Housekeeping",
+    admin: "Administración",
+  }
+
+  function puedeVer(id) {
+    return (permisosPorRol[rolActivo] || permisosPorRol.reception).includes(id)
+  }
+
+  useEffect(() => {
+    if (vista !== "dashboard" && !puedeVer(vista)) {
+      setVista("dashboard")
+    }
+  }, [rolActivo, vista])
+
   function Sidebar() {
     const items = [
       ["dashboard", "▦", "Inicio"],
@@ -1493,7 +1542,7 @@ export default function Home() {
 
         <div style={{ fontSize: 11, opacity: .55, padding: "0 12px 8px" }}>GESTIÓN</div>
 
-        {items.map(([id, icon, label]) => (
+        {items.filter(([id]) => puedeVer(id)).map(([id, icon, label]) => (
           <button
             key={id}
             onClick={() => {
@@ -1522,13 +1571,54 @@ export default function Home() {
           </button>
         ))}
 
+        {rolReal === "owner" && (
+          <div style={{
+            position: "absolute",
+            left: 14,
+            right: 14,
+            bottom: 52,
+            padding: 10,
+            borderRadius: 9,
+            background: "rgba(255,255,255,.08)",
+            border: "1px solid rgba(255,255,255,.12)",
+          }}>
+            <div style={{ fontSize: 9, opacity: .65, textTransform: "uppercase", letterSpacing: 1, marginBottom: 5 }}>
+              Modo prueba
+            </div>
+            <div style={{ fontSize: 11, marginBottom: 7 }}>
+              Simular: <strong>{etiquetasRol[rolActivo]}</strong>
+            </div>
+            <select
+              value={modoPruebaRol || ""}
+              onChange={(e) => setModoPruebaRol(e.target.value || null)}
+              style={{
+                width: "100%",
+                borderRadius: 6,
+                border: "1px solid rgba(255,255,255,.2)",
+                background: "#fff",
+                color: colors.text,
+                padding: "7px 8px",
+                fontSize: 11,
+              }}
+            >
+              <option value="">Mi rol real (Propietario)</option>
+              <option value="owner">Propietario</option>
+              <option value="manager">Gerente</option>
+              <option value="reception">Recepción</option>
+              <option value="housekeeping">Housekeeping</option>
+              <option value="admin">Administración</option>
+            </select>
+          </div>
+        )}
+
         <div style={{
           position: "absolute",
-          bottom: 22,
+          bottom: 18,
           left: 26,
           right: 26,
-          fontSize: 11,
+          fontSize: 10,
           opacity: .5,
+          textAlign: "center",
         }}>
           Habitación Llena · MVP
         </div>
@@ -2954,7 +3044,7 @@ export default function Home() {
               />
               Habitación Llena
             </div>
-            {["dashboard", "reservas", "calendario", "housekeeping", "bloqueos", "huespedes", "caja", "ventas", "comunicaciones", "integraciones", "asistente", "configuracion"].map((id) => (
+            {["dashboard", "reservas", "calendario", "housekeeping", "bloqueos", "huespedes", "caja", "ventas", "comunicaciones", "integraciones", "asistente", "configuracion"].filter((id) => puedeVer(id)).map((id) => (
               <button key={id} onClick={() => { setVista(id); setMenuAbierto(false) }} style={{
                 width: "100%",
                 padding: 13,
@@ -2985,6 +3075,36 @@ export default function Home() {
       )}
 
       <main style={{ marginLeft: 235, minHeight: "100vh" }}>
+        {modoPruebaRol && (
+          <div style={{
+            position: "sticky",
+            top: 0,
+            zIndex: 25,
+            padding: "8px 18px",
+            background: colors.yellowSoft,
+            borderBottom: `1px solid #f0d98a`,
+            color: colors.yellow,
+            fontSize: 12,
+            fontWeight: 700,
+            textAlign: "center",
+          }}>
+            MODO PRUEBA · Simulando permisos de {etiquetasRol[modoPruebaRol]}
+            <button
+              onClick={() => setModoPruebaRol(null)}
+              style={{
+                marginLeft: 10,
+                border: "none",
+                background: "transparent",
+                color: colors.yellow,
+                textDecoration: "underline",
+                fontWeight: 800,
+                cursor: "pointer",
+              }}
+            >
+              Volver a Propietario
+            </button>
+          </div>
+        )}
         {vista === "dashboard" && Dashboard()}
         {vista === "reservas" && Reservas()}
         {vista === "calendario" && CalendarioVista()}
