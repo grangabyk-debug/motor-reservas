@@ -3861,94 +3861,6 @@ export default function Home() {
     )
   }
 
-  function Reservas() {
-    return (
-      <>
-        <Header
-          titulo={modoEdicion ? "Editar reserva" : "Reservas"}
-          subtitulo={modoEdicion ? "Modificá los datos y guardá los cambios" : "Crear y administrar reservas"}
-        />
-
-        <div className="hl-reserva-form"><div style={{ padding: 30 }}>
-          <section style={cardStyle}>
-            <div style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 20,
-            }}>
-              <div>
-                <h2 style={{ margin: 0, fontSize: 18 }}>
-                  {modoEdicion ? "Editar reserva" : "Nueva reserva"}
-                </h2>
-                <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>
-                  Los datos se guardan directamente en el sistema.
-                </div>
-              </div>
-
-              {modoEdicion && (
-                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                  <button type="submit" form="form-reserva-principal" disabled={cargando} style={{ ...primaryButton, opacity: cargando ? .65 : 1 }}>
-                    {cargando ? "Guardando..." : "Guardar cambios"}
-                  </button>
-<button onClick={() => setVista("recepcion")} style={linkButton}>Ver todas</button>
-              </div>
-
-              <div style={{ display: "grid", gap: 10, marginTop: 18 }}>
-                {recientes.length === 0 ? (
-                  <div style={{ color: colors.muted, padding: 25, textAlign: "center" }}>
-                    Todavía no hay reservas.
-                  </div>
-                ) : recientes.map((r) => ReservaCard({ reserva: r }))}
-              </div>
-            </section>
-
-            <section style={{
-              background: colors.white,
-              border: `1px solid ${colors.border}`,
-              borderRadius: 12,
-              padding: 22,
-              height: "fit-content",
-            }}>
-              <h2 style={{ margin: 0, fontSize: 18 }}>Ocupación</h2>
-              <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>
-                Estado actual de las habitaciones
-              </div>
-
-              <div style={{ marginTop: 22 }}>
-                {habitacionesActivas.map((h) => {
-                  const ocupada = reservasHoy.some(
-                    (r) => String(r.habitacion_id) === String(h.id)
-                  )
-                  return (
-                    <div key={h.id} style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      padding: "12px 0",
-                      borderBottom: `1px solid ${colors.border}`,
-                    }}>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: 13 }}>{h.nombre}</div>
-                        <div style={{ color: colors.muted, fontSize: 11 }}>{nombreAlojamiento(h.alojamiento_id)}</div>
-                      </div>
-                      <span style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        color: ocupada ? colors.blue : colors.green,
-                      }}>
-                        {ocupada ? "Ocupada" : "Disponible"}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-            </section>
-          </div>
-        </div>
-      </>
-    )
-  }
 
   function Reservas() {
     return (
@@ -4035,6 +3947,42 @@ export default function Home() {
                 <Field label="Fecha de salida *">
                   <input required type="date" value={fechaSalida} onChange={(e) => setFechaSalida(e.target.value)} style={inputStyle} />
                 </Field>
+
+                {(() => {
+                  const q = calcularPresupuestoInicial()
+                  if (!q) return null
+                  return (
+                    <div style={{
+                      gridColumn: "1 / -1",
+                      marginTop: 2,
+                      padding: "14px 18px",
+                      borderRadius: 12,
+                      border: `1px solid ${colors.blue}`,
+                      background: colors.blueSoft,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 18,
+                    }}>
+                      <div>
+                        <div style={{ fontSize: 11, fontWeight: 900, color: colors.blue }}>PRESUPUESTO AUTOMÁTICO</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, marginTop: 4 }}>
+                          {q.habitacion.nombre} · {q.noches} {q.noches === 1 ? "noche" : "noches"}
+                        </div>
+                        <div style={{ fontSize: 11, color: colors.muted }}>
+                          ${q.precio.toLocaleString("es-AR")} por noche
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 11, color: colors.muted }}>Total estimado</div>
+                        <div style={{ fontSize: 27, fontWeight: 900, color: colors.blue }}>
+                          ${q.total.toLocaleString("es-AR")}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
+
 
                 <Field label="Nombre del huésped principal">
                   <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej. Juan Pérez" style={inputStyle} />
