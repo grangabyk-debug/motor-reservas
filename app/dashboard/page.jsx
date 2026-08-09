@@ -94,10 +94,6 @@ export default function Home() {
 
   const logoHabitacionLlena = "/logo-habitacion-llena.png"
 
-  const nombreAlojamientoActivo = alojamientos.find(
-    (a) => String(a.id) === String(alojamientoSeleccionado)
-  )?.nombre || alojamientos[0]?.nombre || "tu alojamiento"
-
   function saludoSegunHorario() {
     const hora = new Date().getHours()
     if (hora >= 6 && hora < 13) return "Buenos días"
@@ -122,6 +118,10 @@ export default function Home() {
   const [noShow, setNoShow] = useState(false)
 
   const [alojamientoSeleccionado, setAlojamientoSeleccionado] = useState("")
+
+  const nombreAlojamientoActivo = alojamientos.find(
+    (a) => String(a.id) === String(alojamientoSeleccionado)
+  )?.nombre || alojamientos[0]?.nombre || "tu alojamiento"
   const [habitacionSeleccionada, setHabitacionSeleccionada] = useState("")
   const [nombre, setNombre] = useState("")
   const [dni, setDni] = useState("")
