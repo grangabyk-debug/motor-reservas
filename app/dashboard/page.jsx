@@ -157,6 +157,8 @@ export default function Home() {
   const [estado, setEstado] = useState("pendiente")
   const [notas, setNotas] = useState("")
   const [vehiculos, setVehiculos] = useState("0")
+  const [tipoVehiculo, setTipoVehiculo] = useState("")
+  const [dominioVehiculo, setDominioVehiculo] = useState("")
   const [extraDescripcion, setExtraDescripcion] = useState("")
   const [extraReserva, setExtraReserva] = useState("0")
   const [descuentoTipo, setDescuentoTipo] = useState("monto")
@@ -663,6 +665,8 @@ export default function Home() {
     setEstado("pendiente")
     setNotas("")
     setVehiculos("0")
+    setTipoVehiculo("")
+    setDominioVehiculo("")
     setExtraDescripcion("")
     setExtraReserva("0")
     setDescuentoTipo("monto")
@@ -722,6 +726,8 @@ export default function Home() {
     setLateCheckout(Boolean(reserva.late_checkout))
     setNotas(reserva.notas || "")
     setVehiculos(String(reserva.vehiculos ?? reserva.cochera_cantidad ?? 0))
+    setTipoVehiculo(reserva.tipo_vehiculo || "")
+    setDominioVehiculo(reserva.dominio_vehiculo || "")
     setExtraDescripcion(reserva.extra_descripcion || "")
     setExtraReserva(String(reserva.extra ?? reserva.extras ?? 0))
     setDescuentoTipo(reserva.descuento_tipo || "monto")
@@ -3400,8 +3406,8 @@ export default function Home() {
                   type="number"
                   min="0"
                   max="9"
-                  value={cantidadVehiculos}
-                  onChange={(e) => setCantidadVehiculos(e.target.value)}
+                  value={vehiculos}
+                  onChange={(e) => setVehiculos(e.target.value)}
                   style={{ ...inputStyle, width: "90px", boxSizing: "border-box" }}
                 />
               </Field>
