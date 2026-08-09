@@ -92,6 +92,19 @@ export default function Home() {
     },
   })
 
+  const logoHabitacionLlena = "/logo-habitacion-llena.png"
+
+  const nombreAlojamientoActivo = alojamientos.find(
+    (a) => String(a.id) === String(alojamientoSeleccionado)
+  )?.nombre || alojamientos[0]?.nombre || "tu alojamiento"
+
+  function saludoSegunHorario() {
+    const hora = new Date().getHours()
+    if (hora >= 6 && hora < 13) return "Buenos días"
+    if (hora >= 13 && hora < 20) return "Buenas tardes"
+    return "Buenas noches"
+  }
+
   const [assistantMessages, setAssistantMessages] = useState([
     {
       role: "assistant",
@@ -993,9 +1006,11 @@ export default function Home() {
         <div style={{ padding: "6px 12px 30px" }}>
           <div style={{ fontSize: 10, letterSpacing: 2.5, opacity: .75 }}>PLATAFORMA HOTELERA</div>
           <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 9 }}>
-            {config.logo && (
-              <img src={config.logo} alt="" style={{ width: 34, height: 34, objectFit: "contain", borderRadius: 7, background: "#fff" }} />
-            )}
+            <img
+              src={config.logo || logoHabitacionLlena}
+              alt="Habitación Llena"
+              style={{ width: 38, height: 38, objectFit: "contain", borderRadius: 8, background: "#fff" }}
+            />
             <div style={{ fontSize: 22, fontWeight: 800 }}>{config.nombreMarca || "Habitación Llena"}</div>
           </div>
         </div>
@@ -1729,10 +1744,28 @@ export default function Home() {
             padding: 28,
             marginBottom: 22,
           }}>
-            <div style={{ fontSize: 12, opacity: .75, letterSpacing: 1 }}>HABITACIÓN LLENA</div>
-            <div style={{ fontSize: 28, fontWeight: 800, marginTop: 8 }}>Buen día 👋</div>
-            <div style={{ opacity: .8, marginTop: 7 }}>
-              Gestioná reservas y ocupación desde un solo lugar.
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <img
+                src={config.logo || logoHabitacionLlena}
+                alt="Habitación Llena"
+                style={{
+                  width: 64,
+                  height: 64,
+                  objectFit: "contain",
+                  borderRadius: 12,
+                  background: "#fff",
+                  flexShrink: 0,
+                }}
+              />
+              <div>
+                <div style={{ fontSize: 11, opacity: .75, letterSpacing: 2 }}>HABITACIÓN LLENA</div>
+                <div style={{ fontSize: 28, fontWeight: 800, marginTop: 6 }}>
+                  {saludoSegunHorario()}, {nombreAlojamientoActivo} 👋
+                </div>
+                <div style={{ opacity: .8, marginTop: 7 }}>
+                  Gestioná reservas y ocupación desde un solo lugar.
+                </div>
+              </div>
             </div>
           </div>
 
@@ -2286,7 +2319,14 @@ export default function Home() {
           background: "transparent",
           fontSize: 23,
         }}>☰</button>
-        <strong>{config.nombreMarca || "Habitación Llena"}</strong>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <img
+            src={config.logo || logoHabitacionLlena}
+            alt="Habitación Llena"
+            style={{ width: 30, height: 30, objectFit: "contain", borderRadius: 6, background: "#fff" }}
+          />
+          <strong>{config.nombreMarca || "Habitación Llena"}</strong>
+        </div>
         <button onClick={() => { limpiarFormulario(); setVista("reservas") }} style={{
           border: "none",
           background: colors.blue,
@@ -2312,7 +2352,12 @@ export default function Home() {
             padding: 15,
             boxSizing: "border-box",
           }}>
-            <div style={{ fontWeight: 800, fontSize: 20, padding: 12, marginBottom: 20 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, fontWeight: 800, fontSize: 20, padding: 12, marginBottom: 20 }}>
+              <img
+                src={config.logo || logoHabitacionLlena}
+                alt="Habitación Llena"
+                style={{ width: 34, height: 34, objectFit: "contain", borderRadius: 7, background: "#fff" }}
+              />
               Habitación Llena
             </div>
             {["dashboard", "reservas", "calendario", "ventas", "integraciones", "asistente", "configuracion"].map((id) => (
