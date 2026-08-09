@@ -82,6 +82,13 @@ export default function Home() {
     airbnbUrl: "",
     despegarUrl: "",
     webUrl: "",
+    tiposHabitacion: [
+      { id: "simple", nombre: "Simple" },
+      { id: "doble", nombre: "Doble" },
+      { id: "triple", nombre: "Triple" },
+      { id: "cuadruple", nombre: "Cuádruple" },
+    ],
+    tarifasPorTipo: { simple: 0, doble: 0, triple: 0, cuadruple: 0 },
     tarifas: {
       simple: 0,
       doble: 0,
@@ -177,6 +184,9 @@ export default function Home() {
   const [nuevaHabitacion, setNuevaHabitacion] = useState("")
   const [nuevoTipo, setNuevoTipo] = useState("")
   const [nuevoAlojamientoHabitacion, setNuevoAlojamientoHabitacion] = useState("")
+  const [nuevoTipoTarifa, setNuevoTipoTarifa] = useState("")
+  const [nuevoPrecioTarifa, setNuevoPrecioTarifa] = useState("")
+  const [tipoTarifaEditando, setTipoTarifaEditando] = useState(null)
   const [habitacionEditando, setHabitacionEditando] = useState(null)
 
   const diasCalendario = useMemo(
@@ -216,10 +226,28 @@ export default function Home() {
           const guardada = localStorage.getItem(claveConfig)
 
           if (guardada) {
-            setConfig((actual) => ({
-              ...actual,
-              ...JSON.parse(guardada),
-            }))
+            const guardadaConfig = JSON.parse(guardada)
+            setConfig((actual) => {
+              const base = { ...actual, ...guardadaConfig }
+              const defaults = actual.tiposHabitacion || [
+                { id: "simple", nombre: "Simple" },
+                { id: "doble", nombre: "Doble" },
+                { id: "triple", nombre: "Triple" },
+                { id: "cuadruple", nombre: "Cuádruple" },
+              ]
+              const tipos = Array.isArray(guardadaConfig.tiposHabitacion) && guardadaConfig.tiposHabitacion.length
+                ? guardadaConfig.tiposHabitacion
+                : defaults
+              const legacy = guardadaConfig.tarifas || {}
+              const savedRates = guardadaConfig.tarifasPorTipo || {}
+              const tarifasPorTipo = {}
+              tipos.forEach((tipo) => {
+                const id = String(tipo.id || tipo.nombre || "").trim()
+                const clave = id.toLowerCase()
+                if (clave) tarifasPorTipo[clave] = savedRates[id] ?? savedRates[clave] ?? legacy[clave] ?? 0
+              })
+              return { ...base, tiposHabitacion: tipos, tarifasPorTipo }
+            })
           }
         } catch (error) {
           console.error("No se pudo cargar la configuración local:", error)
@@ -289,10 +317,10 @@ export default function Home() {
     if (bloqueosError) console.warn("No se pudieron cargar los bloqueos. Ejecutá la migración PMS.", bloqueosError)
     if (pagosError) console.warn("No se pudieron cargar los pagos. Ejecutá la migración PMS.", pagosError)
 
-    // La interfaz actual todavía trabaja con las tablas antiguas
-    // alojamientos/habitaciones/reservas. Para que owner y reception
-    // puedan usar la misma interfaz, filtramos esas tablas según los
-    // alojamientos a los que el usuario tiene acceso.
+    // Compatibilidad entre el PMS legacy y el modelo nuevo (properties/units/reservations).
+    // Antes el dashboard usaba el modelo nuevo solo como "fallback" cuando no había
+    // datos legacy. Eso hacía que, si existía хотя sea una reserva legacy, las reservas
+    // nuevas no aparecieran en el calendario. Acá unificamos ambos modelos.
     const propiedadesAccesibles = propertiesData || []
     const nombresAccesibles = new Set(
       propiedadesAccesibles
@@ -305,33 +333,48 @@ export default function Home() {
       return nombresAccesibles.has(nombre) || String(a.user_id) === String(user.id)
     })
 
+    const alojamientoPorNombre = new Map(
+      alojamientosData.map((a) => [String(a.nombre || "").trim().toLowerCase(), a])
+    )
+
+    const propertyToAlojamiento = new Map()
+    propiedadesAccesibles.forEach((p) => {
+      const nombre = String(p.name || "").trim().toLowerCase()
+      const legacy = alojamientoPorNombre.get(nombre)
+      propertyToAlojamiento.set(String(p.id), legacy ? legacy.id : p.id)
+    })
+
     const alojamientoIds = new Set(alojamientosData.map((a) => String(a.id)))
 
-    const habitacionesData = (habitacionesLegacy || []).filter((h) =>
-      alojamientoIds.has(String(h.alojamiento_id))
-    )
-
-    const reservasData = (reservasLegacy || []).filter((r) =>
-      alojamientoIds.has(String(r.alojamiento_id))
-    )
-
-    // Si todavía no existe la fila legacy correspondiente, usamos
-    // properties/units/reservations como respaldo para que el acceso
-    // nuevo siga funcionando.
-    let alojamientosFinal = alojamientosData
-    let habitacionesFinal = habitacionesData
-    let reservasFinal = reservasData
-
+    let alojamientosFinal = [...alojamientosData]
     if (!alojamientosFinal.length && propiedadesAccesibles.length) {
       alojamientosFinal = propiedadesAccesibles.map((p) => ({
         id: p.id,
         nombre: p.name,
         user_id: p.owner_id,
       }))
+    } else {
+      // Si existe una property nueva que todavía no tiene fila legacy equivalente,
+      // la agregamos para que sus unidades/reservas también tengan nombre visible.
+      propiedadesAccesibles.forEach((p) => {
+        const existe = alojamientosFinal.some((a) => String(a.id) === String(p.id)) ||
+          alojamientosFinal.some((a) => String(a.nombre || "").trim().toLowerCase() === String(p.name || "").trim().toLowerCase())
+        if (!existe) {
+          alojamientosFinal.push({ id: p.id, nombre: p.name, user_id: p.owner_id })
+        }
+      })
     }
 
-    if (!habitacionesFinal.length && propertyIds.length) {
-      const { data: unitsData, error: unitsError } = await supabase
+    const habitacionesData = (habitacionesLegacy || []).filter((h) =>
+      alojamientoIds.has(String(h.alojamiento_id))
+    )
+
+    // Cargamos SIEMPRE units cuando hay properties accesibles. Si una unit nueva
+    // representa una habitación legacy con el mismo nombre dentro del mismo alojamiento,
+    // la vinculamos al id legacy para que las reservas de ambos modelos caigan en la misma fila.
+    let unitsData = []
+    if (propertyIds.length) {
+      const { data, error: unitsError } = await supabase
         .from("units")
         .select("*")
         .in("property_id", propertyIds)
@@ -340,21 +383,57 @@ export default function Home() {
       if (unitsError) {
         console.error("No se pudieron cargar las unidades:", unitsError)
       } else {
-        habitacionesFinal = (unitsData || []).map((u) => ({
-          id: u.id,
-          nombre: u.name,
-          tipo: "",
-          capacidad: u.capacity,
-          precio: u.price,
-          activa: u.active !== false,
-          alojamiento_id: u.property_id,
-          user_id: user.id,
-          estado: "libre",
-        }))
+        unitsData = data || []
       }
     }
 
-    if (!reservasFinal.length && propertyIds.length) {
+    const habitacionesFinal = [...habitacionesData]
+    const unitToHabitacion = new Map()
+
+    unitsData.forEach((u) => {
+      const alojamientoId = propertyToAlojamiento.get(String(u.property_id)) || u.property_id
+      const nombreUnidad = String(u.name || "").trim().toLowerCase()
+      const legacy = habitacionesData.find((h) =>
+        String(h.alojamiento_id) === String(alojamientoId) &&
+        String(h.nombre || "").trim().toLowerCase() === nombreUnidad
+      )
+
+      if (legacy) {
+        unitToHabitacion.set(String(u.id), legacy.id)
+        return
+      }
+
+      const yaAgregada = habitacionesFinal.some((h) =>
+        String(h.id) === String(u.id) ||
+        (String(h.alojamiento_id) === String(alojamientoId) && String(h.nombre || "").trim().toLowerCase() === nombreUnidad)
+      )
+
+      if (!yaAgregada) {
+        habitacionesFinal.push({
+          id: u.id,
+          nombre: u.name,
+          tipo: u.type || "",
+          capacidad: u.capacity,
+          precio: u.price,
+          activa: u.active !== false,
+          alojamiento_id: alojamientoId,
+          user_id: user.id,
+          estado: "libre",
+        })
+      }
+    })
+
+    const habitacionesIdsAccesibles = new Set(habitacionesFinal.map((h) => String(h.id)))
+
+    // Reservas legacy.
+    const reservasLegacyNormalizadas = (reservasData || []).map((r) => ({
+      ...r,
+      origen_reserva: "legacy",
+    }))
+
+    // Reservas nuevas. Las cargamos aunque existan reservas legacy.
+    let reservasNuevasNormalizadas = []
+    if (propertyIds.length) {
       const { data: reservationsData, error: reservationsError } = await supabase
         .from("reservations")
         .select("*")
@@ -364,26 +443,59 @@ export default function Home() {
       if (reservationsError) {
         console.error("No se pudieron cargar las reservas nuevas:", reservationsError)
       } else {
-        reservasFinal = (reservationsData || []).map((r) => ({
+        reservasNuevasNormalizadas = (reservationsData || []).map((r) => ({
           id: r.id,
-          alojamiento_id: r.property_id,
-          habitacion_id: r.unit_id,
+          alojamiento_id: propertyToAlojamiento.get(String(r.property_id)) || r.property_id,
+          habitacion_id: unitToHabitacion.get(String(r.unit_id)) || r.unit_id,
           nombre_huesped: r.guest_name,
+          dni_huesped: r.guest_document || "",
           email_huesped: r.guest_email,
           telefono_huesped: r.guest_phone,
           fecha_entrada: r.check_in,
           fecha_salida: r.check_out,
           cantidad_huespedes: r.guests || 1,
           precio_total: Number(r.total || 0),
+          numero_reserva: r.reservation_number || r.code || `RS-${String(r.id).slice(0, 8)}`,
           estado:
             r.status === "confirmed" ? "confirmada" :
             r.status === "cancelled" ? "cancelada" :
             r.status === "completed" ? "finalizada" :
             r.status || "pendiente",
           no_show: false,
+          origen_reserva: "reservations",
+          reservation_source_id: r.id,
         }))
       }
     }
+
+    // Evitamos duplicar una misma reserva si existe en ambos modelos. La prioridad
+    // visual es legacy cuando coinciden número + huésped + fechas + habitación.
+    const clavesLegacy = new Set(
+      reservasLegacyNormalizadas.map((r) => [
+        String(r.numero_reserva || "").trim().toLowerCase(),
+        String(r.nombre_huesped || "").trim().toLowerCase(),
+        String(r.fecha_entrada || ""),
+        String(r.fecha_salida || ""),
+        String(r.habitacion_id || ""),
+      ].join("|"))
+    )
+
+    const reservasFinal = [
+      ...reservasLegacyNormalizadas,
+      ...reservasNuevasNormalizadas.filter((r) => {
+        const clave = [
+          String(r.numero_reserva || "").trim().toLowerCase(),
+          String(r.nombre_huesped || "").trim().toLowerCase(),
+          String(r.fecha_entrada || ""),
+          String(r.fecha_salida || ""),
+          String(r.habitacion_id || ""),
+        ].join("|")
+        return !clavesLegacy.has(clave)
+      }),
+    ].filter((r) => {
+      if (!r.habitacion_id) return false
+      return habitacionesIdsAccesibles.has(String(r.habitacion_id))
+    })
 
     setAlojamientos(alojamientosFinal)
     setHabitaciones(habitacionesFinal)
@@ -711,10 +823,77 @@ export default function Home() {
     return "otro"
   }
 
+  function normalizarNombreTipo(tipo) {
+    return String(tipo || "")
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
+  }
+
+  function tiposHabitacionDisponibles() {
+    const configurados = Array.isArray(config.tiposHabitacion) ? config.tiposHabitacion : []
+    const usados = habitaciones.map((h) => String(h.tipo || "").trim()).filter(Boolean)
+    const resultado = []
+    const vistos = new Set()
+    ;[...configurados.map((t) => t.nombre || t), ...usados].forEach((nombre) => {
+      const texto = String(nombre || "").trim()
+      const clave = normalizarNombreTipo(texto)
+      if (!texto || !clave || vistos.has(clave)) return
+      vistos.add(clave)
+      const configurado = configurados.find((t) => normalizarNombreTipo(t.nombre || t) === clave)
+      resultado.push({ id: configurado?.id || clave, nombre: configurado?.nombre || texto })
+    })
+    return resultado
+  }
+
+  function tarifaDeTipo(nombreTipo) {
+    const clave = normalizarNombreTipo(nombreTipo)
+    if (config.tarifasPorTipo?.[clave] !== undefined) return Number(config.tarifasPorTipo[clave]) || 0
+    return Number(config.tarifas?.[claveTipoHabitacion(nombreTipo)] || 0)
+  }
+
   function tarifaDeHabitacion(habitacionId) {
     const habitacion = habitaciones.find((h) => String(h.id) === String(habitacionId))
-    const clave = claveTipoHabitacion(habitacion?.tipo)
-    return Number(config.tarifas?.[clave] || 0)
+    return tarifaDeTipo(habitacion?.tipo)
+  }
+
+  function agregarTipoTarifa() {
+    const nombreTipo = nuevoTipoTarifa.trim()
+    const id = normalizarNombreTipo(nombreTipo)
+    if (!nombreTipo || !id) return
+    if (tiposHabitacionDisponibles().some((t) => normalizarNombreTipo(t.nombre) === id)) {
+      alert("Ese tipo de habitación ya existe.")
+      return
+    }
+    setConfig((actual) => ({
+      ...actual,
+      tiposHabitacion: [...(actual.tiposHabitacion || []), { id, nombre: nombreTipo }],
+      tarifasPorTipo: { ...(actual.tarifasPorTipo || {}), [id]: Number(nuevoPrecioTarifa) || 0 },
+    }))
+    setNuevoTipoTarifa("")
+    setNuevoPrecioTarifa("")
+  }
+
+  function cambiarTarifaTipo(tipo, precio) {
+    const clave = normalizarNombreTipo(tipo.nombre || tipo)
+    setConfig((actual) => ({ ...actual, tarifasPorTipo: { ...(actual.tarifasPorTipo || {}), [clave]: precio } }))
+  }
+
+  function eliminarTipoTarifa(tipo) {
+    const clave = normalizarNombreTipo(tipo.nombre || tipo)
+    if (habitaciones.some((h) => normalizarNombreTipo(h.tipo) === clave)) {
+      alert(`No podés eliminar "${tipo.nombre}" porque hay habitaciones que usan este tipo.`)
+      return
+    }
+    if (!confirm(`¿Eliminar el tipo "${tipo.nombre}"?`)) return
+    setConfig((actual) => ({
+      ...actual,
+      tiposHabitacion: (actual.tiposHabitacion || []).filter((t) => normalizarNombreTipo(t.nombre || t) !== clave),
+      tarifasPorTipo: Object.fromEntries(Object.entries(actual.tarifasPorTipo || {}).filter(([key]) => key !== clave)),
+    }))
   }
 
   function calcularRecargoServicio(base, configuracion) {
@@ -1559,11 +1738,19 @@ export default function Home() {
           : r
       )))
 
-      const { error } = await supabase.from("reservas").update({
-        habitacion_id: nuevaHabitacionId,
-        fecha_entrada: nuevaEntrada,
-        fecha_salida: nuevaSalida,
-      }).eq("id", reserva.id)
+      const esReservaNueva = reserva.origen_reserva === "reservations"
+      const resultado = esReservaNueva
+        ? await supabase.from("reservations").update({
+            unit_id: nuevaHabitacionId,
+            check_in: nuevaEntrada,
+            check_out: nuevaSalida,
+          }).eq("id", reserva.reservation_source_id || reserva.id)
+        : await supabase.from("reservas").update({
+            habitacion_id: nuevaHabitacionId,
+            fecha_entrada: nuevaEntrada,
+            fecha_salida: nuevaSalida,
+          }).eq("id", reserva.id)
+      const error = resultado.error
 
       if (error) {
         console.error(error)
@@ -2628,50 +2815,10 @@ export default function Home() {
               </div>
             )}
 
-            <h2 style={{ margin: "30px 0 18px", fontSize: 18 }}>Tarifas y cargos</h2>
-            <div style={{ color: colors.muted, fontSize: 12, marginBottom: 16 }}>
-              Configurá el precio por noche y los cargos especiales. Early check-in y late check-out pueden ser un monto fijo o un porcentaje de la tarifa de la primera noche.
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
-              {[["simple", "Simple"], ["doble", "Doble"], ["triple", "Triple"], ["cuadruple", "Cuádruple"], ["otro", "Otro"], ["cochera", "Cochera / vehículo"]].map(([clave, label]) => (
-                <Field key={clave} label={label}>
-                  <input type="number" min="0" step="0.01" value={config.tarifas?.[clave] ?? 0}
-                    onChange={(e) => setConfig({ ...config, tarifas: { ...config.tarifas, [clave]: e.target.value } })}
-                    placeholder="0" style={inputStyle} />
-                </Field>
-              ))}
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 18 }}>
-              <div style={{ border: `1px solid ${colors.border}`, borderRadius: 10, padding: 14 }}>
-                <strong style={{ fontSize: 13 }}>Early check-in</strong>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 10 }}>
-                  <select value={config.earlyCheckin?.tipo || "monto"} onChange={e => setConfig({ ...config, earlyCheckin: { ...config.earlyCheckin, tipo: e.target.value } })} style={inputStyle}>
-                    <option value="monto">Monto fijo</option>
-                    <option value="porcentaje">Porcentaje</option>
-                  </select>
-                  <input type="number" min="0" step="0.01" value={config.earlyCheckin?.valor ?? 0} onChange={e => setConfig({ ...config, earlyCheckin: { ...config.earlyCheckin, valor: e.target.value } })} style={inputStyle} />
-                </div>
-              </div>
-              <div style={{ border: `1px solid ${colors.border}`, borderRadius: 10, padding: 14 }}>
-                <strong style={{ fontSize: 13 }}>Late check-out</strong>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 10 }}>
-                  <select value={config.lateCheckout?.tipo || "monto"} onChange={e => setConfig({ ...config, lateCheckout: { ...config.lateCheckout, tipo: e.target.value } })} style={inputStyle}>
-                    <option value="monto">Monto fijo</option>
-                    <option value="porcentaje">Porcentaje</option>
-                  </select>
-                  <input type="number" min="0" step="0.01" value={config.lateCheckout?.valor ?? 0} onChange={e => setConfig({ ...config, lateCheckout: { ...config.lateCheckout, valor: e.target.value } })} style={inputStyle} />
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 18 }}>
-              <Field label="Tipo de cambio USD">
-                <input type="number" min="0.01" step="0.01" value={config.tipoCambioUSD ?? 1} onChange={e => setConfig({ ...config, tipoCambioUSD: e.target.value })} style={inputStyle} />
-              </Field>
-              <div style={{ padding: 12, background: colors.blueSoft, borderRadius: 9, fontSize: 12, color: colors.navyDark }}>
-                Se usa como referencia cuando una reserva se cobra en dólares. También podés cambiarlo individualmente en cada reserva.
+            <div style={{ marginTop: 28, padding: 16, borderRadius: 12, background: colors.blueSoft, border: `1px solid #cfe0f7`, color: colors.navyDark }}>
+              <strong>Tarifas y tipos de habitación</strong>
+              <div style={{ fontSize: 12, lineHeight: 1.5, marginTop: 5 }}>
+                Se administran desde <strong>Configuración → Habitaciones</strong>, donde cada tipo tiene su precio por noche.
               </div>
             </div>
 
@@ -3313,7 +3460,10 @@ export default function Home() {
                 gap: 10,
               }}>
                 <input value={nuevaHabitacion} onChange={(e) => setNuevaHabitacion(e.target.value)} placeholder="Nombre / número" style={inputStyle} />
-                <input value={nuevoTipo} onChange={(e) => setNuevoTipo(e.target.value)} placeholder="Tipo (ej. Doble)" style={inputStyle} />
+                <select value={nuevoTipo} onChange={(e) => setNuevoTipo(e.target.value)} style={inputStyle}>
+                  <option value="">Tipo de habitación</option>
+                  {tiposHabitacionDisponibles().map((tipo) => <option key={tipo.id} value={tipo.nombre}>{tipo.nombre}</option>)}
+                </select>
                 <select value={nuevoAlojamientoHabitacion} onChange={(e) => setNuevoAlojamientoHabitacion(e.target.value)} style={inputStyle}>
                   <option value="">Alojamiento</option>
                   {alojamientos.map((a) => <option key={a.id} value={a.id}>{a.nombre}</option>)}
@@ -3340,12 +3490,14 @@ export default function Home() {
                     placeholder="Nombre / número"
                     style={inputStyle}
                   />
-                  <input
+                  <select
                     value={habitacionEditando.tipo}
                     onChange={(e) => setHabitacionEditando({ ...habitacionEditando, tipo: e.target.value })}
-                    placeholder="Tipo"
                     style={inputStyle}
-                  />
+                  >
+                    <option value="">Tipo de habitación</option>
+                    {tiposHabitacionDisponibles().map((tipo) => <option key={tipo.id} value={tipo.nombre}>{tipo.nombre}</option>)}
+                  </select>
                   <select
                     value={habitacionEditando.alojamiento_id}
                     onChange={(e) => setHabitacionEditando({ ...habitacionEditando, alojamiento_id: e.target.value })}
@@ -3359,6 +3511,67 @@ export default function Home() {
                 </div>
               </form>
             )}
+
+            <section style={{ marginBottom: 20, padding: 18, border: `1px solid ${colors.border}`, borderRadius: 14, background: "#fbfdff" }}>
+              <h3 style={{ margin: 0, fontSize: 16 }}>Tipos y tarifas</h3>
+              <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>
+                Los tipos que aparecen acá son los que después podés elegir en cada habitación.
+              </div>
+              <div style={{ display: "grid", gap: 8, marginTop: 14 }}>
+                {tiposHabitacionDisponibles().map((tipo) => {
+                  const clave = normalizarNombreTipo(tipo.nombre)
+                  const precio = config.tarifasPorTipo?.[clave] ?? 0
+                  const editando = tipoTarifaEditando === clave
+                  return (
+                    <div key={tipo.id} style={{ display: "grid", gridTemplateColumns: "1fr 180px auto", gap: 10, alignItems: "center", padding: 10, border: `1px solid ${colors.border}`, borderRadius: 10, background: "#fff" }}>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: 13 }}>{tipo.nombre}</div>
+                        <div style={{ color: colors.muted, fontSize: 11, marginTop: 2 }}>
+                          {habitaciones.filter((h) => normalizarNombreTipo(h.tipo) === clave).length} habitación(es)
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ color: colors.muted, fontSize: 10, marginBottom: 4 }}>PRECIO POR NOCHE</div>
+                        {editando ? (
+                          <input autoFocus type="number" min="0" step="0.01" value={precio} onChange={(e) => cambiarTarifaTipo(tipo, e.target.value)} style={inputStyle} />
+                        ) : <div style={{ fontWeight: 800 }}>${Number(precio || 0).toLocaleString("es-AR")}</div>}
+                      </div>
+                      <div style={{ display: "flex", gap: 7 }}>
+                        <button type="button" onClick={() => setTipoTarifaEditando(editando ? null : clave)} style={secondaryButton}>{editando ? "Listo" : "Editar precio"}</button>
+                        <button type="button" onClick={() => eliminarTipoTarifa(tipo)} style={{ ...secondaryButton, color: colors.red, borderColor: "#f2caca" }}>Eliminar</button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 180px auto", gap: 10, paddingTop: 12, borderTop: `1px solid ${colors.border}` }}>
+                <input value={nuevoTipoTarifa} onChange={(e) => setNuevoTipoTarifa(e.target.value)} placeholder="Nuevo tipo (ej. Suite)" style={inputStyle} />
+                <input type="number" min="0" step="0.01" value={nuevoPrecioTarifa} onChange={(e) => setNuevoPrecioTarifa(e.target.value)} placeholder="Precio por noche" style={inputStyle} />
+                <button type="button" onClick={agregarTipoTarifa} style={primaryButton}>+ Agregar tipo</button>
+              </div>
+            </section>
+
+            <section style={{ marginBottom: 20, padding: 18, border: `1px solid ${colors.border}`, borderRadius: 14, background: "#fff" }}>
+              <h3 style={{ margin: 0, fontSize: 16 }}>Cargos especiales</h3>
+              <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>Cochera, early check-in y late check-out.</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginTop: 14 }}>
+                <Field label="Cochera / vehículo por noche">
+                  <input type="number" min="0" step="0.01" value={config.tarifas?.cochera ?? 0} onChange={(e) => setConfig({ ...config, tarifas: { ...config.tarifas, cochera: e.target.value } })} style={inputStyle} />
+                </Field>
+                <Field label="Early check-in">
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    <select value={config.earlyCheckin?.tipo || "monto"} onChange={e => setConfig({ ...config, earlyCheckin: { ...config.earlyCheckin, tipo: e.target.value } })} style={inputStyle}><option value="monto">Monto fijo</option><option value="porcentaje">Porcentaje</option></select>
+                    <input type="number" min="0" step="0.01" value={config.earlyCheckin?.valor ?? 0} onChange={e => setConfig({ ...config, earlyCheckin: { ...config.earlyCheckin, valor: e.target.value } })} style={inputStyle} />
+                  </div>
+                </Field>
+                <Field label="Late check-out">
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    <select value={config.lateCheckout?.tipo || "monto"} onChange={e => setConfig({ ...config, lateCheckout: { ...config.lateCheckout, tipo: e.target.value } })} style={inputStyle}><option value="monto">Monto fijo</option><option value="porcentaje">Porcentaje</option></select>
+                    <input type="number" min="0" step="0.01" value={config.lateCheckout?.valor ?? 0} onChange={e => setConfig({ ...config, lateCheckout: { ...config.lateCheckout, valor: e.target.value } })} style={inputStyle} />
+                  </div>
+                </Field>
+              </div>
+            </section>
 
             <div style={{ display: "grid", gap: 10 }}>
               {habitaciones.map((h) => (
