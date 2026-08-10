@@ -1,489 +1,77 @@
 import Link from "next/link"
 
 const faqs = [
-  {
-    q: "¿Qué es Habitación Llena?",
-    a: "Es una plataforma de gestión para alojamientos independientes. Centraliza reservas, calendario, habitaciones, huéspedes, operación diaria y la información que necesitás para manejar tu alojamiento desde un solo lugar.",
-  },
-  {
-    q: "¿Para qué tipo de alojamiento está pensado?",
-    a: "Está pensado especialmente para hosterías, cabañas, posadas, hoteles pequeños, complejos turísticos y otros alojamientos independientes que necesitan ordenar su operación sin meterse en un sistema enorme y difícil de usar.",
-  },
-  {
-    q: "¿Pueden usarlo varias personas del equipo?",
-    a: "Sí. Habitación Llena contempla usuarios con distintos roles, para que cada persona pueda acceder a las funciones que necesita según su tarea.",
-  },
-  {
-    q: "¿Puedo usarlo desde el celular?",
-    a: "Sí. La plataforma está pensada para funcionar desde navegador y adaptarse a pantallas chicas, para que puedas consultar la operación aunque no estés frente a una computadora.",
-  },
-  {
-    q: "¿Puedo gestionar reservas y habitaciones desde el mismo lugar?",
-    a: "Sí. El sistema reúne la información de las reservas y las habitaciones para que recepción y administración tengan una visión más clara de lo que está pasando en el alojamiento.",
-  },
-  {
-    q: "¿Necesito saber de tecnología para usarlo?",
-    a: "No. La idea de Habitación Llena es justamente simplificar la gestión. La configuración está pensada para que un alojamiento pequeño pueda empezar sin una implementación técnica complicada.",
-  },
-  {
-    q: "¿Qué pasa con mis reservas actuales?",
-    a: "Podés comenzar cargando tus reservas en el sistema y, a medida que avancemos con nuevas herramientas de importación, la puesta en marcha será cada vez más simple.",
-  },
-  {
-    q: "¿Tiene Channel Manager y conexión con Booking.com y Airbnb?",
-    a: "Estamos incorporando integraciones y herramientas de distribución progresivamente. Si necesitás una conexión específica, podés consultarnos antes de contratar para confirmar si está disponible.",
-  },
-  {
-    q: "¿Tiene motor de reservas para recibir reservas directas?",
-    a: "La plataforma está evolucionando hacia una solución cada vez más completa para reservas directas. Las funciones disponibles y las próximas incorporaciones se comunicarán claramente para que sepas qué incluye cada etapa.",
-  },
-  {
-    q: "¿Tiene housekeeping?",
-    a: "Sí. Habitación Llena contempla la operación de housekeeping y el seguimiento del estado de las habitaciones, para que recepción y limpieza puedan trabajar con una misma información.",
-  },
-  {
-    q: "¿Hay una prueba gratuita?",
-    a: "Sí. La propuesta actual es ofrecer 14 días de prueba para que puedas cargar tu alojamiento, conocer la plataforma y comprobar si se adapta a tu forma de trabajar antes de tomar una decisión.",
-  },
-  {
-    q: "¿Necesito firmar un contrato?",
-    a: "La propuesta de Habitación Llena está pensada para que puedas probar el producto y decidir si realmente te sirve. Las condiciones comerciales definitivas se informarán claramente antes de contratar.",
-  },
+  ["¿Qué es Habitación Llena?", "Una plataforma de gestión para hoteles, hosterías, cabañas, posadas y alojamientos independientes. Centraliza reservas, calendario, habitaciones, huéspedes y operación diaria."],
+  ["¿Puedo recibir reservas desde mi propia web?", "Sí. El motor de reservas puede integrarse en una web nueva o en una página que el alojamiento ya tenga. Las reservas se registran en Habitación Llena y aparecen en el calendario del alojamiento."],
+  ["¿Las reservas de mi web entran al PMS?", "Sí. El objetivo del motor es que una reserva directa pase al PMS y quede asociada al alojamiento correcto, evitando cargarla manualmente."],
+  ["¿Puedo usarlo si tengo pocas habitaciones?", "Sí. Está pensado especialmente para alojamientos independientes que necesitan ordenar su operación sin incorporar un sistema enorme y complicado."],
+  ["¿Puedo usarlo desde el celular?", "Sí. El PMS funciona desde el navegador y está diseñado para adaptarse a computadora, tablet y celular."],
+  ["¿Puedo darle acceso a mi equipo?", "Sí. Habitación Llena contempla usuarios y roles para que cada integrante tenga acceso a las funciones que necesita."],
+  ["¿Hay prueba gratuita?", "La propuesta comercial contempla una prueba gratuita para que puedas conocer la plataforma antes de decidir."],
 ]
 
 const features = [
-  ["01", "Reservas", "Creá, editá y cancelá reservas desde un mismo lugar, con la información de cada huésped y alojamiento."],
-  ["02", "Calendario", "Visualizá disponibilidad y ocupación sin depender de planillas que se desactualizan."],
-  ["03", "Habitaciones", "Tené una vista rápida del estado de tus habitaciones y de la operación diaria."],
-  ["04", "Housekeeping", "Coordiná el estado operativo de las habitaciones y facilitá el trabajo del equipo."],
-  ["05", "Huéspedes", "Centralizá la información necesaria para atender mejor a quienes se alojan."],
-  ["06", "Caja y pagos", "Ordená la información económica de las reservas y avanzá hacia una gestión más clara de cobros."],
-  ["07", "Usuarios y roles", "Dale acceso a tu equipo sin tener que compartir una misma cuenta."],
-  ["08", "Asistente IA", "Consultá la operación y prepará el camino para tomar decisiones con información del alojamiento."],
+  ["01", "Calendario en tiempo real", "Sabé qué pasa hoy, qué viene después y qué habitaciones están disponibles sin depender de planillas."],
+  ["02", "Motor de reservas", "Recibí reservas directas desde tu propia web y hacé que lleguen al PMS automáticamente."],
+  ["03", "Reservas y huéspedes", "Toda la información de cada estadía ordenada en un mismo lugar."],
+  ["04", "Habitaciones y housekeeping", "Visualizá el estado operativo de tus habitaciones y coordiná mejor con limpieza."],
+  ["05", "Tarifas y disponibilidad", "Trabajá con información actualizada para vender mejor y evitar errores."],
+  ["06", "Reportes", "Convertí la información de tu alojamiento en datos útiles para tomar decisiones."],
 ]
 
-const steps = [
-  ["1", "Creá tu cuenta", "Empezá en minutos y configurá los datos básicos de tu alojamiento."],
-  ["2", "Cargá tus habitaciones", "Definí tus unidades y dejá lista la estructura con la que vas a trabajar."],
-  ["3", "Empezá a gestionar", "Cargá reservas, organizá la operación y centralizá la información de tu equipo."],
-]
+const photos = {
+  hero: "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?auto=format&fit=crop&w=1800&q=85",
+  room: "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=85",
+  cabin: "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=1200&q=85",
+  interior: "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=85",
+}
 
-export default function LandingPage() {
+function Logo({ light = false }) {
   return (
-    <main style={styles.page}>
-      <style>{`
-        * { box-sizing: border-box; }
-        html { scroll-behavior: smooth; }
-        body { margin: 0; background: #f7f9fc; }
-        a { -webkit-tap-highlight-color: transparent; }
-        .hl-container { width: min(1180px, calc(100% - 40px)); margin: 0 auto; }
-        .hl-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-        .hl-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
-        .hl-hero-grid { display: grid; grid-template-columns: 1.02fr .98fr; gap: 58px; align-items: center; }
-        .hl-step-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
-        .hl-dark-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; }
-        .hl-ai-box { display: grid; grid-template-columns: 1fr 420px; gap: 50px; align-items: center; }
-        .hl-nav-links { display: flex; align-items: center; gap: 8px; }
-        .hl-mobile-hide { display: block; }
-        .hl-dashboard { transform: rotate(1deg); transition: transform .3s ease, box-shadow .3s ease; }
-        .hl-dashboard:hover { transform: rotate(0deg) translateY(-4px); box-shadow: 0 35px 90px rgba(0,45,110,.22) !important; }
-        .hl-faq details { background: #fff; border: 1px solid #e3e8f0; border-radius: 14px; padding: 0 20px; }
-        .hl-faq details + details { margin-top: 10px; }
-        .hl-faq summary { cursor: pointer; list-style: none; padding: 20px 28px 20px 0; font-weight: 800; position: relative; }
-        .hl-faq summary::-webkit-details-marker { display: none; }
-        .hl-faq summary:after { content: "+"; position: absolute; right: 2px; top: 15px; font-size: 24px; font-weight: 400; color: #006ce4; }
-        .hl-faq details[open] summary:after { content: "−"; }
-        .hl-faq details p { color: #667085; line-height: 1.7; margin: 0 0 20px; max-width: 850px; }
-        .hl-btn { transition: transform .2s ease, box-shadow .2s ease; }
-        .hl-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(0,108,228,.2); }
-        .hl-feature:hover { transform: translateY(-3px); border-color: #cbd8ea !important; box-shadow: 0 14px 35px rgba(16,34,68,.07); }
-        .hl-feature { transition: .2s ease; }
-        @media (max-width: 920px) {
-          .hl-hero-grid { grid-template-columns: 1fr; }
-          .hl-grid-4 { grid-template-columns: repeat(2, 1fr); }
-          .hl-dashboard { transform: none; }
-          .hl-dark-grid, .hl-ai-box { grid-template-columns: 1fr; }
-        }
-        @media (max-width: 720px) {
-          .hl-container { width: min(100% - 28px, 1180px); }
-          .hl-nav-links .hl-secondary { display: none; }
-          .hl-grid-3, .hl-step-grid { grid-template-columns: 1fr; }
-          .hl-grid-4 { grid-template-columns: 1fr 1fr; }
-          .hl-mobile-hide { display: none; }
-          .hl-hero { padding-top: 58px !important; }
-        }
-        @media (max-width: 460px) {
-          .hl-grid-4 { grid-template-columns: 1fr; }
-        }
-      `}</style>
-
-      <header style={styles.header}>
-        <div style={styles.headerInner}>
-          <Link href="/" style={styles.logo}>
-            <span style={styles.logoMark}>H</span>
-            <span>Habitación Llena</span>
-          </Link>
-
-          <nav className="hl-nav-links">
-            <a href="#funciones" className="hl-secondary" style={styles.navLink}>Funciones</a>
-            <a href="#como-funciona" className="hl-secondary" style={styles.navLink}>Cómo funciona</a>
-            <a href="#preguntas" className="hl-secondary" style={styles.navLink}>Preguntas</a>
-            <Link href="/login" style={styles.login}>Ingresar</Link>
-            <Link href="/registro" className="hl-btn" style={styles.headerCta}>Probar gratis</Link>
-          </nav>
-        </div>
-      </header>
-
-      <section className="hl-hero hl-hero-grid hl-container" style={styles.hero}>
-        <div>
-          <div style={styles.eyebrow}>
-            <span style={styles.liveDot} /> PMS para alojamientos independientes
-          </div>
-
-          <h1 style={styles.heroTitle}>
-            Tu alojamiento.
-            <br />
-            <span style={styles.gradientText}>Todo bajo control.</span>
-          </h1>
-
-          <p style={styles.heroText}>
-            Reservas, calendario, habitaciones, huéspedes y operación diaria en una sola plataforma.
-            <strong> Menos planillas. Menos mensajes. Más control.</strong>
-          </p>
-
-          <div style={styles.heroActions}>
-            <Link href="/registro" className="hl-btn" style={styles.primaryCta}>
-              Empezar prueba gratuita →
-            </Link>
-            <a href="#funciones" style={styles.secondaryCta}>Ver qué incluye</a>
-          </div>
-
-          <div style={styles.trustRow}>
-            <span>✓ Sin instalación</span>
-            <span>✓ Desde cualquier dispositivo</span>
-            <span>✓ Pensado para equipos chicos</span>
-          </div>
-        </div>
-
-        <div className="hl-dashboard" style={styles.dashboard}>
-          <div style={styles.browserBar}>
-            <span style={{...styles.browserDot, background:"#ff6b6b"}} />
-            <span style={{...styles.browserDot, background:"#ffd166"}} />
-            <span style={{...styles.browserDot, background:"#35c76f"}} />
-            <div style={styles.browserAddress}>app.habitacionllena.com/dashboard</div>
-          </div>
-          <div style={styles.dashboardTop}>
-            <div>
-              <div style={styles.miniLabel}>HABITACIÓN LLENA</div>
-              <div style={styles.dashboardTitle}>Buenas noches, Hosteria Durazno 👋</div>
-              <div style={styles.dashboardSub}>Gestioná reservas y ocupación desde un solo lugar.</div>
-            </div>
-            <span style={styles.statusPill}>● Operativo</span>
-          </div>
-          <div style={styles.metricGrid}>
-            {[
-              ["Alojamientos","1","Propiedades cargadas"],
-              ["Habitaciones","3","Habitaciones activas"],
-              ["Ocupadas hoy","1","Reservas activas"],
-              ["Próximas entradas","3","Próximos 7 días"],
-            ].map(([label,value,sub]) => (
-              <div key={label} style={styles.metric}>
-                <div style={styles.metricLabel}>{label}</div>
-                <strong style={styles.metricValue}>{value}</strong>
-                <div style={styles.metricSub}>{sub}</div>
-              </div>
-            ))}
-          </div>
-          <div style={styles.operation}>
-            <div style={styles.operationHeader}>
-              <div>
-                <strong>Operación de hoy</strong>
-                <span>09/08/2026</span>
-              </div>
-              <span style={styles.operationButton}>Housekeeping</span>
-            </div>
-            <div style={styles.operationGrid}>
-              <div style={{...styles.operationCard, background:"#e9f9f1"}}>
-                <strong style={{color:"#00875a"}}>IN DEL DÍA · 0</strong>
-                <span>Sin entradas hoy.</span>
-              </div>
-              <div style={{...styles.operationCard, background:"#fff0f0"}}>
-                <strong style={{color:"#d92d20"}}>OUT DEL DÍA · 0</strong>
-                <span>Sin salidas hoy.</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section style={styles.trialStrip}>
-        <div className="hl-container" style={styles.trialInner}>
-          <div>
-            <div style={styles.trialKicker}>EMPEZÁ SIN RIESGO</div>
-            <h2 style={styles.trialTitle}>Probalo gratis durante 14 días.</h2>
-            <p style={styles.trialText}>Conocé la plataforma, cargá tu alojamiento y comprobá si encaja con tu forma de trabajar.</p>
-          </div>
-          <Link href="/registro" className="hl-btn" style={styles.trialCta}>Crear mi cuenta gratis →</Link>
-        </div>
-      </section>
-
-      <section id="funciones" style={styles.section}>
-        <div className="hl-container">
-          <div style={styles.sectionHeading}>
-            <div style={styles.sectionEyebrow}>TODO EN UN SOLO LUGAR</div>
-            <h2 style={styles.sectionTitle}>Menos herramientas. Más claridad.</h2>
-            <p style={styles.sectionText}>
-              Una operación hotelera no debería depender de una planilla para una cosa, WhatsApp para otra y cinco pestañas abiertas para saber qué pasa.
-            </p>
-          </div>
-
-          <div className="hl-grid-4">
-            {features.map(([number,title,text]) => (
-              <div className="hl-feature" key={title} style={styles.feature}>
-                <div style={styles.featureNumber}>{number}</div>
-                <h3 style={styles.featureTitle}>{title}</h3>
-                <p style={styles.featureText}>{text}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section style={styles.darkSection}>
-        <div className="hl-container hl-dark-grid" style={styles.darkGrid}>
-          <div>
-            <div style={styles.darkEyebrow}>HECHO PARA ALOJAMIENTOS REALES</div>
-            <h2 style={styles.darkTitle}>La tecnología de un hotel grande, sin la complejidad.</h2>
-            <p style={styles.darkText}>
-              Habitación Llena nace pensando en el alojamiento independiente: donde muchas veces una misma persona recibe reservas, atiende huéspedes, coordina limpieza y mira la caja.
-            </p>
-            <Link href="/registro" className="hl-btn" style={styles.darkCta}>Quiero probarlo</Link>
-          </div>
-          <div className="hl-grid-3" style={{gap:12}}>
-            {["Cabañas","Hosterías","Posadas","Hoteles pequeños","Complejos turísticos","Apartamentos"].map((item) => (
-              <div key={item} style={styles.typeCard}>✓ {item}</div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section id="como-funciona" style={styles.section}>
-        <div className="hl-container">
-          <div style={styles.sectionHeading}>
-            <div style={styles.sectionEyebrow}>EMPEZÁ EN POCOS PASOS</div>
-            <h2 style={styles.sectionTitle}>De cero a operativo sin vueltas.</h2>
-          </div>
-          <div className="hl-step-grid">
-            {steps.map(([number,title,text]) => (
-              <div key={number} style={styles.step}>
-                <div style={styles.stepNumber}>{number}</div>
-                <h3 style={styles.stepTitle}>{title}</h3>
-                <p style={styles.featureText}>{text}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section style={styles.comparisonSection}>
-        <div className="hl-container">
-          <div style={styles.sectionHeading}>
-            <div style={styles.sectionEyebrow}>¿TE SUENA CONOCIDO?</div>
-            <h2 style={styles.sectionTitle}>De esto...</h2>
-          </div>
-          <div className="hl-grid-3">
-            {[
-              ["📱", "“¿Me confirmás si hay lugar?”", "Buscar una conversación vieja para saber qué habitación estaba disponible."],
-              ["📊", "“¿Cuánto ocupamos este mes?”", "Abrir planillas, sumar datos y cruzar información de distintos lugares."],
-              ["🧹", "“¿Qué habitaciones están listas?”", "Mandar mensajes al equipo para averiguar qué ya está limpio."],
-            ].map(([icon,title,text]) => (
-              <div key={title} style={styles.problemCard}>
-                <div style={{fontSize:30}}>{icon}</div>
-                <h3 style={styles.featureTitle}>{title}</h3>
-                <p style={styles.featureText}>{text}</p>
-              </div>
-            ))}
-          </div>
-
-          <div style={styles.arrowStatement}>↓</div>
-
-          <div style={styles.solutionBox}>
-            <div style={styles.sectionEyebrow}>A ESTO</div>
-            <h2 style={{...styles.sectionTitle, marginBottom:10}}>“Abrí Habitación Llena y lo veo.”</h2>
-            <p style={{...styles.sectionText, margin:"0 auto", maxWidth:700}}>
-              La información importante tiene que estar donde la necesitás, cuando la necesitás.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section style={styles.section}>
-        <div className="hl-container hl-ai-box" style={styles.aiBox}>
-          <div>
-            <div style={styles.sectionEyebrow}>PRÓXIMO PASO</div>
-            <h2 style={styles.sectionTitle}>Tu operación también puede hablar con vos.</h2>
-            <p style={styles.sectionText}>
-              Estamos preparando un asistente que pueda responder preguntas sobre la operación de tu alojamiento y ayudarte a detectar información importante sin tener que buscarla manualmente.
-            </p>
-            <span style={styles.comingSoon}>✦ Próximamente</span>
-          </div>
-          <div style={styles.chatMock}>
-            <div style={styles.chatHeader}>✦ Asistente IA</div>
-            <div style={styles.chatBubble}>¿Cómo viene la ocupación esta semana?</div>
-            <div style={styles.chatBubbleAnswer}>Tu ocupación actual es del 68%. Tenés 2 entradas próximas y 1 habitación disponible.</div>
-          </div>
-        </div>
-      </section>
-
-      <section id="preguntas" style={styles.faqSection}>
-        <div className="hl-container">
-          <div style={styles.sectionHeading}>
-            <div style={styles.sectionEyebrow}>PREGUNTAS FRECUENTES</div>
-            <h2 style={styles.sectionTitle}>Lo que probablemente quieras saber antes de empezar.</h2>
-            <p style={styles.sectionText}>Si algo no está acá, podés consultarnos antes de crear tu cuenta.</p>
-          </div>
-
-          <div className="hl-faq">
-            {faqs.map((faq) => (
-              <details key={faq.q}>
-                <summary>{faq.q}</summary>
-                <p>{faq.a}</p>
-              </details>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section style={styles.finalCta}>
-        <div className="hl-container">
-          <div style={styles.finalBadge}>14 DÍAS DE PRUEBA</div>
-          <h2 style={styles.finalTitle}>Tu alojamiento merece algo mejor que una planilla.</h2>
-          <p style={styles.finalText}>Probá Habitación Llena y empezá a ordenar tu operación desde hoy.</p>
-          <div style={{display:"flex", justifyContent:"center", gap:12, flexWrap:"wrap"}}>
-            <Link href="/registro" className="hl-btn" style={styles.finalButton}>Empezar gratis →</Link>
-            <Link href="/login" style={styles.finalLogin}>Ya tengo una cuenta</Link>
-          </div>
-        </div>
-      </section>
-
-      <footer style={styles.footer}>
-        <div className="hl-container" style={styles.footerInner}>
-          <div>
-            <div style={styles.logo}><span style={styles.logoMark}>H</span> Habitación Llena</div>
-            <p style={{margin:"10px 0 0", color:"#8b98aa", fontSize:13}}>Gestión hotelera simple y profesional.</p>
-          </div>
-          <div style={styles.footerLinks}>
-            <a href="#funciones" style={styles.footerLink}>Funciones</a>
-            <a href="#como-funciona" style={styles.footerLink}>Cómo funciona</a>
-            <a href="#preguntas" style={styles.footerLink}>Preguntas</a>
-            <Link href="/login" style={styles.footerLink}>Ingresar</Link>
-          </div>
-        </div>
-        <div className="hl-container" style={styles.footerBottom}>© {new Date().getFullYear()} Habitación Llena. Todos los derechos reservados.</div>
-      </footer>
-
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "SoftwareApplication",
-            name: "Habitación Llena",
-            applicationCategory: "BusinessApplication",
-            operatingSystem: "Web",
-            description: "Plataforma de gestión para hoteles, hosterías, cabañas y alojamientos independientes.",
-          }),
-        }}
-      />
-    </main>
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 10, color: light ? "#fff" : "#123b7a", fontWeight: 900, letterSpacing: "-.03em" }}>
+      <span style={{ width: 30, height: 34, display: "grid", placeItems: "center", border: `2px solid ${light ? "#fff" : "#1264d6"}`, borderRadius: "16px 16px 7px 7px", fontSize: 15 }}>H</span>
+      <span style={{ fontSize: 18 }}>HABITACIÓN<br />LLENA</span>
+    </span>
   )
 }
 
-const styles = {
-  page: { minHeight:"100vh", background:"#f7f9fc", color:"#172033", fontFamily:"Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" },
-  header: { position:"sticky", top:0, zIndex:20, height:76, background:"rgba(255,255,255,.92)", backdropFilter:"blur(14px)", borderBottom:"1px solid #e8edf3" },
-  headerInner: { width:"min(1180px, calc(100% - 40px))", height:"100%", margin:"0 auto", display:"flex", alignItems:"center", justifyContent:"space-between", gap:20 },
-  logo: { display:"flex", alignItems:"center", gap:9, color:"#123b7a", textDecoration:"none", fontWeight:900, fontSize:19, letterSpacing:-.5 },
-  logoMark: { display:"grid", placeItems:"center", width:31, height:31, borderRadius:9, background:"linear-gradient(135deg,#073b95,#006ce4)", color:"#fff", fontSize:15, fontWeight:900, boxShadow:"0 6px 15px rgba(0,80,180,.2)" },
-  navLink: { textDecoration:"none", color:"#536176", fontWeight:700, fontSize:14, padding:"9px 10px" },
-  login: { textDecoration:"none", color:"#123b7a", fontWeight:800, fontSize:14, padding:"10px 12px" },
-  headerCta: { textDecoration:"none", background:"#006ce4", color:"#fff", fontWeight:850, borderRadius:10, padding:"11px 16px", boxShadow:"0 8px 20px rgba(0,108,228,.18)" },
-  hero: { padding:"92px 0 82px" },
-  eyebrow: { display:"inline-flex", alignItems:"center", gap:8, color:"#006ce4", fontWeight:850, fontSize:12, letterSpacing:1.15, textTransform:"uppercase" },
-  liveDot: { width:8, height:8, borderRadius:99, background:"#22c55e", boxShadow:"0 0 0 5px rgba(34,197,94,.12)" },
-  heroTitle: { fontSize:"clamp(46px,6.5vw,76px)", lineHeight:.99, margin:"17px 0 23px", letterSpacing:"-4px", fontWeight:900 },
-  gradientText: { background:"linear-gradient(90deg,#006ce4,#0a4ca8)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" },
-  heroText: { fontSize:19, lineHeight:1.65, color:"#5f6c80", maxWidth:650, margin:0 },
-  heroActions: { display:"flex", gap:12, marginTop:30, flexWrap:"wrap", alignItems:"center" },
-  primaryCta: { textDecoration:"none", background:"#006ce4", color:"#fff", fontWeight:850, borderRadius:11, padding:"15px 21px", boxShadow:"0 13px 30px rgba(0,108,228,.22)" },
-  secondaryCta: { textDecoration:"none", color:"#24344d", fontWeight:800, border:"1px solid #dce3ec", background:"#fff", borderRadius:11, padding:"14px 19px" },
-  trustRow: { display:"flex", gap:16, flexWrap:"wrap", marginTop:22, color:"#6d798a", fontSize:12, fontWeight:700 },
-  dashboard: { background:"#fff", border:"1px solid #dbe3ee", borderRadius:20, padding:12, boxShadow:"0 25px 75px rgba(0,45,110,.15)" },
-  browserBar: { height:28, display:"flex", alignItems:"center", gap:6, padding:"0 7px" },
-  browserDot: { width:7, height:7, borderRadius:99 },
-  browserAddress: { flex:1, marginLeft:8, background:"#f5f7fa", borderRadius:6, color:"#a1aab8", fontSize:8, padding:"5px 8px" },
-  dashboardTop: { background:"linear-gradient(135deg,#063887,#0758c5)", color:"#fff", borderRadius:13, padding:20, display:"flex", justifyContent:"space-between", gap:12 },
-  miniLabel: { fontSize:9, letterSpacing:1.5, opacity:.7, fontWeight:800 },
-  dashboardTitle: { fontSize:18, fontWeight:850, marginTop:5 },
-  dashboardSub: { fontSize:10, opacity:.78, marginTop:4 },
-  statusPill: { alignSelf:"flex-start", background:"rgba(255,255,255,.13)", border:"1px solid rgba(255,255,255,.2)", borderRadius:99, padding:"6px 9px", fontSize:8, whiteSpace:"nowrap" },
-  metricGrid: { display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:8, marginTop:10 },
-  metric: { border:"1px solid #e9edf3", borderRadius:10, padding:11 },
-  metricLabel: { color:"#7b8797", fontSize:8 },
-  metricValue: { display:"block", fontSize:21, marginTop:5 },
-  metricSub: { color:"#98a1ae", fontSize:7, marginTop:3 },
-  operation: { border:"1px solid #e9edf3", borderRadius:10, marginTop:10, padding:12 },
-  operationHeader: { display:"flex", justifyContent:"space-between", alignItems:"center", fontSize:9 },
-  operationButton: { border:"1px solid #dfe5ec", borderRadius:7, padding:"6px 8px", fontSize:7 },
-  operationGrid: { display:"grid", gridTemplateColumns:"1fr 1fr", gap:7, marginTop:9 },
-  operationCard: { borderRadius:8, padding:9 },
-  operationCardStrong: { fontSize:8 },
-  operationCardSpan: { display:"block", color:"#667085", fontSize:7, marginTop:4 },
-  trialStrip: { background:"#052f78", color:"#fff", padding:"28px 0" },
-  trialInner: { display:"flex", justifyContent:"space-between", alignItems:"center", gap:30 },
-  trialKicker: { color:"#8fc4ff", fontSize:10, fontWeight:900, letterSpacing:1.3 },
-  trialTitle: { fontSize:25, margin:"5px 0 5px", letterSpacing:-.5 },
-  trialText: { color:"#bfd5f2", margin:0, fontSize:13, lineHeight:1.5 },
-  trialCta: { flexShrink:0, background:"#fff", color:"#063887", textDecoration:"none", fontWeight:900, borderRadius:10, padding:"13px 18px" },
-  section: { padding:"94px 0" },
-  sectionHeading: { maxWidth:760, margin:"0 auto 42px", textAlign:"center" },
-  sectionEyebrow: { color:"#006ce4", fontSize:11, fontWeight:900, letterSpacing:1.4 },
-  sectionTitle: { fontSize:"clamp(32px,4vw,46px)", lineHeight:1.08, letterSpacing:-2, margin:"10px 0 13px", fontWeight:900 },
-  sectionText: { color:"#667085", lineHeight:1.7, fontSize:16, margin:0 },
-  feature: { background:"#fff", border:"1px solid #e2e8f0", borderRadius:16, padding:22 },
-  featureNumber: { color:"#9aa7b9", fontSize:10, fontWeight:900, letterSpacing:1 },
-  featureTitle: { margin:"13px 0 7px", fontSize:18, letterSpacing:-.4 },
-  featureText: { color:"#6b7789", lineHeight:1.6, fontSize:13, margin:0 },
-  darkSection: { background:"linear-gradient(135deg,#052f78,#063b92)", color:"#fff", padding:"88px 0" },
-  darkGrid: { display:"grid", gridTemplateColumns:"1fr 1fr", gap:60, alignItems:"center" },
-  darkEyebrow: { color:"#8fc4ff", fontSize:11, fontWeight:900, letterSpacing:1.4 },
-  darkTitle: { fontSize:"clamp(32px,4vw,48px)", lineHeight:1.05, letterSpacing:-2, margin:"12px 0 17px", fontWeight:900 },
-  darkText: { color:"#c5d7ef", lineHeight:1.7, maxWidth:570, margin:0, fontSize:16 },
-  darkCta: { display:"inline-block", marginTop:26, textDecoration:"none", background:"#fff", color:"#063887", fontWeight:900, borderRadius:10, padding:"13px 18px" },
-  typeCard: { background:"rgba(255,255,255,.08)", border:"1px solid rgba(255,255,255,.12)", borderRadius:11, padding:"15px 13px", color:"#e5effc", fontSize:13, fontWeight:750 },
-  step: { background:"#fff", border:"1px solid #e2e8f0", borderRadius:16, padding:25 },
-  stepNumber: { width:39, height:39, display:"grid", placeItems:"center", borderRadius:12, background:"#e8f2ff", color:"#006ce4", fontWeight:900, fontSize:15 },
-  stepTitle: { fontSize:19, margin:"16px 0 7px" },
-  comparisonSection: { padding:"92px 0", background:"#eef3f9" },
-  problemCard: { background:"#fff", border:"1px solid #e1e7ef", borderRadius:15, padding:24 },
-  arrowStatement: { textAlign:"center", color:"#006ce4", fontSize:28, fontWeight:900, margin:"28px 0" },
-  solutionBox: { background:"linear-gradient(135deg,#fff,#f3f8ff)", border:"1px solid #cfe0f5", borderRadius:20, padding:"45px 25px", textAlign:"center", boxShadow:"0 15px 45px rgba(18,59,122,.08)" },
-  aiBox: { display:"grid", gridTemplateColumns:"1fr 420px", gap:50, alignItems:"center", background:"#fff", border:"1px solid #dfe6ef", borderRadius:22, padding:"42px 46px", boxShadow:"0 18px 55px rgba(16,34,68,.06)" },
-  comingSoon: { display:"inline-block", marginTop:20, background:"#eef6ff", color:"#006ce4", borderRadius:99, padding:"8px 12px", fontSize:11, fontWeight:900 },
-  chatMock: { background:"#f6f8fb", border:"1px solid #e1e7ef", borderRadius:16, padding:16 },
-  chatHeader: { fontWeight:900, fontSize:13, paddingBottom:12, borderBottom:"1px solid #e1e7ef" },
-  chatBubble: { margin:"16px 0 8px auto", maxWidth:"82%", background:"#006ce4", color:"#fff", borderRadius:"12px 12px 3px 12px", padding:12, fontSize:11, lineHeight:1.45 },
-  chatBubbleAnswer: { maxWidth:"90%", background:"#fff", border:"1px solid #e1e7ef", borderRadius:"12px 12px 12px 3px", padding:12, color:"#667085", fontSize:11, lineHeight:1.5 },
-  faqSection: { background:"#fff", padding:"94px 0" },
-  finalCta: { background:"linear-gradient(135deg,#006ce4,#063b92)", color:"#fff", textAlign:"center", padding:"90px 0" },
-  finalBadge: { display:"inline-block", background:"rgba(255,255,255,.12)", border:"1px solid rgba(255,255,255,.2)", borderRadius:99, padding:"7px 12px", fontSize:10, fontWeight:900, letterSpacing:1.2 },
-  finalTitle: { fontSize:"clamp(35px,5vw,58px)", lineHeight:1.02, letterSpacing:-2.5, maxWidth:820, margin:"16px auto 14px", fontWeight:900 },
-  finalText: { color:"#d1e2f8", fontSize:17, margin:"0 auto 28px" },
-  finalButton: { display:"inline-block", textDecoration:"none", background:"#fff", color:"#063b92", fontWeight:900, borderRadius:11, padding:"15px 22px" },
-  finalLogin: { display:"inline-block", textDecoration:"none", color:"#fff", border:"1px solid rgba(255,255,255,.3)", borderRadius:11, padding:"14px 19px", fontWeight:800 },
-  footer: { background:"#071a38", color:"#fff", padding:"38px 0 18px" },
-  footerInner: { display:"flex", justifyContent:"space-between", alignItems:"center", gap:30, paddingBottom:28 },
-  footerLinks: { display:"flex", gap:18, flexWrap:"wrap" },
-  footerLink: { color:"#aebbd0", textDecoration:"none", fontSize:12, fontWeight:700 },
-  footerBottom: { borderTop:"1px solid rgba(255,255,255,.08)", paddingTop:15, color:"#71809a", fontSize:11 },
+function DashboardPreview() {
+  return (
+    <div className="hl-dashboard-shell">
+      <div className="hl-dashboard-topbar"><Logo /><div className="hl-dashboard-top-actions"><span>🔔</span><span>●</span><b>Demo Hotel⌄</b></div></div>
+      <div className="hl-dashboard-body"><aside className="hl-sidebar">{["Dashboard","Calendario","Reservas","Ventas","Habitaciones","Huéspedes","Tarifas","Reportes","Configuración"].map((item,i)=><div key={item} className={i===0?"hl-side-active":"hl-side-item"}>{i===0?"⌂":"•"} {item}</div>)}</aside><div className="hl-dashboard-content"><div className="hl-dashboard-heading"><div><small>DASHBOARD</small><h3>Buenas noches, Hosteria Durazno 👋</h3></div><button>+ Nueva reserva</button></div><div className="hl-metrics">{["12|Reservas hoy","7|Check-ins hoy","5|Check-outs hoy","72%|Ocupación actual"].map(m=>{const [v,l]=m.split("|");return <div className="hl-metric" key={l}><small>{l}</small><strong>{v}</strong><span>Actualizado ahora</span></div>})}</div><div className="hl-chart-grid"><div className="hl-panel"><div className="hl-panel-title">Ocupación de los próximos 7 días <span>Ver reporte</span></div><div className="hl-chart"><div className="hl-line"/><div className="hl-chart-labels"><span>12/8</span><span>13/8</span><span>14/8</span><span>15/8</span><span>16/8</span><span>17/8</span><span>18/8</span></div></div></div><div className="hl-panel"><div className="hl-panel-title">Reservas recientes <span>Ver todas</span></div>{["Martín y familia · Doble","Laura González · Triple","Juan Pérez · Suite"].map((x,i)=><div className="hl-recent" key={x}><span className={`hl-recent-dot d${i}`}/><div><b>{x}</b><small>Check-in próximo</small></div></div>)}</div></div></div></div>
+    </div>
+  )
+}
+
+export default function LandingPage() {
+  return (
+    <main className="hl-page">
+      <style>{`
+        *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#f7faff}.hl-page{color:#15213b;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow:hidden}.hl-container{width:min(1180px,calc(100% - 40px));margin:0 auto}.hl-nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.94);backdrop-filter:blur(14px);border-bottom:1px solid #e6edf7}.hl-nav-inner{height:76px;display:flex;align-items:center;justify-content:space-between}.hl-links{display:flex;align-items:center;gap:26px}.hl-links a{color:#344054;text-decoration:none;font-size:14px;font-weight:650}.hl-links a:hover{color:#1264d6}.hl-nav-cta,.hl-primary{background:#1264d6;color:#fff!important;text-decoration:none;border-radius:10px;font-weight:800;box-shadow:0 10px 25px rgba(18,100,214,.18)}.hl-nav-cta{padding:11px 17px}.hl-hero{position:relative;min-height:690px;padding:70px 0 80px;background:linear-gradient(90deg,#f7faff 0%,#f7faff 47%,rgba(247,250,255,.72) 63%,rgba(247,250,255,0) 100%),url('${photos.hero}') right center/cover no-repeat}.hl-hero-grid{display:grid;grid-template-columns:1fr 1.06fr;gap:40px;align-items:center}.hl-eyebrow{display:inline-flex;align-items:center;gap:8px;color:#1264d6;background:#eaf3ff;border:1px solid #d7e8ff;border-radius:999px;padding:8px 12px;font-size:12px;font-weight:850;letter-spacing:.03em}.hl-dot{width:7px;height:7px;background:#20b26b;border-radius:50%;box-shadow:0 0 0 4px #dff7eb}.hl-h1{font-size:58px;line-height:1.02;letter-spacing:-.055em;margin:18px 0;color:#102a5c}.hl-gradient{color:#1264d6}.hl-lead{font-size:19px;line-height:1.65;color:#596780;max-width:620px;margin:0}.hl-lead strong{color:#263a5d}.hl-actions{display:flex;gap:12px;align-items:center;margin-top:28px;flex-wrap:wrap}.hl-primary{display:inline-flex;padding:15px 22px}.hl-secondary{display:inline-flex;padding:14px 20px;border:1px solid #b8cce7;color:#1264d6;text-decoration:none;border-radius:10px;font-weight:800;background:#fff}.hl-trust{display:flex;gap:20px;flex-wrap:wrap;color:#65748d;font-size:12px;margin-top:22px}.hl-dashboard-shell{background:#fff;border:1px solid #dce6f3;border-radius:18px;box-shadow:0 35px 90px rgba(16,50,100,.22);overflow:hidden;transform:rotate(1deg);transition:.25s}.hl-dashboard-shell:hover{transform:rotate(0) translateY(-5px)}.hl-dashboard-topbar{height:58px;border-bottom:1px solid #e7edf5;display:flex;align-items:center;justify-content:space-between;padding:0 18px}.hl-dashboard-topbar>span:first-child{transform:scale(.72);transform-origin:left center}.hl-dashboard-top-actions{display:flex;gap:13px;align-items:center;color:#60708a;font-size:11px}.hl-dashboard-body{display:grid;grid-template-columns:145px 1fr;min-height:405px}.hl-sidebar{background:#f8faff;border-right:1px solid #e7edf5;padding:15px 9px}.hl-side-item,.hl-side-active{padding:9px 10px;border-radius:8px;font-size:10px;font-weight:700;margin-bottom:3px}.hl-side-active{background:#eaf3ff;color:#1264d6}.hl-side-item{color:#718096}.hl-dashboard-content{padding:18px;background:#fff}.hl-dashboard-heading{display:flex;justify-content:space-between;align-items:center;gap:12px}.hl-dashboard-heading small{color:#8b98aa;font-size:8px;font-weight:900}.hl-dashboard-heading h3{font-size:16px;margin:4px 0 0}.hl-dashboard-heading button{border:0;background:#1264d6;color:#fff;border-radius:7px;padding:8px 10px;font-size:9px;font-weight:800}.hl-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:16px}.hl-metric{border:1px solid #e6edf5;border-radius:9px;padding:10px}.hl-metric small,.hl-metric span{display:block;color:#8b98aa;font-size:7px}.hl-metric strong{display:block;font-size:20px;margin:5px 0}.hl-chart-grid{display:grid;grid-template-columns:1.45fr .8fr;gap:9px;margin-top:9px}.hl-panel{border:1px solid #e6edf5;border-radius:9px;padding:11px}.hl-panel-title{font-size:9px;font-weight:850;display:flex;justify-content:space-between}.hl-panel-title span{color:#1264d6;font-size:8px}.hl-chart{height:145px;position:relative;margin-top:8px;background:repeating-linear-gradient(to bottom,#fff 0,#fff 35px,#edf3fa 36px)}.hl-line{position:absolute;left:5%;right:5%;top:28%;height:65%;border-top:3px solid #1264d6;clip-path:polygon(0 62%,10% 50%,20% 43%,30% 45%,40% 22%,50% 30%,60% 10%,70% 35%,80% 17%,90% 25%,100% 8%,100% 12%,90% 29%,80% 21%,70% 39%,60% 14%,50% 34%,40% 26%,30% 49%,20% 47%,10% 54%,0 67%)}.hl-chart-labels{position:absolute;bottom:0;left:0;right:0;display:flex;justify-content:space-between;color:#9aa7b8;font-size:6px}.hl-recent{display:flex;gap:8px;align-items:center;padding:11px 0;border-bottom:1px solid #eef2f6}.hl-recent-dot{width:8px;height:8px;border-radius:50%;background:#7c3aed}.hl-recent-dot.d1{background:#20b26b}.hl-recent-dot.d2{background:#f5b400}.hl-recent b,.hl-recent small{display:block;font-size:8px}.hl-recent small{color:#8b98aa;margin-top:3px}.hl-strip{background:#1264d6;color:#fff}.hl-strip-inner{display:flex;justify-content:space-between;align-items:center;gap:30px;padding:26px 0}.hl-strip strong{font-size:18px}.hl-strip span{color:#dcecff;font-size:13px}.hl-strip a{background:#fff;color:#1264d6;text-decoration:none;padding:12px 18px;border-radius:9px;font-weight:850;font-size:13px;white-space:nowrap}.hl-section{padding:90px 0}.hl-heading{text-align:center;max-width:760px;margin:0 auto 45px}.hl-kicker{font-size:11px;color:#1264d6;font-weight:900;letter-spacing:.12em}.hl-title{font-size:39px;line-height:1.1;letter-spacing:-.04em;color:#132d61;margin:10px 0 12px}.hl-text{color:#66748a;line-height:1.7;font-size:16px}.hl-features{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.hl-feature{background:#fff;border:1px solid #e1e9f3;border-radius:16px;padding:25px;transition:.2s;box-shadow:0 8px 25px rgba(16,45,90,.035)}.hl-feature:hover{transform:translateY(-4px);box-shadow:0 18px 40px rgba(16,45,90,.09);border-color:#c7dcf7}.hl-number{font-size:11px;color:#1264d6;font-weight:900}.hl-feature h3{font-size:19px;margin:14px 0 8px;color:#19366e}.hl-feature p{font-size:14px;line-height:1.65;color:#68768c;margin:0}.hl-product{background:#eef5ff;padding:90px 0}.hl-product-grid{display:grid;grid-template-columns:.82fr 1.18fr;gap:50px;align-items:center}.hl-product-copy h2{font-size:40px;line-height:1.1;letter-spacing:-.04em;color:#132d61;margin:10px 0 15px}.hl-checks{display:grid;gap:11px;margin:25px 0}.hl-checks div{font-size:14px;color:#34445e}.hl-checks span{display:inline-grid;place-items:center;width:21px;height:21px;border-radius:50%;background:#dff2e8;color:#0b8f55;margin-right:8px;font-size:12px}.hl-photo-card{display:grid;grid-template-columns:1.05fr .95fr;gap:12px}.hl-photo-card img{width:100%;height:100%;min-height:245px;object-fit:cover;border-radius:16px}.hl-photo-stack{display:grid;gap:12px}.hl-photo-stack img{height:117px;min-height:0}.hl-engine{padding:90px 0}.hl-engine-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:50px;align-items:center}.hl-booking-card{background:#fff;border:1px solid #dce6f3;border-radius:18px;padding:25px;box-shadow:0 25px 60px rgba(16,45,90,.12)}.hl-booking-card h3{font-size:22px;margin:0 0 18px}.hl-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}.hl-field{border:1px solid #dce4ee;border-radius:8px;padding:10px}.hl-field small{display:block;color:#8b98aa;font-size:9px}.hl-field b{font-size:12px}.hl-booking-button{margin-top:10px;width:100%;border:0;border-radius:9px;padding:12px;background:#1264d6;color:#fff;font-weight:800}.hl-photo-main{position:relative}.hl-photo-main img{width:100%;height:420px;object-fit:cover;border-radius:20px}.hl-floating{position:absolute;left:-20px;bottom:22px;background:#fff;border:1px solid #e2e9f2;border-radius:13px;padding:14px 16px;box-shadow:0 18px 45px rgba(16,45,90,.16);font-size:12px}.hl-floating b{display:block;color:#1264d6;margin-bottom:4px}.hl-dark{background:#0e2855;color:#fff;padding:80px 0}.hl-dark-grid{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center}.hl-dark h2{font-size:40px;line-height:1.08;letter-spacing:-.04em;margin:10px 0 14px}.hl-dark p{color:#b9c8de;line-height:1.7}.hl-dark-card{display:grid;grid-template-columns:1fr 1fr;gap:10px}.hl-type{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);padding:16px;border-radius:12px;font-size:13px}.hl-steps{background:#f7faff;padding:90px 0}.hl-step-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.hl-step{background:#fff;border:1px solid #e2e9f2;border-radius:16px;padding:25px}.hl-step-number{width:38px;height:38px;border-radius:50%;background:#1264d6;color:#fff;display:grid;place-items:center;font-weight:900}.hl-step h3{margin:16px 0 7px}.hl-step p{color:#6b7890;line-height:1.6;font-size:14px}.hl-faq{padding:90px 0}.hl-faq-list{max-width:880px;margin:auto}.hl-faq details{background:#fff;border:1px solid #e0e7f0;border-radius:12px;padding:0 20px;margin-bottom:9px}.hl-faq summary{cursor:pointer;padding:20px 30px 20px 0;font-weight:800;list-style:none;position:relative}.hl-faq summary::-webkit-details-marker{display:none}.hl-faq summary:after{content:"+";position:absolute;right:3px;font-size:22px;color:#1264d6}.hl-faq details[open] summary:after{content:"−"}.hl-faq p{color:#66748a;line-height:1.7;margin:0 0 20px}.hl-final{padding:80px 0;background:linear-gradient(135deg,#1264d6,#08499f);color:#fff;text-align:center}.hl-final h2{font-size:43px;line-height:1.08;letter-spacing:-.04em;margin:10px auto 12px;max-width:760px}.hl-final p{color:#dbeaff}.hl-final a{display:inline-flex;margin-top:20px;background:#fff;color:#1264d6;text-decoration:none;border-radius:10px;padding:14px 22px;font-weight:900}.hl-footer{background:#091c3b;color:#fff;padding:38px 0 22px}.hl-footer-inner{display:flex;justify-content:space-between;gap:30px;align-items:center}.hl-footer-links{display:flex;gap:20px;flex-wrap:wrap}.hl-footer a{color:#b9c8de;text-decoration:none;font-size:13px}.hl-copy{border-top:1px solid rgba(255,255,255,.1);margin-top:28px;padding-top:18px;color:#8393aa;font-size:12px}@media(max-width:950px){.hl-hero-grid,.hl-product-grid,.hl-engine-grid,.hl-dark-grid{grid-template-columns:1fr}.hl-h1{font-size:48px}.hl-dashboard-shell{transform:none}.hl-features{grid-template-columns:repeat(2,1fr)}}@media(max-width:700px){.hl-container{width:calc(100% - 28px)}.hl-links a:not(.hl-nav-cta){display:none}.hl-hero{padding:50px 0 65px}.hl-h1{font-size:41px}.hl-features,.hl-step-grid{grid-template-columns:1fr}.hl-strip-inner,.hl-footer-inner{align-items:flex-start;flex-direction:column}.hl-photo-card{grid-template-columns:1fr}.hl-photo-stack{grid-template-columns:1fr 1fr}.hl-chart-grid{grid-template-columns:1fr}.hl-sidebar{display:none}.hl-dashboard-body{display:block}.hl-metrics{grid-template-columns:1fr 1fr}.hl-final h2{font-size:34px}}
+      `}</style>
+
+      <header className="hl-nav"><div className="hl-container hl-nav-inner"><Link href="/" style={{textDecoration:"none"}}><Logo /></Link><nav className="hl-links"><a href="#funciones">Funciones</a><a href="#motor">Motor de reservas</a><a href="#como-funciona">Cómo funciona</a><a href="#preguntas">Preguntas</a><Link href="/login">Ingresar</Link><Link href="/registro" className="hl-nav-cta">Probar gratis</Link></nav></div></header>
+
+      <section className="hl-hero"><div className="hl-container hl-hero-grid"><div><div className="hl-eyebrow"><span className="hl-dot"/> PMS para alojamientos independientes</div><h1 className="hl-h1">Gestioná tu alojamiento.<br/><span className="hl-gradient">Llená tus habitaciones.</span></h1><p className="hl-lead">Reservas, calendario, habitaciones, huéspedes y operación diaria en una sola plataforma. <strong>Menos planillas. Menos mensajes. Más control.</strong></p><div className="hl-actions"><Link href="/registro" className="hl-primary">Probar gratis 14 días →</Link><a href="#motor" className="hl-secondary">Ver el motor de reservas</a></div><div className="hl-trust"><span>✓ Sin instalación</span><span>✓ Desde cualquier dispositivo</span><span>✓ Pensado para equipos chicos</span></div></div><DashboardPreview/></div></section>
+
+      <section className="hl-strip"><div className="hl-container hl-strip-inner"><div><strong>¿Ya tenés una web?</strong> <span>También podemos conectar tu página actual con el motor de reservas.</span></div><a href="#motor">Quiero saber cómo funciona</a></div></section>
+
+      <section id="funciones" className="hl-section"><div className="hl-container"><div className="hl-heading"><div className="hl-kicker">TODO LO QUE NECESITÁS, EN UN SOLO LUGAR</div><h2 className="hl-title">Más reservas. Menos trabajo.</h2><p className="hl-text">Una operación hotelera no debería depender de una planilla para una cosa, WhatsApp para otra y cinco pestañas abiertas para saber qué pasa.</p></div><div className="hl-features">{features.map(([n,t,p])=><article className="hl-feature" key={t}><div className="hl-number">{n}</div><h3>{t}</h3><p>{p}</p></article>)}</div></div></section>
+
+      <section className="hl-product"><div className="hl-container hl-product-grid"><div className="hl-product-copy"><div className="hl-kicker">EL PMS QUE VAS A USAR TODOS LOS DÍAS</div><h2>Todo lo importante, a la vista.</h2><p className="hl-text">El dashboard está pensado para que abras Habitación Llena y entiendas rápidamente qué está pasando en tu alojamiento.</p><div className="hl-checks"><div><span>✓</span>Calendario y ocupación en tiempo real</div><div><span>✓</span>Reservas, check-in y check-out</div><div><span>✓</span>Habitaciones y housekeeping</div><div><span>✓</span>Huéspedes, tarifas y pagos</div><div><span>✓</span>Reportes para tomar decisiones</div></div><Link href="/registro" className="hl-primary">Quiero probarlo →</Link></div><div className="hl-photo-card"><img src={photos.room} alt="Habitación de hotel"/><div className="hl-photo-stack"><img src={photos.cabin} alt="Interior de cabaña"/><img src={photos.interior} alt="Interior de alojamiento"/></div></div></div></section>
+
+      <section id="motor" className="hl-engine"><div className="hl-container hl-engine-grid"><div className="hl-booking-card"><div className="hl-kicker">MOTOR DE RESERVAS</div><h3>Recibí reservas directas desde tu propia web</h3><p className="hl-text" style={{fontSize:14}}>El pasajero elige fechas, consulta disponibilidad real y completa sus datos. La reserva se registra en Habitación Llena.</p><div className="hl-fields"><div className="hl-field"><small>Entrada</small><b>10/08/2026</b></div><div className="hl-field"><small>Salida</small><b>12/08/2026</b></div><div className="hl-field"><small>Huéspedes</small><b>2 adultos</b></div><div className="hl-field"><small>Disponibilidad</small><b style={{color:"#0b8f55"}}>✓ Real</b></div></div><button className="hl-booking-button">Buscar disponibilidad</button></div><div className="hl-photo-main"><img src={photos.hero} alt="Alojamiento turístico"/><div className="hl-floating"><b>Reserva directa</b>La reserva entra al PMS y aparece en el calendario.</div></div></div></section>
+
+      <section className="hl-dark"><div className="hl-container hl-dark-grid"><div><div className="hl-kicker" style={{color:"#7eb5ff"}}>HECHO PARA ALOJAMIENTOS REALES</div><h2>La tecnología de un hotel grande, sin la complejidad.</h2><p>Habitación Llena nace pensando en el alojamiento independiente: donde muchas veces una misma persona recibe reservas, atiende huéspedes, coordina limpieza y mira la caja.</p><Link href="/registro" className="hl-primary">Empezar gratis →</Link></div><div className="hl-dark-card">{["Cabañas","Hosterías","Posadas","Hoteles pequeños","Complejos turísticos","Apartamentos"].map(x=><div className="hl-type" key={x}>✓ {x}</div>)}</div></div></section>
+
+      <section id="como-funciona" className="hl-steps"><div className="hl-container"><div className="hl-heading"><div className="hl-kicker">EMPEZÁ SIN VUELTAS</div><h2 className="hl-title">De cero a operativo en pocos pasos.</h2></div><div className="hl-step-grid">{[["1","Creá tu cuenta","Empezá y configurá los datos básicos de tu alojamiento."],["2","Cargá tu operación","Habitaciones, tarifas, reservas y equipo, todo en un mismo lugar."],["3","Empezá a vender","Conectá tu web al motor de reservas y recibí reservas directas."]].map(([n,t,p])=><div className="hl-step" key={n}><div className="hl-step-number">{n}</div><h3>{t}</h3><p>{p}</p></div>)}</div></div></section>
+
+      <section id="preguntas" className="hl-faq"><div className="hl-container"><div className="hl-heading"><div className="hl-kicker">PREGUNTAS FRECUENTES</div><h2 className="hl-title">Antes de empezar, seguramente quieras saber esto.</h2></div><div className="hl-faq-list">{faqs.map(([q,a])=><details key={q}><summary>{q}</summary><p>{a}</p></details>)}</div></div></section>
+
+      <section className="hl-final"><div className="hl-container"><div className="hl-kicker" style={{color:"#cfe3ff"}}>14 DÍAS DE PRUEBA</div><h2>Tu alojamiento merece algo mejor que una planilla.</h2><p>Probá Habitación Llena y empezá a ordenar tu operación.</p><Link href="/registro">Crear mi cuenta gratis →</Link></div></section>
+
+      <footer className="hl-footer"><div className="hl-container hl-footer-inner"><div><Logo light/><div className="hl-copy">© {new Date().getFullYear()} Habitación Llena. Gestión hotelera simple y profesional.</div></div><div className="hl-footer-links"><a href="#funciones">Funciones</a><a href="#motor">Motor de reservas</a><a href="#preguntas">Preguntas</a><Link href="/login">Ingresar</Link></div></div></footer>
+    </main>
+  )
 }
