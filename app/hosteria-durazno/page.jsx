@@ -142,14 +142,14 @@ export default function HosteriaDuraznoPublicBooking() {
                 <div><h2 style={{ margin: 0 }}>Habitaciones disponibles</h2><p style={{ color: "#667085" }}>{form.checkIn} → {form.checkOut} · {nights} {nights === 1 ? "noche" : "noches"}</p></div>
                 <button onClick={() => setStep("search")} style={secondary}>Cambiar fechas</button>
               </div>
-              {rooms.length === 0 ? <div style={empty}>No hay habitaciones disponibles para esas fechas.</div> : <div style={{ display: "grid", gap: 12 }}>{rooms.map((room) => <button key={room.id} onClick={() => { setSelectedRoom(room); setStep("guest") }} style={{ textAlign: "left", background: "#fff", border: "1px solid #dfe5ef", borderRadius: 14, padding: 18, cursor: "pointer" }}><div style={{ display: "flex", justifyContent: "space-between", gap: 20 }}><div><div style={{ fontSize: 19, fontWeight: 800 }}>{room.name}</div><div style={{ color: "#667085", marginTop: 5 }}>{room.type || "Habitación"} · hasta {room.capacity || form.guests} huéspedes</div></div><div style={{ fontWeight: 800 }}>{room.price ? `${money.format(room.price)} / noche` : "Consultar tarifa"}</div></div></button>)}</div>}
+              {rooms.length === 0 ? <div style={empty}>No hay habitaciones disponibles para esas fechas.</div> : <div style={{ display: "grid", gap: 12 }}>{rooms.map((room) => <button key={room.id} onClick={() => { setSelectedRoom(room); setStep("guest") }} style={{ textAlign: "left", background: "#fff", border: "1px solid #dfe5ef", borderRadius: 14, padding: 18, cursor: "pointer" }}><div style={{ display: "flex", justifyContent: "space-between", gap: 20 }}><div><div style={{ fontSize: 19, fontWeight: 800 }}>{room.type || "Habitación"}</div><div style={{ color: "#667085", marginTop: 5 }}>Hasta {room.capacity || form.guests} huéspedes</div></div><div style={{ fontWeight: 800 }}>{room.price ? `${money.format(room.price)} / noche` : "Consultar tarifa"}</div></div></button>)}</div>}
             </div>
           )}
 
           {step === "guest" && selectedRoom && (
             <form onSubmit={submitBooking}>
               <h2 style={{ marginTop: 0 }}>Confirmá tu reserva</h2>
-              <div style={{ background: "#f6f8fb", borderRadius: 12, padding: 14, marginBottom: 20 }}><strong>{selectedRoom.name}</strong> · {form.checkIn} → {form.checkOut} · {nights} noches</div>
+              <div style={{ background: "#f6f8fb", borderRadius: 12, padding: 14, marginBottom: 20 }}><strong>{selectedRoom.type || "Habitación"}</strong> · {form.checkIn} → {form.checkOut} · {nights} noches</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14 }}>
                 <label>Nombre y apellido<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Juan Pérez" style={input} /></label>
                 <label>Email<input required type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="juan@email.com" style={input} /></label>
@@ -165,7 +165,7 @@ export default function HosteriaDuraznoPublicBooking() {
               <div style={{ width: 58, height: 58, borderRadius: "50%", background: "#e8f7ee", color: "#0b8f55", display: "grid", placeItems: "center", margin: "0 auto 16px", fontSize: 28 }}>✓</div>
               <h2>Reserva confirmada</h2>
               <p style={{ color: "#667085" }}>Tu reserva fue registrada correctamente en Hosteria Durazno.</p>
-              <div style={{ background: "#f6f8fb", borderRadius: 12, padding: 16, display: "inline-block", textAlign: "left" }}><strong>Número de reserva:</strong> {bookingResult.numero_reserva}<br /><strong>Habitación:</strong> {selectedRoom.name}<br /><strong>Entrada:</strong> {form.checkIn}<br /><strong>Salida:</strong> {form.checkOut}</div>
+              <div style={{ background: "#f6f8fb", borderRadius: 12, padding: 16, display: "inline-block", textAlign: "left" }}><strong>Número de reserva:</strong> {bookingResult.numero_reserva}<br /><strong>Habitación:</strong> {selectedRoom.type || "Habitación"}<br /><strong>Entrada:</strong> {form.checkIn}<br /><strong>Salida:</strong> {form.checkOut}</div>
             </div>
           )}
           {error && <div style={{ marginTop: 16, padding: 12, borderRadius: 10, background: "#fff0f0", color: "#b42318" }}>{error}</div>}
