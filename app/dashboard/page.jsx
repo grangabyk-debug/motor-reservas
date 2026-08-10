@@ -240,6 +240,8 @@ export default function Home() {
   const [bandejaRespuesta, setBandejaRespuesta] = useState("")
   const [bandejaFiltro, setBandejaFiltro] = useState("Todos")
   const [bandejaConversaciones, setBandejaConversaciones] = useState([])
+  const [bandejaCargando, setBandejaCargando] = useState(false)
+  const [bandejaError, setBandejaError] = useState("")
   const [webIntegracion, setWebIntegracion] = useState("propia")
 
   const [mostrarAlojamiento, setMostrarAlojamiento] = useState(false)
@@ -324,10 +326,24 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
-    if (user?.id) {
-      cargarDatos()
+    if (!user?.id) return
+
+    cargarDatos()
+
+    let cancelado = false
+
+    async function refrescarBandeja() {
+      if (!cancelado) await cargarBandejaInstagram({ silencioso: true })
     }
-  }, [user])
+
+    refrescarBandeja()
+    const intervalo = window.setInterval(refrescarBandeja, 5000)
+
+    return () => {
+      cancelado = true
+      window.clearInterval(intervalo)
+    }
+  }, [user?.id])
 
   async function cargarDatos() {
     if (!user?.id) return
@@ -2703,6 +2719,104 @@ export default function Home() {
     if (user?.id) localStorage.setItem(`habitacion_llena_bandeja_${user.id}`, JSON.stringify(conversaciones))
   }
 
+  async function cargarBandejaInstagram({ silencioso = false } = {}) {
+    if (!user?.id) return
+
+    if (!silencioso) setBandejaCargando(true)
+    setBandejaError("")
+
+    try {
+      const { data: memberships, error: membershipsError } = await supabase
+        .from("property_members")
+        .select("property_id")
+        .eq("user_id", user.id)
+
+      if (membershipsError) throw membershipsError
+
+      const propertyIds = (memberships || []).map((m) => m.property_id).filter(Boolean)
+
+      if (!propertyIds.length) {
+        setBandejaConversaciones([])
+        return
+      }
+
+      const { data: conversacionesDB, error: conversacionesError } = await supabase
+        .from("inbox_conversations")
+        .select("id, property_id, connection_id, channel, external_thread_id, external_contact_id, last_message_at, last_message_text, unread_count")
+        .in("property_id", propertyIds)
+        .eq("channel", "Instagram")
+        .order("last_message_at", { ascending: false })
+
+      if (conversacionesError) throw conversacionesError
+
+      const ids = (conversacionesDB || []).map((c) => c.id).filter(Boolean)
+      let mensajesDB = []
+
+      if (ids.length) {
+        const { data, error } = await supabase
+          .from("inbox_messages")
+          .select("id, conversation_id, external_message_id, direction, sender_external_id, text, occurred_at, payload")
+          .in("conversation_id", ids)
+          .order("occurred_at", { ascending: true })
+
+        if (error) throw error
+        mensajesDB = data || []
+      }
+
+      const mensajesPorConversacion = new Map()
+      for (const mensaje of mensajesDB) {
+        const lista = mensajesPorConversacion.get(mensaje.conversation_id) || []
+        lista.push({
+          id: mensaje.id,
+          autor: mensaje.direction === "outbound" ? "hotel" : "huesped",
+          texto: mensaje.text || "[Mensaje multimedia]",
+          fecha: mensaje.occurred_at,
+          externalMessageId: mensaje.external_message_id,
+          payload: mensaje.payload,
+        })
+        mensajesPorConversacion.set(mensaje.conversation_id, lista)
+      }
+
+      const conversaciones = (conversacionesDB || []).map((c) => {
+        const contacto = String(c.external_contact_id || "")
+        return {
+          id: c.id,
+          propertyId: c.property_id,
+          connectionId: c.connection_id,
+          canal: "Instagram",
+          nombre: contacto ? `Instagram · ${contacto.slice(-6)}` : "Consulta de Instagram",
+          instagramContactId: contacto,
+          noLeida: Number(c.unread_count || 0) > 0,
+          ultimoMensaje: c.last_message_text || "",
+          fechaUltimoMensaje: c.last_message_at,
+          mensajes: mensajesPorConversacion.get(c.id) || [],
+        }
+      })
+
+      setBandejaConversaciones(conversaciones)
+
+      setBandejaConversacionActiva((actual) => {
+        if (actual && conversaciones.some((c) => c.id === actual)) return actual
+        return conversaciones[0]?.id || null
+      })
+    } catch (error) {
+      console.error("No se pudo cargar la bandeja de Instagram:", error)
+      if (!silencioso) setBandejaError(error?.message || "No se pudo cargar Instagram.")
+    } finally {
+      if (!silencioso) setBandejaCargando(false)
+    }
+  }
+
+  async function marcarConversacionLeida(id) {
+    if (!id) return
+    const { error } = await supabase
+      .from("inbox_conversations")
+      .update({ unread_count: 0 })
+      .eq("id", id)
+
+    if (error) console.warn("No se pudo marcar la conversación como leída:", error)
+  }
+
   function abrirAsistenciaHumana() {
     const numero = String(process.env.NEXT_PUBLIC_HL_SUPPORT_WHATSAPP || "").replace(/\D/g, "")
     if (!numero) {
@@ -3480,21 +3594,62 @@ export default function Home() {
     const filtradas = bandejaConversaciones.filter((c) => bandejaFiltro === "Todos" || c.canal === bandejaFiltro)
     const activa = filtradas.find((c) => c.id === bandejaConversacionActiva) || filtradas[0]
 
-    function seleccionarConversacion(c) {
+    async function seleccionarConversacion(c) {
       setBandejaConversacionActiva(c.id)
       if (c.noLeida) {
-        const actualizadas = bandejaConversaciones.map((x) => x.id === c.id ? { ...x, noLeida: false } : x)
-        guardarBandeja(actualizadas)
+        setBandejaConversaciones((actuales) => actuales.map((x) => x.id === c.id ? { ...x, noLeida: false } : x))
+        await marcarConversacionLeida(c.id)
       }
     }
 
-    function responder(e) {
+    async function responder(e) {
       e.preventDefault()
       const texto = bandejaRespuesta.trim()
       if (!texto || !activa) return
-      const actualizadas = bandejaConversaciones.map((c) => c.id === activa.id ? { ...c, mensajes: [...(c.mensajes || []), { autor: "hotel", texto, fecha: new Date().toISOString() }] } : c)
-      guardarBandeja(actualizadas)
-      setBandejaRespuesta("")
+
+      if (activa.canal !== "Instagram") {
+        const actualizadas = bandejaConversaciones.map((c) => c.id === activa.id
+          ? { ...c, mensajes: [...(c.mensajes || []), { autor: "hotel", texto, fecha: new Date().toISOString() }] }
+          : c
+        )
+        guardarBandeja(actualizadas)
+        setBandejaRespuesta("")
+        return
+      }
+
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+
+        if (!session?.access_token) {
+          alert("La sesión expiró. Volvé a iniciar sesión.")
+          return
+        }
+
+        const response = await fetch("/api/integrations/instagram/webhook", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            action: "send_message",
+            conversation_id: activa.id,
+            text: texto,
+          }),
+        })
+
+        const data = await response.json().catch(() => ({}))
+
+        if (!response.ok) {
+          throw new Error(data.error || "Instagram no aceptó el mensaje.")
+        }
+
+        setBandejaRespuesta("")
+        await cargarBandejaInstagram({ silencioso: true })
+      } catch (error) {
+        console.error("No se pudo enviar el mensaje de Instagram:", error)
+        alert(error?.message || "No se pudo enviar el mensaje de Instagram.")
+      }
     }
 
     return (<><Header titulo="Bandeja de entrada" subtitulo="Consultas de WhatsApp, Instagram, web y email en un solo lugar" />
@@ -3502,18 +3657,20 @@ export default function Home() {
         <section style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
           <div style={{ display: "flex", gap: 8, padding: 14, borderBottom: `1px solid ${colors.border}`, flexWrap: "wrap" }}>
             {canales.map((canal) => <button key={canal} onClick={() => setBandejaFiltro(canal)} style={bandejaFiltro === canal ? primaryButton : secondaryButton}>{canal}</button>)}
-            <span style={{ marginLeft: "auto", color: colors.muted, fontSize: 12, alignSelf: "center" }}>La IA está preparada, pero desactivada.</span>
+            <span style={{ marginLeft: "auto", color: colors.muted, fontSize: 12, alignSelf: "center" }}>
+              {bandejaCargando ? "Cargando conversaciones…" : bandejaError ? bandejaError : "Instagram se actualiza automáticamente."}
+            </span>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", minHeight: 520 }}>
             <div style={{ borderRight: `1px solid ${colors.border}`, overflowY: "auto" }}>
               {filtradas.length ? filtradas.map((c) => <button key={c.id} onClick={() => seleccionarConversacion(c)} style={{ width: "100%", border: "none", borderBottom: `1px solid ${colors.border}`, background: activa?.id === c.id ? colors.blueSoft : colors.white, padding: 14, textAlign: "left", cursor: "pointer" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}><strong>{c.nombre || "Consulta"}</strong><span style={{ fontSize: 10, color: colors.muted }}>{c.canal}</span></div>
-                <div style={{ color: colors.muted, fontSize: 12, marginTop: 5 }}>{c.mensajes?.[c.mensajes.length - 1]?.texto || "Sin mensajes"}</div>
+                <div style={{ color: colors.muted, fontSize: 12, marginTop: 5 }}>{c.mensajes?.[c.mensajes.length - 1]?.texto || c.ultimoMensaje || "Sin mensajes"}</div>
                 {c.noLeida && <span style={{ display: "inline-block", marginTop: 7, padding: "3px 7px", borderRadius: 999, background: colors.red, color: "#fff", fontSize: 10, fontWeight: 800 }}>NUEVO</span>}
-              </button>) : <div style={{ padding: 30, color: colors.muted, textAlign: "center" }}>No hay conversaciones conectadas todavía.<div style={{ marginTop: 8, fontSize: 12 }}>Cuando conectemos WhatsApp, Instagram, web o email, van a aparecer acá.</div></div>}
+              </button>) : <div style={{ padding: 30, color: colors.muted, textAlign: "center" }}>No hay conversaciones conectadas todavía.<div style={{ marginTop: 8, fontSize: 12 }}>Cuando llegue un mensaje de Instagram, va a aparecer acá.</div></div>}
             </div>
             <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-              {activa ? <><div style={{ padding: 16, borderBottom: `1px solid ${colors.border}` }}><strong>{activa.nombre}</strong><div style={{ color: colors.muted, fontSize: 11, marginTop: 3 }}>{activa.canal} · {activa.email || activa.telefono || "Sin contacto"}</div></div><div style={{ flex: 1, padding: 18, overflowY: "auto", background: colors.bg }}>{(activa.mensajes || []).map((m,i)=><div key={i} style={{ display: "flex", justifyContent: m.autor === "hotel" ? "flex-end" : "flex-start", marginBottom: 10 }}><div style={{ maxWidth: "75%", padding: "10px 12px", borderRadius: 12, background: m.autor === "hotel" ? colors.blue : colors.white, color: m.autor === "hotel" ? "#fff" : colors.text, border: m.autor === "hotel" ? "none" : `1px solid ${colors.border}`, fontSize: 13 }}>{m.texto}</div></div>)}</div><form onSubmit={responder} style={{ display: "flex", gap: 8, padding: 12, borderTop: `1px solid ${colors.border}` }}><input value={bandejaRespuesta} onChange={(e)=>setBandejaRespuesta(e.target.value)} placeholder="Escribí una respuesta..." style={{ ...inputStyle, flex: 1 }} /><button type="submit" style={primaryButton}>Responder</button></form></> : <div style={{ flex: 1, display: "grid", placeItems: "center", color: colors.muted }}>Seleccioná una conversación</div>}
+              {activa ? <><div style={{ padding: 16, borderBottom: `1px solid ${colors.border}` }}><strong>{activa.nombre}</strong><div style={{ color: colors.muted, fontSize: 11, marginTop: 3 }}>{activa.canal} · {activa.instagramContactId || "Sin contacto"}</div></div><div style={{ flex: 1, padding: 18, overflowY: "auto", background: colors.bg }}>{(activa.mensajes || []).map((m,i)=><div key={m.id || i} style={{ display: "flex", justifyContent: m.autor === "hotel" ? "flex-end" : "flex-start", marginBottom: 10 }}><div style={{ maxWidth: "75%", padding: "10px 12px", borderRadius: 12, background: m.autor === "hotel" ? colors.blue : colors.white, color: m.autor === "hotel" ? "#fff" : colors.text, border: m.autor === "hotel" ? "none" : `1px solid ${colors.border}`, fontSize: 13 }}>{m.texto}</div></div>)}</div><form onSubmit={responder} style={{ display: "flex", gap: 8, padding: 12, borderTop: `1px solid ${colors.border}` }}><input value={bandejaRespuesta} onChange={(e)=>setBandejaRespuesta(e.target.value)} placeholder={activa.canal === "Instagram" ? "Escribí una respuesta para Instagram..." : "Escribí una respuesta..."} style={{ ...inputStyle, flex: 1 }} /><button type="submit" style={primaryButton}>Responder</button></form></> : <div style={{ flex: 1, display: "grid", placeItems: "center", color: colors.muted }}>Seleccioná una conversación</div>}
             </div>
           </div>
         </section>
