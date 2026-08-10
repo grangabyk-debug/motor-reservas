@@ -92,16 +92,13 @@ t = t.replace(
   ""
 )
 
-const dniEnd = `                </Field>
-
-                <Field label="Pasajeros adicionales" wide>`
 const dniStart = t.indexOf(`                <Field label="DNI / Pasaporte">`)
-const passengersStart = t.indexOf(dniEnd, dniStart)
-if (dniStart < 0 || passengersStart < 0) throw new Error("No se encontró el bloque DNI/Pasajeros")
+if (dniStart < 0) throw new Error("No se encontró el campo DNI / Pasaporte")
+const dniFieldEnd = t.indexOf(`                </Field>`, dniStart)
+if (dniFieldEnd < 0) throw new Error("No se encontró el cierre del campo DNI / Pasaporte")
+const dniFieldClose = dniFieldEnd + `                </Field>`.length
 
-const addressBlock = `                <Field label="DNI / Pasaporte">
-                  <input value={dni} onChange={(e) => setDni(e.target.value)} placeholder="Ej. 35.123.456 o pasaporte" style={inputStyle} />
-                </Field>
+const addressBlock = `
 
                 <div ${marker} style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr", gap: 12, alignItems: "end" }}>
                   <Field label="Dirección">
@@ -113,11 +110,9 @@ const addressBlock = `                <Field label="DNI / Pasaporte">
                   <Field label="País">
                     <input value={pais} onChange={(e) => setPais(e.target.value)} placeholder="Argentina" style={inputStyle} />
                   </Field>
-                </div>
+                </div>`
 
-                <Field label="Pasajeros adicionales" wide>`
-
-t = t.slice(0, dniStart) + addressBlock + t.slice(passengersStart + len(dniEnd))
+t = t.slice(0, dniFieldClose) + addressBlock + t.slice(dniFieldClose)
 
 const contactStart = t.indexOf(`                <Field label="Email">`)
 const extraStart = t.indexOf(`                <Field label="Extra de la reserva">`, contactStart)
