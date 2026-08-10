@@ -114,6 +114,21 @@ const addressBlock = `
 
 t = t.slice(0, dniFieldClose) + addressBlock + t.slice(dniFieldClose)
 
+// Último ajuste solicitado: el bloque de pasajeros adicionales queda inmediatamente
+// debajo de Nombre del huésped principal + DNI/Pasaporte y antes de Dirección/Provincia/País.
+const passengerTextIndex = t.indexOf("Pasajeros adicionales")
+const passengerStart = passengerTextIndex >= 0 ? t.lastIndexOf("<Field", passengerTextIndex) : -1
+const addressMarkerStart = t.indexOf(`<div ${marker} style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr"`)
+if (passengerStart < 0 || addressMarkerStart < 0) throw new Error("No se encontró el bloque de pasajeros o dirección para reordenarlo")
+if (passengerStart > addressMarkerStart) {
+  const passengerEnd = t.indexOf(`</Field>`, passengerStart)
+  if (passengerEnd < 0) throw new Error("No se pudo cerrar el bloque de pasajeros adicionales")
+  const passengerBlock = t.slice(passengerStart, passengerEnd + `</Field>`.length) + "\n\n"
+  t = t.slice(0, passengerStart) + t.slice(passengerEnd + `</Field>`.length)
+  const newAddressMarkerStart = t.indexOf(`<div ${marker} style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr"`)
+  t = t.slice(0, newAddressMarkerStart) + passengerBlock + t.slice(newAddressMarkerStart)
+}
+
 const contactStart = t.indexOf(`                <Field label="Email">`)
 const extraStart = t.indexOf(`                <Field label="Extra de la reserva">`, contactStart)
 if (contactStart < 0 || extraStart < 0) throw new Error("No se encontró el bloque Email/Teléfono/Vehículos")
