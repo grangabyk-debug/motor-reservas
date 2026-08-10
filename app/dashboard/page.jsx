@@ -115,6 +115,44 @@ export default function Home() {
     document.body.dataset.hlTheme = modoOscuro ? "dark" : "light"
   }, [modoOscuro])
 
+  useEffect(() => {
+    if (!user?.id) return
+
+    const params = new URLSearchParams(window.location.search)
+    const instagramEstado = params.get("instagram")
+
+    if (!instagramEstado) return
+
+    if (instagramEstado === "connected") {
+      const username = params.get("username") || ""
+      const instagramUrl = username
+        ? `https://instagram.com/${username}`
+        : "https://instagram.com/"
+
+      setConfig((actual) => {
+        const actualizado = { ...actual, instagram: instagramUrl }
+        try {
+          localStorage.setItem(
+            `habitacion_llena_config_${user.id}`,
+            JSON.stringify(actualizado)
+          )
+        } catch {}
+        return actualizado
+      })
+
+      alert(
+        username
+          ? `Instagram @${username} quedó conectado correctamente.`
+          : "Instagram quedó conectado correctamente."
+      )
+    } else if (instagramEstado === "error") {
+      const detalle = params.get("message")
+      alert(`No se pudo conectar Instagram.${detalle ? `\n\n${detalle}` : ""}`)
+    }
+
+    window.history.replaceState({}, document.title, window.location.pathname)
+  }, [user?.id])
+
   function alternarModoOscuro() {
     setModoOscuro((actual) => !actual)
   }
@@ -3103,6 +3141,50 @@ export default function Home() {
     )
   }
 
+  async function conectarInstagram() {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        alert("La sesión expiró. Volvé a iniciar sesión.")
+        return
+      }
+
+      const { data: membership, error: membershipError } = await supabase
+        .from("property_members")
+        .select("property_id")
+        .eq("user_id", user.id)
+        .limit(1)
+        .maybeSingle()
+
+      if (membershipError) throw membershipError
+      if (!membership?.property_id) {
+        alert("No encontramos un alojamiento asociado a tu usuario.")
+        return
+      }
+
+      const response = await fetch("/api/integrations/instagram/oauth/start", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ property_id: membership.property_id }),
+      })
+
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok || !data.authorization_url) {
+        throw new Error(data.error || "No se pudo iniciar la conexión con Instagram.")
+      }
+
+      window.location.href = data.authorization_url
+    } catch (error) {
+      console.error("No se pudo iniciar la conexión de Instagram:", error)
+      alert(error?.message || "No se pudo iniciar la conexión de Instagram.")
+    }
+  }
+
   function Integraciones() {
     const conexiones = [
       {
@@ -3114,7 +3196,9 @@ export default function Home() {
       },
       {
         nombre: "Instagram",
-        descripcion: "Preparado para recibir consultas de Instagram en la bandeja omnicanal.",
+        descripcion: config.instagram
+          ? "Cuenta conectada y preparada para recibir mensajes en la bandeja omnicanal."
+          : "Conectá tu cuenta profesional de Instagram para recibir y responder mensajes desde la bandeja.",
         estado: config.instagram ? "Configurado" : "Pendiente",
         color: "#E1306C",
         url: config.instagram || "",
@@ -3191,9 +3275,10 @@ export default function Home() {
                   <div style={{ color: colors.muted, fontSize: 11, marginTop: 3 }}>Configuración sencilla, sin tokens técnicos visibles.</div>
                 </div>
                 <button type="button" onClick={() => {
+                  if (nombre === "Instagram") return conectarInstagram()
                   if (nombre === "Página web") return setWebIntegracion("propia")
-                  alert(`${nombre}: conexión real disponible en la próxima etapa de integración. Por ahora dejamos el flujo preparado.`)
-                }} style={secondaryButton}>{accion}</button>
+                  alert(`${nombre}: todavía no está habilitado el flujo de conexión real.`)
+                }} style={secondaryButton}>{nombre === "Instagram" ? "Conectar cuenta" : accion}</button>
               </div>
             ))}
           </div>
