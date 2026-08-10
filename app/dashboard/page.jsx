@@ -2726,72 +2726,29 @@ export default function Home() {
     setBandejaError("")
 
     try {
-      const { data: memberships, error: membershipsError } = await supabase
-        .from("property_members")
-        .select("property_id")
-        .eq("user_id", user.id)
+      const { data: { session } } = await supabase.auth.getSession()
 
-      if (membershipsError) throw membershipsError
-
-      const propertyIds = (memberships || []).map((m) => m.property_id).filter(Boolean)
-
-      if (!propertyIds.length) {
-        setBandejaConversaciones([])
-        return
+      if (!session?.access_token) {
+        throw new Error("La sesión expiró. Volvé a iniciar sesión.")
       }
 
-      const { data: conversacionesDB, error: conversacionesError } = await supabase
-        .from("inbox_conversations")
-        .select("id, property_id, connection_id, channel, external_thread_id, external_contact_id, last_message_at, last_message_text, unread_count")
-        .in("property_id", propertyIds)
-        .eq("channel", "Instagram")
-        .order("last_message_at", { ascending: false })
-
-      if (conversacionesError) throw conversacionesError
-
-      const ids = (conversacionesDB || []).map((c) => c.id).filter(Boolean)
-      let mensajesDB = []
-
-      if (ids.length) {
-        const { data, error } = await supabase
-          .from("inbox_messages")
-          .select("id, conversation_id, external_message_id, direction, sender_external_id, text, occurred_at, payload")
-          .in("conversation_id", ids)
-          .order("occurred_at", { ascending: true })
-
-        if (error) throw error
-        mensajesDB = data || []
-      }
-
-      const mensajesPorConversacion = new Map()
-      for (const mensaje of mensajesDB) {
-        const lista = mensajesPorConversacion.get(mensaje.conversation_id) || []
-        lista.push({
-          id: mensaje.id,
-          autor: mensaje.direction === "outbound" ? "hotel" : "huesped",
-          texto: mensaje.text || "[Mensaje multimedia]",
-          fecha: mensaje.occurred_at,
-          externalMessageId: mensaje.external_message_id,
-          payload: mensaje.payload,
-        })
-        mensajesPorConversacion.set(mensaje.conversation_id, lista)
-      }
-
-      const conversaciones = (conversacionesDB || []).map((c) => {
-        const contacto = String(c.external_contact_id || "")
-        return {
-          id: c.id,
-          propertyId: c.property_id,
-          connectionId: c.connection_id,
-          canal: "Instagram",
-          nombre: contacto ? `Instagram · ${contacto.slice(-6)}` : "Consulta de Instagram",
-          instagramContactId: contacto,
-          noLeida: Number(c.unread_count || 0) > 0,
-          ultimoMensaje: c.last_message_text || "",
-          fechaUltimoMensaje: c.last_message_at,
-          mensajes: mensajesPorConversacion.get(c.id) || [],
-        }
+      const response = await fetch("/api/integrations/instagram/webhook", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        cache: "no-store",
       })
+
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(data.error || "No se pudo cargar la bandeja de Instagram.")
+      }
+
+      const conversaciones = Array.isArray(data.conversations)
+        ? data.conversations
+        : []
 
       setBandejaConversaciones(conversaciones)
 
@@ -2801,7 +2758,9 @@ export default function Home() {
       })
     } catch (error) {
       console.error("No se pudo cargar la bandeja de Instagram:", error)
-      if (!silencioso) setBandejaError(error?.message || "No se pudo cargar Instagram.")
+      if (!silencioso) {
+        setBandejaError(error?.message || "No se pudo cargar Instagram.")
+      }
     } finally {
       if (!silencioso) setBandejaCargando(false)
     }
@@ -2809,12 +2768,34 @@ export default function Home() {
 
   async function marcarConversacionLeida(id) {
     if (!id) return
-    const { error } = await supabase
-      .from("inbox_conversations")
-      .update({ unread_count: 0 })
-      .eq("id", id)
 
-    if (error) console.warn("No se pudo marcar la conversación como leída:", error)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.access_token) return
+
+      const response = await fetch("/api/integrations/instagram/webhook", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          action: "mark_read",
+          conversation_id: id,
+        }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        console.warn(
+          "No se pudo marcar la conversación como leída:",
+          data.error || response.statusText
+        )
+      }
+    } catch (error) {
+      console.warn("No se pudo marcar la conversación como leída:", error)
+    }
   }
 
   function abrirAsistenciaHumana() {
