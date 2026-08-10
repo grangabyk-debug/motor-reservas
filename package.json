@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/migrate-dashboard-tenant-scope.mjs && next dev",
     "build": "node scripts/migrate-dashboard-tenant-scope.mjs && next build",
     "start": "next start"
   },
