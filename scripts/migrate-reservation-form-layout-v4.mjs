@@ -125,7 +125,7 @@ const newBlock = `                <div ${marker} style={{ gridColumn: "1 / -1", 
                           padding: 10,
                           background: colors.bg,
                           borderRadius: 9,
-                          border: `1px solid ${colors.border}`,
+                          border: "1px solid " + colors.border,
                         }}>
                           <div style={{ display: "grid", gap: 4 }}>
                             <span style={{ fontSize: 10, color: colors.muted, fontWeight: 800 }}>Pasajero {indice + 1}</span>
@@ -221,7 +221,7 @@ const newBlock = `                <div ${marker} style={{ gridColumn: "1 / -1", 
                         <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={handleDocumentoUpload} style={{ ...inputStyle, padding: 9 }} />
                         <div style={{ color: colors.muted, fontSize: 11 }}>
                           Foto o PDF del documento. Se guarda en un almacenamiento privado.
-                          {reservaSeleccionada?.documento_nombre ? ` Documento actual: ${reservaSeleccionada.documento_nombre}` : ""}
+                          {reservaSeleccionada?.documento_nombre ? " Documento actual: " + reservaSeleccionada.documento_nombre : ""}
                         </div>
                       </div>
                     </Field>
