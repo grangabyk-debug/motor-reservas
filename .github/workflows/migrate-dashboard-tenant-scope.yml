@@ -1,0 +1,316 @@
+name: Migrate dashboard tenant scope
+
+on:
+  push:
+    branches:
+      - refactor/multi-tenant-pms
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    if: github.event.head_commit.message != 'chore: apply dashboard tenant-scope migration'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Rewrite dashboard scope
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          path = Path('app/dashboard/page.jsx')
+          text = path.read_text(encoding='utf-8')
+
+          start = text.index('  async function cargarDatos() {')
+          end = text.index('\n  const habitacionesActivas =', start)
+
+          new_loader = r'''  async function cargarDatos() {
+    if (!user?.id) return
+
+    // El alcance del dashboard se determina exclusivamente por property_id.
+    // El usuario puede ser owner o miembro (reception, etc.) de una o varias propiedades.
+    const [
+      { data: membershipsData, error: membershipsError },
+      { data: ownedProperties, error: ownedPropertiesError },
+    ] = await Promise.all([
+      supabase
+        .from("property_members")
+        .select("property_id, role")
+        .eq("user_id", user.id),
+      supabase
+        .from("properties")
+        .select("id, name, owner_id, created_at")
+        .eq("owner_id", user.id),
+    ])
+
+    if (membershipsError) console.error("No se pudieron cargar los accesos del usuario:", membershipsError)
+    if (ownedPropertiesError) console.error("No se pudieron cargar las propiedades propias:", ownedPropertiesError)
+
+    const membershipIds = (membershipsData || []).map((m) => m.property_id).filter(Boolean)
+    const ownerIds = (ownedProperties || []).map((p) => p.id).filter(Boolean)
+    const propertyIds = Array.from(new Set([...membershipIds, ...ownerIds]))
+
+    const membershipRoles = (membershipsData || []).map((m) => m.role).filter(Boolean)
+    setRolReal(membershipRoles[0] || (ownerIds.length ? "owner" : "reception"))
+
+    if (!propertyIds.length) {
+      setAlojamientos([])
+      setHabitaciones([])
+      setReservas([])
+      setBloqueos([])
+      setPagos([])
+      return
+    }
+
+    const [
+      { data: propertiesData, error: propertiesError },
+      { data: alojamientosData, error: alojamientosError },
+      { data: habitacionesData, error: habitacionesError },
+      { data: reservasData, error: reservasError },
+      { data: bloqueosData, error: bloqueosError },
+      { data: pagosData, error: pagosError },
+    ] = await Promise.all([
+      supabase.from("properties").select("*").in("id", propertyIds).order("created_at", { ascending: true }),
+      supabase.from("alojamientos").select("*").in("property_id", propertyIds).order("id", { ascending: true }),
+      supabase.from("habitaciones").select("*").in("property_id", propertyIds).order("id", { ascending: true }),
+      supabase.from("reservas").select("*").in("property_id", propertyIds).order("id", { ascending: false }),
+      supabase.from("bloqueos").select("*").in("property_id", propertyIds).order("fecha_desde", { ascending: true }),
+      supabase.from("pagos").select("*").in("property_id", propertyIds).order("created_at", { ascending: false }),
+    ])
+
+    if (propertiesError) console.error("No se pudieron cargar las propiedades:", propertiesError)
+    if (alojamientosError) console.error("No se pudieron cargar los alojamientos:", alojamientosError)
+    if (habitacionesError) console.error("No se pudieron cargar las habitaciones:", habitacionesError)
+    if (reservasError) console.error("No se pudieron cargar las reservas:", reservasError)
+    if (bloqueosError) console.warn("No se pudieron cargar los bloqueos:", bloqueosError)
+    if (pagosError) console.warn("No se pudieron cargar los pagos:", pagosError)
+
+    const propiedadesAccesibles = propertiesData || []
+    const propertiesById = new Map(propiedadesAccesibles.map((p) => [String(p.id), p]))
+
+    // Las tablas legacy siguen siendo la fuente de datos de esta interfaz,
+    // pero ahora el vínculo con la propiedad es explícito y no depende del nombre.
+    const alojamientosFinal = (alojamientosData || []).map((a) => ({
+      ...a,
+      property_id: a.property_id || null,
+    }))
+
+    // Si alguna propiedad todavía no tiene fila legacy de alojamiento,
+    // exponemos la propiedad como fallback para no dejarla invisible.
+    for (const propertyId of propertyIds) {
+      if (!alojamientosFinal.some((a) => String(a.property_id) === String(propertyId))) {
+        const property = propertiesById.get(String(propertyId))
+        if (property) {
+          alojamientosFinal.push({
+            id: property.id,
+            nombre: property.name,
+            user_id: property.owner_id,
+            property_id: property.id,
+          })
+        }
+      }
+    }
+
+    const alojamientoIds = new Set(alojamientosFinal.map((a) => String(a.id)))
+    const habitacionesFinal = (habitacionesData || []).filter((h) =>
+      alojamientoIds.has(String(h.alojamiento_id)) || propertyIds.some((p) => String(p) === String(h.property_id))
+    )
+    const reservasFinal = (reservasData || []).filter((r) =>
+      alojamientoIds.has(String(r.alojamiento_id)) || propertyIds.some((p) => String(p) === String(r.property_id))
+    )
+
+    setAlojamientos(alojamientosFinal)
+    setHabitaciones(habitacionesFinal)
+    setReservas(reservasFinal)
+    setHabitacionEstados(
+      habitacionesFinal.map((h) => ({
+        habitacion_id: h.id,
+        estado: h.estado || "libre",
+      }))
+    )
+    setEstadosHousekeepingPendientes(
+      Object.fromEntries(
+        habitacionesFinal.map((h) => [String(h.id), h.estado || "libre"])
+      )
+    )
+    setBloqueos(bloqueosData || [])
+    setPagos(pagosData || [])
+
+    if (!alojamientoSeleccionado && alojamientosFinal.length) {
+      setAlojamientoSeleccionado(String(alojamientosFinal[0].id))
+    }
+  }
+'''
+
+          text = text[:start] + new_loader + text[end:]
+
+          replacements = [
+            (
+              '''const filas = seleccionadas.map((id) => ({
+      user_id: user.id,
+      habitacion_id: Number(id),''',
+              '''const filas = seleccionadas.map((id) => {
+      const habitacion = habitaciones.find((h) => String(h.id) === String(id))
+      return {
+      property_id: habitacion?.property_id || null,
+      user_id: user.id,
+      habitacion_id: Number(id),'''
+            ),
+            (
+              '''      detalle: bloqueoDetalle.trim(),
+    }))''',
+              '''      detalle: bloqueoDetalle.trim(),
+      }
+    })'''
+            ),
+            (
+              '''      user_id: user.id,
+      reserva_id: reserva.id,
+      monto,''',
+              '''      property_id: reserva.property_id || alojamientos.find((a) => String(a.id) === String(reserva.alojamiento_id))?.property_id || null,
+      user_id: user.id,
+      reserva_id: reserva.id,
+      monto,'''
+            ),
+            ('''.eq("habitacion_id", reserva.habitacion_id)
+      .eq("user_id", user.id)''', '''.eq("habitacion_id", reserva.habitacion_id)'''),
+            ('''.eq("id", reserva.id)
+      .eq("user_id", user.id)''', '''.eq("id", reserva.id)'''),
+            ('''.eq("id", Number(reserva.habitacion_id))
+      .eq("user_id", user.id)''', '''.eq("id", Number(reserva.habitacion_id))'''),
+            ('''.eq("id", reserva.id)
+      .eq("user_id", user.id)
+      .select("*")''', '''.eq("id", reserva.id)
+      .select("*")'''),
+            ('''.eq("id", reserva.id)
+      .eq("user_id", user.id)
+
+    if (error) {''', '''.eq("id", reserva.id)
+
+    if (error) {'''),
+            ('''.eq("id", reserva.id)
+      .eq("user_id", user.id)
+    if (error) {''', '''.eq("id", reserva.id)
+    if (error) {'''),
+          ]
+
+          for old, new in replacements:
+            if old not in text:
+              print('WARNING: pattern not found:', old[:80].replace('\n', ' '))
+            text = text.replace(old, new)
+
+          # Guardar una reserva siempre incluye el property_id real.
+          marker = '''    const calculo = calcularImporteReserva()
+
+    const datos = {'''
+          replacement = '''    const calculo = calcularImporteReserva()
+    const alojamientoActivo = alojamientos.find((a) => String(a.id) === String(alojamientoSeleccionado))
+    const propertyIdActivo = alojamientoActivo?.property_id || (properties?.find?.((p) => String(p.id) === String(alojamientoSeleccionado))?.id) || null
+
+    const datos = {'''
+          # properties is not part of component state, so use the selected accommodation directly.
+          replacement = '''    const calculo = calcularImporteReserva()
+    const alojamientoActivo = alojamientos.find((a) => String(a.id) === String(alojamientoSeleccionado))
+    const propertyIdActivo = alojamientoActivo?.property_id || (alojamientoActivo?.id && String(alojamientoActivo.id).includes("-") ? alojamientoActivo.id : null)
+
+    const datos = {'''
+          if marker not in text:
+            raise SystemExit('Could not find reservation calculation marker')
+          text = text.replace(marker, replacement, 1)
+          text = text.replace('''    const datos = {
+      alojamiento_id: Number(alojamientoSeleccionado),''', '''    const datos = {
+      property_id: propertyIdActivo,
+      alojamiento_id: Number.isFinite(Number(alojamientoSeleccionado)) ? Number(alojamientoSeleccionado) : null,''', 1)
+
+          # New properties and rooms are always linked explicitly to property_id.
+          old_create_property = '''  async function crearAlojamiento(e) {
+    e.preventDefault()
+    if (!nuevoAlojamiento.trim()) return
+
+    const { error } = await supabase
+      .from("alojamientos")
+      .insert([{ nombre: nuevoAlojamiento.trim(), user_id: user.id }])
+
+    if (error) {
+      console.error(error)
+      alert("No se pudo crear el alojamiento.")
+      return
+    }
+
+    setNuevoAlojamiento("")
+    setMostrarAlojamiento(false)
+    await cargarDatos()
+  }'''
+          new_create_property = '''  async function crearAlojamiento(e) {
+    e.preventDefault()
+    const nombreNuevo = nuevoAlojamiento.trim()
+    if (!nombreNuevo) return
+
+    const { data: property, error: propertyError } = await supabase
+      .from("properties")
+      .insert([{ name: nombreNuevo, owner_id: user.id }])
+      .select("id, name, owner_id")
+      .single()
+
+    if (propertyError || !property) {
+      console.error(propertyError)
+      alert("No se pudo crear la propiedad.")
+      return
+    }
+
+    const { error: alojamientoError } = await supabase
+      .from("alojamientos")
+      .insert([{ nombre: nombreNuevo, user_id: user.id, property_id: property.id }])
+
+    if (alojamientoError) {
+      console.error(alojamientoError)
+      await supabase.from("properties").delete().eq("id", property.id)
+      alert("No se pudo crear el alojamiento.")
+      return
+    }
+
+    setNuevoAlojamiento("")
+    setMostrarAlojamiento(false)
+    setAlojamientoSeleccionado(String(property.id))
+    await cargarDatos()
+  }'''
+          if old_create_property in text:
+            text = text.replace(old_create_property, new_create_property, 1)
+          else:
+            print('WARNING: crearAlojamiento block not found')
+
+          old_room = '''    const datos = {
+      nombre: nuevaHabitacion.trim(),
+      tipo: tipoFinal,
+      alojamiento_id: Number(nuevoAlojamientoHabitacion),
+      activa: true,
+      user_id: user.id,
+    }'''
+          new_room = '''    const alojamientoHabitacion = alojamientos.find((a) => String(a.id) === String(nuevoAlojamientoHabitacion))
+    const datos = {
+      nombre: nuevaHabitacion.trim(),
+      tipo: tipoFinal,
+      alojamiento_id: Number.isFinite(Number(nuevoAlojamientoHabitacion)) ? Number(nuevoAlojamientoHabitacion) : null,
+      property_id: alojamientoHabitacion?.property_id || (String(nuevoAlojamientoHabitacion).includes("-") ? nuevoAlojamientoHabitacion : null),
+      activa: true,
+      user_id: user.id,
+    }'''
+          if old_room in text:
+            text = text.replace(old_room, new_room, 1)
+          else:
+            print('WARNING: crearHabitacion block not found')
+
+          path.write_text(text, encoding='utf-8')
+          print('dashboard migration applied')
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/dashboard/page.jsx
+          git diff --cached --quiet && exit 0
+          git commit -m "chore: apply dashboard tenant-scope migration"
+          git push
