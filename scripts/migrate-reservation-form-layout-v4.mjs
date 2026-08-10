@@ -151,16 +151,10 @@ if (financialStart < 0 || documentStart < 0) throw new Error("No se encontró el
 const financialBlock = `                <div ${marker} style={{
                   gridColumn: "1 / -1",
                   display: "grid",
-                  gridTemplateColumns: monedaReserva === "USD" ? "1.35fr 1fr 1fr 1fr" : "1.35fr 1fr 1fr",
+                  gridTemplateColumns: monedaReserva === "USD" ? "1fr 1fr 1fr" : "1fr 1fr",
                   gap: 12,
                   alignItems: "end",
                 }}>
-                  <Field label="Extra de la reserva">
-                    <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 8 }}>
-                      <input value={extraDescripcion} onChange={(e) => setExtraDescripcion(e.target.value)} placeholder="Ej. Desayuno, mascota, traslado..." style={inputStyle} />
-                      <input type="number" min="0" step="0.01" value={extraReserva} onChange={(e) => setExtraReserva(e.target.value)} placeholder="Valor" style={inputStyle} />
-                    </div>
-                  </Field>
                   <Field label="Descuento">
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                       <select value={descuentoTipo} onChange={(e) => setDescuentoTipo(e.target.value)} style={inputStyle}>
@@ -191,7 +185,7 @@ const documentStart2 = t.indexOf(`                <Field label="Documento del hu
 const conditionsStart = t.indexOf(`                <Field label="Condiciones especiales" wide>`, documentStart2)
 if (documentStart2 < 0 || conditionsStart < 0) throw new Error("No se encontró el bloque Documento/Garantía")
 
-const documentGuaranteeBlock = `                <div ${marker} style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, alignItems: "start" }}>
+const documentGuaranteeBlock = `                <div ${marker} style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1fr 1fr 1.35fr", gap: 14, alignItems: "start" }}>
                   <Field label="Documento del huésped">
                     <div style={{ display: "grid", gap: 7 }}>
                       <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={handleDocumentoUpload} style={{ ...inputStyle, padding: 9 }} />
@@ -201,6 +195,14 @@ const documentGuaranteeBlock = `                <div ${marker} style={{ gridColu
                       </div>
                     </div>
                   </Field>
+
+                  <Field label="Extra de la reserva">
+                    <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 8 }}>
+                      <input value={extraDescripcion} onChange={(e) => setExtraDescripcion(e.target.value)} placeholder="Ej. Desayuno, mascota, traslado..." style={inputStyle} />
+                      <input type="number" min="0" step="0.01" value={extraReserva} onChange={(e) => setExtraReserva(e.target.value)} placeholder="Valor" style={inputStyle} />
+                    </div>
+                  </Field>
+
                   <Field label="Garantía de reserva">
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                       <select value={garantiaTipo} onChange={(e) => setGarantiaTipo(e.target.value)} style={inputStyle}>
