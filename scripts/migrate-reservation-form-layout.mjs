@@ -23,15 +23,15 @@ const extraStart = text.indexOf(`                <Field label="Extra de la reser
 if (contactStart < 0 || extraStart < 0) throw new Error("No se encontró el bloque Email/Teléfono/Vehículos")
 
 const contactVehicleBlock = `                <div ${marker} style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.25fr) minmax(0, 1.25fr) 90px minmax(0, 1fr) minmax(0, 1fr)", gap: 10, alignItems: "end", marginTop: 2 }}>
-                  <Field label="Email">
+                  <Field label={<span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>✉️ Email</span>}>
                     <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="huésped@email.com" style={inputStyle} />
                   </Field>
 
-                  <Field label="Teléfono">
+                  <Field label={<span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>📞 Teléfono</span>}>
                     <input value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="+54 9..." style={inputStyle} />
                   </Field>
 
-                  <Field label="Vehículos">
+                  <Field label={<span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>🚗 Vehículos</span>}>
                     <input
                       type="number"
                       min="0"
@@ -125,6 +125,20 @@ const extraGuaranteeBlock = `                <div style={{ display: "grid", grid
 
 `
 text = text.slice(0, extraFieldStart) + extraGuaranteeBlock + text.slice(conditionsStart)
+
+// Último ajuste visual: pasajeros adicionales va inmediatamente debajo del huésped principal,
+// antes de dirección/provincia/país, como en el diseño aprobado.
+const passengerStart = text.indexOf(`                <Field label={<span style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}><span>Pasajeros adicionales</span>`)
+const addressStart = text.indexOf(`                <Field label="Dirección">`)
+if (passengerStart < 0 || addressStart < 0) throw new Error("No se encontró el bloque de pasajeros o dirección")
+if (passengerStart > addressStart) {
+  const passengerEnd = text.indexOf(`</Field>`, passengerStart)
+  if (passengerEnd < 0) throw new Error("No se pudo cerrar el bloque de pasajeros adicionales")
+  const passengerBlock = text.slice(passengerStart, passengerEnd + `</Field>`.length) + "\n\n"
+  text = text.slice(0, passengerStart) + text.slice(passengerEnd + `</Field>`.length)
+  const newAddressStart = text.indexOf(`                <Field label="Dirección">`)
+  text = text.slice(0, newAddressStart) + passengerBlock + text.slice(newAddressStart)
+}
 
 fs.writeFileSync(path, text)
 console.log("Reservation form layout migration applied")
