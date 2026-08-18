@@ -1,6 +1,7 @@
 "use client";
 import ComandaFinal from "./ComandaFinal";
+import ComandaDashboardChrome from "./ComandaDashboardChrome";
 
 export default function ComandaApp(){
-  return <ComandaFinal/>;
+  return <ComandaDashboardChrome><ComandaFinal/></ComandaDashboardChrome>;
 }
