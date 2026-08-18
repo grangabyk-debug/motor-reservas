@@ -4,18 +4,18 @@ import {useEffect,useState} from "react";
 import {supabase} from "../../../lib/supabase";
 
 const DEFAULTS={
-  principal:{admin:true,salonEdit:true,cashMode:"full",sale:true,kds:false,print:true,menuEdit:true,reports:true,customers:true},
-  support:{admin:true,salonEdit:true,cashMode:"full",sale:true,kds:false,print:true,menuEdit:true,reports:true,customers:true},
-  waiter:{admin:false,salonEdit:false,cashMode:"open_close",sale:true,kds:false,print:true,menuEdit:false,reports:false,customers:false},
-  waiter_app:{admin:false,salonEdit:false,cashMode:"none",sale:true,kds:false,print:true,menuEdit:false,reports:false,customers:false},
-  cashier:{admin:false,salonEdit:false,cashMode:"full",sale:true,kds:false,print:true,menuEdit:false,reports:false,customers:false},
-  counter:{admin:false,salonEdit:false,cashMode:"open_close",sale:true,kds:false,print:true,menuEdit:false,reports:false,customers:false},
-  kitchen:{admin:false,salonEdit:false,cashMode:"none",sale:false,kds:true,print:false,menuEdit:false,reports:false,customers:false},
-  bar:{admin:false,salonEdit:false,cashMode:"none",sale:false,kds:true,print:false,menuEdit:false,reports:false,customers:false},
-  printer:{admin:false,salonEdit:false,cashMode:"none",sale:false,kds:false,print:true,menuEdit:false,reports:false,customers:false},
-  delivery:{admin:false,salonEdit:false,cashMode:"open_close",sale:true,kds:false,print:true,menuEdit:false,reports:false,customers:false},
-  delivery_app:{admin:false,salonEdit:false,cashMode:"none",sale:true,kds:false,print:false,menuEdit:false,reports:false,customers:false},
-  custom:{admin:false,salonEdit:false,cashMode:"none",sale:true,kds:false,print:false,menuEdit:false,reports:false,customers:false}
+  principal:{admin:true,salonEdit:true,cashMode:"full",sale:true,kds:false,print:true,menuEdit:true,reports:true,customerAdmin:true},
+  support:{admin:true,salonEdit:true,cashMode:"full",sale:true,kds:false,print:true,menuEdit:true,reports:true,customerAdmin:true},
+  waiter:{admin:false,salonEdit:false,cashMode:"open_close",sale:true,kds:false,print:true,menuEdit:false,reports:false,customerAdmin:false},
+  waiter_app:{admin:false,salonEdit:false,cashMode:"none",sale:true,kds:false,print:true,menuEdit:false,reports:false,customerAdmin:false},
+  cashier:{admin:false,salonEdit:false,cashMode:"full",sale:true,kds:false,print:true,menuEdit:false,reports:false,customerAdmin:false},
+  counter:{admin:false,salonEdit:false,cashMode:"open_close",sale:true,kds:false,print:true,menuEdit:false,reports:false,customerAdmin:false},
+  kitchen:{admin:false,salonEdit:false,cashMode:"none",sale:false,kds:true,print:false,menuEdit:false,reports:false,customerAdmin:false},
+  bar:{admin:false,salonEdit:false,cashMode:"none",sale:false,kds:true,print:false,menuEdit:false,reports:false,customerAdmin:false},
+  printer:{admin:false,salonEdit:false,cashMode:"none",sale:false,kds:false,print:true,menuEdit:false,reports:false,customerAdmin:false},
+  delivery:{admin:false,salonEdit:false,cashMode:"open_close",sale:true,kds:false,print:true,menuEdit:false,reports:false,customerAdmin:false},
+  delivery_app:{admin:false,salonEdit:false,cashMode:"none",sale:true,kds:false,print:false,menuEdit:false,reports:false,customerAdmin:false},
+  custom:{admin:false,salonEdit:false,cashMode:"none",sale:true,kds:false,print:false,menuEdit:false,reports:false,customerAdmin:false}
 };
 
 const ADMIN_LABELS=new Set(["Usuarios","Funcionarios","Cajas","Puestos","Sectores","Cocinas","Impresoras","Impresión","Tickets","Notificaciones","Módulos y pagos","Mi cuenta","Comercio","Sucursales"]);
@@ -40,7 +40,7 @@ function resolveCfg(role,permissions={}){
     print:all||permissions?.print_queue===true||permissions?.partial_ticket===true||permissions?.full_ticket===true||base.print,
     menuEdit:all||permissions?.menu_edit===true||permissions?.product_edit===true||base.menuEdit,
     reports:all||permissions?.reports===true||Object.keys(permissions||{}).some(k=>k.startsWith("reports_")&&permissions[k]===true)||base.reports,
-    customers:all||permissions?.customers===true||permissions?.customer_read===true||base.customers
+    customerAdmin:all||permissions?.customers===true||permissions?.customer_edit===true||permissions?.customer_incidents===true||base.customerAdmin
   };
 }
 
@@ -48,7 +48,7 @@ export default function ComandaRoleGuard(){
   const [station,setStation]=useState(null);
   useEffect(()=>{let alive=true;(async()=>{const id=sessionStorage.getItem("comanda_workstation");if(!id){if(alive)setStation({role:"principal",permissions:{all:true}});return}const {data}=await supabase.from("comanda_workstations").select("kind,permissions,is_support").eq("id",id).maybeSingle();if(alive)setStation({role:data?.is_support?"support":data?.kind||"custom",permissions:data?.permissions||{}})})();return()=>{alive=false}},[]);
   useEffect(()=>{if(!station)return;const {role,permissions}=station,cfg=resolveCfg(role,permissions);document.documentElement.dataset.comandaRole=role;document.documentElement.dataset.comandaSalonEdit=cfg.salonEdit?"1":"0";document.documentElement.dataset.comandaCashMode=cfg.cashMode;document.documentElement.dataset.comandaPermissions=JSON.stringify(permissions||{});
-    const forbiddenLabel=label=>(!cfg.admin&&ADMIN_LABELS.has(label))||(!cfg.salonEdit&&SALON_EDIT_LABELS.has(label))||(cfg.cashMode!=="full"&&FULL_CASH_LABELS.has(label))||(!cfg.menuEdit&&MENU_EDIT_LABELS.has(label))||(!cfg.reports&&REPORT_LABELS.has(label))||(!cfg.customers&&CUSTOMER_ADMIN_LABELS.has(label));
+    const forbiddenLabel=label=>(!cfg.admin&&ADMIN_LABELS.has(label))||(!cfg.salonEdit&&SALON_EDIT_LABELS.has(label))||(cfg.cashMode!=="full"&&FULL_CASH_LABELS.has(label))||(!cfg.menuEdit&&MENU_EDIT_LABELS.has(label))||(!cfg.reports&&REPORT_LABELS.has(label))||(!cfg.customerAdmin&&CUSTOMER_ADMIN_LABELS.has(label));
     const apply=()=>{for(const el of document.querySelectorAll("button,a,[role=button]")){const label=txt(el);if(forbiddenLabel(label)&&!el.closest('[data-session-ui="1"]'))el.style.display="none";}if(!cfg.salonEdit){for(const el of document.querySelectorAll('[data-sector-planner="1"]'))el.style.display="none";}};
     const deny=e=>{const el=e.target?.closest?.("button,a,[role=button]");if(!el||!forbiddenLabel(txt(el)))return;e.preventDefault();e.stopPropagation();e.stopImmediatePropagation?.();};
     apply();const mo=new MutationObserver(apply);mo.observe(document.body,{subtree:true,childList:true});document.addEventListener("click",deny,true);
