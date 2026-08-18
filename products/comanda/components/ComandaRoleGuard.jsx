@@ -4,18 +4,18 @@ import {useEffect,useState} from "react";
 import {supabase} from "../../../lib/supabase";
 
 const DEFAULTS={
-  principal:{admin:true,salonEdit:true,cashMode:"full",sale:true,kds:false,print:true},
-  support:{admin:true,salonEdit:true,cashMode:"full",sale:true,kds:false,print:true},
-  waiter:{admin:false,salonEdit:false,cashMode:"open_close",sale:true,kds:false,print:true},
-  waiter_app:{admin:false,salonEdit:false,cashMode:"none",sale:true,kds:false,print:true},
-  cashier:{admin:false,salonEdit:false,cashMode:"full",sale:true,kds:false,print:true},
-  counter:{admin:false,salonEdit:false,cashMode:"open_close",sale:true,kds:false,print:true},
-  kitchen:{admin:false,salonEdit:false,cashMode:"none",sale:false,kds:true,print:false},
-  bar:{admin:false,salonEdit:false,cashMode:"none",sale:false,kds:true,print:false},
-  printer:{admin:false,salonEdit:false,cashMode:"none",sale:false,kds:false,print:true},
-  delivery:{admin:false,salonEdit:false,cashMode:"open_close",sale:true,kds:false,print:true},
-  delivery_app:{admin:false,salonEdit:false,cashMode:"none",sale:true,kds:false,print:false},
-  custom:{admin:false,salonEdit:false,cashMode:"none",sale:true,kds:false,print:false}
+  principal:{admin:true,salonEdit:true,cashMode:"full",sale:true,kds:false,print:true,menuEdit:true,reports:true,customers:true},
+  support:{admin:true,salonEdit:true,cashMode:"full",sale:true,kds:false,print:true,menuEdit:true,reports:true,customers:true},
+  waiter:{admin:false,salonEdit:false,cashMode:"open_close",sale:true,kds:false,print:true,menuEdit:false,reports:false,customers:false},
+  waiter_app:{admin:false,salonEdit:false,cashMode:"none",sale:true,kds:false,print:true,menuEdit:false,reports:false,customers:false},
+  cashier:{admin:false,salonEdit:false,cashMode:"full",sale:true,kds:false,print:true,menuEdit:false,reports:false,customers:false},
+  counter:{admin:false,salonEdit:false,cashMode:"open_close",sale:true,kds:false,print:true,menuEdit:false,reports:false,customers:false},
+  kitchen:{admin:false,salonEdit:false,cashMode:"none",sale:false,kds:true,print:false,menuEdit:false,reports:false,customers:false},
+  bar:{admin:false,salonEdit:false,cashMode:"none",sale:false,kds:true,print:false,menuEdit:false,reports:false,customers:false},
+  printer:{admin:false,salonEdit:false,cashMode:"none",sale:false,kds:false,print:true,menuEdit:false,reports:false,customers:false},
+  delivery:{admin:false,salonEdit:false,cashMode:"open_close",sale:true,kds:false,print:true,menuEdit:false,reports:false,customers:false},
+  delivery_app:{admin:false,salonEdit:false,cashMode:"none",sale:true,kds:false,print:false,menuEdit:false,reports:false,customers:false},
+  custom:{admin:false,salonEdit:false,cashMode:"none",sale:true,kds:false,print:false,menuEdit:false,reports:false,customers:false}
 };
 
 const ADMIN_LABELS=new Set(["Usuarios","Funcionarios","Cajas","Puestos","Sectores","Cocinas","Impresoras","Impresión","Tickets","Notificaciones","Módulos y pagos","Mi cuenta","Comercio","Sucursales"]);
@@ -28,7 +28,21 @@ const CUSTOMER_ADMIN_LABELS=new Set(["Nuevo cliente","Eliminar cliente","Editar 
 function txt(el){return el?.textContent?.replace(/\s+/g," ").trim()||""}
 function visible(el){if(!el)return false;const s=getComputedStyle(el);return s.display!=="none"&&s.visibility!=="hidden"}
 function clickLegacy(labels){const all=[...document.querySelectorAll("button")].filter(b=>visible(b)&&!b.closest('[data-role-guard="1"]'));for(const l of labels){const b=all.find(x=>txt(x)===l);if(b){b.click();return true}}return false}
-function resolveCfg(role,permissions={}){const base=DEFAULTS[role]||DEFAULTS.custom;const all=permissions?.all===true;return {admin:all||permissions?.settings===true||base.admin,salonEdit:all||permissions?.tables_layout===true||permissions?.manage_sectors===true,cashMode:all||permissions?.cash_full===true||permissions?.cash_audit===true?"full":permissions?.cash_open_close===true?"open_close":base.cashMode,sale:all||permissions?.sale===true||permissions?.sale_restaurant===true||permissions?.sale_counter===true||permissions?.sale_delivery===true||base.sale,kds:permissions?.kds===true||permissions?.kds_view===true||base.kds,print:all||permissions?.print_queue===true||permissions?.partial_ticket===true||permissions?.full_ticket===true||base.print,menuEdit:all||permissions?.menu_edit===true||permissions?.product_edit===true,reports:all||permissions?.reports===true||Object.keys(permissions||{}).some(k=>k.startsWith("reports_")&&permissions[k]===true),customers:all||permissions?.customers===true||permissions?.customer_read===true};}
+function resolveCfg(role,permissions={}){
+  const base=DEFAULTS[role]||DEFAULTS.custom;
+  const all=permissions?.all===true;
+  return {
+    admin:all||permissions?.settings===true||base.admin,
+    salonEdit:all||permissions?.tables_layout===true||permissions?.manage_sectors===true||base.salonEdit,
+    cashMode:all||permissions?.cash_full===true||permissions?.cash_audit===true?"full":permissions?.cash_open_close===true?"open_close":base.cashMode,
+    sale:all||permissions?.sale===true||permissions?.sale_restaurant===true||permissions?.sale_counter===true||permissions?.sale_delivery===true||base.sale,
+    kds:all||permissions?.kds===true||permissions?.kds_view===true||base.kds,
+    print:all||permissions?.print_queue===true||permissions?.partial_ticket===true||permissions?.full_ticket===true||base.print,
+    menuEdit:all||permissions?.menu_edit===true||permissions?.product_edit===true||base.menuEdit,
+    reports:all||permissions?.reports===true||Object.keys(permissions||{}).some(k=>k.startsWith("reports_")&&permissions[k]===true)||base.reports,
+    customers:all||permissions?.customers===true||permissions?.customer_read===true||base.customers
+  };
+}
 
 export default function ComandaRoleGuard(){
   const [station,setStation]=useState(null);
@@ -47,7 +61,7 @@ export default function ComandaRoleGuard(){
       else if(role==="printer")clickLegacy(["Impresión","Impresoras"]);
       else if(role==="delivery"||role==="delivery_app")clickLegacy(["Venta","Delivery"]);
     },180);
-    return()=>{clearTimeout(t);mo.disconnect();document.removeEventListener("click",deny,true);delete document.documentElement.dataset.comandaRole;delete document.documentElement.dataset.comandaPermissions;};
+    return()=>{clearTimeout(t);mo.disconnect();document.removeEventListener("click",deny,true);delete document.documentElement.dataset.comandaRole;delete document.documentElement.dataset.comandaSalonEdit;delete document.documentElement.dataset.comandaCashMode;delete document.documentElement.dataset.comandaPermissions;};
   },[station]);
   return <span data-role-guard="1" style={{display:"none"}}/>;
 }
