@@ -2,6 +2,7 @@
 
 import {useEffect,useMemo,useRef,useState} from "react";
 import {supabase} from "../../../lib/supabase";
+import {COMANDA_INSPECTOR_MANUAL} from "../inspector/manual";
 import ui from "../styles/comanda-mobile-inspector.module.css";
 
 const STORAGE_KEY="comanda_inspector_chat_v1";
@@ -95,7 +96,7 @@ export default function ComandaMobileInspector(){
       const access=await token();
       let summary=`Inspección terminada: ${passed} controles correctos, ${warnings} para revisar y ${failed} problemas.`;
       if(access){
-        const response=await fetch("/api/comanda/inspector",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${access}`},body:JSON.stringify({action:"inspection",report:next,context:await collectContext()})});
+        const response=await fetch("/api/comanda/inspector",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${access}`},body:JSON.stringify({action:"inspection",report:next,context:await collectContext(),manual:COMANDA_INSPECTOR_MANUAL})});
         const data=await response.json().catch(()=>({}));
         if(response.ok&&data.answer)summary=data.answer;
       }
@@ -114,7 +115,7 @@ export default function ComandaMobileInspector(){
     setMessages(prev=>[...prev,userMessage]);setInput("");setSending(true);setNotice("");
     try{
       const access=await token();if(!access)throw new Error("Tu sesión venció. Volvé a ingresar.");
-      const response=await fetch("/api/comanda/inspector",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${access}`},body:JSON.stringify({action:"chat",question,context:await collectContext(),report,history:messages.slice(-10).map(m=>({role:m.role,text:m.text}))})});
+      const response=await fetch("/api/comanda/inspector",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${access}`},body:JSON.stringify({action:"chat",question,context:await collectContext(),report,history:messages.slice(-10).map(m=>({role:m.role,text:m.text})),manual:COMANDA_INSPECTOR_MANUAL})});
       const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||"No pude consultar al Inspector.");
       setMessages(prev=>[...prev,{id:uid(),role:"assistant",text:data.answer||"No pude generar una respuesta."}]);
     }catch(error){setMessages(prev=>[...prev,{id:uid(),role:"assistant",text:error?.message||"No pude responder en este momento."}])}finally{setSending(false)}
