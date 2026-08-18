@@ -13,9 +13,10 @@ import ComandaStaffManager from "./ComandaStaffManager";
 import ComandaUserManager from "./ComandaUserManager";
 import ComandaWorkstationManager from "./ComandaWorkstationManager";
 import ComandaPrinterManager from "./ComandaPrinterManager";
+import ComandaSetupManagers from "./ComandaSetupManagers";
 import ComandaPrincipalHome from "./ComandaPrincipalHome";
 import ComandaReportsHub from "./ComandaReportsHub";
 
 export default function ComandaApp(){
-  return <ComandaAccessGate><ComandaDashboardChrome><ComandaNavigationGuard/><ComandaSessionUX/><ComandaRoleGuard/><ComandaPrincipalHome/><ComandaReportsHub/><ComandaKitchenKDS/><ComandaWaiterCash/><ComandaSectorPlanner/><ComandaUserManager/><ComandaStaffManager/><ComandaWorkstationManager/><ComandaPrinterManager/><ComandaMenuLayer><ComandaFinal/></ComandaMenuLayer></ComandaDashboardChrome></ComandaAccessGate>;
+  return <ComandaAccessGate><ComandaDashboardChrome><ComandaNavigationGuard/><ComandaSessionUX/><ComandaRoleGuard/><ComandaPrincipalHome/><ComandaReportsHub/><ComandaKitchenKDS/><ComandaWaiterCash/><ComandaSectorPlanner/><ComandaUserManager/><ComandaStaffManager/><ComandaWorkstationManager/><ComandaPrinterManager/><ComandaSetupManagers/><ComandaMenuLayer><ComandaFinal/></ComandaMenuLayer></ComandaDashboardChrome></ComandaAccessGate>;
 }
