@@ -17,7 +17,8 @@ import ComandaSetupManagers from "./ComandaSetupManagers";
 import ComandaPrincipalHome from "./ComandaPrincipalHome";
 import ComandaReportsHub from "./ComandaReportsHub";
 import ComandaSalesLayer from "./ComandaSalesLayer";
+import ComandaReadyNotifier from "./ComandaReadyNotifier";
 
 export default function ComandaApp(){
-  return <ComandaAccessGate><ComandaDashboardChrome><ComandaNavigationGuard/><ComandaSessionUX/><ComandaRoleGuard/><ComandaPrincipalHome/><ComandaReportsHub/><ComandaKitchenKDS/><ComandaWaiterCash/><ComandaSalesLayer/><ComandaSectorPlanner/><ComandaUserManager/><ComandaStaffManager/><ComandaWorkstationManager/><ComandaPrinterManager/><ComandaSetupManagers/><ComandaMenuLayer><ComandaFinal/></ComandaMenuLayer></ComandaDashboardChrome></ComandaAccessGate>;
+  return <ComandaAccessGate><ComandaDashboardChrome><ComandaNavigationGuard/><ComandaSessionUX/><ComandaRoleGuard/><ComandaPrincipalHome/><ComandaReportsHub/><ComandaKitchenKDS/><ComandaReadyNotifier/><ComandaWaiterCash/><ComandaSalesLayer/><ComandaSectorPlanner/><ComandaUserManager/><ComandaStaffManager/><ComandaWorkstationManager/><ComandaPrinterManager/><ComandaSetupManagers/><ComandaMenuLayer><ComandaFinal/></ComandaMenuLayer></ComandaDashboardChrome></ComandaAccessGate>;
 }
