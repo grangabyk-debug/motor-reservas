@@ -3,7 +3,8 @@
 import {useEffect} from "react";
 
 const DIRECT={"Principal":"Venta","Caja activa":"Caja","Venta / Salón":"Venta","Menú":"Menú","Clientes":"Clientes","Reportes":"Reportes"};
-const ADMIN={"Usuarios":"Usuarios","Funcionarios":"Funcionarios","Cajas":"Cajas","Puestos":"Puestos","Cocinas":"Cocinas","Impresión":"Impresoras","Configuración":"Config.","Mi cuenta":"Mi cuenta"};
+const ADMIN={"Configuración":"Config."};
+const HIDE_FROM_SIDEBAR=new Set(["Usuarios","Funcionarios","Cajas","Puestos","Cocinas","Impresión","Mi cuenta"]);
 
 function textOf(button){return button?.textContent?.replace(/\s+/g," ").trim()||""}
 function isSidebar(button){return !!button?.closest?.('[class*="sidebar"]')}
@@ -28,22 +29,32 @@ function trigger(label){
   return true;
 }
 
-function openAdmin(target){
+function openConfig(){
   const config=findLegacy("Config.")||findLegacy("Configuración")||findLegacy("Cuenta");
   if(!config)return false;
   config.click();
-  if(target==="Config.")return true;
-  window.setTimeout(()=>{
-    const next=findLegacy(target);
-    if(next)next.click();
-  },160);
   return true;
 }
 
 function setSidebarActive(label){
   for(const button of document.querySelectorAll('[class*="sidebar"] button')){
+    const text=textOf(button);
     button.dataset.comandaSide="1";
-    button.dataset.comandaActive=textOf(button)===label?"1":"0";
+    button.dataset.comandaActive=text===label?"1":"0";
+  }
+}
+
+function simplifySidebar(){
+  const sidebar=document.querySelector('[class*="sidebar"]');
+  if(!sidebar)return;
+  for(const button of sidebar.querySelectorAll("button")){
+    const label=textOf(button);
+    button.dataset.comandaSide="1";
+    if(HIDE_FROM_SIDEBAR.has(label))button.style.display="none";
+    else button.style.removeProperty("display");
+  }
+  for(const divider of sidebar.querySelectorAll('[class*="sideDivider"]')){
+    divider.style.display="none";
   }
 }
 
@@ -61,7 +72,7 @@ export default function ComandaNavigationGuard(){
     document.head.appendChild(style);
 
     const normalize=()=>{
-      for(const button of document.querySelectorAll('[class*="sidebar"] button'))button.dataset.comandaSide="1";
+      simplifySidebar();
       for(const account of document.querySelectorAll('[class*="topbar"] [class*="accountButton"]')){
         if(textOf(account)!=="Cuenta")account.textContent="Cuenta";
       }
@@ -81,11 +92,11 @@ export default function ComandaNavigationGuard(){
 
       let ok=false;
       if(DIRECT[label])ok=trigger(DIRECT[label]);
-      else ok=openAdmin(ADMIN[label]);
+      else ok=openConfig();
 
       if(!ok){
         window.setTimeout(()=>{
-          if(DIRECT[label])trigger(DIRECT[label]); else openAdmin(ADMIN[label]);
+          if(DIRECT[label])trigger(DIRECT[label]); else openConfig();
         },80);
       }
     };
