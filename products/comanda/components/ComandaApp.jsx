@@ -2,7 +2,8 @@
 import ComandaFinal from "./ComandaFinal";
 import ComandaDashboardChrome from "./ComandaDashboardChrome";
 import ComandaMenuLayer from "./ComandaMenuLayer";
+import ComandaNavigationGuard from "./ComandaNavigationGuard";
 
 export default function ComandaApp(){
-  return <ComandaDashboardChrome><ComandaMenuLayer><ComandaFinal/></ComandaMenuLayer></ComandaDashboardChrome>;
+  return <ComandaDashboardChrome><ComandaNavigationGuard/><ComandaMenuLayer><ComandaFinal/></ComandaMenuLayer></ComandaDashboardChrome>;
 }
