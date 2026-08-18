@@ -7,7 +7,8 @@ import ComandaSessionUX from "./ComandaSessionUX";
 import ComandaKitchenKDS from "./ComandaKitchenKDS";
 import ComandaWaiterCash from "./ComandaWaiterCash";
 import ComandaSectorPlanner from "./ComandaSectorPlanner";
+import ComandaRoleGuard from "./ComandaRoleGuard";
 
 export default function ComandaApp(){
-  return <ComandaDashboardChrome><ComandaNavigationGuard/><ComandaSessionUX/><ComandaKitchenKDS/><ComandaWaiterCash/><ComandaSectorPlanner/><ComandaMenuLayer><ComandaFinal/></ComandaMenuLayer></ComandaDashboardChrome>;
+  return <ComandaDashboardChrome><ComandaNavigationGuard/><ComandaSessionUX/><ComandaRoleGuard/><ComandaKitchenKDS/><ComandaWaiterCash/><ComandaSectorPlanner/><ComandaMenuLayer><ComandaFinal/></ComandaMenuLayer></ComandaDashboardChrome>;
 }
