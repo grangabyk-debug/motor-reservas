@@ -1,0 +1,129 @@
+"use client";
+
+import {useCallback,useEffect,useMemo,useState} from "react";
+import {supabase} from "../../../lib/supabase";
+import ui from "../styles/comanda-sector-planner.module.css";
+
+const clamp=(n,min,max)=>Math.max(min,Math.min(max,Number(n)||min));
+
+function text(el){return el?.textContent?.replace(/\s+/g," ").trim()||""}
+function workspace(){
+  const h=[...document.querySelectorAll("h1,h2,h3")].find(x=>text(x).toLowerCase().includes("mantenimiento de sectores"));
+  return h?.closest('[class*="workspace"]')||h?.parentElement?.parentElement||null;
+}
+
+export default function ComandaSectorPlanner(){
+  const [active,setActive]=useState(false);
+  const [branchId,setBranchId]=useState(null);
+  const [accountId,setAccountId]=useState(null);
+  const [sectors,setSectors]=useState([]);
+  const [tables,setTables]=useState([]);
+  const [sectorId,setSectorId]=useState(null);
+  const [modal,setModal]=useState(null);
+  const [saving,setSaving]=useState(false);
+  const [notice,setNotice]=useState("");
+
+  const sector=sectors.find(s=>s.id===sectorId)||null;
+  const cols=clamp(sector?.grid_cols||8,2,18);
+  const rows=clamp(sector?.grid_rows||6,2,14);
+  const scale=clamp(sector?.cell_size||86,55,120);
+
+  const load=useCallback(async(id)=>{
+    if(!id)return;
+    const [{data:branch},{data:ss,error:se},{data:tt,error:te}]=await Promise.all([
+      supabase.from("comanda_branches").select("account_id").eq("id",id).maybeSingle(),
+      supabase.from("comanda_sectors").select("*").eq("branch_id",id).eq("active",true).order("sort_order").order("created_at"),
+      supabase.from("comanda_tables").select("*").eq("branch_id",id).eq("active",true).order("created_at")
+    ]);
+    if(se||te){setNotice(se?.message||te?.message||"No se pudo cargar el salón");return}
+    setAccountId(branch?.account_id||null);setSectors(ss||[]);setTables(tt||[]);setSectorId(old=>(ss||[]).some(s=>s.id===old)?old:ss?.[0]?.id||null);
+  },[]);
+
+  useEffect(()=>{
+    const id=sessionStorage.getItem("comanda_branch");setBranchId(id);load(id);
+    const detect=()=>{const w=workspace();const yes=!!w;setActive(yes);if(w)w.style.display=yes?"none":""};
+    detect();const mo=new MutationObserver(detect);mo.observe(document.body,{subtree:true,childList:true,characterData:true});
+    return()=>{mo.disconnect();const w=workspace();if(w)w.style.display=""};
+  },[load]);
+
+  const sectorTables=useMemo(()=>tables.filter(t=>t.sector_id===sectorId),[tables,sectorId]);
+  const occupied=useMemo(()=>{
+    const map=new Map();
+    const fallback=[];
+    for(const t of sectorTables){
+      const x=Number(t.pos_x),y=Number(t.pos_y);
+      if(Number.isInteger(x)&&Number.isInteger(y)&&x>=0&&x<cols&&y>=0&&y<rows&&!map.has(`${x}:${y}`))map.set(`${x}:${y}`,t);
+      else fallback.push(t);
+    }
+    let i=0;for(const t of fallback){while(i<cols*rows&&map.has(`${i%cols}:${Math.floor(i/cols)}`))i++;if(i<cols*rows){map.set(`${i%cols}:${Math.floor(i/cols)}`,t);i++}}
+    return map;
+  },[sectorTables,cols,rows]);
+
+  async function patchSector(patch){
+    if(!sector)return;setSectors(v=>v.map(s=>s.id===sector.id?{...s,...patch}:s));
+    const {error}=await supabase.from("comanda_sectors").update(patch).eq("id",sector.id);if(error)setNotice(error.message);
+  }
+  async function addTable(form){
+    if(!accountId||!branchId||!sector)return;
+    setSaving(true);
+    const payload={account_id:accountId,branch_id:branchId,sector_id:sector.id,number:String(form.number||form.name||sectorTables.length+1),name:form.name||`Mesa ${form.number||sectorTables.length+1}`,seats:Number(form.seats||4),pos_x:form.x,pos_y:form.y,width:1,height:1,shape:form.shape||"square",table_type:"table",active:true};
+    const {data,error}=await supabase.from("comanda_tables").insert(payload).select().single();setSaving(false);
+    if(error){setNotice(error.message);return}setTables(v=>[...v,data]);setModal(null);
+  }
+  async function updateTable(id,patch){
+    setSaving(true);const {data,error}=await supabase.from("comanda_tables").update(patch).eq("id",id).select().single();setSaving(false);
+    if(error){setNotice(error.message);return}setTables(v=>v.map(t=>t.id===id?data:t));setModal(null);
+  }
+  async function deleteTable(id){
+    setSaving(true);const {error}=await supabase.from("comanda_tables").update({active:false}).eq("id",id);setSaving(false);
+    if(error){setNotice(error.message);return}setTables(v=>v.filter(t=>t.id!==id));setModal(null);
+  }
+  async function addSector(){
+    if(!accountId||!branchId)return;setSaving(true);
+    const {data,error}=await supabase.from("comanda_sectors").insert({account_id:accountId,branch_id:branchId,name:`Sector ${sectors.length+1}`,sort_order:sectors.length+1,active:true,sector_type:"salon",grid_cols:8,grid_rows:6,cell_size:86}).select().single();setSaving(false);
+    if(error){setNotice(error.message);return}setSectors(v=>[...v,data]);setSectorId(data.id);
+  }
+  async function editSectorName(){setModal({type:"sector",name:sector?.name||""})}
+
+  if(!active||!sector)return null;
+  const cells=Array.from({length:cols*rows},(_,i)=>({x:i%cols,y:Math.floor(i/cols)}));
+
+  return <div className={ui.layer} data-sector-planner="1">
+    <div className={ui.header}><div><span>CONFIGURACIÓN DEL SALÓN</span><h1>Mantenimiento de sectores y mesas</h1><p>Armá el plano por celdas. La grilla se adapta automáticamente a la pantalla.</p></div><button className={ui.primary} onClick={addSector}>+ Nuevo sector</button></div>
+    <div className={ui.tabs}>{sectors.map(s=><button key={s.id} className={s.id===sectorId?ui.activeTab:""} onClick={()=>setSectorId(s.id)}>{s.name}</button>)}</div>
+    <div className={ui.body}>
+      <section className={ui.boardWrap}>
+        <div className={ui.board} style={{gridTemplateColumns:`repeat(${cols}, minmax(0,1fr))`,gridTemplateRows:`repeat(${rows}, minmax(0,1fr))`,"--scale":scale}}>
+          {cells.map(({x,y})=>{const t=occupied.get(`${x}:${y}`);return <button key={`${x}-${y}`} className={`${ui.cell} ${t?ui.filled:""} ${t?.shape==="round"?ui.round:""}`} onClick={()=>t?setModal({type:"table",table:t,x,y}):setModal({type:"newTable",x,y})}>{t?<><strong>{t.number||t.name}</strong><small>{t.seats||4} lugares</small></>:<><b>＋</b><span>Agregar mesa</span></>}</button>})}
+        </div>
+      </section>
+      <aside className={ui.panel}>
+        <div className={ui.panelHead}><div><small>SECTOR ACTIVO</small><strong>{sector.name}</strong></div><button onClick={editSectorName}>Editar</button></div>
+        <label><span>Cantidad de columnas <b>{cols}</b></span><input type="range" min="2" max="18" value={cols} onChange={e=>patchSector({grid_cols:Number(e.target.value)})}/></label>
+        <label><span>Cantidad de filas <b>{rows}</b></span><input type="range" min="2" max="14" value={rows} onChange={e=>patchSector({grid_rows:Number(e.target.value)})}/></label>
+        <label><span>Tamaño visual <b>{scale}%</b></span><input type="range" min="55" max="120" value={scale} onChange={e=>patchSector({cell_size:Number(e.target.value)})}/></label>
+        <div className={ui.hint}>El tamaño es proporcional. La grilla nunca supera el área disponible: se achica o agranda para entrar completa.</div>
+        <div className={ui.legend}><span><i className={ui.dotTable}/>Mesa creada</span><span><i className={ui.dotEmpty}/>Celda libre</span></div>
+      </aside>
+    </div>
+
+    {modal&&<div className={ui.overlay} onMouseDown={e=>e.target===e.currentTarget&&setModal(null)}><div className={ui.modal}>
+      <div className={ui.modalHead}><div><small>{modal.type==="sector"?"SECTOR":"MESA"}</small><h3>{modal.type==="newTable"?"Agregar mesa":modal.type==="table"?`Editar ${modal.table.name||modal.table.number}`:"Editar sector"}</h3></div><button onClick={()=>setModal(null)}>×</button></div>
+      {modal.type==="sector"?<SectorForm initial={modal} disabled={saving} onCancel={()=>setModal(null)} onSave={async f=>{setSaving(true);const {data,error}=await supabase.from("comanda_sectors").update({name:f.name}).eq("id",sector.id).select().single();setSaving(false);if(error){setNotice(error.message);return}setSectors(v=>v.map(s=>s.id===sector.id?data:s));setModal(null)}}/>:
+      modal.type==="newTable"?<TableForm initial={{number:String(sectorTables.length+1),name:"",seats:4,shape:"square",x:modal.x,y:modal.y}} disabled={saving} onCancel={()=>setModal(null)} onSave={addTable}/>:
+      <TableForm initial={{...modal.table,x:modal.x,y:modal.y}} disabled={saving} onCancel={()=>setModal(null)} onDelete={()=>deleteTable(modal.table.id)} onSave={f=>updateTable(modal.table.id,{number:String(f.number),name:f.name,seats:Number(f.seats),shape:f.shape,pos_x:f.x,pos_y:f.y})}/>} 
+    </div></div>}
+    {notice&&<div className={ui.toast} onClick={()=>setNotice("")}>{notice}</div>}
+  </div>;
+}
+
+function TableForm({initial,onSave,onCancel,onDelete,disabled}){
+  const [f,setF]=useState(initial);const set=(k,v)=>setF(x=>({...x,[k]:v}));
+  return <form onSubmit={e=>{e.preventDefault();onSave(f)}}><div className={ui.form}>
+    <label>Número<input value={f.number||""} onChange={e=>set("number",e.target.value)} required/></label>
+    <label>Nombre<input value={f.name||""} onChange={e=>set("name",e.target.value)} placeholder="Ej. Mesa ventana"/></label>
+    <label>Comensales<input type="number" min="1" max="30" value={f.seats||4} onChange={e=>set("seats",e.target.value)} required/></label>
+    <label>Forma<select value={f.shape||"square"} onChange={e=>set("shape",e.target.value)}><option value="square">Cuadrada</option><option value="round">Redonda</option><option value="rect">Rectangular</option></select></label>
+  </div><div className={ui.modalFoot}>{onDelete&&<button type="button" className={ui.danger} onClick={onDelete}>Eliminar</button>}<span/><button type="button" onClick={onCancel}>Cancelar</button><button className={ui.primary} disabled={disabled}>Guardar cambios</button></div></form>
+}
+function SectorForm({initial,onSave,onCancel,disabled}){const [name,setName]=useState(initial.name);return <form onSubmit={e=>{e.preventDefault();onSave({name})}}><div className={ui.form}><label className={ui.full}>Nombre del sector<input value={name} onChange={e=>setName(e.target.value)} required autoFocus/></label></div><div className={ui.modalFoot}><span/><button type="button" onClick={onCancel}>Cancelar</button><button className={ui.primary} disabled={disabled}>Guardar cambios</button></div></form>}
