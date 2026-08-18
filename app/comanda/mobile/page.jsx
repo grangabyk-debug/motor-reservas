@@ -1,4 +1,3 @@
-import ComandaInspectorGate from "../../../products/comanda/components/ComandaInspectorGate";
 import ComandaMobileInspector from "../../../products/comanda/components/ComandaMobileInspector";
 
 export const metadata={
@@ -8,5 +7,5 @@ export const metadata={
 };
 
 export default function Page(){
-  return <ComandaInspectorGate><ComandaMobileInspector/></ComandaInspectorGate>;
+  return <ComandaMobileInspector publicPreview/>;
 }
