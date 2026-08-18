@@ -30,22 +30,17 @@ export default function ComandaMenuLayer({children}){
     const root=rootRef.current;if(!root)return;
     const update=()=>{
       const workspace=findMenuWorkspace(root);
-      const isActive=!!workspace&&productsTabActive(workspace);
-      setActive(isActive);
-      if(workspace)workspace.style.display=isActive?"none":"";
+      setActive(!!workspace&&productsTabActive(workspace));
     };
     update();
     const observer=new MutationObserver(update);
     observer.observe(root,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:["class","aria-selected"]});
-    return()=>{
-      observer.disconnect();
-      const workspace=findMenuWorkspace(root);if(workspace)workspace.style.display="";
-    };
+    return()=>observer.disconnect();
   },[]);
 
   return <div ref={rootRef} className={v.menuLayer}>
     {children}
-    {active&&branchId&&<ComandaVisualMenu rootRef={rootRef} branchId={branchId} onNotice={setNotice}/>} 
+    {active&&branchId&&<div className={v.overlay}><ComandaVisualMenu rootRef={rootRef} branchId={branchId} onNotice={setNotice}/></div>}
     {notice&&<div className={ui.notice} onAnimationEnd={()=>setNotice("")}>{notice}</div>}
   </div>;
 }
