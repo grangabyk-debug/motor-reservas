@@ -6,8 +6,10 @@ import ui from "../styles/comanda-polish.module.css";
 import v from "../styles/comanda-menu-visual.module.css";
 
 function findMenuWorkspace(root){
-  const heading=[...root.querySelectorAll("h1,h2,h3")].find(el=>el.textContent?.trim()==="Menú");
-  return heading?.closest('[class*="workspace"]')||heading?.parentElement?.parentElement||null;
+  const heading=[...root.querySelectorAll("h1,h2,h3")].find(el=>
+    el.textContent?.trim()==="Menú" && !el.closest('[data-comanda-visual-menu="1"]')
+  );
+  return heading?.closest('[class*="workspace"]')||null;
 }
 
 function productsTabActive(workspace){
@@ -40,7 +42,7 @@ export default function ComandaMenuLayer({children}){
 
   return <div ref={rootRef} className={v.menuLayer}>
     {children}
-    {active&&branchId&&<div className={v.overlay}><ComandaVisualMenu rootRef={rootRef} branchId={branchId} onNotice={setNotice}/></div>}
+    {active&&branchId&&<div className={v.overlay} data-comanda-visual-menu="1"><ComandaVisualMenu rootRef={rootRef} branchId={branchId} onNotice={setNotice}/></div>}
     {notice&&<div className={ui.notice} onAnimationEnd={()=>setNotice("")}>{notice}</div>}
   </div>;
 }
