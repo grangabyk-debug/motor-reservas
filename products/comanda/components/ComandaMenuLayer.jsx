@@ -3,6 +3,7 @@
 import {useEffect,useRef,useState} from "react";
 import ComandaVisualMenu from "./ComandaVisualMenu";
 import ui from "../styles/comanda-polish.module.css";
+import v from "../styles/comanda-menu-visual.module.css";
 
 function findMenuWorkspace(root){
   const heading=[...root.querySelectorAll("h1,h2,h3")].find(el=>el.textContent?.trim()==="Menú");
@@ -42,7 +43,7 @@ export default function ComandaMenuLayer({children}){
     };
   },[]);
 
-  return <div ref={rootRef} className={ui.menuLayer}>
+  return <div ref={rootRef} className={v.menuLayer}>
     {children}
     {active&&branchId&&<ComandaVisualMenu rootRef={rootRef} branchId={branchId} onNotice={setNotice}/>} 
     {notice&&<div className={ui.notice} onAnimationEnd={()=>setNotice("")}>{notice}</div>}
