@@ -4,6 +4,7 @@ import {useEffect,useMemo,useState} from "react";
 import {supabase} from "../../../lib/supabase";
 import ComandaArt,{resolveCategoryArt,resolveProductArt} from "./ComandaArt";
 import ui from "../styles/comanda-polish.module.css";
+import v from "../styles/comanda-menu-visual.module.css";
 
 const money=(value)=>new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS",minimumFractionDigits:0,maximumFractionDigits:2}).format(Number(value||0));
 
@@ -16,8 +17,8 @@ function clickLegacy(rootRef,label){
 function ArtBox({item,category,isCategory=false}){
   const image=item?.image_url;
   const kind=isCategory?resolveCategoryArt(item):resolveProductArt(item,category);
-  return <div className={`${ui.visualArtBox} ${isCategory?ui.visualArtCategory:""}`}>
-    {image?<img src={image} alt="" loading="lazy"/>:<ComandaArt kind={kind} className={ui.visualArt}/>} 
+  return <div className={`${v.artBox} ${isCategory?v.artCategory:""}`}>
+    {image?<img src={image} alt="" loading="lazy"/>:<ComandaArt kind={kind} className={v.art}/>} 
   </div>;
 }
 
@@ -53,40 +54,40 @@ export default function ComandaVisualMenu({rootRef,branchId,onNotice}){
     return products.filter(p=>(!selected||p.category_id===selected)&&(!q||`${p.public_name||p.name} ${p.sku||""}`.toLowerCase().includes(q)));
   },[products,selected,search]);
 
-  return <section className={ui.visualMenuStage}>
-    <header className={ui.visualMenuHeader}>
-      <div><span className={ui.visualEyebrow}>CARTA OPERATIVA</span><h1>Menú</h1><p>Categorías y productos visuales para comandar más rápido.</p></div>
-      <div className={ui.visualHeaderActions}><button className={ui.secondaryButton} onClick={()=>clickLegacy(rootRef,"Nueva categoría")}>Nueva categoría</button><button className={ui.primaryButton} onClick={()=>clickLegacy(rootRef,"Nuevo producto")}>Nuevo producto</button></div>
+  return <section className={v.stage}>
+    <header className={v.header}>
+      <div><span className={v.eyebrow}>CARTA OPERATIVA</span><h1>Menú</h1><p>Categorías y productos visuales para comandar más rápido.</p></div>
+      <div className={v.headerActions}><button className={ui.secondaryButton} onClick={()=>clickLegacy(rootRef,"Nueva categoría")}>Nueva categoría</button><button className={ui.primaryButton} onClick={()=>clickLegacy(rootRef,"Nuevo producto")}>Nuevo producto</button></div>
     </header>
 
-    <div className={ui.visualTabs}>
-      <button className={ui.visualTabActive}>Productos</button>
+    <div className={v.tabs}>
+      <button className={v.tabActive}>Productos</button>
       <button onClick={()=>clickLegacy(rootRef,"Opciones")}>Opciones</button>
       <button onClick={()=>clickLegacy(rootRef,"Combos")}>Combos</button>
       <button onClick={()=>clickLegacy(rootRef,"Ingredientes")}>Ingredientes</button>
     </div>
 
-    <div className={ui.visualToolbar}>
-      <div className={ui.visualSearchWrap}><input className={ui.input} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar producto o código…"/><span>{visibleProducts.length} productos</span></div>
-      <div className={ui.viewSwitch}><span>Categorías</span><button className={categoryMode==="buttons"?ui.viewActive:""} onClick={()=>setCategoryMode("buttons")}>Botones</button><button className={categoryMode==="list"?ui.viewActive:""} onClick={()=>setCategoryMode("list")}>Lista</button></div>
-      <div className={ui.viewSwitch}><span>Productos</span><button className={productMode==="buttons"?ui.viewActive:""} onClick={()=>setProductMode("buttons")}>Botones</button><button className={productMode==="list"?ui.viewActive:""} onClick={()=>setProductMode("list")}>Lista</button></div>
+    <div className={v.toolbar}>
+      <div className={v.searchWrap}><input className={ui.input} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar producto o código…"/><span>{visibleProducts.length} productos</span></div>
+      <div className={v.viewSwitch}><span>Categorías</span><button className={categoryMode==="buttons"?v.viewActive:""} onClick={()=>setCategoryMode("buttons")}>Botones</button><button className={categoryMode==="list"?v.viewActive:""} onClick={()=>setCategoryMode("list")}>Lista</button></div>
+      <div className={v.viewSwitch}><span>Productos</span><button className={productMode==="buttons"?v.viewActive:""} onClick={()=>setProductMode("buttons")}>Botones</button><button className={productMode==="list"?v.viewActive:""} onClick={()=>setProductMode("list")}>Lista</button></div>
     </div>
 
-    {loading?<div className={ui.visualLoading}>Cargando menú…</div>:<>
-      {categoryMode==="buttons"?<div className={ui.visualCategoryGrid}>{categories.map(cat=><button key={cat.id} className={`${ui.visualCategoryCard} ${selected===cat.id?ui.visualCategorySelected:""}`} onClick={()=>setSelected(cat.id)}>
+    {loading?<div className={v.loading}>Cargando menú…</div>:<>
+      {categoryMode==="buttons"?<div className={v.categoryGrid}>{categories.map(cat=><button key={cat.id} className={`${v.categoryCard} ${selected===cat.id?v.categorySelected:""}`} onClick={()=>setSelected(cat.id)}>
         <ArtBox item={cat} isCategory/>
         <div><strong>{cat.public_name||cat.name}</strong><span>{products.filter(p=>p.category_id===cat.id).length} productos</span></div>
-      </button>)}</div>:<div className={ui.visualCategoryList}>{categories.map(cat=><button key={cat.id} className={`${ui.visualCategoryRow} ${selected===cat.id?ui.visualCategorySelected:""}`} onClick={()=>setSelected(cat.id)}><ArtBox item={cat} isCategory/><strong>{cat.public_name||cat.name}</strong><span>{products.filter(p=>p.category_id===cat.id).length}</span></button>)}</div>}
+      </button>)}</div>:<div className={v.categoryList}>{categories.map(cat=><button key={cat.id} className={`${v.categoryRow} ${selected===cat.id?v.categorySelected:""}`} onClick={()=>setSelected(cat.id)}><ArtBox item={cat} isCategory/><strong>{cat.public_name||cat.name}</strong><span>{products.filter(p=>p.category_id===cat.id).length}</span></button>)}</div>}
 
-      <div className={ui.visualSectionHead}><div><span>PRODUCTOS</span><h2>{selectedCategory?.public_name||selectedCategory?.name||"Todos"}</h2></div><small>{visibleProducts.length} disponibles</small></div>
+      <div className={v.sectionHead}><div><span>PRODUCTOS</span><h2>{selectedCategory?.public_name||selectedCategory?.name||"Todos"}</h2></div><small>{visibleProducts.length} disponibles</small></div>
 
-      {productMode==="buttons"?<div className={ui.visualProductGrid}>{visibleProducts.map(product=><button key={product.id} className={ui.visualProductCard} onClick={()=>clickLegacy(rootRef,product.public_name||product.name)}>
+      {productMode==="buttons"?<div className={v.productGrid}>{visibleProducts.map(product=><button key={product.id} className={v.productCard} onClick={()=>clickLegacy(rootRef,product.public_name||product.name)}>
         <ArtBox item={product} category={selectedCategory}/>
-        <div className={ui.visualProductInfo}><strong>{product.public_name||product.name}</strong><span>{money(product.restaurant_price??product.price)}</span></div>
-        {product.track_stock&&<small className={ui.stockPill}>Stock {Number(product.stock_quantity||0)}</small>}
-      </button>)}</div>:<div className={ui.visualProductList}>{visibleProducts.map(product=><button key={product.id} className={ui.visualProductRow} onClick={()=>clickLegacy(rootRef,product.public_name||product.name)}><ArtBox item={product} category={selectedCategory}/><div><strong>{product.public_name||product.name}</strong><span>{product.sku||"Sin código"}</span></div><b>{money(product.restaurant_price??product.price)}</b></button>)}</div>}
+        <div className={v.productInfo}><strong>{product.public_name||product.name}</strong><span>{money(product.restaurant_price??product.price)}</span></div>
+        {product.track_stock&&<small className={v.stockPill}>Stock {Number(product.stock_quantity||0)}</small>}
+      </button>)}</div>:<div className={v.productList}>{visibleProducts.map(product=><button key={product.id} className={v.productRow} onClick={()=>clickLegacy(rootRef,product.public_name||product.name)}><ArtBox item={product} category={selectedCategory}/><div><strong>{product.public_name||product.name}</strong><span>{product.sku||"Sin código"}</span></div><b>{money(product.restaurant_price??product.price)}</b></button>)}</div>}
 
-      {!visibleProducts.length&&<div className={ui.visualEmpty}>No hay productos en esta categoría.</div>}
+      {!visibleProducts.length&&<div className={v.empty}>No hay productos en esta categoría.</div>}
     </>}
   </section>;
 }
