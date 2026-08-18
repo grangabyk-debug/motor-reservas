@@ -5,10 +5,14 @@ import {supabase} from "../../../lib/supabase";
 import ui from "../styles/comanda-sector-planner.module.css";
 
 const clamp=(n,min,max)=>Math.max(min,Math.min(max,Number(n)||min));
+const SHAPES=["square","round","diamond"];
+const shapeIndex=(shape)=>Math.max(0,SHAPES.indexOf(shape));
+const shapeLabel=(shape)=>shape==="round"?"Circular":shape==="diamond"?"Rombo":"Cuadrada";
 
 function text(el){return el?.textContent?.replace(/\s+/g," ").trim()||""}
-function workspace(){
-  const h=[...document.querySelectorAll("h1,h2,h3")].find(x=>text(x).toLowerCase().includes("mantenimiento de sectores"));
+function legacyWorkspace(){
+  const headings=[...document.querySelectorAll("h1,h2,h3")].filter(x=>!x.closest('[data-sector-planner="1"]'));
+  const h=headings.find(x=>text(x).toLowerCase().includes("mantenimiento de sectores"));
   return h?.closest('[class*="workspace"]')||h?.parentElement?.parentElement||null;
 }
 
@@ -41,9 +45,17 @@ export default function ComandaSectorPlanner(){
 
   useEffect(()=>{
     const id=sessionStorage.getItem("comanda_branch");setBranchId(id);load(id);
-    const detect=()=>{const w=workspace();const yes=!!w;setActive(yes);if(w)w.style.display=yes?"none":""};
-    detect();const mo=new MutationObserver(detect);mo.observe(document.body,{subtree:true,childList:true,characterData:true});
-    return()=>{mo.disconnect();const w=workspace();if(w)w.style.display=""};
+    let hidden=null;
+    const detect=()=>{
+      const w=legacyWorkspace();
+      const yes=!!w;
+      setActive(yes);
+      if(w){hidden=w;w.style.display="none"}
+      else if(hidden){hidden.style.display="";hidden=null}
+    };
+    detect();
+    const mo=new MutationObserver(detect);mo.observe(document.body,{subtree:true,childList:true,characterData:true});
+    return()=>{mo.disconnect();if(hidden)hidden.style.display=""};
   },[load]);
 
   const sectorTables=useMemo(()=>tables.filter(t=>t.sector_id===sectorId),[tables,sectorId]);
@@ -66,7 +78,8 @@ export default function ComandaSectorPlanner(){
   async function addTable(form){
     if(!accountId||!branchId||!sector)return;
     setSaving(true);
-    const payload={account_id:accountId,branch_id:branchId,sector_id:sector.id,number:String(form.number||form.name||sectorTables.length+1),name:form.name||`Mesa ${form.number||sectorTables.length+1}`,seats:Number(form.seats||4),pos_x:form.x,pos_y:form.y,width:1,height:1,shape:form.shape||"square",table_type:"table",active:true};
+    const number=String(form.number||sectorTables.length+1);
+    const payload={account_id:accountId,branch_id:branchId,sector_id:sector.id,number,name:form.name||`Mesa ${number}`,seats:Number(form.seats||4),pos_x:form.x,pos_y:form.y,width:1,height:1,shape:form.shape||"square",table_type:"table",active:true};
     const {data,error}=await supabase.from("comanda_tables").insert(payload).select().single();setSaving(false);
     if(error){setNotice(error.message);return}setTables(v=>[...v,data]);setModal(null);
   }
@@ -83,7 +96,7 @@ export default function ComandaSectorPlanner(){
     const {data,error}=await supabase.from("comanda_sectors").insert({account_id:accountId,branch_id:branchId,name:`Sector ${sectors.length+1}`,sort_order:sectors.length+1,active:true,sector_type:"salon",grid_cols:8,grid_rows:6,cell_size:86}).select().single();setSaving(false);
     if(error){setNotice(error.message);return}setSectors(v=>[...v,data]);setSectorId(data.id);
   }
-  async function editSectorName(){setModal({type:"sector",name:sector?.name||""})}
+  function editSectorName(){setModal({type:"sector",name:sector?.name||""})}
 
   if(!active||!sector)return null;
   const cells=Array.from({length:cols*rows},(_,i)=>({x:i%cols,y:Math.floor(i/cols)}));
@@ -94,24 +107,24 @@ export default function ComandaSectorPlanner(){
     <div className={ui.body}>
       <section className={ui.boardWrap}>
         <div className={ui.board} style={{gridTemplateColumns:`repeat(${cols}, minmax(0,1fr))`,gridTemplateRows:`repeat(${rows}, minmax(0,1fr))`,"--scale":scale}}>
-          {cells.map(({x,y})=>{const t=occupied.get(`${x}:${y}`);return <button key={`${x}-${y}`} className={`${ui.cell} ${t?ui.filled:""} ${t?.shape==="round"?ui.round:""}`} onClick={()=>t?setModal({type:"table",table:t,x,y}):setModal({type:"newTable",x,y})}>{t?<><strong>{t.number||t.name}</strong><small>{t.seats||4} lugares</small></>:<><b>＋</b><span>Agregar mesa</span></>}</button>})}
+          {cells.map(({x,y})=>{const t=occupied.get(`${x}:${y}`);const shape=t?.shape||"square";return <button key={`${x}-${y}`} className={`${ui.cell} ${t?ui.filled:""} ${shape==="round"?ui.round:""} ${shape==="diamond"?ui.diamond:""}`} onClick={()=>t?setModal({type:"table",table:t,x,y}):setModal({type:"newTable",x,y})}>{t?<><strong>{t.number||t.name}</strong><small>{t.seats||4} lugares</small></>:<><b>＋</b><span>Agregar mesa</span></>}</button>})}
         </div>
       </section>
       <aside className={ui.panel}>
         <div className={ui.panelHead}><div><small>SECTOR ACTIVO</small><strong>{sector.name}</strong></div><button onClick={editSectorName}>Editar</button></div>
         <label><span>Cantidad de columnas <b>{cols}</b></span><input type="range" min="2" max="18" value={cols} onChange={e=>patchSector({grid_cols:Number(e.target.value)})}/></label>
         <label><span>Cantidad de filas <b>{rows}</b></span><input type="range" min="2" max="14" value={rows} onChange={e=>patchSector({grid_rows:Number(e.target.value)})}/></label>
-        <label><span>Tamaño visual <b>{scale}%</b></span><input type="range" min="55" max="120" value={scale} onChange={e=>patchSector({cell_size:Number(e.target.value)})}/></label>
-        <div className={ui.hint}>El tamaño es proporcional. La grilla nunca supera el área disponible: se achica o agranda para entrar completa.</div>
+        <label><span>Tamaño de celdas <b>{scale}%</b></span><input type="range" min="55" max="120" value={scale} onChange={e=>patchSector({cell_size:Number(e.target.value)})}/></label>
+        <div className={ui.hint}>El tamaño es proporcional. La grilla se reescala para entrar completa en el área visible, sin scroll horizontal.</div>
         <div className={ui.legend}><span><i className={ui.dotTable}/>Mesa creada</span><span><i className={ui.dotEmpty}/>Celda libre</span></div>
       </aside>
     </div>
 
     {modal&&<div className={ui.overlay} onMouseDown={e=>e.target===e.currentTarget&&setModal(null)}><div className={ui.modal}>
-      <div className={ui.modalHead}><div><small>{modal.type==="sector"?"SECTOR":"MESA"}</small><h3>{modal.type==="newTable"?"Agregar mesa":modal.type==="table"?`Editar ${modal.table.name||modal.table.number}`:"Editar sector"}</h3></div><button onClick={()=>setModal(null)}>×</button></div>
+      <div className={ui.modalHead}><div><small>{modal.type==="sector"?"SECTOR":"MESA"}</small><h3>{modal.type==="newTable"?"Agregar mesa":modal.type==="table"?`Editar mesa ${modal.table.number||""}`:"Editar sector"}</h3></div><button onClick={()=>setModal(null)}>×</button></div>
       {modal.type==="sector"?<SectorForm initial={modal} disabled={saving} onCancel={()=>setModal(null)} onSave={async f=>{setSaving(true);const {data,error}=await supabase.from("comanda_sectors").update({name:f.name}).eq("id",sector.id).select().single();setSaving(false);if(error){setNotice(error.message);return}setSectors(v=>v.map(s=>s.id===sector.id?data:s));setModal(null)}}/>:
       modal.type==="newTable"?<TableForm initial={{number:String(sectorTables.length+1),name:"",seats:4,shape:"square",x:modal.x,y:modal.y}} disabled={saving} onCancel={()=>setModal(null)} onSave={addTable}/>:
-      <TableForm initial={{...modal.table,x:modal.x,y:modal.y}} disabled={saving} onCancel={()=>setModal(null)} onDelete={()=>deleteTable(modal.table.id)} onSave={f=>updateTable(modal.table.id,{number:String(f.number),name:f.name,seats:Number(f.seats),shape:f.shape,pos_x:f.x,pos_y:f.y})}/>} 
+      <TableForm initial={{...modal.table,x:modal.x,y:modal.y}} disabled={saving} onCancel={()=>setModal(null)} onDelete={()=>deleteTable(modal.table.id)} onSave={f=>updateTable(modal.table.id,{number:String(f.number),name:f.name||`Mesa ${f.number}`,seats:Number(f.seats),shape:f.shape,pos_x:f.x,pos_y:f.y})}/>} 
     </div></div>}
     {notice&&<div className={ui.toast} onClick={()=>setNotice("")}>{notice}</div>}
   </div>;
@@ -119,11 +132,11 @@ export default function ComandaSectorPlanner(){
 
 function TableForm({initial,onSave,onCancel,onDelete,disabled}){
   const [f,setF]=useState(initial);const set=(k,v)=>setF(x=>({...x,[k]:v}));
+  const stylePos=shapeIndex(f.shape);
   return <form onSubmit={e=>{e.preventDefault();onSave(f)}}><div className={ui.form}>
-    <label>Número<input value={f.number||""} onChange={e=>set("number",e.target.value)} required/></label>
-    <label>Nombre<input value={f.name||""} onChange={e=>set("name",e.target.value)} placeholder="Ej. Mesa ventana"/></label>
-    <label>Comensales<input type="number" min="1" max="30" value={f.seats||4} onChange={e=>set("seats",e.target.value)} required/></label>
-    <label>Forma<select value={f.shape||"square"} onChange={e=>set("shape",e.target.value)}><option value="square">Cuadrada</option><option value="round">Redonda</option><option value="rect">Rectangular</option></select></label>
-  </div><div className={ui.modalFoot}>{onDelete&&<button type="button" className={ui.danger} onClick={onDelete}>Eliminar</button>}<span/><button type="button" onClick={onCancel}>Cancelar</button><button className={ui.primary} disabled={disabled}>Guardar cambios</button></div></form>
+    <label className={ui.full}>Nombre / número<input value={f.number||""} onChange={e=>set("number",e.target.value)} required autoFocus/></label>
+    <label className={ui.full}>Comensales<input type="number" min="1" max="30" value={f.seats||4} onChange={e=>set("seats",e.target.value)} required/></label>
+    <div className={`${ui.full} ${ui.styleField}`}><div className={ui.styleTitle}><span>Estética</span><b>{shapeLabel(f.shape)}</b></div><input className={ui.styleSlider} type="range" min="0" max="2" step="1" value={stylePos} onChange={e=>set("shape",SHAPES[Number(e.target.value)])}/><div className={ui.styleChoices}><span><i className={ui.shapeSquare}/>Cuadrada</span><span><i className={ui.shapeRound}/>Circular</span><span><i className={ui.shapeDiamond}/>Rombo</span></div></div>
+  </div><div className={ui.modalFoot}>{onDelete&&<button type="button" className={ui.danger} onClick={onDelete}>Eliminar</button>}<span/><button type="button" onClick={onCancel}>Cerrar</button><button className={ui.primary} disabled={disabled}>Aceptar</button></div></form>
 }
-function SectorForm({initial,onSave,onCancel,disabled}){const [name,setName]=useState(initial.name);return <form onSubmit={e=>{e.preventDefault();onSave({name})}}><div className={ui.form}><label className={ui.full}>Nombre del sector<input value={name} onChange={e=>setName(e.target.value)} required autoFocus/></label></div><div className={ui.modalFoot}><span/><button type="button" onClick={onCancel}>Cancelar</button><button className={ui.primary} disabled={disabled}>Guardar cambios</button></div></form>}
+function SectorForm({initial,onSave,onCancel,disabled}){const [name,setName]=useState(initial.name);return <form onSubmit={e=>{e.preventDefault();onSave({name})}}><div className={ui.form}><label className={ui.full}>Nombre del sector<input value={name} onChange={e=>setName(e.target.value)} required autoFocus/></label></div><div className={ui.modalFoot}><span/><button type="button" onClick={onCancel}>Cerrar</button><button className={ui.primary} disabled={disabled}>Aceptar</button></div></form>}
