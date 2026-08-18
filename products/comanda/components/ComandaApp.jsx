@@ -9,7 +9,8 @@ import ComandaWaiterCash from "./ComandaWaiterCash";
 import ComandaSectorPlanner from "./ComandaSectorPlanner";
 import ComandaRoleGuard from "./ComandaRoleGuard";
 import ComandaAccessGate from "./ComandaAccessGate";
+import ComandaStaffManager from "./ComandaStaffManager";
 
 export default function ComandaApp(){
-  return <ComandaAccessGate><ComandaDashboardChrome><ComandaNavigationGuard/><ComandaSessionUX/><ComandaRoleGuard/><ComandaKitchenKDS/><ComandaWaiterCash/><ComandaSectorPlanner/><ComandaMenuLayer><ComandaFinal/></ComandaMenuLayer></ComandaDashboardChrome></ComandaAccessGate>;
+  return <ComandaAccessGate><ComandaDashboardChrome><ComandaNavigationGuard/><ComandaSessionUX/><ComandaRoleGuard/><ComandaKitchenKDS/><ComandaWaiterCash/><ComandaSectorPlanner/><ComandaStaffManager/><ComandaMenuLayer><ComandaFinal/></ComandaMenuLayer></ComandaDashboardChrome></ComandaAccessGate>;
 }
