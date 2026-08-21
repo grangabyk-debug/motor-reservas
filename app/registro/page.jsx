@@ -1,80 +1,21 @@
-"use client"
+export const metadata={title:"Habitación Llena | Registros pausados",robots:{index:false,follow:false}}
 
-import { useState } from "react"
-import Link from "next/link"
-import { supabase } from "../../lib/supabase"
-
-export default function RegistroPage() {
-  const [nombre, setNombre] = useState("")
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [mensaje, setMensaje] = useState("")
-  const [cargando, setCargando] = useState(false)
-
-  async function registrar(e) {
-    e.preventDefault()
-    setMensaje("")
-
-    if (password.length < 6) {
-      setMensaje("La contraseña debe tener al menos 6 caracteres.")
-      return
-    }
-
-    setCargando(true)
-
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { nombre },
-        emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/dashboard` : undefined,
-      },
-    })
-
-    if (error) {
-      setMensaje(error.message)
-      setCargando(false)
-      return
-    }
-
-    if (data?.session) {
-      window.location.href = "/dashboard"
-      return
-    }
-
-    setMensaje("Cuenta creada. Revisá tu email para confirmar la cuenta.")
-    setCargando(false)
-  }
-
-  return (
-    <main style={page}>
-      <div style={card}>
-        <Link href="/" style={brand}>Habitación Llena</Link>
-        <h1 style={title}>Crear cuenta</h1>
-        <p style={muted}>Empezá a administrar tu alojamiento.</p>
-
-        <form onSubmit={registrar} style={{display:"grid",gap:14,marginTop:24}}>
-          <label style={label}>Nombre<input required value={nombre} onChange={e=>setNombre(e.target.value)} placeholder="Tu nombre" style={input}/></label>
-          <label style={label}>Email<input type="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="tu@email.com" style={input}/></label>
-          <label style={label}>Contraseña<input type="password" required value={password} onChange={e=>setPassword(e.target.value)} placeholder="Mínimo 6 caracteres" style={input}/></label>
-          {mensaje && <div style={message}>{mensaje}</div>}
-          <button disabled={cargando} style={button}>{cargando ? "Creando..." : "Crear cuenta"}</button>
-        </form>
-
-        <p style={bottom}>¿Ya tenés cuenta? <Link href="/login" style={link}>Ingresar</Link></p>
-      </div>
-    </main>
-  )
+export default function RegistroPage(){
+  return <main style={page}>
+    <section style={card}>
+      <div style={brand}>HABITACIÓN LLENA</div>
+      <h1 style={title}>Estamos trabajando<br/>en una nueva versión.</h1>
+      <p style={text}>Los nuevos registros están temporalmente pausados mientras terminamos las mejoras.</p>
+      <div style={line}/>
+      <small style={small}>Volvemos pronto.</small>
+    </section>
+  </main>
 }
 
-const page={minHeight:"100vh",background:"#f5f7fa",display:"grid",placeItems:"center",padding:20,fontFamily:"Inter,system-ui,sans-serif"}
-const card={width:"min(420px,100%)",background:"#fff",border:"1px solid #e5e7eb",borderRadius:16,padding:32,boxShadow:"0 20px 50px rgba(0,40,100,.08)"}
-const brand={color:"#003b95",fontWeight:850,fontSize:22,textDecoration:"none"}
-const title={fontSize:30,margin:"32px 0 6px"}
-const muted={color:"#6b7280",margin:0}
-const label={display:"grid",gap:7,fontSize:13,fontWeight:700}
-const input={padding:"12px 13px",border:"1px solid #dfe4ea",borderRadius:8,fontSize:14}
-const button={border:"none",background:"#006ce4",color:"#fff",borderRadius:8,padding:13,fontWeight:800,cursor:"pointer"}
-const message={background:"#eef7ff",color:"#003b95",padding:11,borderRadius:8,fontSize:13}
-const bottom={textAlign:"center",color:"#6b7280",fontSize:13,marginTop:22}
-const link={color:"#006ce4",fontWeight:800}
+const page={minHeight:"100dvh",display:"grid",placeItems:"center",padding:24,background:"radial-gradient(circle at 14% 10%,rgba(18,100,214,.22),transparent 34%),radial-gradient(circle at 88% 86%,rgba(245,164,0,.13),transparent 30%),#081426",color:"#fff",fontFamily:'Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif'}
+const card={width:"min(620px,100%)",textAlign:"center",padding:"clamp(34px,7vw,60px) clamp(22px,6vw,50px)",borderRadius:30,border:"1px solid rgba(255,255,255,.12)",background:"rgba(255,255,255,.055)",boxShadow:"0 30px 90px rgba(0,0,0,.34)"}
+const brand={display:"inline-flex",padding:"8px 12px",borderRadius:999,border:"1px solid rgba(255,255,255,.12)",background:"rgba(255,255,255,.06)",fontSize:11,fontWeight:900,letterSpacing:".12em",color:"rgba(255,255,255,.74)",marginBottom:24}
+const title={margin:0,fontSize:"clamp(38px,8vw,64px)",lineHeight:.98,letterSpacing:"-.05em",fontWeight:950}
+const text={margin:"24px auto 0",maxWidth:450,fontSize:"clamp(16px,3.7vw,19px)",lineHeight:1.55,color:"rgba(255,255,255,.66)"}
+const line={width:46,height:4,margin:"30px auto 0",borderRadius:999,background:"linear-gradient(90deg,#1264d6,#f5a400)"}
+const small={display:"block",marginTop:18,color:"rgba(255,255,255,.42)",fontSize:13}
