@@ -5,8 +5,8 @@
   "scripts": {
     "check:product-boundaries": "node scripts/check-product-boundaries.mjs",
     "prebuild": "npm run check:product-boundaries",
-    "dev": "node products/comanda/scripts/materialize-final.mjs && node scripts/migrate-dashboard-tenant-scope.mjs && node scripts/migrate-reservation-form-layout-v4.mjs && node scripts/migrate-calendar-status-colors-v4.mjs && node scripts/migrate-calendar-status-colors-v5.mjs && node scripts/migrate-calendar-occupied-room-v6.mjs && next dev",
-    "build": "node products/comanda/scripts/materialize-final.mjs && node scripts/migrate-dashboard-tenant-scope.mjs && node scripts/migrate-reservation-form-layout-v4.mjs && node scripts/migrate-calendar-status-colors-v4.mjs && node scripts/migrate-calendar-status-colors-v5.mjs && node scripts/migrate-calendar-occupied-room-v6.mjs && next build",
+    "dev": "node products/comanda/scripts/materialize-final.mjs && node scripts/migrate-dashboard-tenant-scope.mjs && node scripts/migrate-reservation-form-layout-v4.mjs && node scripts/migrate-calendar-status-colors-v4.mjs && node scripts/migrate-calendar-status-colors-v5.mjs && node scripts/migrate-calendar-occupied-room-v6.mjs && node scripts/migrate-reservation-multiroom-services-v7.mjs && next dev",
+    "build": "node products/comanda/scripts/materialize-final.mjs && node scripts/migrate-dashboard-tenant-scope.mjs && node scripts/migrate-reservation-form-layout-v4.mjs && node scripts/migrate-calendar-status-colors-v4.mjs && node scripts/migrate-calendar-status-colors-v5.mjs && node scripts/migrate-calendar-occupied-room-v6.mjs && node scripts/migrate-reservation-multiroom-services-v7.mjs && next build",
     "start": "next start"
   },
   "dependencies": {
