@@ -1,98 +1,215 @@
 import Link from "next/link"
 
-const imgHotel="https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1800&q=86"
-const imgCabin="https://images.unsplash.com/photo-1449158743715-0a90ebb6d2d8?auto=format&fit=crop&w=1400&q=84"
-const imgHost="https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?auto=format&fit=crop&w=1400&q=84"
-const imgRoom="https://images.unsplash.com/photo-1611892440504-42a792e24d32?auto=format&fit=crop&w=1400&q=84"
+const HERO = "https://images.unsplash.com/photo-1564501049412-61c2a3083791?auto=format&fit=crop&w=1900&q=88"
+const LODGE = "https://images.unsplash.com/photo-1449158743715-0a90ebb6d2d8?auto=format&fit=crop&w=1300&q=86"
+const ROOM = "https://images.unsplash.com/photo-1611892440504-42a792e24d32?auto=format&fit=crop&w=1300&q=86"
+const HOTEL = "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?auto=format&fit=crop&w=1300&q=86"
+const RESORT = "https://images.unsplash.com/photo-1445019980597-93fa8acb246c?auto=format&fit=crop&w=1400&q=86"
 
-const pillars=[
- ["01","Operación","Calendario vivo, reservas multi-habitación, IN/OUT, housekeeping, caja, pagos y huéspedes."],
- ["02","Distribución","Channel Manager con inventario único y conexiones OTA bidireccionales certificadas."],
- ["03","Venta directa","Web + motor de reservas + pagos + extras + promociones, sin comisiones del PMS."],
- ["04","Revenue","ADR, RevPAR, pickup, demanda, competencia y recomendaciones de tarifa."],
- ["05","Experiencia huésped","Pre check-in, mensajería, portal, upsells, self check-in y reputación."],
- ["06","Automatización IA","Un copiloto que entiende el tenant, reservas, fechas, huéspedes y operación real."],
+const features = [
+  ["Calendario operativo", "Reservas, bloqueos, IN, OUT y ocupación en una vista clara y rápida."],
+  ["Reservas flexibles", "Una o varias habitaciones, cambios, upgrades y estadías que se adaptan a la operación real."],
+  ["Recepción completa", "Pagos divididos, notas, vehículos, cocheras, mascotas, extras y cuenta del huésped."],
+  ["Housekeeping", "Estado de habitaciones, limpieza, salidas del día y tareas operativas sin papeles."],
+  ["Venta directa", "Motor de reservas y página del alojamiento conectados al inventario del PMS."],
+  ["Canales sincronizados", "Arquitectura preparada para centralizar disponibilidad, tarifas y reservas externas."],
+  ["Revenue inteligente", "Ocupación, ADR, RevPAR, pickup y reglas de precio para decidir mejor."],
+  ["IA hotelera", "Un asistente que entiende fechas, reservas, huéspedes y la información de cada propiedad."],
+  ["Reportes simples", "Entradas, salidas, cobros, saldos, ocupación y operación descargables cuando los necesitás."],
 ]
 
-const featureGroups=[
- {title:"Recepción y calendario",items:["Timeline drag & drop","Reservas multi-habitación","Cambio de habitación + upgrade","Check-out anticipado real","Late / early check-in","No-show y bloqueos","Alertas de nuevas reservas","Estado IN · OUT · Pendiente"]},
- {title:"Huésped & cuenta",items:["Huésped principal editable","Perfil 360° e historial","Pagos divididos","Vehículos por cantidad y días","Cocheras múltiples","Mascotas por días","Extras y consumos","Saldo y folio visible"]},
- {title:"Housekeeping & equipo",items:["Habitación limpia / sucia","Checklist por habitación","Asignación de tareas","Alertas de mantenimiento","App móvil operativa","Turnos y permisos","Room rack","Reportes IN / OUT"]},
- {title:"Revenue & analítica",items:["ADR, RevPAR y ocupación","Pickup y lead time","Comparativa por canal","Paridad tarifaria","Reglas por ocupación","Eventos y temporada","Recomendador de precios","Forecast de demanda"]},
- {title:"Venta directa",items:["Web responsive del hotel","Motor de reservas embebible","Promos y códigos","Paquetes y extras","Multiidioma / multimoneda","Checkout mobile-first","Google Hotel Ads","SEO local"]},
- {title:"Automatización",items:["Mensajes pre-arribo","Recordatorios de pago","Confirmaciones automáticas","Solicitud de reseña","IA con contexto del tenant","Tareas por evento","Webhooks / API","Bitácora de automatizaciones"]},
+const plans = [
+  {
+    name: "Esencial",
+    price: "US$ 45",
+    text: "Para cabañas, hosterías y alojamientos chicos que quieren ordenar la operación.",
+    items: ["PMS + calendario", "Reservas y huéspedes", "Recepción y housekeeping", "Caja y pagos", "Reportes esenciales", "Motor de reservas"],
+  },
+  {
+    name: "Crecimiento",
+    price: "US$ 79",
+    text: "Para propiedades que quieren vender más directo y automatizar tareas.",
+    best: true,
+    items: ["Todo Esencial", "Canales sincronizados", "Web del alojamiento", "Automatizaciones", "Upselling y extras", "IA hotelera"],
+  },
+  {
+    name: "Profesional",
+    price: "US$ 139",
+    text: "Para hoteles con mayor operación, equipos y múltiples sectores.",
+    items: ["Todo Crecimiento", "Multi-property", "Revenue avanzado", "API y webhooks", "Roles avanzados", "Reportes personalizados"],
+  },
 ]
 
-const competitorIdeas=[
- ["Pxsol","LatAm + distribución","CRM hotelero, reputación, Ads, GDS, POS/ERP y ecosistema integral."],
- ["Omnibees","Distribución","Gran red de canales y foco fuerte en revenue y comercialización."],
- ["Cloudbeds","Plataforma unificada","PMS + CM + pagos + CRM + revenue + marketing sobre un mismo modelo de datos."],
- ["Little Hotelier","Pequeños alojamientos","Experiencia muy simple, app móvil, metasearch y onboarding rápido."],
- ["eviivo","Sincronización profunda","Contenido, políticas, tarifas, mensajes y extras sincronizados con OTAs."],
- ["Amenitiz","Hotel independiente","Website builder, pagos y PriceAdvisor dentro de una sola suite."],
- ["HotelRunner","Distribución + mobile","Canales, PMS, web, motor y operación móvil con configuración simple."],
- ["Lodgify","Venta directa","Web no-code, guest app, smart locks, automatizaciones y channel manager."],
- ["Mews","Hospitality OS","Pagos nativos, automatización financiera, monetización de espacios y RMS."],
- ["RoomRaccoon","Revenue con IA","Pricing predictivo usando pickup, histórico y precios de competidores."],
-]
-
-const roadmap=[
- {phase:"A",title:"Channel Manager real",tag:"PRIORIDAD",items:["Partner/conectividad certificada","Booking.com","Airbnb","Expedia Group","Despegar","Google Hotel Ads","Mapeo de habitaciones y rate plans","Logs de sincronización + reintentos"]},
- {phase:"B",title:"Motor + web del cliente",tag:"VENTA DIRECTA",items:["Constructor de landing por hotel","Widget embebible","Disponibilidad real","Pago/seña","Promos y códigos","Extras","Confirmación automática","Analytics de conversión"]},
- {phase:"C",title:"Revenue inteligente",tag:"MARGEN",items:["ADR / RevPAR / pickup","Forecast","Eventos locales","Competitor rate shopper","Reglas automáticas","Sugerencias IA","Control manual siempre disponible"]},
- {phase:"D",title:"Guest journey",tag:"EXPERIENCIA",items:["Pre check-in","Portal del huésped","Upselling","Mensajería unificada","Self check-in","Cerraduras","Solicitud de reseña","Automatizaciones post-estadía"]},
-]
-
-const plans=[
- {name:"Esencial",price:"US$ 45",desc:"Para cabañas, hosterías y alojamientos chicos que quieren ordenar la operación.",items:["PMS + calendario","Reservas y huéspedes","Recepción / housekeeping","Caja y pagos","Reportes base","Motor de reservas","2 conexiones OTA*","Soporte y onboarding"]},
- {name:"Crecimiento",price:"US$ 79",desc:"Para propiedades que quieren vender más directo y automatizar tareas.",best:true,items:["Todo Esencial","Channel Manager 8 OTAs*","Web del alojamiento","Mensajería automatizada","Upselling y extras","Revenue básico","Google Hotel Ads*","IA hotelera"]},
- {name:"Profesional",price:"US$ 139",desc:"Para hoteles con mayor operación, varios sectores o múltiples propiedades.",items:["Todo Crecimiento","OTAs ampliadas*","Multi-property","Revenue avanzado","API / webhooks","Roles avanzados","Reportes personalizados","Onboarding prioritario"]},
-]
-
-function Logo(){return <div className="logo"><span className="mark">H</span><span><b>Habitación</b><small>LLENA</small></span></div>}
-function Chip({children}){return <span className="chip">{children}</span>}
-
-function CalendarMock(){
- const rows=[
-  ["101 · Doble","SOFÍA M.","in",1,3],["102 · Doble","MARTÍN R.","future",3,3],["201 · Triple","LUCÍA P.","in",2,4],["202 · Suite","FAMILIA DÍAZ","pending",4,3],["Cabaña 1","CARLA + 3","future",1,4],["Cabaña 2","LIBRE","",0,0]
- ]
- return <div className="dashMock">
-  <div className="dashTop"><Logo/><div className="dashUser"><span>● Sincronizado</span><b>Hostería El Molino</b><i>GG</i></div></div>
-  <div className="dashBody">
-   <aside>{["Inicio","Calendario","Reservas","Recepción","Housekeeping","Huéspedes","Caja","Reportes","Integraciones","Asistente IA"].map((x,i)=><div key={x} className={i===1?"active":""}><em>{["⌂","▦","▤","◉","✦","☺","$","↗","⌘","✺"][i]}</em>{x}</div>)}</aside>
-   <section>
-    <div className="dashHead"><div><small>PLANIFICACIÓN</small><h3>Calendario de ocupación</h3><p>23–29 agosto · 6 habitaciones</p></div><div><button>Hoy</button><button>14 días</button><button className="primary">+ Reserva</button></div></div>
-    <div className="metrics">{[["78%","Ocupación","+8%"],["6","IN hoy","2 pendientes"],["4","OUT hoy","1 late"],["$ 86.400","ADR","+12%"]].map(([v,l,s])=><article key={l}><small>{l}</small><b>{v}</b><span>{s}</span></article>)}</div>
-    <div className="calendar"><div className="cHead"><b>Habitación</b>{["23 D","24 L","25 M","26 X","27 J","28 V","29 S"].map(x=><b key={x}>{x}</b>)}</div>{rows.map(([room,guest,state,start,w])=><div className="cRow" key={room}><strong>{room}</strong>{w>0&&<div className={`booking ${state}`} style={{gridColumn:`${start+1} / span ${w}`}}><b>{guest}</b><small>{state==="in"?"IN · pagado":state==="pending"?"PENDIENTE":"RESERVA"}</small></div>}</div>)}</div>
-   </section>
-  </div>
- </div>
+function Brand(){
+  return <div className="brand">Habitación <strong>llena</strong><span>.com</span></div>
 }
 
-export default function PMSNext(){return <main><style>{`
-*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#f8fafc;color:#0f172a;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.wrap{width:min(1180px,calc(100% - 32px));margin:auto}.nav{position:sticky;top:0;z-index:100;background:rgba(248,250,252,.88);backdrop-filter:blur(18px);border-bottom:1px solid #e5e7eb}.navin{height:72px;display:flex;align-items:center;justify-content:space-between;gap:18px}.logo{display:flex;align-items:center;gap:10px}.mark{width:39px;height:39px;border-radius:13px;background:linear-gradient(145deg,#0f4c81,#2563eb 60%,#6d5dfc);display:grid;place-items:center;color:white;font-weight:950;box-shadow:0 8px 26px #2563eb30}.logo>span:last-child{display:grid;line-height:1}.logo b{font-size:15px}.logo small{font-size:8px;letter-spacing:.22em;color:#64748b;margin-top:4px}.navlinks{display:flex;align-items:center;gap:20px}.navlinks a{font-size:13px;text-decoration:none;color:#475569;font-weight:760}.navlinks .login{padding:9px 13px;border:1px solid #cbd5e1;border-radius:11px;background:#fff;color:#0f172a}.navlinks .trial{padding:10px 15px;border-radius:11px;background:#0f172a;color:#fff}.hero{position:relative;overflow:hidden;padding:74px 0 70px;background:radial-gradient(circle at 15% 20%,#dbeafe 0,transparent 32%),radial-gradient(circle at 83% 9%,#ede9fe 0,transparent 28%),#f8fafc}.heroGrid{display:grid;grid-template-columns:.92fr 1.08fr;gap:48px;align-items:center}.eyebrow{display:flex;gap:8px;flex-wrap:wrap}.chip{display:inline-flex;align-items:center;border-radius:999px;padding:7px 10px;background:#fff;border:1px solid #dbe2ea;color:#475569;font-size:10px;font-weight:900;letter-spacing:.04em}.chip.arg{background:#eaf6ff;border-color:#a8d8ff;color:#075985}.hero h1{font-size:61px;line-height:.98;letter-spacing:-.062em;margin:17px 0 20px;max-width:660px}.hero h1 span{background:linear-gradient(90deg,#0f4c81,#5b52e8);-webkit-background-clip:text;color:transparent}.hero p{font-size:17px;line-height:1.67;color:#64748b;max-width:610px}.heroActions{display:flex;gap:10px;flex-wrap:wrap;margin-top:28px}.btn{display:inline-flex;text-decoration:none;align-items:center;justify-content:center;padding:13px 18px;border-radius:12px;font-size:14px;font-weight:870}.btnDark{background:#0f172a;color:#fff;box-shadow:0 14px 30px #0f172a22}.btnLight{background:#fff;color:#0f172a;border:1px solid #cbd5e1}.micro{display:flex;gap:17px;flex-wrap:wrap;margin-top:18px;color:#64748b;font-size:11px}.micro b{color:#0f172a}.visual{position:relative;padding:22px 0 18px}.photoStack{position:absolute;right:-35px;top:-20px;width:260px;height:190px;border-radius:22px;overflow:hidden;border:6px solid #fff;box-shadow:0 20px 50px #3341552c;transform:rotate(4deg)}.photoStack img{width:100%;height:100%;object-fit:cover}.dashMock{position:relative;z-index:3;background:#fff;border:1px solid #dbe2ea;border-radius:22px;box-shadow:0 35px 85px #20304729;overflow:hidden;transform:perspective(1200px) rotateY(-2deg)}.dashTop{height:57px;padding:0 15px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #edf0f4}.dashTop .mark{width:27px;height:27px;border-radius:8px;font-size:10px}.dashTop .logo b{font-size:9px}.dashTop .logo small{font-size:5px}.dashUser{display:flex;align-items:center;gap:9px;font-size:7px}.dashUser span{color:#16835d}.dashUser i{font-style:normal;background:#eef2ff;color:#4f46e5;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-weight:900}.dashBody{display:grid;grid-template-columns:128px 1fr;min-height:430px}.dashBody aside{background:#0b1220;padding:12px 8px;color:#9cadc4}.dashBody aside div{font-size:7px;padding:9px 8px;border-radius:7px;display:flex;gap:7px;align-items:center;margin-bottom:2px}.dashBody aside em{font-style:normal;width:14px;text-align:center}.dashBody aside .active{background:#ffffff16;color:#fff}.dashBody section{padding:17px;overflow:hidden}.dashHead{display:flex;align-items:center;justify-content:space-between;gap:8px}.dashHead small{font-size:6px;letter-spacing:.16em;color:#8b98a9}.dashHead h3{font-size:14px;margin:3px 0}.dashHead p{font-size:6px;margin:0;color:#94a3b8}.dashHead button{font-size:6px;padding:6px 7px;background:#fff;border:1px solid #d8dee8;border-radius:6px;margin-left:3px}.dashHead .primary{background:#2563eb;color:#fff;border-color:#2563eb}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:12px 0}.metrics article{padding:8px;border:1px solid #e6e9ee;border-radius:8px}.metrics small{display:block;font-size:5px;color:#94a3b8}.metrics b{display:block;font-size:12px;margin:3px 0}.metrics span{font-size:5px;color:#16835d}.calendar{border:1px solid #e6e9ee;border-radius:10px;overflow:hidden}.cHead,.cRow{display:grid;grid-template-columns:95px repeat(7,1fr);position:relative}.cHead{background:#f8fafc;min-height:29px}.cHead b{font-size:5px;padding:9px 4px;text-align:center;border-right:1px solid #eef1f5;color:#64748b}.cHead b:first-child{text-align:left;padding-left:8px}.cRow{min-height:43px;border-top:1px solid #eef1f5;background:repeating-linear-gradient(90deg,transparent 0,transparent calc((100% - 95px)/7 - 1px),#eef1f5 calc((100% - 95px)/7 - 1px),#eef1f5 calc((100% - 95px)/7));background-position:95px 0}.cRow>strong{font-size:6px;padding:14px 8px;border-right:1px solid #eef1f5;background:#fff}.booking{z-index:2;align-self:center;margin:5px 2px;padding:6px 7px;border-radius:7px;color:white;overflow:hidden}.booking b{display:block;font-size:6px;white-space:nowrap}.booking small{display:block;font-size:4px;margin-top:2px;opacity:.82}.booking.in{background:#16835d}.booking.future{background:#6d5dfc}.booking.pending{background:#e3a008;color:#2f2500}.strip{padding:18px 0;background:#0d1627;color:white}.stripin{display:flex;align-items:center;justify-content:space-between;gap:18px}.strip b{font-size:15px}.strip span{font-size:11px;color:#aab7c8}.logos{display:flex;gap:10px;flex-wrap:wrap}.logos i{font-style:normal;border:1px solid #31405a;background:#152239;padding:7px 9px;border-radius:8px;font-size:8px;font-weight:800}.section{padding:86px 0}.head{max-width:760px;margin:0 auto 40px;text-align:center}.head small{font-size:10px;letter-spacing:.15em;font-weight:900;color:#4f46e5}.head h2{font-size:42px;line-height:1.04;letter-spacing:-.045em;margin:11px 0}.head p{color:#64748b;line-height:1.65}.pillars{display:grid;grid-template-columns:repeat(3,1fr);gap:13px}.pillar{background:#fff;border:1px solid #e4e7ec;border-radius:17px;padding:22px;min-height:175px}.pillar .n{font-size:10px;color:#4f46e5;font-weight:950}.pillar h3{font-size:18px;margin:18px 0 8px}.pillar p{color:#64748b;font-size:13px;line-height:1.58;margin:0}.featureZone{background:#eef3f8}.groups{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.group{background:#fff;border:1px solid #dce3ec;border-radius:17px;padding:21px}.group h3{font-size:16px;margin:0 0 15px}.group ul{list-style:none;margin:0;padding:0;display:grid;gap:9px}.group li{font-size:12px;color:#475569}.group li:before{content:"✓";font-weight:950;color:#15835e;margin-right:8px}.humanSection{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:stretch}.photoGrid{display:grid;grid-template-columns:1.2fr .8fr;grid-template-rows:1fr 1fr;gap:10px;min-height:480px}.photoGrid div{border-radius:18px;overflow:hidden;position:relative}.photoGrid div:first-child{grid-row:1/3}.photoGrid img{width:100%;height:100%;object-fit:cover}.photoGrid span{position:absolute;left:14px;bottom:13px;background:#0f172acc;color:white;padding:7px 9px;border-radius:8px;font-size:10px;font-weight:850}.humanCopy{background:#0f172a;color:#fff;border-radius:20px;padding:36px;display:flex;flex-direction:column;justify-content:center}.humanCopy small{color:#90a7c6;font-size:10px;letter-spacing:.14em;font-weight:900}.humanCopy h2{font-size:39px;line-height:1.05;letter-spacing:-.045em;margin:12px 0 18px}.humanCopy p{color:#b7c2d2;line-height:1.66}.humanCopy ul{padding-left:18px;color:#dce5f0;line-height:1.9;font-size:13px}.research{background:#08111f;color:#fff}.matrix{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.comp{display:grid;grid-template-columns:130px 150px 1fr;gap:12px;align-items:center;background:#111d30;border:1px solid #24334b;border-radius:13px;padding:15px}.comp b{font-size:13px}.comp span{font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:#7dd3fc;font-weight:900}.comp p{font-size:11px;color:#aebbd0;margin:0;line-height:1.5}.researchNote{margin-top:18px;border:1px solid #314058;border-radius:13px;padding:16px;color:#b8c4d5;font-size:12px;line-height:1.6;background:#0d1829}.road{background:#f1f5f9}.roadGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.roadCard{background:#fff;border:1px solid #dce3eb;border-radius:18px;padding:22px}.roadTop{display:flex;align-items:center;justify-content:space-between;gap:10px}.roadTop i{width:34px;height:34px;border-radius:10px;background:#eef2ff;color:#4f46e5;display:grid;place-items:center;font-style:normal;font-weight:950}.roadTop span{font-size:8px;letter-spacing:.1em;font-weight:950;color:#4f46e5;background:#eef2ff;padding:6px 8px;border-radius:999px}.roadCard h3{font-size:19px;margin:15px 0}.roadCard ul{columns:2;gap:22px;padding-left:16px;color:#64748b;font-size:12px;line-height:1.8}.otaFlow{margin-top:26px;background:#fff;border:1px solid #dbe3ec;border-radius:18px;padding:22px}.flow{display:grid;grid-template-columns:repeat(7,auto);align-items:center;gap:8px;justify-content:center;margin-top:18px}.flow span{padding:10px 12px;border-radius:10px;background:#f8fafc;border:1px solid #e2e8f0;font-size:10px;font-weight:800}.flow b{color:#94a3b8}.pricing{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.plan{background:#fff;border:1px solid #dce3eb;border-radius:18px;padding:25px;position:relative}.plan.best{border:2px solid #4f46e5;box-shadow:0 22px 50px #4f46e51b}.bestTag{position:absolute;right:14px;top:14px;font-size:8px;background:#eef2ff;color:#4f46e5;padding:6px 8px;border-radius:999px;font-weight:950}.plan h3{font-size:21px;margin:3px 0}.plan .price{font-size:35px;font-weight:950;letter-spacing:-.04em;margin:15px 0}.plan .price small{font-size:11px;color:#64748b;font-weight:600}.plan p{font-size:12px;color:#64748b;line-height:1.55}.plan ul{list-style:none;padding:0;margin:20px 0;display:grid;gap:9px}.plan li{font-size:11px}.plan li:before{content:"✓";color:#15835e;font-weight:950;margin-right:8px}.plan a{display:block;text-decoration:none;text-align:center;background:#0f172a;color:#fff;padding:12px;border-radius:10px;font-size:12px;font-weight:900}.plan.best a{background:#4f46e5}.asterisk{margin-top:16px;text-align:center;font-size:10px;color:#64748b}.final{padding:78px 0;background:linear-gradient(130deg,#0b1322,#172554);color:white;text-align:center}.final h2{font-size:43px;letter-spacing:-.045em;margin:0 auto 14px;max-width:780px}.final p{color:#bbc6d6;max-width:700px;margin:0 auto 24px;line-height:1.6}.final .btnLight{border:0}.footer{padding:28px 0;background:#07101e;color:#8ea0ba}.footerin{display:flex;justify-content:space-between;gap:20px;align-items:center}.footer .logo b{color:#fff}.footer small{font-size:10px}.previewBadge{position:fixed;right:14px;bottom:14px;z-index:200;background:#fff7d6;color:#7c5800;border:1px solid #ead788;padding:8px 10px;border-radius:999px;font-size:9px;font-weight:950;box-shadow:0 8px 24px #0001}
-@media(max-width:900px){.navlinks a:not(.login):not(.trial){display:none}.hero{padding-top:52px}.heroGrid,.humanSection{grid-template-columns:1fr}.hero h1{font-size:48px}.visual{margin-top:15px}.pillars,.groups{grid-template-columns:repeat(2,1fr)}.matrix{grid-template-columns:1fr}.roadGrid{grid-template-columns:1fr}.pricing{grid-template-columns:1fr}.photoStack{display:none}.comp{grid-template-columns:110px 130px 1fr}}
-@media(max-width:620px){.wrap{width:min(100% - 22px,1180px)}.navin{height:64px}.navlinks{gap:7px}.navlinks .login{display:none}.navlinks .trial{font-size:11px;padding:9px 10px}.hero h1{font-size:39px}.hero p{font-size:15px}.heroGrid{gap:24px}.dashMock{transform:none;border-radius:15px}.dashBody{grid-template-columns:1fr}.dashBody aside{display:none}.dashBody section{padding:10px}.metrics{grid-template-columns:repeat(2,1fr)}.cHead,.cRow{grid-template-columns:80px repeat(7,44px);min-width:388px}.calendar{overflow-x:auto}.cRow>strong{position:sticky;left:0;z-index:4}.section{padding:62px 0}.head h2{font-size:32px}.pillars,.groups{grid-template-columns:1fr}.photoGrid{min-height:400px;grid-template-columns:1fr 1fr}.photoGrid div:first-child{grid-column:1/3;grid-row:auto}.humanCopy{padding:26px}.humanCopy h2{font-size:32px}.comp{grid-template-columns:1fr;gap:6px}.roadCard ul{columns:1}.flow{display:flex;overflow-x:auto;justify-content:flex-start;padding-bottom:5px}.flow span{white-space:nowrap}.stripin{align-items:flex-start;flex-direction:column}.final h2{font-size:33px}.footerin{flex-direction:column;align-items:flex-start}.previewBadge{font-size:8px}}
-`}</style>
+function PMSMock(){
+  const rows = [
+    ["101 · Doble", "Sofía M.", "in", 1, 3],
+    ["102 · Doble", "Martín R.", "book", 3, 3],
+    ["201 · Triple", "Lucía P.", "in", 2, 4],
+    ["202 · Suite", "Familia Díaz", "wait", 4, 3],
+    ["Cabaña 1", "Carla + 3", "book", 1, 4],
+    ["Cabaña 2", "Libre", "", 0, 0],
+  ]
 
-<nav className="nav"><div className="wrap navin"><Logo/><div className="navlinks"><a href="#producto">Producto</a><a href="#competencia">Competencia</a><a href="#roadmap">Integraciones</a><a href="#planes">Planes</a><Link className="login" href="/login">Iniciar sesión</Link><Link className="trial" href="/registro">Probar 30 días gratis</Link></div></div></nav>
+  return <div className="pmsMock">
+    <div className="mockTop">
+      <Brand />
+      <div className="sync"><span /> Sincronizado</div>
+      <div className="property">Hostería Los Aromos</div>
+    </div>
+    <div className="mockBody">
+      <aside>
+        {["Inicio","Calendario","Reservas","Recepción","Housekeeping","Huéspedes","Caja","Reportes","Integraciones","Asistente IA"].map((x,i)=><div key={x} className={i===1?"active":""}><i />{x}</div>)}
+      </aside>
+      <section>
+        <div className="mockHead">
+          <div><small>PLANIFICACIÓN</small><h3>Calendario de ocupación</h3><p>23 — 29 agosto</p></div>
+          <div className="mockBtns"><button>Hoy</button><button>14 días</button><button className="mainBtn">+ Reserva</button></div>
+        </div>
+        <div className="miniStats">
+          {[["78%","Ocupación"],["6","IN hoy"],["4","OUT hoy"],["$ 86.400","ADR"]].map(([v,l])=><article key={l}><small>{l}</small><b>{v}</b></article>)}
+        </div>
+        <div className="calendar">
+          <div className="calHead"><b>Habitación</b>{["23 D","24 L","25 M","26 X","27 J","28 V","29 S"].map(d=><b key={d}>{d}</b>)}</div>
+          {rows.map(([room,guest,state,start,w])=><div className="calRow" key={room}><strong>{room}</strong>{w>0&&<div className={`reservation ${state}`} style={{gridColumn:`${start+1} / span ${w}`}}><b>{guest}</b><small>{state==="in"?"IN · pagado":state==="wait"?"PENDIENTE":"RESERVA"}</small></div>}</div>)}
+        </div>
+      </section>
+    </div>
+  </div>
+}
 
-<section className="hero"><div className="wrap heroGrid"><div><div className="eyebrow"><span className="chip arg">🇦🇷 Startup argentina</span><Chip>PMS para alojamientos independientes</Chip></div><h1>Tu alojamiento, <span>más lleno y mejor gestionado.</span></h1><p>Habitación Llena reúne reservas, calendario, huéspedes, cobros, housekeeping, venta directa, distribución e inteligencia hotelera en una experiencia moderna pensada para hosterías, cabañas, posadas y hoteles independientes.</p><div className="heroActions"><Link href="/registro" className="btn btnDark">Empezar 30 días gratis →</Link><a href="#producto" className="btn btnLight">Ver cómo funciona</a></div><div className="micro"><span><b>30 días</b> de prueba</span><span><b>Sin tarjeta</b> para comenzar</span><span><b>Onboarding</b> acompañado</span></div></div><div className="visual"><div className="photoStack"><img src={imgHotel} alt="Hotel independiente"/></div><CalendarMock/></div></div></section>
+function SectionTitle({eyebrow,title,text,dark=false}){
+  return <div className={`sectionTitle ${dark?"dark":""}`}><small>{eyebrow}</small><h2>{title}</h2>{text&&<p>{text}</p>}</div>
+}
 
-<div className="strip"><div className="wrap stripin"><div><b>Una sola operación. Todos tus canales.</b><br/><span>El objetivo: que una reserva entre una vez y todo el ecosistema se actualice.</span></div><div className="logos"><i>Booking.com</i><i>Airbnb</i><i>Expedia</i><i>Despegar</i><i>Google</i></div></div></div>
+export default function PMSNext(){
+  return <main>
+    <style>{`
+      :root{--ink:#14201d;--forest:#173d38;--forest2:#0d2f2b;--moss:#55766d;--sage:#aabdb4;--ivory:#f5f0e7;--paper:#fbf8f2;--sand:#dfcfba;--brass:#b58962;--clay:#a56850;--white:#ffffff;--line:rgba(20,32,29,.12)}
+      *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--paper);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.wrap{width:min(1200px,calc(100% - 36px));margin:auto}.nav{position:sticky;top:0;z-index:80;background:rgba(251,248,242,.76);backdrop-filter:blur(22px);border-bottom:1px solid rgba(20,32,29,.08)}.navin{height:76px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:18px}.brand{font-family:Georgia,"Times New Roman",serif;font-size:21px;letter-spacing:-.045em;white-space:nowrap}.brand strong{font-weight:700}.brand span{font-family:Inter,sans-serif;font-size:11px;letter-spacing:.04em;margin-left:1px;color:var(--moss);font-weight:750}.nav .brand{justify-self:start}.navlinks{display:flex;align-items:center;justify-content:center;gap:24px}.navlinks a{text-decoration:none;color:#41504c;font-size:12px;font-weight:720;transition:.25s}.navlinks a:hover{color:var(--forest)}.navactions{justify-self:end;display:flex;gap:9px}.navbtn{padding:10px 14px;border-radius:999px;text-decoration:none;font-size:12px;font-weight:800;transition:.25s}.navbtn.login{border:1px solid rgba(20,32,29,.16);color:var(--forest);background:rgba(255,255,255,.55)}.navbtn.trial{background:var(--forest);color:#fff;box-shadow:0 10px 24px rgba(23,61,56,.18)}.navbtn:hover{transform:translateY(-1px)}
+      .hero{position:relative;min-height:780px;overflow:hidden;background:var(--ivory)}.hero:before{content:"";position:absolute;inset:0;background-image:radial-gradient(circle at 18% 15%,rgba(181,137,98,.15),transparent 23%),radial-gradient(circle at 80% 18%,rgba(85,118,109,.14),transparent 25%),linear-gradient(rgba(255,255,255,.22) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.18) 1px,transparent 1px);background-size:auto,auto,56px 56px,56px 56px;mask-image:linear-gradient(to bottom,#000 0%,transparent 88%)}.heroGrid{position:relative;z-index:2;display:grid;grid-template-columns:.94fr 1.06fr;gap:58px;align-items:center;padding:78px 0 90px}.kicker{display:flex;align-items:center;gap:10px;color:var(--forest);font-size:11px;font-weight:850;letter-spacing:.13em;text-transform:uppercase}.kicker:before{content:"";width:34px;height:1px;background:var(--brass)}.hero h1{font-family:Georgia,"Times New Roman",serif;font-weight:500;font-size:76px;line-height:.93;letter-spacing:-.064em;margin:18px 0 24px;max-width:650px}.hero h1 em{font-style:italic;color:var(--forest)}.heroCopy>p{font-size:17px;line-height:1.72;color:#52615c;max-width:590px;margin:0}.heroActions{display:flex;gap:10px;flex-wrap:wrap;margin-top:29px}.cta{display:inline-flex;align-items:center;justify-content:center;padding:14px 19px;border-radius:999px;text-decoration:none;font-size:13px;font-weight:830;transition:.28s}.cta.primary{background:var(--forest);color:white;box-shadow:0 15px 34px rgba(23,61,56,.2)}.cta.secondary{color:var(--forest);border:1px solid rgba(23,61,56,.2);background:rgba(255,255,255,.45);backdrop-filter:blur(10px)}.cta:hover{transform:translateY(-2px)}.heroMeta{display:flex;gap:24px;flex-wrap:wrap;margin-top:22px;font-size:11px;color:#6d7874}.heroMeta b{color:var(--forest)}
+      .visual{position:relative;min-height:610px}.heroPhoto{position:absolute;right:0;top:0;width:78%;height:560px;border-radius:180px 26px 26px 26px;overflow:hidden;box-shadow:0 35px 90px rgba(30,44,40,.2);animation:photoFloat 8s ease-in-out infinite}.heroPhoto img{width:100%;height:100%;object-fit:cover;filter:saturate(.9) contrast(.98)}.heroPhoto:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 48%,rgba(13,47,43,.42))}.floatingCard{position:absolute;left:0;bottom:15px;width:310px;padding:22px;border-radius:24px;background:rgba(255,255,255,.78);backdrop-filter:blur(22px);border:1px solid rgba(255,255,255,.72);box-shadow:0 20px 50px rgba(28,43,39,.16);animation:cardFloat 7s ease-in-out infinite}.floatingCard small{font-size:9px;letter-spacing:.16em;color:var(--moss);font-weight:850}.floatingCard b{display:block;font-family:Georgia,serif;font-size:25px;font-weight:500;margin-top:7px}.floatingCard p{font-size:11px;line-height:1.5;color:#60706a;margin:8px 0 0}.roomPill{position:absolute;right:-5px;bottom:80px;background:rgba(23,61,56,.88);color:white;border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(18px);padding:12px 15px;border-radius:999px;font-size:10px;letter-spacing:.05em;box-shadow:0 16px 36px rgba(13,47,43,.2)}
+      .ribbon{background:var(--forest);color:white;overflow:hidden;border-top:1px solid rgba(255,255,255,.08);border-bottom:1px solid rgba(255,255,255,.08)}.ribbonTrack{display:flex;gap:45px;width:max-content;padding:15px 0;animation:marquee 24s linear infinite}.ribbonTrack span{font-family:Georgia,serif;font-size:14px;font-style:italic;opacity:.88;white-space:nowrap}.ribbonTrack i{width:5px;height:5px;border-radius:50%;background:var(--brass);align-self:center}
+      .section{padding:104px 0}.sectionTitle{max-width:760px;margin-bottom:46px}.sectionTitle small{font-size:10px;font-weight:900;letter-spacing:.16em;color:var(--brass);text-transform:uppercase}.sectionTitle h2{font-family:Georgia,serif;font-size:51px;line-height:1.02;letter-spacing:-.05em;font-weight:500;margin:12px 0 15px}.sectionTitle p{color:#68746f;font-size:15px;line-height:1.7;max-width:650px}.sectionTitle.dark h2,.sectionTitle.dark p{color:white}.sectionTitle.dark p{opacity:.65}
+      .experience{background:var(--paper)}.experienceGrid{display:grid;grid-template-columns:1.04fr .96fr;gap:30px;align-items:stretch}.editorialPhoto{position:relative;min-height:650px;border-radius:28px;overflow:hidden}.editorialPhoto img{width:100%;height:100%;object-fit:cover;transition:transform .8s ease}.editorialPhoto:hover img{transform:scale(1.035)}.editorialPhoto:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 45%,rgba(13,47,43,.78))}.editorialCopy{position:absolute;z-index:2;left:28px;right:28px;bottom:28px;color:white}.editorialCopy small{font-size:9px;letter-spacing:.17em}.editorialCopy h3{font-family:Georgia,serif;font-weight:500;font-size:34px;letter-spacing:-.04em;margin:9px 0}.editorialCopy p{font-size:12px;line-height:1.55;max-width:460px;opacity:.82}.sideStack{display:grid;grid-template-rows:1fr 1fr;gap:18px}.sidePhoto{position:relative;border-radius:24px;overflow:hidden;min-height:300px}.sidePhoto img{width:100%;height:100%;object-fit:cover;transition:transform .8s ease}.sidePhoto:hover img{transform:scale(1.04)}.sidePhoto:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 46%,rgba(13,47,43,.62))}.sidePhoto span{position:absolute;z-index:2;left:20px;bottom:18px;color:white;font-family:Georgia,serif;font-size:23px}
+      .platform{position:relative;background:var(--forest2);color:white;overflow:hidden}.platform:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 20% 10%,rgba(181,137,98,.18),transparent 22%),radial-gradient(circle at 85% 85%,rgba(170,189,180,.12),transparent 25%)}.platform .wrap{position:relative;z-index:2}.mockShell{position:relative;margin-top:48px}.glassNote{position:absolute;right:18px;top:-28px;z-index:5;background:rgba(255,255,255,.12);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.16);border-radius:16px;padding:12px 15px;font-size:10px;color:#dce8e3;animation:cardFloat 6s ease-in-out infinite}.pmsMock{background:#fdfbf7;color:#18231f;border:1px solid rgba(255,255,255,.12);border-radius:26px;box-shadow:0 38px 100px rgba(0,0,0,.34);overflow:hidden;transform:perspective(1300px) rotateX(1deg)}.mockTop{height:62px;display:flex;align-items:center;padding:0 18px;border-bottom:1px solid #e8e2d8;gap:14px}.mockTop .brand{font-size:13px}.mockTop .brand span{font-size:6px}.sync{margin-left:auto;font-size:7px;color:#55766d;font-weight:750}.sync span{display:inline-block;width:5px;height:5px;background:#5f8f74;border-radius:50%;box-shadow:0 0 0 4px rgba(95,143,116,.12);margin-right:5px}.property{font-size:8px;font-weight:800;padding:7px 9px;border:1px solid #ded8ce;border-radius:8px}.mockBody{display:grid;grid-template-columns:145px 1fr;min-height:465px}.mockBody aside{background:#153833;padding:13px 9px;color:#bfd0c9}.mockBody aside div{display:flex;gap:7px;align-items:center;font-size:7px;padding:10px 9px;border-radius:8px;margin-bottom:2px}.mockBody aside i{width:6px;height:6px;border:1px solid #77938a;border-radius:2px}.mockBody aside .active{background:rgba(255,255,255,.11);color:white}.mockBody aside .active i{background:#c4a27f;border-color:#c4a27f}.mockBody section{padding:18px}.mockHead{display:flex;align-items:center;justify-content:space-between}.mockHead small{font-size:6px;letter-spacing:.18em;color:#9c968c}.mockHead h3{font-size:15px;margin:3px 0}.mockHead p{font-size:6px;color:#aaa39a;margin:0}.mockBtns button{font-size:6px;padding:6px 8px;border:1px solid #ddd7cd;background:white;border-radius:7px;margin-left:4px;color:#35443f}.mockBtns .mainBtn{background:#173d38;color:white;border-color:#173d38}.miniStats{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:14px 0}.miniStats article{padding:9px;border:1px solid #e8e2d8;border-radius:9px;background:#fff}.miniStats small{display:block;font-size:5px;color:#9c968c}.miniStats b{display:block;font-size:12px;margin-top:4px}.calendar{border:1px solid #e7e1d7;border-radius:11px;overflow:hidden;background:#fff}.calHead,.calRow{display:grid;grid-template-columns:105px repeat(7,1fr);position:relative}.calHead{background:#f7f3ec;min-height:30px}.calHead b{font-size:5px;padding:9px 4px;text-align:center;border-right:1px solid #ebe5db;color:#857f76}.calHead b:first-child{text-align:left;padding-left:10px}.calRow{min-height:48px;border-top:1px solid #eee8df}.calRow>strong{font-size:6px;padding:16px 9px;border-right:1px solid #eee8df}.calRow:after{content:"";position:absolute;left:105px;right:0;top:0;bottom:0;background:repeating-linear-gradient(90deg,transparent 0,transparent calc(14.285% - 1px),#eee8df calc(14.285% - 1px),#eee8df 14.285%);pointer-events:none}.reservation{z-index:2;align-self:center;border-radius:8px;padding:6px 7px;color:white;margin:4px 2px;min-width:0;box-shadow:0 3px 10px rgba(0,0,0,.08)}.reservation b{font-size:6px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.reservation small{font-size:5px;opacity:.76}.reservation.in{background:#4f7568}.reservation.book{background:#9f7959}.reservation.wait{background:#b99d67}
+      .featuresSection{background:#eee6d9}.featureGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.feature{position:relative;background:rgba(255,255,255,.66);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.72);border-radius:22px;padding:24px;min-height:190px;transition:.32s;overflow:hidden}.feature:before{content:"";position:absolute;width:90px;height:90px;border-radius:50%;background:rgba(181,137,98,.08);right:-30px;top:-30px}.feature:hover{transform:translateY(-5px);box-shadow:0 20px 45px rgba(48,54,49,.10);background:rgba(255,255,255,.82)}.featureNo{font-family:Georgia,serif;font-style:italic;color:var(--brass);font-size:12px}.feature h3{font-family:Georgia,serif;font-size:24px;font-weight:500;letter-spacing:-.035em;margin:24px 0 9px}.feature p{font-size:12px;line-height:1.6;color:#68746f;margin:0}
+      .flow{background:var(--paper)}.flowGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.flowItem{padding:27px 24px;border-right:1px solid var(--line)}.flowItem:last-child{border-right:none}.flowItem small{font-size:9px;color:var(--brass);font-weight:900}.flowItem h3{font-family:Georgia,serif;font-size:22px;font-weight:500;margin:13px 0 8px}.flowItem p{font-size:11px;line-height:1.55;color:#6a7772}.flowArrow{margin-top:18px;font-size:16px;color:var(--moss)}
+      .pricing{background:#f3ede3}.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.plan{background:rgba(255,255,255,.72);backdrop-filter:blur(12px);border:1px solid rgba(20,32,29,.10);border-radius:25px;padding:28px;position:relative;transition:.3s}.plan:hover{transform:translateY(-4px);box-shadow:0 22px 50px rgba(37,48,43,.10)}.plan.best{background:var(--forest);color:white;box-shadow:0 25px 60px rgba(23,61,56,.18)}.planTag{position:absolute;right:18px;top:18px;padding:6px 9px;border-radius:999px;background:#d9c6ae;color:#173d38;font-size:8px;font-weight:900;letter-spacing:.08em}.plan h3{font-family:Georgia,serif;font-size:29px;font-weight:500;margin:4px 0}.price{font-size:37px;font-weight:850;letter-spacing:-.05em;margin:17px 0 6px}.price span{font-size:11px;font-weight:600;opacity:.55}.plan>p{font-size:12px;line-height:1.6;color:#68746f;min-height:58px}.plan.best>p{color:#d4dfda}.plan ul{list-style:none;padding:0;margin:23px 0;display:grid;gap:11px}.plan li{font-size:11px}.plan li:before{content:"✓";margin-right:8px;color:#8b735b;font-weight:900}.plan.best li:before{color:#d8bc9a}.plan a{display:block;text-align:center;padding:12px;border-radius:999px;text-decoration:none;background:#173d38;color:white;font-size:12px;font-weight:850}.plan.best a{background:#f4eadf;color:#173d38}.trialNote{text-align:center;margin-top:20px;color:#6f7a76;font-size:11px}
+      .closing{position:relative;min-height:560px;display:grid;place-items:center;overflow:hidden;color:white}.closing img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.closing:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(12,39,35,.9),rgba(12,39,35,.62))}.closingInner{position:relative;z-index:2;width:min(820px,calc(100% - 36px));text-align:center}.closingInner small{font-size:10px;letter-spacing:.17em;text-transform:uppercase;color:#ddc4a7}.closingInner h2{font-family:Georgia,serif;font-size:58px;line-height:1;letter-spacing:-.05em;font-weight:500;margin:15px 0}.closingInner p{max-width:620px;margin:0 auto 25px;line-height:1.7;color:#dbe5e1}.closingInner .cta.primary{background:#f4eadf;color:#173d38}.closingInner .cta.secondary{border-color:rgba(255,255,255,.27);color:white;background:rgba(255,255,255,.08)}
+      footer{background:#0c2925;color:#9fb4ad;padding:34px 0}.footerIn{display:flex;align-items:center;justify-content:space-between;gap:20px}.footerIn .brand{color:white}.footerIn .brand span{color:#bfcfc8}.footerIn p{font-size:10px;margin:0}.footerLinks{display:flex;gap:16px}.footerLinks a{font-size:10px;color:#b9cac4;text-decoration:none}
+      @keyframes photoFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}@keyframes cardFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}@keyframes marquee{to{transform:translateX(-50%)}}
+      @media(max-width:980px){.navin{grid-template-columns:1fr auto}.navlinks{display:none}.hero{min-height:0}.heroGrid{grid-template-columns:1fr;padding:62px 0 72px}.hero h1{font-size:64px;max-width:760px}.visual{min-height:570px}.heroPhoto{width:86%;right:0}.experienceGrid{grid-template-columns:1fr}.editorialPhoto{min-height:520px}.sideStack{grid-template-columns:1fr 1fr;grid-template-rows:auto}.mockBody{grid-template-columns:120px 1fr}.featureGrid{grid-template-columns:repeat(2,1fr)}.flowGrid{grid-template-columns:repeat(2,1fr)}.flowItem:nth-child(2){border-right:none}.flowItem:nth-child(-n+2){border-bottom:1px solid var(--line)}.plans{grid-template-columns:1fr}.plan>p{min-height:0}}
+      @media(max-width:680px){.wrap{width:min(100% - 24px,1200px)}.navin{height:66px}.nav .brand{font-size:18px}.navactions .login{display:none}.navbtn{padding:9px 12px;font-size:10px}.heroGrid{padding-top:46px;gap:34px}.kicker{font-size:9px}.hero h1{font-size:49px;line-height:.98}.heroCopy>p{font-size:15px}.heroActions{display:grid;grid-template-columns:1fr}.cta{width:100%}.heroMeta{gap:10px;font-size:10px}.visual{min-height:440px}.heroPhoto{width:94%;height:405px;border-radius:110px 20px 20px 20px}.floatingCard{left:0;bottom:-6px;width:245px;padding:16px;border-radius:19px}.floatingCard b{font-size:20px}.roomPill{display:none}.section{padding:76px 0}.sectionTitle h2{font-size:40px}.experienceGrid{gap:12px}.editorialPhoto{min-height:460px;border-radius:21px}.sideStack{grid-template-columns:1fr;gap:12px}.sidePhoto{min-height:260px;border-radius:20px}.platform{overflow:hidden}.mockShell{margin-top:35px;overflow-x:auto;padding-bottom:10px}.pmsMock{width:760px;transform:none;border-radius:20px}.glassNote{display:none}.featureGrid{grid-template-columns:1fr}.feature{min-height:165px}.flowGrid{grid-template-columns:1fr}.flowItem{border-right:none;border-bottom:1px solid var(--line)}.flowItem:last-child{border-bottom:none}.closing{min-height:520px}.closingInner h2{font-size:44px}.footerIn{align-items:flex-start;flex-direction:column}.footerLinks{flex-wrap:wrap}}
+      @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+    `}</style>
 
-<section id="producto" className="section"><div className="wrap"><div className="head"><small>PRODUCTO</small><h2>Un PMS que no se siente como software viejo.</h2><p>La propuesta combina operación hotelera seria con una interfaz rápida, visual y usable desde notebook, tablet o celular.</p></div><div className="pillars">{pillars.map(([n,t,d])=><article className="pillar" key={n}><div className="n">{n}</div><h3>{t}</h3><p>{d}</p></article>)}</div></div></section>
+    <nav className="nav">
+      <div className="wrap navin">
+        <Brand />
+        <div className="navlinks">
+          <a href="#producto">Producto</a>
+          <a href="#funciones">Funciones</a>
+          <a href="#planes">Planes</a>
+          <a href="#nosotros">Nosotros</a>
+        </div>
+        <div className="navactions">
+          <Link href="/login" className="navbtn login">Iniciar sesión</Link>
+          <Link href="/registro" className="navbtn trial">Probar 30 días</Link>
+        </div>
+      </div>
+    </nav>
 
-<section className="section featureZone"><div className="wrap"><div className="head"><small>FUNCIONES</small><h2>Todo lo que el equipo necesita, sin saltar entre diez sistemas.</h2><p>Estas son las funciones que quedan como norte de producto después de comparar el PMS con plataformas líderes internacionales y regionales.</p></div><div className="groups">{featureGroups.map(g=><article className="group" key={g.title}><h3>{g.title}</h3><ul>{g.items.map(x=><li key={x}>{x}</li>)}</ul></article>)}</div></div></section>
+    <section className="hero">
+      <div className="wrap heroGrid">
+        <div className="heroCopy">
+          <div className="kicker">PMS para alojamientos independientes</div>
+          <h1>Tu alojamiento, <em>mucho más simple</em> de gestionar.</h1>
+          <p>Calendario, reservas, huéspedes, recepción, housekeeping, pagos, venta directa y automatizaciones en una experiencia pensada para trabajar rápido y sin llenar la operación de pantallas.</p>
+          <div className="heroActions">
+            <Link href="/registro" className="cta primary">Empezar 30 días gratis</Link>
+            <a href="#producto" className="cta secondary">Ver cómo funciona</a>
+          </div>
+          <div className="heroMeta"><span><b>✓</b> Sin tarjeta</span><span><b>✓</b> Mobile first</span><span><b>✓</b> Startup argentina</span></div>
+        </div>
+        <div className="visual">
+          <div className="heroPhoto"><img src={HERO} alt="Hotel boutique moderno" /></div>
+          <div className="floatingCard"><small>TODO EN UN MISMO LUGAR</small><b>Menos administración. Más hospitalidad.</b><p>Una plataforma clara para que la tecnología acompañe al equipo sin complicarlo.</p></div>
+          <div className="roomPill">● disponibilidad actualizada</div>
+        </div>
+      </div>
+    </section>
 
-<section className="section"><div className="wrap humanSection"><div className="photoGrid"><div><img src={imgCabin} alt="Cabaña pequeña"/><span>Cabañas y complejos</span></div><div><img src={imgHost} alt="Recepción hotelera"/><span>Equipos chicos</span></div><div><img src={imgRoom} alt="Habitación de hotel"/><span>Hoteles independientes</span></div></div><div className="humanCopy"><small>HECHO PARA LA HOTELERÍA REAL</small><h2>Menos planillas. Menos pestañas. Más tiempo con tus huéspedes.</h2><p>No apuntamos primero a una cadena de 5.000 habitaciones. Apuntamos a la persona que atiende recepción, responde WhatsApp, cobra una seña, mueve una reserva y necesita saber rápido qué habitación queda libre.</p><ul><li>Interfaz clara y táctil.</li><li>Información importante visible de un vistazo.</li><li>Mobile-first sin perder potencia en escritorio.</li><li>Soporte y contexto local para Argentina y Latinoamérica.</li></ul></div></div></section>
+    <div className="ribbon"><div className="ribbonTrack">
+      {["Calendario vivo","Reservas","Recepción","Housekeeping","Pagos","Motor de reservas","Canales","Revenue","IA hotelera","Calendario vivo","Reservas","Recepción","Housekeeping","Pagos","Motor de reservas","Canales","Revenue","IA hotelera"].map((x,i)=><span key={i}>{x}</span>)}
+    </div></div>
 
-<section id="competencia" className="section research"><div className="wrap"><div className="head"><small>BENCHMARK 2026</small><h2 style={{color:"white"}}>10 plataformas estudiadas. Una dirección más clara.</h2><p style={{color:"#aebbd0"}}>No se trata de copiar pantallas. Se trata de identificar qué resuelve mejor cada competidor y convertirlo en una experiencia coherente para nuestro cliente objetivo.</p></div><div className="matrix">{competitorIdeas.map(([n,f,i])=><article className="comp" key={n}><b>{n}</b><span>{f}</span><p>{i}</p></article>)}</div><div className="researchNote"><b>Conclusión:</b> la oportunidad de Habitación Llena no está en tener “más botones”, sino en unir cuatro cosas especialmente bien: <b>operación simple + conectividad OTA + venta directa + automatización inteligente</b>. Para hoteles chicos, la velocidad de aprendizaje y el soporte local pueden ser una ventaja tan importante como la cantidad de integraciones.</div></div></section>
+    <section className="section experience" id="nosotros">
+      <div className="wrap">
+        <SectionTitle eyebrow="Diseñado para hospitalidad" title="Tecnología que se siente como parte del hotel." text="Una interfaz cálida, limpia y simple para hosterías, cabañas, posadas, pequeños hoteles y propiedades que quieren profesionalizarse sin perder su identidad." />
+        <div className="experienceGrid">
+          <div className="editorialPhoto"><img src={LODGE} alt="Cabaña moderna" /><div className="editorialCopy"><small>PEQUEÑOS ALOJAMIENTOS, GRANDES EXPERIENCIAS</small><h3>Hecho para la escala real de tu negocio.</h3><p>Desde una propiedad familiar hasta una operación con varias unidades y equipos.</p></div></div>
+          <div className="sideStack">
+            <div className="sidePhoto"><img src={ROOM} alt="Habitación moderna" /><span>Operación clara</span></div>
+            <div className="sidePhoto"><img src={HOTEL} alt="Recepción hotelera" /><span>Experiencia profesional</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
 
-<section id="roadmap" className="section road"><div className="wrap"><div className="head"><small>INTEGRACIONES</small><h2>Cómo lo llevamos a un PMS realmente competitivo.</h2><p>El siguiente salto requiere conectividad real, no logos decorativos. Las OTAs deben mapear inventario, tarifas, restricciones, reservas, cancelaciones y modificaciones según las capacidades de cada canal.</p></div><div className="roadGrid">{roadmap.map(r=><article className="roadCard" key={r.phase}><div className="roadTop"><i>{r.phase}</i><span>{r.tag}</span></div><h3>{r.title}</h3><ul>{r.items.map(x=><li key={x}>{x}</li>)}</ul></article>)}</div><div className="otaFlow"><b>Arquitectura de distribución propuesta</b><div className="flow"><span>Web / OTA</span><b>→</b><span>Channel Manager</span><b>→</b><span>Inventario central</span><b>↔</b><span>PMS</span></div></div></div></section>
+    <section className="section platform" id="producto">
+      <div className="wrap">
+        <SectionTitle dark eyebrow="El corazón del sistema" title="Un calendario que organiza todo lo demás." text="La disponibilidad, las reservas, los cambios y la operación diaria parten de una vista central que el equipo entiende en segundos." />
+        <div className="mockShell"><div className="glassNote">Reserva nueva · notificación activa</div><PMSMock /></div>
+      </div>
+    </section>
 
-<section id="planes" className="section"><div className="wrap"><div className="head"><small>PLANES PROPUESTOS</small><h2>Entrar fácil. Crecer sin cambiar de sistema.</h2><p>Todos los planes comienzan con 30 días de prueba para que el alojamiento pueda cargar habitaciones, simular reservas y comprobar el flujo real antes de contratar.</p></div><div className="pricing">{plans.map(p=><article className={`plan ${p.best?"best":""}`} key={p.name}>{p.best&&<span className="bestTag">RECOMENDADO</span>}<h3>{p.name}</h3><div className="price">{p.price}<small> / mes</small></div><p>{p.desc}</p><ul>{p.items.map(x=><li key={x}>{x}</li>)}</ul><Link href="/registro">Probar 30 días gratis</Link></article>)}</div><div className="asterisk">* Las conexiones OTA dependen de homologación, disponibilidad del canal, partner tecnológico y alcance técnico de cada API. En esta preview se presentan como propuesta de producto.</div></div></section>
+    <section className="section featuresSection" id="funciones">
+      <div className="wrap">
+        <SectionTitle eyebrow="Funciones" title="Todo lo importante, sin hacerte perder tiempo." text="Cada módulo está pensado para resolver una tarea concreta y mantener la información conectada." />
+        <div className="featureGrid">
+          {features.map(([title,text],i)=><article className="feature" key={title}><span className="featureNo">0{i+1}</span><h3>{title}</h3><p>{text}</p></article>)}
+        </div>
+      </div>
+    </section>
 
-<section className="final"><div className="wrap"><h2>La recepción de siempre. Con herramientas de 2026.</h2><p>Una plataforma argentina, humana y simple para que alojamientos independientes puedan competir con tecnología que hasta hace poco parecía reservada para grandes cadenas.</p><div className="heroActions" style={{justifyContent:"center"}}><Link href="/registro" className="btn btnLight">Probar 30 días gratis</Link><Link href="/login" className="btn btnDark" style={{background:"#4f46e5"}}>Ya tengo cuenta</Link></div></div></section>
-<footer className="footer"><div className="wrap footerin"><Logo/><small>Habitación Llena · Preview estratégica Bloque 2 · Argentina</small></div></footer><div className="previewBadge">PREVIEW · NO PRODUCCIÓN</div>
-</main>}
+    <section className="section flow">
+      <div className="wrap">
+        <SectionTitle eyebrow="Una sola operación" title="De la consulta a la salida, todo conectado." text="El sistema acompaña el ciclo completo del huésped sin duplicar datos ni obligarte a saltar entre herramientas." />
+        <div className="flowGrid">
+          {[
+            ["01","Reserva","Entra por venta directa, recepción o un canal conectado."],
+            ["02","Estadía","Check-in, pagos, extras, cambios, vehículos, mascotas y notas."],
+            ["03","Operación","Recepción y housekeeping ven el mismo estado en tiempo real."],
+            ["04","Salida","Check-out, saldo, reporte y disponibilidad actualizada al instante."],
+          ].map(([n,t,p])=><div className="flowItem" key={n}><small>{n}</small><h3>{t}</h3><p>{p}</p><div className="flowArrow">→</div></div>)}
+        </div>
+      </div>
+    </section>
+
+    <section className="section pricing" id="planes">
+      <div className="wrap">
+        <SectionTitle eyebrow="Planes simples" title="Empezá chico. Crecé cuando lo necesites." text="30 días para probar el sistema con tu operación real y decidir con tranquilidad." />
+        <div className="plans">
+          {plans.map(plan=><article className={`plan ${plan.best?"best":""}`} key={plan.name}>{plan.best&&<span className="planTag">MÁS ELEGIDO</span>}<h3>{plan.name}</h3><div className="price">{plan.price} <span>/ mes</span></div><p>{plan.text}</p><ul>{plan.items.map(x=><li key={x}>{x}</li>)}</ul><Link href="/registro">Probar 30 días</Link></article>)}
+        </div>
+        <div className="trialNote">Sin permanencia. Podés empezar con lo esencial y ampliar cuando la operación lo pida.</div>
+      </div>
+    </section>
+
+    <section className="closing">
+      <img src={RESORT} alt="Hotel boutique al atardecer" />
+      <div className="closingInner">
+        <small>Habitación llena.com</small>
+        <h2>Un sistema a la altura de la experiencia que querés ofrecer.</h2>
+        <p>Profesionalizá la operación de tu alojamiento sin perder cercanía, identidad ni tiempo con herramientas difíciles.</p>
+        <div className="heroActions" style={{justifyContent:"center"}}><Link href="/registro" className="cta primary">Empezar 30 días gratis</Link><Link href="/login" className="cta secondary">Ya tengo cuenta</Link></div>
+      </div>
+    </section>
+
+    <footer><div className="wrap footerIn"><Brand /><p>Startup argentina · PMS para alojamientos independientes.</p><div className="footerLinks"><a href="#producto">Producto</a><a href="#funciones">Funciones</a><a href="#planes">Planes</a></div></div></footer>
+  </main>
+}
