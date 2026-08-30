@@ -8,4 +8,65 @@ export const metadata={
   openGraph:{title:"Habitación Llena · Hospitality Operating System",description:"El sistema hotelero que llena habitaciones y libera a recepción.",type:"website"},
 }
 
-export default function Home(){return <MarketingHome/>}
+const headerPolish=`
+main nav a[href="/"]>span,
+main nav a[href="/"]>small{display:none!important}
+main nav a[href="/"]>b{font-size:0!important;line-height:1!important}
+main nav a[href="/"]>b::after{
+  content:"HabitaciónLlena.com";
+  display:block;
+  font:600 24px/1 Georgia,"Times New Roman",serif;
+  letter-spacing:-.025em;
+  color:#fff;
+  text-shadow:0 2px 18px rgba(0,0,0,.25)
+}
+main nav a[href="/login"]{
+  display:inline-flex!important;
+  align-items:center;
+  justify-content:center;
+  min-height:46px;
+  padding:0 20px!important;
+  border:1px solid rgba(255,255,255,.48)!important;
+  border-radius:999px;
+  background:rgba(5,24,18,.44)!important;
+  color:#fff!important;
+  font-size:15px!important;
+  font-weight:750!important;
+  letter-spacing:.01em;
+  text-decoration:none;
+  text-shadow:0 1px 8px rgba(0,0,0,.3);
+  box-shadow:inset 0 1px rgba(255,255,255,.08),0 10px 28px rgba(0,0,0,.16);
+  backdrop-filter:blur(14px)
+}
+main nav a[href="/login"]:hover{
+  background:rgba(255,255,255,.12)!important;
+  border-color:rgba(255,255,255,.72)!important;
+  transform:translateY(-1px)
+}
+main nav a[href="/registro"]{
+  min-height:48px;
+  padding:0 24px!important;
+  background:#f2cf8d!important;
+  color:#10241c!important;
+  border:1px solid rgba(255,238,196,.92)!important;
+  font-size:15px!important;
+  font-weight:900!important;
+  letter-spacing:.005em;
+  box-shadow:0 10px 30px rgba(0,0,0,.22),0 0 24px rgba(240,207,148,.18)!important
+}
+main nav a[href="/registro"]:hover{
+  background:#ffe1a5!important;
+  transform:translateY(-2px) scale(1.015)
+}
+@media(max-width:700px){
+  main nav a[href="/"]>b::after{font-size:18px}
+  main nav a[href="/login"]{min-height:40px;font-size:12px!important;padding:0 12px!important}
+  main nav a[href="/registro"]{min-height:42px;font-size:12px!important;padding:0 13px!important}
+}
+@media(max-width:480px){
+  main nav a[href="/login"]{display:none!important}
+  main nav a[href="/"]>b::after{font-size:17px}
+}
+`
+
+export default function Home(){return <><style dangerouslySetInnerHTML={{__html:headerPolish}}/><MarketingHome/></>}
