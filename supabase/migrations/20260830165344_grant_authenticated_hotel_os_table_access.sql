@@ -1,0 +1,13 @@
+grant select, insert, update, delete on table public.hotel_guest_profiles to authenticated;
+grant select, insert, update, delete on table public.hotel_partners to authenticated;
+grant select, insert, update, delete on table public.hotel_groups to authenticated;
+grant select, insert, update, delete on table public.hotel_housekeeping_tasks to authenticated;
+grant select, insert, update, delete on table public.hotel_maintenance_tickets to authenticated;
+grant select, insert, update, delete on table public.hotel_resources to authenticated;
+grant select, insert, update, delete on table public.hotel_cash_sessions to authenticated;
+grant select, insert, update, delete on table public.hotel_cash_movements to authenticated;
+grant select, insert, update, delete on table public.hotel_finance_documents to authenticated;
+grant select, insert, update, delete on table public.hotel_upsell_catalog to authenticated;
+grant select, insert, update, delete on table public.hotel_role_permissions to authenticated;
+grant select, insert, update, delete on table public.hotel_automation_events to authenticated;
+grant select, insert, update, delete on table public.hotel_web_checkins to authenticated;
