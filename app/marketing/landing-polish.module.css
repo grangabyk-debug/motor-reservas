@@ -1,0 +1,3 @@
+.marqueeMotion{position:relative;overflow:hidden;background:linear-gradient(90deg,#e9c883,#f3d69b 48%,#e8c27b)}
+.marqueeTrack{display:flex!important;width:max-content!important;gap:26px;white-space:nowrap;animation:hotelMarquee 28s linear infinite;will-change:transform}
+@keyframes hotelMarquee{from{transform:translate3d(0,0,0)}to{transform:translate3d(-50%,0,0)}}
