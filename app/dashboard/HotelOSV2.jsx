@@ -1,0 +1,57 @@
+"use client"
+
+import{useMemo,useState}from"react"
+import HotelSidebar from"./components/shell/HotelSidebar"
+import HotelTopbar from"./components/shell/HotelTopbar"
+import{useHotelSession}from"./hooks/useHotelSession"
+import{useHotelData}from"./hooks/useHotelData"
+import{can}from"./core/permissions"
+import{VIEW_META}from"./core/navigation"
+import{addDays,isoDate}from"./core/formatters"
+import CommandCenter from"./features/frontdesk/CommandCenter"
+import{Lobby,Reservations,GuestCRM}from"./features/frontdesk/FrontDeskViews"
+import ReservationDrawer from"./features/frontdesk/ReservationDrawer"
+import{blankReservation,reservationToDraft}from"./features/frontdesk/reservationModel"
+import{saveReservation,moveReservation,checkinReservation,checkoutReservation,savePayment}from"./services/reservations"
+import{saveFloor,saveRoom,updateRoomStatus,saveBlock,saveHousekeepingTask,setHousekeepingStatus,saveMaintenanceTicket,setMaintenanceStatus,saveResource}from"./services/operations"
+import{RoomsView,HousekeepingView,MaintenanceView,ResourcesView,DigitalTwinView}from"./features/operations/OperationsViews"
+import ui from"./v2.module.css"
+
+const TITLES={lobby:"Bienvenidos a casa.",calendar:"El hotel entero, en una mirada.",reservations:"Cada estadía, completamente editable.",guests:"Una memoria elegante del huésped.",keys:"La llave correcta, para la habitación correcta.",rooms:"El edificio, exactamente como existe.",housekeeping:"Habitaciones listas antes de que el huésped pregunte.",maintenance:"Resolver antes de que el huésped lo note.",resources:"Todo recurso del hotel, bajo control.",twin:"El edificio vivo.",rates:"Precio, demanda y margen bajo control.",partners:"Relaciones comerciales que sí dejan trazabilidad.",groups:"Grupos sin planillas paralelas.",upselling:"Más valor para el huésped y para el hotel.",distribution:"Una disponibilidad. Todos los canales.",cash:"Cada turno cierra con claridad.",billing:"Folios y documentos sin perder el contexto.",reports:"Decisiones con información real.",team:"Cada persona ve lo que necesita.",automations:"El hotel trabaja incluso antes de que lo pidas.",intelligence:"Una inteligencia que entiende la operación.",integrations:"Conectar sin convertir el PMS en un rompecabezas.",settings:"Tu hotel, tus reglas."}
+
+export default function HotelOSV2(){
+  const session=useHotelSession(),[view,setView]=useState("lobby"),[search,setSearch]=useState(""),[mobile,setMobile]=useState(false),[drawer,setDrawer]=useState(null),[blockDraft,setBlockDraft]=useState(null),[busy,setBusy]=useState(false),[toast,setToast]=useState("")
+  const data=useHotelData(session.propertyId,view),permissions=data.hotel?.permissions||[],role=session.role,today=isoDate(),live=useMemo(()=>data.reservations.filter(r=>r.estado!=="cancelada"&&!r.no_show),[data.reservations]),activeRooms=data.rooms.filter(r=>r.activa!==false)
+  const allowed=permission=>can(role,permission,permissions),settings=data.settings||{hotel_name:"Habitación Llena",motto:"La hospitalidad se siente en cada detalle."}
+  const notify=message=>{setToast(String(message));setTimeout(()=>setToast(""),3200)}
+  const changeView=id=>{setView(id);setMobile(false)}
+  async function action(fn,success){try{setBusy(true);await fn();await data.reload();if(success)notify(success)}catch(error){notify(error?.message||"No se pudo completar la operación.")}finally{setBusy(false)}}
+  function openReservation(r){setDrawer(reservationToDraft(r))}
+  function newReservation(roomId=activeRooms[0]?.id||"",start=today){setDrawer(blankReservation(roomId,start))}
+  async function persistReservation(draft){const room=data.rooms.find(r=>String(r.id)===String(draft.roomId)),original=draft.id?data.reservations.find(r=>String(r.id)===String(draft.id)):null;if(!room)return notify("Elegí una habitación.");if(!draft.guest?.trim())return notify("Falta el nombre del huésped.");await action(async()=>{await saveReservation({draft,room,propertyId:session.propertyId,userId:session.user.id,original});setDrawer(null)},draft.id?"Reserva actualizada.":"Reserva creada.")}
+  async function move(id,roomId,start){const r=data.reservations.find(x=>String(x.id)===String(id));if(!r)return;await action(()=>moveReservation({reservationId:r.id,roomId,start,end:null}),"Reserva movida.")}
+  async function resize(id,end){const r=data.reservations.find(x=>String(x.id)===String(id));if(!r)return;await action(()=>moveReservation({reservationId:r.id,roomId:r.habitacion_id,start:r.fecha_entrada,end}),"Fecha de salida actualizada.")}
+  async function pay(payment){if(!drawer?.id)return;await action(()=>savePayment({propertyId:session.propertyId,userId:session.user.id,reservationId:drawer.id,amount:payment.amount,method:payment.method,currency:payment.currency||"ARS",note:payment.note||""}),"Pago registrado.")}
+  async function checkin(){if(!drawer?.id)return;await action(async()=>{await checkinReservation({id:drawer.id,propertyId:session.propertyId});setDrawer(null)},"Check-in realizado.")}
+  async function checkout(){if(!drawer?.id)return;await action(async()=>{await checkoutReservation(drawer.id);setDrawer(null)},"Check-out realizado. La habitación pasó a Housekeeping.")}
+  const original=drawer?.id?data.reservations.find(r=>String(r.id)===String(drawer.id)):null
+  if(session.loading)return <div className={ui.loading}>Preparando Habitación Llena OS…</div>
+  if(!session.properties.length)return <div className={ui.loading}>No hay una propiedad asociada a esta cuenta.</div>
+  return <div className={ui.shell}><HotelSidebar view={view} onView={changeView} hotelName={settings.hotel_name||"Habitación Llena"} role={role} properties={session.properties} propertyId={session.propertyId} onPropertyChange={session.setPropertyId} onLogout={session.logout} mobileOpen={mobile}/><main className={ui.work}><HotelTopbar view={view} title={TITLES[view]||VIEW_META[view]?.label||"Habitación Llena"} search={search} onSearch={setSearch} onNewReservation={allowed("frontdesk.reservations.edit")?()=>newReservation():null} onMenu={()=>setMobile(v=>!v)}/>{data.error&&<div className={ui.notice}>{data.error}</div>}{renderView()}</main>{drawer&&<ReservationDrawer initial={drawer} original={original} rooms={activeRooms} partners={data.commercial.partners||[]} groups={data.commercial.groups||[]} charges={data.charges} payments={data.payments} busy={busy} onClose={()=>setDrawer(null)} onSave={persistReservation} onCheckin={checkin} onCheckout={checkout} onPayment={pay}/>} {blockDraft&&<BlockModal draft={blockDraft} setDraft={setBlockDraft} rooms={activeRooms} busy={busy} onClose={()=>setBlockDraft(null)} onSave={()=>action(async()=>{await saveBlock({propertyId:session.propertyId,userId:session.user.id,draft:blockDraft});setBlockDraft(null)},"Habitación bloqueada.")}/>} {toast&&<div className={ui.toast}>{toast}</div>}</div>
+
+  function renderView(){
+    if(view==="lobby")return <Lobby settings={settings} rooms={data.rooms} reservations={live} payments={data.payments} onView={changeView} onOpen={openReservation}/>
+    if(view==="calendar")return <CommandCenter rooms={activeRooms} reservations={live} blocks={data.blocks} floors={data.floors} onMove={move} onResize={resize} onOpen={openReservation} onNew={(room,day)=>newReservation(room.id,day)} onBlock={(room,day)=>setBlockDraft({roomId:String(room.id),start:day,end:addDays(day,1),reason:"Bloqueo operativo",detail:""})}/>
+    if(view==="reservations")return <Reservations reservations={data.reservations} rooms={data.rooms} search={search} onOpen={openReservation}/>
+    if(view==="guests")return <GuestCRM guests={data.guests} search={search}/>
+    if(view==="rooms")return <RoomsView rooms={data.rooms} floors={data.floors} canManage={allowed("operations.rooms.manage")} onSaveFloor={draft=>action(()=>saveFloor({propertyId:session.propertyId,draft}),"Piso guardado.")} onSaveRoom={draft=>action(()=>saveRoom({propertyId:session.propertyId,draft}),"Habitación guardada.")} onBlock={room=>setBlockDraft({roomId:String(room.id),start:today,end:addDays(today,1),reason:"Mantenimiento",detail:""})}/>
+    if(view==="housekeeping")return <HousekeepingView rooms={activeRooms} reservations={live} tasks={data.operations.housekeeping||[]} onRoomStatus={(room,status)=>action(()=>updateRoomStatus({propertyId:session.propertyId,roomId:room.id,status}),"Estado actualizado.")} onSaveTask={draft=>action(()=>saveHousekeepingTask({propertyId:session.propertyId,userId:session.user.id,draft}),"Tarea creada.")} onTaskStatus={(task,status)=>action(()=>setHousekeepingStatus({propertyId:session.propertyId,id:task.id,status}),"Tarea actualizada.")}/>
+    if(view==="maintenance")return <MaintenanceView rooms={activeRooms} resources={data.operations.resources||[]} tickets={data.operations.maintenance||[]} onSave={draft=>action(()=>saveMaintenanceTicket({propertyId:session.propertyId,userId:session.user.id,draft}),"Ticket creado.")} onStatus={(ticket,status)=>action(()=>setMaintenanceStatus({propertyId:session.propertyId,id:ticket.id,status}),"Mantenimiento actualizado.")}/>
+    if(view==="resources")return <ResourcesView resources={data.operations.resources||[]} onSave={draft=>action(()=>saveResource({propertyId:session.propertyId,draft}),"Recurso guardado.")}/>
+    if(view==="twin")return <DigitalTwinView rooms={activeRooms} floors={data.floors} reservations={live}/>
+    return <ModuleBridge view={view}/>
+  }
+}
+
+function ModuleBridge({view}){return <div className={ui.content}><section className={ui.placeholder}><div><span>MIGRACIÓN MODULAR SEGURA</span><h2>{VIEW_META[view]?.label||"Módulo"}</h2><p>Este dominio está siendo trasladado desde el monolito a su feature independiente. En esta rama no se simula funcionalidad: se activa cuando alcanza paridad y pasa CI.</p></div></section></div>}
+function BlockModal({draft,setDraft,rooms,busy,onClose,onSave}){return <div className={ui.shade} onMouseDown={e=>e.target===e.currentTarget&&onClose()}><form className={ui.modal} onSubmit={e=>{e.preventDefault();onSave()}}><header><h3>Bloquear habitación</h3><button type="button" onClick={onClose}>×</button></header><div className={ui.fieldGrid}><label><span>Habitación</span><select value={draft.roomId} onChange={e=>setDraft(x=>({...x,roomId:e.target.value}))}>{rooms.map(r=><option key={r.id} value={r.id}>{r.nombre}</option>)}</select></label><label><span>Motivo</span><select value={draft.reason} onChange={e=>setDraft(x=>({...x,reason:e.target.value}))}><option>Mantenimiento</option><option>Fuera de servicio</option><option>Uso interno</option><option>Bloqueo operativo</option><option>Otro</option></select></label><label><span>Desde</span><input type="date" value={draft.start} onChange={e=>setDraft(x=>({...x,start:e.target.value}))}/></label><label><span>Hasta</span><input type="date" value={draft.end} onChange={e=>setDraft(x=>({...x,end:e.target.value}))}/></label><label className={ui.wide}><span>Detalle</span><textarea value={draft.detail||""} onChange={e=>setDraft(x=>({...x,detail:e.target.value}))}/></label></div><footer><button type="button" onClick={onClose}>Cancelar</button><button disabled={busy}>Crear bloqueo</button></footer></form></div>}
