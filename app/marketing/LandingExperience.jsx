@@ -3,6 +3,7 @@
 import Link from "next/link"
 import {useEffect,useMemo,useState} from "react"
 import ui from "./marketing.module.css"
+import polish from "./landing-polish.module.css"
 
 const FRONT_DESK="https://images.pexels.com/photos/5371676/pexels-photo-5371676.jpeg?auto=compress&cs=tinysrgb&w=1800"
 const KEY_CARD="https://images.pexels.com/photos/7820357/pexels-photo-7820357.jpeg?auto=compress&cs=tinysrgb&w=1400"
@@ -92,12 +93,14 @@ export default function LandingExperience(){
     e.currentTarget.style.setProperty("--rx",`${y*-4}deg`)
   }
 
+  const marquee=["Recepción sin fricción","Inventario protegido","Huéspedes con memoria","Housekeeping conectado","Revenue explicado","Venta directa"]
+
   return <main className={ui.page}>
     <nav className={ui.nav}>
       <div className={ui.wrap}>
         <Link className={ui.brand} href="/"><span>HL</span><b>Habitación Llena</b><small>Hotel OS</small></Link>
         <div className={ui.links}><a href="#producto">Producto</a><a href="#sistema">Cómo se siente</a><a href="#oportunidad">Diagnóstico</a><a href="#hotelero">Hotelería real</a></div>
-        <div className={ui.navActions}><Link className={ui.navLogin} href="/login">Ingresar</Link><Link className={ui.primary} href="/registro">Solicitar acceso <span>↗</span></Link></div>
+        <div className={ui.navActions}><Link className={ui.navLogin} href="/login">Ingresar</Link><Link className={ui.primary} href="/registro">Crear cuenta <span>↗</span></Link></div>
       </div>
     </nav>
 
@@ -110,7 +113,7 @@ export default function LandingExperience(){
           <div className={ui.kicker}><i/>HOSPITALITY OPERATING SYSTEM</div>
           <h1>Menos pantalla.<br/><em>Más hotel.</em></h1>
           <p>El sistema que conecta recepción, reservas, huéspedes, habitaciones, housekeeping, revenue y venta directa sin convertir tu hotel en una planilla.</p>
-          <div className={ui.heroActions}><Link className={ui.heroPrimary} href="/registro">Quiero verlo en mi hotel <span>→</span></Link><Link className={ui.heroGhost} href="/preview/pms-next"><i/> Ver el sistema en acción</Link></div>
+          <div className={`${ui.heroActions} ${polish.heroActionsClean}`}><Link className={`${ui.heroPrimary} ${polish.heroPrimaryGlow}`} href="/registro">Quiero verlo en mi hotel <span>→</span></Link></div>
         </div>
 
         <div className={ui.heroStage} aria-hidden="true">
@@ -118,9 +121,7 @@ export default function LandingExperience(){
             <div className={ui.deviceTop}><b>Habitación Llena</b><span>Command Center · ahora</span><i/></div>
             <div className={ui.deviceStats}><div><small>OCUPACIÓN</small><b>78%</b></div><div><small>LLEGAN</small><b>12</b></div><div><small>SALEN</small><b>9</b></div></div>
             <div className={ui.deviceDiary}>
-              {[
-                ["301","Benítez","in"],["302","Martins","stay"],["303","Libre","free"],["304","Mantenimiento","block"],["305","Pereyra","out"]
-              ].map(r=><div key={r[0]}><span>{r[0]}</span><b className={ui[r[2]]}>{r[1]}</b><i/></div>)}
+              {[["301","Benítez","in"],["302","Martins","stay"],["303","Libre","free"],["304","Mantenimiento","block"],["305","Pereyra","out"]].map(r=><div key={r[0]}><span>{r[0]}</span><b className={ui[r[2]]}>{r[1]}</b><i/></div>)}
             </div>
             <div className={ui.deviceFoot}><span><i/>Todo sincronizado</span><b>Llena Intelligence ✦</b></div>
           </div>
@@ -131,7 +132,7 @@ export default function LandingExperience(){
       <div className={ui.scrollCue}><span>SCROLL</span><i/></div>
     </section>
 
-    <div className={ui.marquee}><div><span>Recepción sin fricción</span><i/> <span>Inventario protegido</span><i/> <span>Huéspedes con memoria</span><i/> <span>Housekeeping conectado</span><i/> <span>Revenue explicado</span><i/> <span>Venta directa</span><i/> <span>Recepción sin fricción</span><i/> <span>Inventario protegido</span></div></div>
+    <div className={`${ui.marquee} ${polish.marqueeMotion}`}><div className={polish.marqueeTrack}>{[...marquee,...marquee,...marquee].map((item,i)=><span key={`${item}-${i}`}>{item}<i/></span>)}</div></div>
 
     <section className={ui.moments} id="sistema">
       <div className={ui.wrap}>
@@ -146,7 +147,7 @@ export default function LandingExperience(){
 
     <section className={ui.productStage} id="producto">
       <div className={ui.wrap}>
-        <div className={ui.productIntro} data-reveal><small>EL PRODUCTO ES EL PROTAGONISTA</small><h2>Un escritorio que <em>cambia con el turno.</em></h2><p>No seis cajas explicando funciones. Tocá una escena y mirá cómo responde el mismo sistema.</p></div>
+        <div className={ui.productIntro} data-reveal><small>EL PRODUCTO ES EL PROTAGONISTA</small><h2>Un escritorio que <em>cambia con el turno.</em></h2><p>Tocá una escena y mirá cómo responde el mismo sistema.</p></div>
         <div className={ui.productTabs}>{Object.keys(productViews).map(name=><button key={name} className={active===name?ui.active:""} onClick={()=>setActive(name)}>{name}</button>)}</div>
         <div className={ui.productPerspective} data-reveal><ProductMock active={active}/><div className={ui.productHalo}/></div>
       </div>
@@ -157,13 +158,13 @@ export default function LandingExperience(){
         <div className={ui.humanCopy} data-reveal>
           <small>HECHO DESDE HOTELERÍA</small>
           <h2>La tecnología no recibe al huésped.<br/><em>La persona sí.</em></h2>
-          <p>Por eso Habitación Llena no intenta ocupar el centro de la escena. Ordena lo complejo atrás para que adelante quede lo importante: mirar, escuchar, resolver y recibir bien.</p>
-          <div className={ui.humanLine}><i/><span><b>Recepción</b> ve el contexto.</span><span><b>Housekeeping</b> ve la prioridad.</span><span><b>Dirección</b> ve el negocio.</span></div>
+          <p>Habitación Llena ordena lo complejo atrás para que adelante quede lo importante: mirar, escuchar, resolver y recibir bien.</p>
+          <div className={`${ui.humanLine} ${polish.humanLineBig}`}><i/><span><b>Recepción</b> ve el contexto.</span><span><b>Housekeeping</b> ve la prioridad.</span><span><b>Dirección</b> ve el negocio.</span></div>
         </div>
         <div className={ui.humanVisual} data-reveal>
           <div className={ui.humanMain}><img src={LINEN} alt="Personal de hotel preparando una habitación"/></div>
           <div className={ui.humanInset}><img src={LOBBY} alt="Lobby de hotel"/></div>
-          <div className={ui.humanBadge}><span>✦</span><b>Diseñado para<br/>el ritmo real</b></div>
+          <div className={`${ui.humanBadge} ${polish.humanBadgeLux}`}><span>✦</span><b>Diseñado para<br/>el ritmo real</b></div>
         </div>
       </div>
     </section>
@@ -185,9 +186,9 @@ export default function LandingExperience(){
 
     <section className={ui.finalCta}>
       <div className={ui.finalPhoto}><img src={FRONT_DESK} alt="Recepción de hotel"/></div><div className={ui.finalShade}/>
-      <div className={ui.wrap} data-reveal><small>HABITACIÓN LLENA</small><h2>Que se note el hotel.<br/><em>No el software.</em></h2><p>Una operación más clara, un equipo más coordinado y más tiempo para recibir personas.</p><div><Link className={ui.heroPrimary} href="/registro">Solicitar acceso <span>→</span></Link><Link className={ui.heroGhost} href="/login">Ya tengo cuenta</Link></div></div>
+      <div className={ui.wrap} data-reveal><small>HABITACIÓN LLENA</small><h2>Que se note el hotel.<br/><em>No el software.</em></h2><p>Una operación más clara, un equipo más coordinado y más tiempo para recibir personas.</p><div><Link className={`${ui.heroPrimary} ${polish.heroPrimaryGlow}`} href="/registro">Crear cuenta <span>→</span></Link><Link className={ui.heroGhost} href="/login">Ya tengo cuenta</Link></div></div>
     </section>
 
-    <footer className={ui.footer}><div className={ui.wrap}><Link className={ui.brand} href="/"><span>HL</span><b>Habitación Llena</b></Link><p>Hospitality Operating System · 2026</p><div><Link href="/login">Ingresar</Link><Link href="/registro">Solicitar acceso</Link></div></div></footer>
+    <footer className={ui.footer}><div className={ui.wrap}><Link className={ui.brand} href="/"><span>HL</span><b>Habitación Llena</b></Link><p>Hospitality Operating System · 2026</p><div><Link href="/login">Ingresar</Link><Link href="/registro">Crear cuenta</Link></div></div></footer>
   </main>
 }
