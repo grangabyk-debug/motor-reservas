@@ -110,8 +110,8 @@ const replacements = [
   ],
   [`      detalle: bloqueoDetalle.trim(),\n    }))`, `      detalle: bloqueoDetalle.trim(),\n      }\n    })`],
   [
-    `      user_id: user.id,\n      reserva_id: reserva.id,\n      monto,`,
-    `      property_id: reserva.property_id || alojamientos.find((a) => String(a.id) === String(reserva.alojamiento_id))?.property_id || null,\n      user_id: user.id,\n      reserva_id: reserva.id,\n      monto,`,
+    `    const { error } = await supabase.from("pagos").insert([{\n      user_id: user.id,\n      reserva_id: reserva.id,\n      monto,`,
+    `    const { error } = await supabase.from("pagos").insert([{\n      property_id: reserva.property_id || alojamientos.find((a) => String(a.id) === String(reserva.alojamiento_id))?.property_id || null,\n      user_id: user.id,\n      reserva_id: reserva.id,\n      monto,`,
   ],
 ]
 

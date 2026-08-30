@@ -157,12 +157,14 @@ if (text.includes(recepcionHelperMarker) && !text.includes("function descargarRe
 `
   text = text.replace(recepcionHelperMarker, helper + recepcionHelperMarker)
 }
-text = replaceMaybe(
-  text,
-  `              ["caja","💵 Caja diaria"],`,
-  `              ["caja","💵 Caja diaria"],\n              ["reportes","📊 Reportes"],`,
-  "reception reports tab"
-)
+if (!text.includes('["reportes","📊 Reportes"]') && !text.includes('["reportes","📄 Reportes"]')) {
+  text = replaceMaybe(
+    text,
+    `              ["caja","💵 Caja diaria"],`,
+    `              ["caja","💵 Caja diaria"],\n              ["reportes","📊 Reportes"],`,
+    "reception reports tab"
+  )
+}
 const receptionReportsAnchor = `          {recepcionSeccion === "caja" && (`
 if (text.includes(receptionReportsAnchor) && !text.includes('recepcionSeccion === "reportes"')) {
   const reportsSection = `          {recepcionSeccion === "reportes" && (
@@ -360,10 +362,12 @@ if (fs.existsSync(assistantPath)) {
     `    reservas: Array.isArray(context.reservas) ? context.reservas.slice(-300) : [],`,
     `    reservas: Array.isArray(context.reservas) ? context.reservas.slice(-500) : [],`
   )
-  assistant = assistant.replace(
-    `- Podés hacer recomendaciones operativas, aclarando que son recomendaciones.`,
-    `- Podés hacer recomendaciones operativas, aclarando que son recomendaciones.\n- Conocés el funcionamiento del PMS: calendario, reservas, huéspedes, habitaciones, housekeeping, bloqueos, recepción, caja, pagos parciales/divididos, early check-in, late check-out, vehículos, extras, notas, reportes, comunicaciones e integraciones.\n- Interpretá nombres, fechas y estados usando los datos del tenant autenticado. Nunca mezcles información entre alojamientos o usuarios.`
-  )
+  if (!assistant.includes("Conocés el funcionamiento del PMS")) {
+    assistant = assistant.replace(
+      `- Podés hacer recomendaciones operativas, aclarando que son recomendaciones.`,
+      `- Podés hacer recomendaciones operativas, aclarando que son recomendaciones.\n- Conocés el funcionamiento del PMS: calendario, reservas, huéspedes, habitaciones, housekeeping, bloqueos, recepción, caja, pagos parciales/divididos, early check-in, late check-out, vehículos, extras, notas, reportes, comunicaciones e integraciones.\n- Interpretá nombres, fechas y estados usando los datos del tenant autenticado. Nunca mezcles información entre alojamientos o usuarios.`
+    )
+  }
   fs.writeFileSync(assistantPath, assistant)
   console.log("Applied assistant operational knowledge")
 }

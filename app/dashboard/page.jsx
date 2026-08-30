@@ -62,6 +62,10 @@ function nombreMes(fecha) {
 }
 
 export default function Home() {
+  // HL_RESERVATION_FORM_LAYOUT_V5: formulario materializado y mantenido en este componente.
+  // HL_CALENDAR_STATUS_COLORS_V4
+  // HL_CALENDAR_STATUS_COLORS_V5
+  // HL_RESERVATION_CONTRAST_V11: la paleta nueva se mantiene directamente en el calendario.
   const [user, setUser] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [rolReal, setRolReal] = useState("owner")
@@ -97,6 +101,17 @@ export default function Home() {
     habitacionesTarifas: {},
     earlyCheckin: { tipo: "monto", valor: 0 },
     lateCheckout: { tipo: "monto", valor: 0 },
+    mascota: { tipo: "monto", valor: 0 },
+    horarios: { checkin: "14:00", checkout: "10:00" },
+    fiscal: {
+      razonSocial: "",
+      cuit: "",
+      condicionIVA: "",
+      ingresosBrutos: "",
+      inicioActividades: "",
+      domicilio: "",
+      puntoVenta: "",
+    },
     tipoCambioUSD: 1,
     vehiculosTarifas: { auto: 0, camioneta: 0 },
     pisos: [],
@@ -176,7 +191,9 @@ export default function Home() {
   const [configSubvista, setConfigSubvista] = useState("general")
   const [vehiculosConfig, setVehiculosConfig] = useState({ auto: 0, camioneta: 0 })
   const [fechaCalendario, setFechaCalendario] = useState(fechaLocal(0))
+  const [fechaHoraActual, setFechaHoraActual] = useState(null)
   const [busquedaReserva, setBusquedaReserva] = useState("")
+  const [mostrarTodasReservas, setMostrarTodasReservas] = useState(false)
   const [earlyCheckin, setEarlyCheckin] = useState(false)
   const [lateCheckout, setLateCheckout] = useState(false)
   const [noShow, setNoShow] = useState(false)
@@ -187,8 +204,15 @@ export default function Home() {
     (a) => String(a.id) === String(alojamientoSeleccionado)
   )?.nombre || alojamientos[0]?.nombre || "tu alojamiento"
   const [habitacionSeleccionada, setHabitacionSeleccionada] = useState("")
+  const [habitacionesAdicionales, setHabitacionesAdicionales] = useState([])
+  const [serviciosReserva, setServiciosReserva] = useState([])
+  const HL_BLOCK1_FINAL_V7 = true
+  const HL_BLOCK1_FINAL_V8 = true
   const [nombre, setNombre] = useState("")
   const [dni, setDni] = useState("")
+  const [direccion, setDireccion] = useState("")
+  const [provinciaEstado, setProvinciaEstado] = useState("")
+  const [pais, setPais] = useState("")
   const [pasajerosExtra, setPasajerosExtra] = useState([])
   const [email, setEmail] = useState("")
   const [telefono, setTelefono] = useState("")
@@ -216,6 +240,9 @@ export default function Home() {
   const [garantiaReferencia, setGarantiaReferencia] = useState("")
 
   const [reservaSeleccionada, setReservaSeleccionada] = useState(null)
+  const [reservaEditandoId, setReservaEditandoId] = useState(null)
+  const [notasFicha, setNotasFicha] = useState("")
+  const [guardandoNotas, setGuardandoNotas] = useState(false)
   const [confirmarCheckoutReserva, setConfirmarCheckoutReserva] = useState(null)
   const [confirmarCheckinNuevaReserva, setConfirmarCheckinNuevaReserva] = useState(null)
   const [recepcionSeccion, setRecepcionSeccion] = useState("panel")
@@ -261,6 +288,11 @@ export default function Home() {
   const [pagoMonto, setPagoMonto] = useState("")
   const [pagoMetodo, setPagoMetodo] = useState("Efectivo")
   const [pagoNota, setPagoNota] = useState("")
+  const [modoPagoDividido, setModoPagoDividido] = useState(false)
+  const [pagoPartes, setPagoPartes] = useState([
+    { id: "parte-1", metodo: "Efectivo", monto: "" },
+    { id: "parte-2", metodo: "Tarjeta", monto: "" },
+  ])
   const [busquedaHuesped, setBusquedaHuesped] = useState("")
   const [bloqueoHabitacion, setBloqueoHabitacion] = useState("")
   const [bloqueoHabitaciones, setBloqueoHabitaciones] = useState([])
@@ -281,6 +313,8 @@ export default function Home() {
   const [bandejaCargando, setBandejaCargando] = useState(false)
   const [bandejaError, setBandejaError] = useState("")
   const [webIntegracion, setWebIntegracion] = useState("propia")
+  const [reservasNuevasPendientes, setReservasNuevasPendientes] = useState(0)
+  const [avisoReservaNueva, setAvisoReservaNueva] = useState(null)
 
   const [mostrarAlojamiento, setMostrarAlojamiento] = useState(false)
   const [nuevoAlojamiento, setNuevoAlojamiento] = useState("")
@@ -294,9 +328,19 @@ export default function Home() {
     tipo: "",
     alojamiento_id: "",
     precio: 0,
+    cochera: 0,
+    earlyTipo: "monto",
+    earlyValor: 0,
+    lateTipo: "monto",
+    lateValor: 0,
   })
   const [nuevoTipoConfiguracion, setNuevoTipoConfiguracion] = useState("")
   const [nuevoPiso, setNuevoPiso] = useState("")
+
+  const reservaEnEdicion = useMemo(
+    () => reservas.find((r) => String(r.id) === String(reservaEditandoId)) || null,
+    [reservas, reservaEditandoId]
+  )
 
   const diasCalendario = useMemo(
     () => Array.from({ length: 38 }, (_, i) => {
@@ -309,6 +353,29 @@ export default function Home() {
     }),
     [fechaCalendario]
   )
+
+  useEffect(() => {
+    const actualizar = () => setFechaHoraActual(new Date())
+    actualizar()
+    const intervalo = window.setInterval(actualizar, 30000)
+    return () => window.clearInterval(intervalo)
+  }, [])
+
+  useEffect(() => {
+    setNotasFicha(reservaSeleccionada?.notas || "")
+    setModoPagoDividido(false)
+    setPagoPartes([
+      { id: `parte-${Date.now()}-1`, metodo: "Efectivo", monto: "" },
+      { id: `parte-${Date.now()}-2`, metodo: "Tarjeta", monto: "" },
+    ])
+  }, [reservaSeleccionada?.id])
+
+  useEffect(() => {
+    setVehiculosConfig({
+      auto: Number(config.vehiculosTarifas?.auto || 0),
+      camioneta: Number(config.vehiculosTarifas?.camioneta || 0),
+    })
+  }, [config.vehiculosTarifas?.auto, config.vehiculosTarifas?.camioneta])
 
   useEffect(() => {
     let mounted = true
@@ -383,160 +450,107 @@ export default function Home() {
     }
   }, [user?.id])
 
+  useEffect(() => {
+    if (!user?.id) return
+    const channel = supabase.channel("hl-reservas-realtime")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "reservas" }, (payload) => {
+        const nueva = payload?.new
+        if (!nueva) return
+        const propiedades = new Set(alojamientos.map((a) => String(a.property_id || "")).filter(Boolean))
+        const alojamientosIds = new Set(alojamientos.map((a) => String(a.id)))
+        if ((nueva.property_id && propiedades.has(String(nueva.property_id))) || alojamientosIds.has(String(nueva.alojamiento_id))) {
+          setReservasNuevasPendientes((n) => n + 1)
+          setAvisoReservaNueva(nueva)
+          cargarDatos()
+          window.setTimeout(() => setAvisoReservaNueva(null), 9000)
+        }
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [user?.id, alojamientos.length])
+
   async function cargarDatos() {
     if (!user?.id) return
 
-    // El acceso al alojamiento ya no depende de que el usuario
-    // sea el dueño. Ahora se determina mediante property_members.
-    const { data: membershipsData, error: membershipsError } = await supabase
-      .from("property_members")
-      .select("property_id, role")
-      .eq("user_id", user.id)
+    const [
+      { data: membershipsData, error: membershipsError },
+      { data: ownedProperties, error: ownedPropertiesError },
+    ] = await Promise.all([
+      supabase.from("property_members").select("property_id, role").eq("user_id", user.id),
+      supabase.from("properties").select("id, name, owner_id, created_at").eq("owner_id", user.id),
+    ])
 
-    if (membershipsError) {
-      console.error("No se pudieron cargar los accesos del usuario:", membershipsError)
+    if (membershipsError) console.error("No se pudieron cargar los accesos del usuario:", membershipsError)
+    if (ownedPropertiesError) console.error("No se pudieron cargar las propiedades propias:", ownedPropertiesError)
+
+    const membershipIds = (membershipsData || []).map((m) => m.property_id).filter(Boolean)
+    const ownerIds = (ownedProperties || []).map((p) => p.id).filter(Boolean)
+    const propertyIds = Array.from(new Set([...membershipIds, ...ownerIds]))
+    const roles = (membershipsData || []).map((m) => m.role).filter(Boolean)
+    setRolReal(roles[0] || (ownerIds.length ? "owner" : "reception"))
+
+    if (!propertyIds.length) {
+      setAlojamientos([])
+      setHabitaciones([])
+      setReservas([])
+      setBloqueos([])
+      setPagos([])
+      return
     }
-
-    const propertyIds = (membershipsData || []).map((m) => m.property_id).filter(Boolean)
-
-    const rolDetectado = membershipsData?.[0]?.role || "owner"
-    setRolReal(rolDetectado)
 
     const [
       { data: propertiesData, error: propertiesError },
-      { data: alojamientosLegacy, error: alojamientosError },
-      { data: habitacionesLegacy, error: habitacionesError },
-      { data: reservasLegacy, error: reservasError },
+      { data: alojamientosData, error: alojamientosError },
+      { data: habitacionesData, error: habitacionesError },
+      { data: reservasData, error: reservasError },
       { data: bloqueosData, error: bloqueosError },
       { data: pagosData, error: pagosError },
     ] = await Promise.all([
-      propertyIds.length
-        ? supabase.from("properties").select("*").in("id", propertyIds).order("created_at", { ascending: true })
-        : Promise.resolve({ data: [], error: null }),
-      supabase.from("alojamientos").select("*").order("id", { ascending: true }),
-      supabase.from("habitaciones").select("*").order("id", { ascending: true }),
-      supabase.from("reservas").select("*").order("id", { ascending: false }),
-      supabase.from("bloqueos").select("*").eq("user_id", user.id).order("fecha_desde", { ascending: true }),
-      supabase.from("pagos").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
+      supabase.from("properties").select("*").in("id", propertyIds).order("created_at", { ascending: true }),
+      supabase.from("alojamientos").select("*").in("property_id", propertyIds).order("id", { ascending: true }),
+      supabase.from("habitaciones").select("*").in("property_id", propertyIds).order("id", { ascending: true }),
+      supabase.from("reservas").select("*").in("property_id", propertyIds).order("id", { ascending: false }),
+      supabase.from("bloqueos").select("*").in("property_id", propertyIds).order("fecha_desde", { ascending: true }),
+      supabase.from("pagos").select("*").in("property_id", propertyIds).order("created_at", { ascending: false }),
     ])
 
     if (propertiesError) console.error("No se pudieron cargar las propiedades:", propertiesError)
     if (alojamientosError) console.error("No se pudieron cargar los alojamientos:", alojamientosError)
     if (habitacionesError) console.error("No se pudieron cargar las habitaciones:", habitacionesError)
     if (reservasError) console.error("No se pudieron cargar las reservas:", reservasError)
-    if (bloqueosError) console.warn("No se pudieron cargar los bloqueos. Ejecutá la migración PMS.", bloqueosError)
-    if (pagosError) console.warn("No se pudieron cargar los pagos. Ejecutá la migración PMS.", pagosError)
+    if (bloqueosError) console.warn("No se pudieron cargar los bloqueos:", bloqueosError)
+    if (pagosError) console.warn("No se pudieron cargar los pagos:", pagosError)
 
-    // La interfaz actual todavía trabaja con las tablas antiguas
-    // alojamientos/habitaciones/reservas. Para que owner y reception
-    // puedan usar la misma interfaz, filtramos esas tablas según los
-    // alojamientos a los que el usuario tiene acceso.
-    const propiedadesAccesibles = propertiesData || []
-    const nombresAccesibles = new Set(
-      propiedadesAccesibles
-        .map((p) => String(p.name || "").trim().toLowerCase())
-        .filter(Boolean)
-    )
+    const propertiesById = new Map((propertiesData || []).map((p) => [String(p.id), p]))
+    const alojamientosFinal = (alojamientosData || []).map((a) => ({ ...a, property_id: a.property_id }))
 
-    const alojamientosData = (alojamientosLegacy || []).filter((a) => {
-      const nombre = String(a.nombre || "").trim().toLowerCase()
-      return nombresAccesibles.has(nombre) || String(a.user_id) === String(user.id)
-    })
-
-    const alojamientoIds = new Set(alojamientosData.map((a) => String(a.id)))
-
-    const habitacionesData = (habitacionesLegacy || []).filter((h) =>
-      alojamientoIds.has(String(h.alojamiento_id))
-    )
-
-    const reservasData = (reservasLegacy || []).filter((r) =>
-      alojamientoIds.has(String(r.alojamiento_id))
-    )
-
-    // Si todavía no existe la fila legacy correspondiente, usamos
-    // properties/units/reservations como respaldo para que el acceso
-    // nuevo siga funcionando.
-    let alojamientosFinal = alojamientosData
-    let habitacionesFinal = habitacionesData
-    let reservasFinal = reservasData
-
-    if (!alojamientosFinal.length && propiedadesAccesibles.length) {
-      alojamientosFinal = propiedadesAccesibles.map((p) => ({
-        id: p.id,
-        nombre: p.name,
-        user_id: p.owner_id,
-      }))
-    }
-
-    if (!habitacionesFinal.length && propertyIds.length) {
-      const { data: unitsData, error: unitsError } = await supabase
-        .from("units")
-        .select("*")
-        .in("property_id", propertyIds)
-        .order("created_at", { ascending: true })
-
-      if (unitsError) {
-        console.error("No se pudieron cargar las unidades:", unitsError)
-      } else {
-        habitacionesFinal = (unitsData || []).map((u) => ({
-          id: u.id,
-          nombre: u.name,
-          tipo: "",
-          capacidad: u.capacity,
-          precio: u.price,
-          activa: u.active !== false,
-          alojamiento_id: u.property_id,
-          user_id: user.id,
-          estado: "libre",
-        }))
+    for (const propertyId of propertyIds) {
+      if (!alojamientosFinal.some((a) => String(a.property_id) === String(propertyId))) {
+        const property = propertiesById.get(String(propertyId))
+        if (property) {
+          alojamientosFinal.push({
+            id: property.id,
+            nombre: property.name,
+            user_id: property.owner_id,
+            property_id: property.id,
+          })
+        }
       }
     }
 
-    if (!reservasFinal.length && propertyIds.length) {
-      const { data: reservationsData, error: reservationsError } = await supabase
-        .from("reservations")
-        .select("*")
-        .in("property_id", propertyIds)
-        .order("created_at", { ascending: false })
-
-      if (reservationsError) {
-        console.error("No se pudieron cargar las reservas nuevas:", reservationsError)
-      } else {
-        reservasFinal = (reservationsData || []).map((r) => ({
-          id: r.id,
-          alojamiento_id: r.property_id,
-          habitacion_id: r.unit_id,
-          nombre_huesped: r.guest_name,
-          email_huesped: r.guest_email,
-          telefono_huesped: r.guest_phone,
-          fecha_entrada: r.check_in,
-          fecha_salida: r.check_out,
-          cantidad_huespedes: r.guests || 1,
-          precio_total: Number(r.total || 0),
-          estado:
-            r.status === "confirmed" ? "confirmada" :
-            r.status === "cancelled" ? "cancelada" :
-            r.status === "completed" ? "finalizada" :
-            r.status || "pendiente",
-          no_show: false,
-        }))
-      }
-    }
+    const alojamientoIds = new Set(alojamientosFinal.map((a) => String(a.id)))
+    const habitacionesFinal = (habitacionesData || []).filter((h) =>
+      alojamientoIds.has(String(h.alojamiento_id)) || propertyIds.some((p) => String(p) === String(h.property_id))
+    )
+    const reservasFinal = (reservasData || []).filter((r) =>
+      alojamientoIds.has(String(r.alojamiento_id)) || propertyIds.some((p) => String(p) === String(r.property_id))
+    )
 
     setAlojamientos(alojamientosFinal)
     setHabitaciones(habitacionesFinal)
     setReservas(reservasFinal)
-    setHabitacionEstados(
-      habitacionesFinal.map((h) => ({
-        habitacion_id: h.id,
-        estado: h.estado || "libre",
-      }))
-    )
-    setEstadosHousekeepingPendientes(
-      Object.fromEntries(
-        habitacionesFinal.map((h) => [String(h.id), h.estado || "libre"])
-      )
-    )
+    setHabitacionEstados(habitacionesFinal.map((h) => ({ habitacion_id: h.id, estado: h.estado || "libre" })))
+    setEstadosHousekeepingPendientes(Object.fromEntries(habitacionesFinal.map((h) => [String(h.id), h.estado || "libre"])))
     setBloqueos(bloqueosData || [])
     setPagos(pagosData || [])
 
@@ -613,9 +627,9 @@ export default function Home() {
     if (manual === "sucia") return "sucia"
     if (manual === "en_limpieza") return "en_limpieza"
     const hoy = fechaLocal(0)
-    const ocupada = reservas.some((r) => String(r.habitacion_id) === String(habitacion.id) && r.estado !== "cancelada" && !r.no_show && r.fecha_entrada <= hoy && r.fecha_salida > hoy)
+    const ocupada = reservas.some((r) => reservaIncluyeHabitacion(r, habitacion.id) && r.estado !== "cancelada" && !r.no_show && r.fecha_entrada <= hoy && r.fecha_salida > hoy)
     if (ocupada) return "ocupada"
-    const futura = reservas.some((r) => String(r.habitacion_id) === String(habitacion.id) && r.estado !== "cancelada" && !r.no_show && r.fecha_entrada > hoy && r.fecha_entrada <= fechaLocal(30))
+    const futura = reservas.some((r) => reservaIncluyeHabitacion(r, habitacion.id) && r.estado !== "cancelada" && !r.no_show && r.fecha_entrada > hoy && r.fecha_entrada <= fechaLocal(30))
     if (manual === "libre" && futura) return "reservada"
     return manual
   }
@@ -675,6 +689,65 @@ export default function Home() {
     return inicioA < finB && finA > inicioB
   }
 
+  function idsHabitacionesReserva(reserva) {
+    const ids = Array.isArray(reserva?.habitaciones_ids) && reserva.habitaciones_ids.length
+      ? reserva.habitaciones_ids
+      : (reserva?.habitacion_id ? [reserva.habitacion_id] : [])
+    return [...new Set(ids.map((id) => String(id)).filter(Boolean))]
+  }
+
+  function reservaIncluyeHabitacion(reserva, habitacionId) {
+    return idsHabitacionesReserva(reserva).includes(String(habitacionId))
+  }
+
+  function habitacionesElegidasFormulario() {
+    return [...new Set([habitacionSeleccionada, ...habitacionesAdicionales].map(String).filter(Boolean))]
+  }
+
+  function normalizarServiciosReserva(lista = serviciosReserva) {
+    return (Array.isArray(lista) ? lista : []).map((s, index) => ({
+      id: s.id || `srv_${Date.now()}_${index}`,
+      tipo: s.tipo || "extra",
+      descripcion: String(s.descripcion || "").trim(),
+      cantidad: Math.max(1, Number(s.cantidad || 1)),
+      dias: Math.max(1, Number(s.dias || 1)),
+      precio_unitario: Math.max(0, Number(s.precio_unitario || 0)),
+    }))
+  }
+
+  function totalServiciosReserva(lista = serviciosReserva) {
+    return normalizarServiciosReserva(lista).reduce((acc, s) => acc + s.cantidad * s.dias * s.precio_unitario, 0)
+  }
+
+  function agregarServicioReserva(tipo = "extra") {
+    const presets = {
+      mascota: {
+        descripcion: "Mascota",
+        precio: calcularRecargoServicio(tarifaDeHabitacion(habitacionSeleccionada), config.mascota || { tipo: "monto", valor: 0 }),
+      },
+      desayuno: { descripcion: "Desayuno", precio: 0 },
+      traslado: { descripcion: "Traslado", precio: 0 },
+      extra: { descripcion: "", precio: 0 },
+    }
+    const preset = presets[tipo] || presets.extra
+    setServiciosReserva((actual) => [...actual, {
+      id: `srv_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,
+      tipo,
+      descripcion: preset.descripcion,
+      cantidad: 1,
+      dias: 1,
+      precio_unitario: preset.precio,
+    }])
+  }
+
+  function actualizarServicioReserva(id, campo, valor) {
+    setServiciosReserva((actual) => actual.map((s) => s.id === id ? { ...s, [campo]: valor } : s))
+  }
+
+  function quitarServicioReserva(id) {
+    setServiciosReserva((actual) => actual.filter((s) => s.id !== id))
+  }
+
   function bloqueoParaHabitacion(habitacionId, inicio, fin) {
     return bloqueos.find((b) => String(b.habitacion_id) === String(habitacionId) && bloquesSeCruzan(inicio, fin, b.fecha_desde, b.fecha_hasta))
   }
@@ -686,14 +759,18 @@ export default function Home() {
       alert("Seleccioná al menos una habitación y fechas válidas.")
       return
     }
-    const filas = seleccionadas.map((id) => ({
+    const filas = seleccionadas.map((id) => {
+      const habitacion = habitaciones.find((h) => String(h.id) === String(id))
+      return {
+      property_id: habitacion?.property_id || null,
       user_id: user.id,
       habitacion_id: Number(id),
       fecha_desde: bloqueoInicio,
       fecha_hasta: bloqueoFin,
       motivo: bloqueoMotivo,
       detalle: bloqueoDetalle.trim(),
-    }))
+      }
+    })
     const { error } = await supabase.from("bloqueos").insert(filas)
     if (error) {
       console.error(error)
@@ -742,6 +819,7 @@ export default function Home() {
       return
     }
     const { error } = await supabase.from("pagos").insert([{
+      property_id: reserva.property_id || alojamientos.find((a) => String(a.id) === String(reserva.alojamiento_id))?.property_id || null,
       user_id: user.id,
       reserva_id: reserva.id,
       monto,
@@ -760,6 +838,91 @@ export default function Home() {
     await cargarDatos()
     const actualizada = reservas.find((r) => String(r.id) === String(reserva.id))
     if (actualizada) setReservaSeleccionada(actualizada)
+  }
+
+  function actualizarPartePago(id, campo, valor) {
+    setPagoPartes((partes) => partes.map((parte) => parte.id === id ? { ...parte, [campo]: valor } : parte))
+  }
+
+  function agregarPartePago() {
+    setPagoPartes((partes) => [
+      ...partes,
+      { id: `parte-${Date.now()}`, metodo: "Transferencia", monto: "" },
+    ])
+  }
+
+  function eliminarPartePago(id) {
+    setPagoPartes((partes) => partes.length > 2 ? partes.filter((parte) => parte.id !== id) : partes)
+  }
+
+  async function registrarPagosDivididos(reserva) {
+    const partesValidas = pagoPartes
+      .map((parte) => ({ ...parte, montoNumero: Number(parte.monto) }))
+      .filter((parte) => Number.isFinite(parte.montoNumero) && parte.montoNumero > 0)
+
+    if (partesValidas.length < 2) {
+      alert("Cargá al menos dos importes para dividir el pago.")
+      return
+    }
+
+    const totalDividido = partesValidas.reduce((suma, parte) => suma + parte.montoNumero, 0)
+    if (totalDividido > saldoReserva(reserva) + 0.01) {
+      alert("La suma de los pagos supera el saldo pendiente.")
+      return
+    }
+
+    const creadoEn = new Date().toISOString()
+    const propertyId = reserva.property_id || alojamientos.find((a) => String(a.id) === String(reserva.alojamiento_id))?.property_id || null
+    const filas = partesValidas.map((parte, indice) => ({
+      property_id: propertyId,
+      user_id: user.id,
+      reserva_id: reserva.id,
+      monto: parte.montoNumero,
+      metodo: parte.metodo,
+      moneda: reserva.moneda || "ARS",
+      nota: `${pagoNota.trim() ? `${pagoNota.trim()} · ` : ""}Pago dividido ${indice + 1}/${partesValidas.length}`,
+      created_at: creadoEn,
+    }))
+
+    const { error } = await supabase.from("pagos").insert(filas)
+    if (error) {
+      console.error(error)
+      alert("No se pudo registrar el pago dividido.")
+      return
+    }
+
+    setPagoNota("")
+    setModoPagoDividido(false)
+    setPagoPartes([
+      { id: `parte-${Date.now()}-1`, metodo: "Efectivo", monto: "" },
+      { id: `parte-${Date.now()}-2`, metodo: "Tarjeta", monto: "" },
+    ])
+    await cargarDatos()
+  }
+
+  async function guardarNotasReserva(reserva) {
+    if (!reserva?.id) return
+    setGuardandoNotas(true)
+    const notasActualizadas = notasFicha.trim()
+    const { error } = await supabase
+      .from("reservas")
+      .update({ notas: notasActualizadas })
+      .eq("id", reserva.id)
+
+    if (error) {
+      console.error(error)
+      alert("No se pudieron guardar las notas.")
+      setGuardandoNotas(false)
+      return
+    }
+
+    setReservas((actuales) => actuales.map((item) => (
+      String(item.id) === String(reserva.id) ? { ...item, notas: notasActualizadas } : item
+    )))
+    setReservaSeleccionada((actual) => actual && String(actual.id) === String(reserva.id)
+      ? { ...actual, notas: notasActualizadas }
+      : actual)
+    setGuardandoNotas(false)
   }
 
   const huespedesCRM = useMemo(() => {
@@ -805,10 +968,13 @@ export default function Home() {
   }
 
   function limpiarFormulario() {
-    setAlojamientoSeleccionado("")
-    setHabitacionSeleccionada("")
+    setAlojamientoSeleccionado(String(alojamientos[0]?.id || ""))
+    setHabitacionSeleccionada(""); setHabitacionesAdicionales([]); setServiciosReserva([])
     setNombre("")
     setDni("")
+    setDireccion("")
+    setProvinciaEstado("")
+    setPais("")
     setPasajerosExtra([])
     setEmail("")
     setTelefono("")
@@ -838,17 +1004,24 @@ export default function Home() {
     setGarantiaVencimiento("")
     setGarantiaReferencia("")
     setReservaSeleccionada(null)
+    setReservaEditandoId(null)
     setModoEdicion(false)
   }
 
   function editarReserva(reserva) {
     // Cerramos el panel lateral inmediatamente al pasar a edición.
+    setReservaEditandoId(reserva.id)
     setReservaSeleccionada(null)
     setModoEdicion(true)
     setAlojamientoSeleccionado(String(reserva.alojamiento_id))
     setHabitacionSeleccionada(String(reserva.habitacion_id))
+    setHabitacionesAdicionales(idsHabitacionesReserva(reserva).filter((id) => String(id) !== String(reserva.habitacion_id)))
+    setServiciosReserva(normalizarServiciosReserva(Array.isArray(reserva.servicios) ? reserva.servicios : []))
     setNombre(reserva.nombre_huesped || "")
     setDni(reserva.dni_huesped || "")
+    setDireccion(reserva.direccion_huesped || "")
+    setProvinciaEstado(reserva.provincia_estado_huesped || "")
+    setPais(reserva.pais_huesped || "")
     setEmail(reserva.email_huesped || "")
     setTelefono(reserva.telefono_huesped || "")
 
@@ -920,14 +1093,16 @@ export default function Home() {
     const guardada = config.habitacionesTarifas?.[String(habitacionId)] || {}
     const clave = claveTipoHabitacion(habitacion?.tipo)
     const precioAnterior = Number(config.tarifas?.[clave] || 0)
+    const earlyHabitacion = Number(habitacion?.early_checkin_valor ?? guardada.earlyValor ?? 0)
+    const lateHabitacion = Number(habitacion?.late_checkout_valor ?? guardada.lateValor ?? 0)
 
     return {
-      precio: Number(guardada.precio ?? habitacion?.precio ?? precioAnterior ?? 0),
-      cochera: Number(guardada.cochera ?? config.tarifas?.cochera ?? 0),
-      earlyTipo: guardada.earlyTipo || "monto",
-      earlyValor: Number(guardada.earlyValor ?? config.earlyCheckin?.valor ?? 0),
-      lateTipo: guardada.lateTipo || "monto",
-      lateValor: Number(guardada.lateValor ?? config.lateCheckout?.valor ?? 0),
+      precio: Number(habitacion?.precio ?? guardada.precio ?? precioAnterior ?? 0),
+      cochera: Number(habitacion?.cochera_precio ?? guardada.cochera ?? config.tarifas?.cochera ?? 0),
+      earlyTipo: earlyHabitacion > 0 ? (habitacion?.early_checkin_tipo || guardada.earlyTipo || "monto") : (config.earlyCheckin?.tipo || "monto"),
+      earlyValor: earlyHabitacion > 0 ? earlyHabitacion : Number(config.earlyCheckin?.valor || 0),
+      lateTipo: lateHabitacion > 0 ? (habitacion?.late_checkout_tipo || guardada.lateTipo || "monto") : (config.lateCheckout?.tipo || "monto"),
+      lateValor: lateHabitacion > 0 ? lateHabitacion : Number(config.lateCheckout?.valor || 0),
     }
   }
 
@@ -942,23 +1117,59 @@ export default function Home() {
   }
 
   function calcularImporteReserva() {
+    const servicios = normalizarServiciosReserva()
+    const serviciosTotal = totalServiciosReserva(servicios)
+    const extraManual = Number(extraReserva) || 0
+    const habitacionesIds = habitacionesElegidasFormulario()
+
     if (!habitacionSeleccionada || !fechaEntrada || !fechaSalida) {
-      const extra = Number(extraReserva) || 0
-      return { noches: 0, tarifaNoche: 0, alojamiento: 0, cochera: 0, early: 0, late: 0, extra, descuento: 0, subtotal: extra, total: extra, totalUSD: 0, tipoCambio: Number(tipoCambioReserva || config.tipoCambioUSD || 1) || 1 }
+      const extra = extraManual + serviciosTotal
+      return {
+        noches: 0,
+        tarifaNoche: 0,
+        alojamiento: 0,
+        cochera: 0,
+        precioCocheraPorNoche: 0,
+        early: 0,
+        late: 0,
+        extra,
+        extraManual,
+        servicios,
+        serviciosTotal,
+        habitacionesIds,
+        habitacionesDetalle: [],
+        descuento: 0,
+        subtotal: extra,
+        total: extra,
+        totalUSD: 0,
+        tipoCambio: Number(tipoCambioReserva || config.tipoCambioUSD || 1) || 1,
+      }
     }
 
     const noches = diasEntre(fechaEntrada, fechaSalida)
     const tarifaHabitacion = datosTarifaHabitacion(habitacionSeleccionada)
     const tarifaNoche = tarifaHabitacion.precio
-    const alojamiento = tarifaNoche * noches
-    const cochera = (Number(vehiculos) || 0) * tarifaHabitacion.cochera * noches
+    const habitacionesDetalle = habitacionesIds.map((id) => {
+      const tarifa = datosTarifaHabitacion(id).precio
+      return {
+        habitacion_id: Number.isFinite(Number(id)) ? Number(id) : id,
+        nombre: nombreHabitacion(id),
+        tarifa_noche: tarifa,
+        noches,
+        total: tarifa * noches,
+      }
+    })
+    const alojamiento = habitacionesDetalle.reduce((total, detalle) => total + detalle.total, 0)
+    const tipoCochera = tipoVehiculo || "auto"
+    const precioCocheraPorNoche = Number(config.vehiculosTarifas?.[tipoCochera] ?? tarifaHabitacion.cochera ?? 0)
+    const cochera = (Number(vehiculos) || 0) * precioCocheraPorNoche * noches
     const early = earlyCheckin
       ? calcularRecargoServicio(tarifaNoche, { tipo: tarifaHabitacion.earlyTipo, valor: tarifaHabitacion.earlyValor })
       : 0
     const late = lateCheckout
       ? calcularRecargoServicio(tarifaNoche, { tipo: tarifaHabitacion.lateTipo, valor: tarifaHabitacion.lateValor })
       : 0
-    const extra = Number(extraReserva) || 0
+    const extra = extraManual + serviciosTotal
     const subtotal = alojamiento + cochera + early + late + extra
     const descuento = descuentoTipo === "porcentaje"
       ? subtotal * (Number(descuentoValor) || 0) / 100
@@ -966,7 +1177,36 @@ export default function Home() {
     const total = Math.max(0, subtotal - descuento)
     const tipoCambio = Number(tipoCambioReserva || config.tipoCambioUSD || 1) || 1
 
-    return { noches, tarifaNoche, alojamiento, cochera, early, late, extra, descuento, subtotal, total, totalUSD: total / tipoCambio, tipoCambio }
+    return {
+      noches,
+      tarifaNoche,
+      alojamiento,
+      habitacionesIds,
+      habitacionesDetalle,
+      cochera,
+      precioCocheraPorNoche,
+      early,
+      late,
+      extra,
+      extraManual,
+      servicios,
+      serviciosTotal,
+      descuento,
+      subtotal,
+      total,
+      totalUSD: total / tipoCambio,
+      tipoCambio,
+    }
+  }
+
+  function aplicarTarifaMascota() {
+    const base = tarifaDeHabitacion(habitacionSeleccionada)
+    const importe = calcularRecargoServicio(base, config.mascota || { tipo: "monto", valor: 0 })
+    if (!importe) {
+      alert("Primero configurá la tarifa predeterminada de mascota en Configuración → Operación.")
+      return
+    }
+    agregarServicioReserva("mascota")
   }
 
   function agregarPasajeroExtra() {
@@ -1048,7 +1288,7 @@ export default function Home() {
       "Pasajeros:",
       detallePasajeros,
       "",
-      `Habitación: ${nombreHabitacion(reserva.habitacion_id)}`,
+      `Habitación/es: ${idsHabitacionesReserva(reserva).map((id) => nombreHabitacion(id)).join(", ") || nombreHabitacion(reserva.habitacion_id)}`,
       `Entrada: ${formatearFecha(reserva.fecha_entrada)}`,
       `Salida: ${formatearFecha(reserva.fecha_salida)}`,
       `Noches: ${noches}`,
@@ -1096,7 +1336,6 @@ export default function Home() {
       .from("reservas")
       .select("id,fecha_entrada,fecha_salida")
       .eq("habitacion_id", reserva.habitacion_id)
-      .eq("user_id", user.id)
       .neq("id", reserva.id)
       .neq("estado", "cancelada")
       .eq("no_show", false)
@@ -1114,12 +1353,17 @@ export default function Home() {
 
     const noches = diasEntre(reserva.fecha_entrada, nuevaSalida)
     const tarifaNoche = Number(reserva.tarifa_noche || 0)
-    const cocheraPorNoche = Number(config.tarifas?.cochera || 0)
+    const nochesActuales = Math.max(1, Number(reserva.noches) || diasEntre(reserva.fecha_entrada, reserva.fecha_salida))
+    const cocheraPorNoche = Number(reserva.cochera_total || 0) / nochesActuales || Number(config.vehiculosTarifas?.[reserva.tipo_vehiculo || "auto"] || config.tarifas?.cochera || 0)
     const vehiculosReserva = Number(reserva.vehiculos || 0)
     const extra = Number(reserva.extra || 0)
     const early = Number(reserva.early_checkin_importe || 0)
     const late = Number(reserva.late_checkout_importe || 0)
-    const subtotal = tarifaNoche * noches + cocheraPorNoche * vehiculosReserva * noches + early + late + extra
+    const detalleHabitacionesExtendido = Array.isArray(reserva.habitaciones_detalle) && reserva.habitaciones_detalle.length
+      ? reserva.habitaciones_detalle.map((h) => ({ ...h, noches, subtotal: Number(h.tarifa_noche || 0) * noches }))
+      : [{ habitacion_id: reserva.habitacion_id, nombre: nombreHabitacion(reserva.habitacion_id), tarifa_noche: tarifaNoche, noches, subtotal: tarifaNoche * noches }]
+    const alojamientoExtendido = detalleHabitacionesExtendido.reduce((acc, h) => acc + Number(h.subtotal || 0), 0)
+    const subtotal = alojamientoExtendido + cocheraPorNoche * vehiculosReserva * noches + early + late + extra
     const descuento = reserva.descuento_tipo === "porcentaje"
       ? subtotal * Number(reserva.descuento_valor || 0) / 100
       : Number(reserva.descuento_valor || 0)
@@ -1132,6 +1376,7 @@ export default function Home() {
       .update({
         fecha_salida: nuevaSalida,
         noches,
+        habitaciones_detalle: detalleHabitacionesExtendido,
         precio_total: precioTotal,
         precio_total_usd: precioTotalUSD,
         cochera_total: cocheraPorNoche * vehiculosReserva * noches,
@@ -1139,7 +1384,6 @@ export default function Home() {
         descuento_importe: descuento,
       })
       .eq("id", reserva.id)
-      .eq("user_id", user.id)
 
     if (error) {
       console.error(error)
@@ -1169,7 +1413,6 @@ export default function Home() {
       .from("reservas")
       .update({ estado: "alojado" })
       .eq("id", reserva.id)
-      .eq("user_id", user.id)
       .select("*")
       .single()
     if (error) {
@@ -1194,11 +1437,38 @@ export default function Home() {
   async function realizarCheckOutConfirmado(reserva) {
     if (!reserva?.id || reserva.estado === "cancelada" || reserva.no_show) return
 
+    const hoyCheckout = fechaLocal(0)
+    const salidaReal = hoyCheckout < reserva.fecha_salida ? hoyCheckout : reserva.fecha_salida
+    const nochesReales = Math.max(1, diasEntre(reserva.fecha_entrada, salidaReal))
+    const tarifaNocheReal = Number(reserva.tarifa_noche || tarifaDeHabitacion(reserva.habitacion_id) || 0)
+    const tarifaHabitacionReal = datosTarifaHabitacion(reserva.habitacion_id)
+    const cocheraReal = Number(reserva.vehiculos || 0) * Number(tarifaHabitacionReal.cochera || 0) * nochesReales
+    const detalleHabitacionesReal = Array.isArray(reserva.habitaciones_detalle) && reserva.habitaciones_detalle.length
+      ? reserva.habitaciones_detalle.map((h) => ({ ...h, noches: nochesReales, subtotal: Number(h.tarifa_noche || 0) * nochesReales }))
+      : [{ habitacion_id: reserva.habitacion_id, nombre: nombreHabitacion(reserva.habitacion_id), tarifa_noche: tarifaNocheReal, noches: nochesReales, subtotal: tarifaNocheReal * nochesReales }]
+    const alojamientoReal = detalleHabitacionesReal.reduce((acc, h) => acc + Number(h.subtotal || 0), 0)
+    const baseReal = alojamientoReal + cocheraReal + Number(reserva.early_checkin_importe || 0) + Number(reserva.late_checkout_importe || 0) + Number(reserva.extra || 0)
+    const descuentoReal = reserva.descuento_tipo === "porcentaje"
+      ? baseReal * Number(reserva.descuento_valor || 0) / 100
+      : Number(reserva.descuento_valor || 0)
+    const totalReal = Math.max(0, baseReal - descuentoReal)
+    const tcReal = Number(reserva.tipo_cambio || 1) || 1
+
     const { error } = await supabase
       .from("reservas")
-      .update({ estado: "finalizada" })
+      .update({
+        estado: "finalizada",
+        fecha_salida: salidaReal,
+        checkout_real_at: new Date().toISOString(),
+        noches: nochesReales,
+        habitaciones_detalle: detalleHabitacionesReal,
+        cochera_total: cocheraReal,
+        subtotal: baseReal,
+        descuento_importe: descuentoReal,
+        precio_total: totalReal,
+        precio_total_usd: totalReal / tcReal,
+      })
       .eq("id", reserva.id)
-      .eq("user_id", user.id)
 
     if (error) {
       console.error("Error al finalizar reserva:", error)
@@ -1211,14 +1481,13 @@ export default function Home() {
       .from("habitaciones")
       .update({ estado: "sucia" })
       .eq("id", Number(reserva.habitacion_id))
-      .eq("user_id", user.id)
 
     if (errorLimpieza) {
       console.error("La reserva finalizó, pero no se pudo marcar la habitación como sucia:", errorLimpieza)
       alert("El check-out se realizó, pero no se pudo marcar la habitación como sucia. Revisá los permisos de habitaciones.")
     }
 
-    const reservaFinalizada = { ...reserva, estado: "finalizada" }
+    const reservaFinalizada = { ...reserva, estado: "finalizada", fecha_salida: salidaReal, checkout_real_at: new Date().toISOString(), noches: nochesReales, habitaciones_detalle: detalleHabitacionesReal, cochera_total: cocheraReal, subtotal: baseReal, descuento_importe: descuentoReal, precio_total: totalReal, precio_total_usd: totalReal / tcReal }
     setReservas((actuales) => actuales.map((r) => String(r.id) === String(reserva.id) ? reservaFinalizada : r))
     setHabitaciones((actuales) => actuales.map((h) =>
       String(h.id) === String(reserva.habitacion_id) ? { ...h, estado: "sucia" } : h
@@ -1233,11 +1502,16 @@ export default function Home() {
 
   function imprimirReserva(reserva) {
     const pasajeros = obtenerListaPasajeros(reserva)
+    const fiscal = config.fiscal || {}
+    const encabezadoFiscal = fiscal.razonSocial || fiscal.cuit || fiscal.condicionIVA
+      ? `<div class="muted">${fiscal.razonSocial || ""}${fiscal.cuit ? ` · CUIT ${fiscal.cuit}` : ""}${fiscal.condicionIVA ? ` · ${fiscal.condicionIVA}` : ""}${fiscal.domicilio ? `<br>${fiscal.domicilio}` : ""}</div>`
+      : ""
     imprimirHTML(`Reserva ${reserva.numero_reserva || ""}`, `
       <h1>${config.nombreMarca || "Habitación Llena"}</h1>
-      <div class="muted">Resumen de reserva</div>
+      ${encabezadoFiscal}
+      <div class="muted" style="margin-top:8px">Comprobante interno de estadía · no fiscal</div>
       <h2>${reserva.numero_reserva || "Reserva"} · ${reserva.nombre_huesped || ""}</h2>
-      <table><tr><th>Alojamiento</th><td>${nombreAlojamiento(reserva.alojamiento_id)}</td></tr><tr><th>Habitación</th><td>${nombreHabitacion(reserva.habitacion_id)}</td></tr><tr><th>Entrada</th><td>${formatearFecha(reserva.fecha_entrada)}</td></tr><tr><th>Salida</th><td>${formatearFecha(reserva.fecha_salida)}</td></tr><tr><th>Noches</th><td>${reserva.noches || diasEntre(reserva.fecha_entrada,reserva.fecha_salida)}</td></tr><tr><th>Estado</th><td>${estadoBadge(reserva.estado).label}${reserva.no_show ? " · NO SHOW" : ""}</td></tr></table>
+      <table><tr><th>Alojamiento</th><td>${nombreAlojamiento(reserva.alojamiento_id)}</td></tr><tr><th>Habitación/es</th><td>${idsHabitacionesReserva(reserva).map((id)=>nombreHabitacion(id)).join(", ")}</td></tr><tr><th>Entrada</th><td>${formatearFecha(reserva.fecha_entrada)}</td></tr><tr><th>Salida</th><td>${formatearFecha(reserva.fecha_salida)}</td></tr><tr><th>Noches</th><td>${reserva.noches || diasEntre(reserva.fecha_entrada,reserva.fecha_salida)}</td></tr><tr><th>Estado</th><td>${estadoBadge(reserva.estado).label}${reserva.no_show ? " · NO SHOW" : ""}</td></tr></table>
       <h2>Pasajeros</h2><table><tr><th>#</th><th>Nombre</th><th>DNI</th><th>Menor</th></tr>${pasajeros.map((p,i)=>`<tr><td>${i+1}</td><td>${p.nombre || ""}</td><td>${p.dni || ""}</td><td>${p.menor ? "Sí" : "No"}</td></tr>`).join("")}</table>
       <h2>Importes</h2><table><tr><th>Habitación</th><td>$${Number(reserva.tarifa_noche||0).toLocaleString("es-AR")} / noche</td></tr><tr><th>Cochera</th><td>$${Number(reserva.cochera_total||0).toLocaleString("es-AR")}</td></tr><tr><th>Extra</th><td>$${Number(reserva.extra||0).toLocaleString("es-AR")}</td></tr><tr><th>Total</th><td class="total">$${Number(reserva.precio_total||0).toLocaleString("es-AR")}</td></tr></table>
       ${reserva.notas ? `<h2>Notas</h2><p>${reserva.notas}</p>` : ""}`)
@@ -1283,8 +1557,8 @@ export default function Home() {
   function colorReservaCalendario(reserva) {
     const estado = String(reserva?.estado || "").toLowerCase()
     if (["alojado", "check-in", "checkin", "in_house"].includes(estado)) return colors.green || "#16a34a"
-    if (["finalizada", "checkout", "check-out"].includes(estado)) return colors.red || "#dc2626"
-    return "#7c3aed" // violeta para pendiente, confirmada y futuras
+    if (["finalizada", "checkout", "check-out"].includes(estado)) return "#a85343"
+    return "#c59a46"
   }
 
   function nochesEntre(fechaInicio, fechaFin) {
@@ -1440,8 +1714,9 @@ export default function Home() {
       .from("reservas")
       .select("*")
       .eq("habitacion_id", habitacionSeleccionada)
+      .eq("user_id", user.id)
       .neq("estado", "cancelada")
-      .neq("id", reservaSeleccionada?.id ?? -1)
+      .neq("id", reservaEditandoId ?? -1)
 
     if (errorBusqueda) {
       console.error(errorBusqueda)
@@ -1467,13 +1742,43 @@ export default function Home() {
       return
     }
 
+    const habitacionesAValidar = habitacionesElegidasFormulario()
+    for (const habitacionId of habitacionesAValidar) {
+      const bloqueoExtra = bloqueoParaHabitacion(habitacionId, fechaEntrada, fechaSalida)
+      if (bloqueoExtra) {
+        setMensaje(`La habitación ${nombreHabitacion(habitacionId)} está bloqueada del ${formatearFecha(bloqueoExtra.fecha_desde)} al ${formatearFecha(bloqueoExtra.fecha_hasta)} (${bloqueoExtra.motivo}).`)
+        setCargando(false)
+        return
+      }
+      const conflictoReserva = reservas.some((otra) =>
+        String(otra.id) !== String(reservaEditandoId || "") &&
+        otra.estado !== "cancelada" && !otra.no_show &&
+        reservaIncluyeHabitacion(otra, habitacionId) &&
+        bloquesSeCruzan(fechaEntrada, fechaSalida, otra.fecha_entrada, otra.fecha_salida)
+      )
+      if (conflictoReserva) {
+        setMensaje(`La habitación ${nombreHabitacion(habitacionId)} ya está ocupada en esas fechas.`)
+        setCargando(false)
+        return
+      }
+    }
+
     const calculo = calcularImporteReserva()
+    const alojamientoActivo = alojamientos.find((a) => String(a.id) === String(alojamientoSeleccionado))
+    const propertyIdActivo = alojamientoActivo?.property_id || (String(alojamientoSeleccionado).includes("-") ? alojamientoSeleccionado : null)
 
     const datos = {
-      alojamiento_id: Number(alojamientoSeleccionado),
+      property_id: propertyIdActivo,
+      alojamiento_id: Number.isFinite(Number(alojamientoSeleccionado)) ? Number(alojamientoSeleccionado) : null,
       habitacion_id: Number(habitacionSeleccionada),
+      habitaciones_ids: calculo.habitacionesIds,
+      habitaciones_detalle: calculo.habitacionesDetalle,
+      servicios: calculo.servicios,
       nombre_huesped: nombre.trim(),
       dni_huesped: dni.trim(),
+      direccion_huesped: direccion.trim(),
+      provincia_estado_huesped: provinciaEstado.trim(),
+      pais_huesped: pais.trim(),
       es_menor: false,
       pasajeros: obtenerPasajerosReserva(),
       email_huesped: email.trim(),
@@ -1485,7 +1790,7 @@ export default function Home() {
       no_show: Boolean(noShow),
       early_checkin: Boolean(earlyCheckin),
       late_checkout: Boolean(lateCheckout),
-      numero_reserva: modoEdicion && reservaSeleccionada?.numero_reserva ? reservaSeleccionada.numero_reserva : generarNumeroReserva(),
+      numero_reserva: modoEdicion && reservaEnEdicion?.numero_reserva ? reservaEnEdicion.numero_reserva : generarNumeroReserva(),
       notas: notas.trim(),
       user_id: user.id,
       extra_descripcion: extraDescripcion.trim(),
@@ -1501,13 +1806,13 @@ export default function Home() {
     }
 
     let error
-    let reservaId = reservaSeleccionada?.id || null
+    let reservaId = reservaEditandoId || null
 
-    if (modoEdicion && reservaSeleccionada) {
+    if (modoEdicion && reservaEditandoId) {
       const resultado = await supabase
         .from("reservas")
         .update(datos)
-        .eq("id", reservaSeleccionada.id)
+        .eq("id", reservaEditandoId)
         .eq("user_id", user.id)
       error = resultado.error
     } else {
@@ -1535,7 +1840,12 @@ export default function Home() {
         .update({
           tarifa_noche: calculo.tarifaNoche,
           noches: calculo.noches,
+          habitaciones_ids: calculo.habitacionesIds,
+          habitaciones_detalle: calculo.habitacionesDetalle,
+          servicios: calculo.servicios,
           vehiculos: Number(vehiculos) || 0,
+          tipo_vehiculo: tipoVehiculo || null,
+          dominio_vehiculo: dominioVehiculo.trim().toUpperCase() || null,
           cochera_total: calculo.cochera,
           early_checkin_importe: calculo.early,
           late_checkout_importe: calculo.late,
@@ -1608,6 +1918,29 @@ export default function Home() {
     setCargando(false)
   }
 
+  async function cambiarHabitacionRapido(reserva, soloUpgrade = false) {
+    const actual = habitaciones.find((h) => String(h.id) === String(reserva.habitacion_id))
+    const precioActual = Number(datosTarifaHabitacion(actual?.id).precio || 0)
+    const candidatas = habitacionesDisponibles.filter((h) => String(h.id) !== String(reserva.habitacion_id) && (!soloUpgrade || Number(datosTarifaHabitacion(h.id).precio || 0) > precioActual))
+    if (!candidatas.length) return alert(soloUpgrade ? "No hay habitaciones de tarifa superior disponibles para ofrecer como upgrade." : "No hay otras habitaciones disponibles.")
+    const detalle = candidatas.map((h) => `${h.id} · ${h.nombre} · ${h.tipo || "Sin tipo"} · ${Number(datosTarifaHabitacion(h.id).precio || 0).toLocaleString("es-AR")}`).join("\n")
+    const elegido = window.prompt((soloUpgrade ? "UPGRADE" : "CAMBIO DE HABITACIÓN") + "\nIngresá el ID de la habitación destino:\n\n" + detalle)
+    if (!elegido) return
+    const destino = candidatas.find((h) => String(h.id) === String(elegido).trim())
+    if (!destino) return alert("La habitación elegida no es válida.")
+    const conflicto = reservas.some((r) => String(r.id) !== String(reserva.id) && r.estado !== "cancelada" && !r.no_show && String(r.habitacion_id) === String(destino.id) && bloquesSeCruzan(reserva.fecha_entrada, reserva.fecha_salida, r.fecha_entrada, r.fecha_salida))
+    if (conflicto) return alert("La habitación elegida tiene una reserva que se cruza con estas fechas.")
+    const nuevaTarifa = Number(datosTarifaHabitacion(destino.id).precio || 0)
+    const noches = Math.max(1, diasEntre(reserva.fecha_entrada, reserva.fecha_salida))
+    const subtotal = nuevaTarifa * noches + Number(reserva.cochera_total || 0) + Number(reserva.early_checkin_importe || 0) + Number(reserva.late_checkout_importe || 0) + Number(reserva.extra || 0)
+    const descuento = reserva.descuento_tipo === "porcentaje" ? subtotal * Number(reserva.descuento_valor || 0) / 100 : Number(reserva.descuento_valor || 0)
+    const total = Math.max(0, subtotal - descuento)
+    const { error } = await supabase.from("reservas").update({ habitacion_id: destino.id, tarifa_noche: nuevaTarifa, subtotal, descuento_importe: descuento, precio_total: total, precio_total_usd: total / (Number(reserva.tipo_cambio || 1) || 1) }).eq("id", reserva.id)
+    if (error) { console.error(error); return alert("No se pudo cambiar la habitación.") }
+    setReservaSeleccionada(null)
+    await cargarDatos()
+  }
+
   async function cancelarReserva(reserva) {
     if (!confirm(`¿Cancelar la reserva de ${reserva.nombre_huesped}?`)) return
 
@@ -1628,14 +1961,28 @@ export default function Home() {
 
   async function crearAlojamiento(e) {
     e.preventDefault()
-    if (!nuevoAlojamiento.trim()) return
+    const nombreNuevo = nuevoAlojamiento.trim()
+    if (!nombreNuevo) return
 
-    const { error } = await supabase
+    const { data: property, error: propertyError } = await supabase
+      .from("properties")
+      .insert([{ name: nombreNuevo, owner_id: user.id }])
+      .select("id, name, owner_id")
+      .single()
+
+    if (propertyError || !property) {
+      console.error(propertyError)
+      alert("No se pudo crear la propiedad.")
+      return
+    }
+
+    const { error: alojamientoError } = await supabase
       .from("alojamientos")
-      .insert([{ nombre: nuevoAlojamiento.trim(), user_id: user.id }])
+      .insert([{ nombre: nombreNuevo, user_id: user.id, property_id: property.id }])
 
-    if (error) {
-      console.error(error)
+    if (alojamientoError) {
+      console.error(alojamientoError)
+      await supabase.from("properties").delete().eq("id", property.id)
       alert("No se pudo crear el alojamiento.")
       return
     }
@@ -1654,10 +2001,12 @@ export default function Home() {
       return
     }
 
+    const alojamientoHabitacion = alojamientos.find((a) => String(a.id) === String(nuevoAlojamientoHabitacion))
     const datos = {
       nombre: nuevaHabitacion.trim(),
       tipo: tipoFinal,
-      alojamiento_id: Number(nuevoAlojamientoHabitacion),
+      alojamiento_id: Number.isFinite(Number(nuevoAlojamientoHabitacion)) ? Number(nuevoAlojamientoHabitacion) : null,
+      property_id: alojamientoHabitacion?.property_id || (String(nuevoAlojamientoHabitacion).includes("-") ? nuevoAlojamientoHabitacion : null),
       activa: true,
       user_id: user.id,
     }
@@ -1770,13 +2119,18 @@ export default function Home() {
     const [dropTarget, setDropTarget] = useState(null)
     const [guardandoMovimiento, setGuardandoMovimiento] = useState(false)
 
-    // Horarios operativos del alojamiento.
-    // El calendario visualiza cada día como 24 h:
-    // CHECK-OUT 10:00 → ventana de limpieza/rotación → CHECK-IN 14:00.
-    const HORA_CHECKOUT = 10
-    const HORA_CHECKIN = 14
+    const textoCheckin = config.horarios?.checkin || "14:00"
+    const textoCheckout = config.horarios?.checkout || "10:00"
+    const horaDecimal = (valor, predeterminado) => {
+      const [hora, minutos] = String(valor || "").split(":").map(Number)
+      return Number.isFinite(hora) ? hora + (Number.isFinite(minutos) ? minutos / 60 : 0) : predeterminado
+    }
+    const HORA_CHECKOUT = horaDecimal(textoCheckout, 10)
+    const HORA_CHECKIN = horaDecimal(textoCheckin, 14)
     const FRACCION_CHECKIN = HORA_CHECKIN / 24
     const FRACCION_CHECKOUT = HORA_CHECKOUT / 24
+    const COLOR_FUTURA = "#c59a46"
+    const COLOR_OUT = "#a85343"
 
     const calendarioDias = useMemo(() => {
       const base = new Date(`${fechaCalendario}T12:00:00`)
@@ -1809,6 +2163,9 @@ export default function Home() {
       setFechaSalida(salidaTexto)
       setNombre("")
       setDni("")
+      setDireccion("")
+      setProvinciaEstado("")
+      setPais("")
       setEmail("")
       setTelefono("")
       setPasajerosExtra([])
@@ -1837,6 +2194,11 @@ export default function Home() {
       salidaDate.setDate(salidaDate.getDate() + noches)
       const nuevaSalida = `${salidaDate.getFullYear()}-${String(salidaDate.getMonth() + 1).padStart(2, "0")}-${String(salidaDate.getDate()).padStart(2, "0")}`
 
+      if (idsHabitacionesReserva(reserva).length > 1 && String(reserva.habitacion_id) !== String(nuevaHabitacionId)) {
+        alert("Esta reserva ocupa varias habitaciones. Para cambiar habitaciones usá Editar reserva, así se mantiene el grupo completo.")
+        return
+      }
+
       const mismoDestino =
         String(reserva.habitacion_id) === String(nuevaHabitacionId) &&
         reserva.fecha_entrada === nuevaEntrada
@@ -1847,7 +2209,7 @@ export default function Home() {
         String(otra.id) !== String(reserva.id) &&
         otra.estado !== "cancelada" &&
         !otra.no_show &&
-        String(otra.habitacion_id) === String(nuevaHabitacionId) &&
+        reservaIncluyeHabitacion(otra, nuevaHabitacionId) &&
         bloquesSeCruzan(nuevaEntrada, nuevaSalida, otra.fecha_entrada, otra.fecha_salida)
       ))
 
@@ -1927,7 +2289,7 @@ export default function Home() {
         }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <h2 style={{ margin: 0, fontSize: 20, letterSpacing: -.3 }}>Plano de ocupación</h2>
+              <h2 style={{ margin: 0, fontSize: 20, letterSpacing: -.3 }}>Calendario de ocupación</h2>
 
               {guardandoMovimiento && (
                 <span style={{
@@ -1943,7 +2305,7 @@ export default function Home() {
               )}
             </div>
             <div style={{ color: colors.muted, fontSize: 12, marginTop: 5 }}>
-              Las reservas se muestran desde el check-in de las 14:00 hasta el check-out de las 10:00.
+              Las reservas se muestran desde el check-in de las {textoCheckin} hasta el check-out de las {textoCheckout}.
             </div>
           </div>
 
@@ -1984,8 +2346,8 @@ export default function Home() {
           {[
             ["Habitaciones", habitacionesActivas.length, "unidades activas", colors.navy],
             ["Ocupadas hoy", reservasHoy.length, `${habitacionesActivas.length ? Math.round(reservasHoy.length / habitacionesActivas.length * 100) : 0}% ocupación`, colors.blue],
-            ["Entradas", entradasHoy.length, "check-in hoy · 14:00", colors.green],
-            ["Noches en agenda", totalNoches, "estadías activas", "#7c3aed"],
+            ["Entradas", entradasHoy.length, `check-in hoy · ${textoCheckin}`, colors.green],
+            ["Noches en agenda", totalNoches, "estadías activas", COLOR_FUTURA],
           ].map(([label, value, detail, color]) => (
             <div key={label} style={{
               background: colors.white,
@@ -2022,15 +2384,15 @@ export default function Home() {
             Alojado
           </span>
           <span>
-            <i style={{ display: "inline-block", width: 9, height: 9, borderRadius: 3, background: "#7c3aed", marginRight: 5 }} />
+            <i style={{ display: "inline-block", width: 9, height: 9, borderRadius: 3, background: COLOR_FUTURA, marginRight: 5 }} />
             Confirmada / futura
           </span>
           <span>
-            <i style={{ display: "inline-block", width: 9, height: 9, borderRadius: 3, background: colors.yellow, marginRight: 5 }} />
-            Pendiente
+            <i style={{ display: "inline-block", width: 9, height: 9, borderRadius: 3, background: COLOR_FUTURA, border: "1px dashed #fff", boxShadow: `0 0 0 1px ${COLOR_FUTURA}`, marginRight: 5 }} />
+            Pendiente · borde punteado
           </span>
           <span>
-            <i style={{ display: "inline-block", width: 9, height: 9, borderRadius: 3, background: colors.red, marginRight: 5 }} />
+            <i style={{ display: "inline-block", width: 9, height: 9, borderRadius: 3, background: COLOR_OUT, marginRight: 5 }} />
             Salida hoy
           </span>
           <span style={{ color: colors.muted }}>↔ Arrastrá para mover</span>
@@ -2088,7 +2450,8 @@ export default function Home() {
                       textAlign: "center",
                       padding: "8px 3px 6px",
                       borderLeft: `1px solid ${colors.border}`,
-                      background: esHoy ? colors.blueSoft : colors.white,
+                      background: esHoy ? "#d9efff" : colors.white,
+                      boxShadow: esHoy ? "inset 3px 0 0 #71bdf2, inset -3px 0 0 #71bdf2" : "none",
                     }}
                   >
                     <div style={{
@@ -2117,14 +2480,14 @@ export default function Home() {
 
             {habitacionesCalendario.map((habitacion) => {
               const reservasHabitacion = reservasActivas.filter((r) =>
-                String(r.habitacion_id) === String(habitacion.id) &&
+                reservaIncluyeHabitacion(r, habitacion.id) &&
                 r.fecha_salida > calendarioDias[0] &&
                 r.fecha_entrada <= calendarioDias[calendarioDias.length - 1]
               )
 
               const estado = estadoHabitacionVisual(habitacion)
               const info = infoEstadoHabitacion(estado)
-              const ocupada = reservasHoy.some((r) => String(r.habitacion_id) === String(habitacion.id))
+              const ocupada = reservasHoy.some((r) => reservaIncluyeHabitacion(r, habitacion.id))
 
               return (
                 <div
@@ -2214,7 +2577,7 @@ export default function Home() {
                             background: isDrop
                               ? "#dbeafe"
                               : esHoy
-                                ? "rgba(22,119,232,.045)"
+                                ? "rgba(88,183,245,.12)"
                                 : esFinDeSemana
                                   ? "#fcfcfe"
                                   : "#fff",
@@ -2292,14 +2655,12 @@ export default function Home() {
                       const pendiente = reserva.estado === "pendiente"
                       const colorReserva =
                         reserva.estado === "finalizada"
-                          ? colors.red
+                          ? COLOR_OUT
                           : estadoVisual === "in"
                             ? colors.green
                             : estadoVisual === "out"
-                              ? colors.red
-                              : pendiente
-                                ? colors.yellow
-                                : "#7c3aed"
+                              ? COLOR_OUT
+                              : COLOR_FUTURA
 
                       /*
                        * CLAVE DEL PLANO:
@@ -2338,7 +2699,7 @@ export default function Home() {
                             e.stopPropagation()
                             editarReserva(reserva)
                           }}
-                          title={`${reserva.nombre_huesped} · ${formatearFecha(reserva.fecha_entrada)} 14:00 → ${formatearFecha(reserva.fecha_salida)} 10:00 · ${reserva.cantidad_huespedes || 1} pax\nArrastrá para mover`}
+                          title={`${reserva.nombre_huesped} · ${formatearFecha(reserva.fecha_entrada)} ${textoCheckin} → ${formatearFecha(reserva.fecha_salida)} ${textoCheckout} · ${reserva.cantidad_huespedes || 1} pax\nArrastrá para mover`}
                           style={{
                             position: "absolute",
                             left: inicioVisible + 3,
@@ -2402,8 +2763,8 @@ export default function Home() {
                               opacity: .88,
                               whiteSpace: "nowrap",
                             }}>
-                              <span>IN 14:00</span>
-                              {salidaVisibleEnVista && <span>OUT 10:00</span>}
+                              <span>IN {textoCheckin}</span>
+                              {salidaVisibleEnVista && <span>OUT {textoCheckout}</span>}
                             </div>
                           )}
 
@@ -2435,7 +2796,7 @@ export default function Home() {
           fontSize: 11,
         }}>
           <span>
-            💡 <strong>10:00</strong> salida · <strong>10:00–14:00</strong> recambio · <strong>14:00</strong> entrada.
+            💡 <strong>{textoCheckout}</strong> salida · <strong>{textoCheckout}–{textoCheckin}</strong> recambio · <strong>{textoCheckin}</strong> entrada.
           </span>
           <span>
             Arrastrá una reserva para cambiar fecha o habitación · Click libre = nueva reserva · Doble click = editar
@@ -2450,7 +2811,7 @@ export default function Home() {
     return (<><Header titulo="Housekeeping" subtitulo="Limpieza y estado operativo de las habitaciones" /><div style={{ padding: 30 }}>
       <section style={cardStyle}><div style={sectionHeader}><div><h2 style={{ margin: 0, fontSize: 18 }}>Estado de habitaciones</h2><div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>{hoyOut.length} OUT programados hoy</div></div><button onClick={() => imprimirHousekeeping()} style={secondaryButton}>🖨 Imprimir planilla</button></div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 14, marginTop: 18 }}>
-        {habitacionesActivas.map((h) => { const estado = estadoHabitacionVisual(h); const info = infoEstadoHabitacion(estado); const reservaOut = hoyOut.find(r => String(r.habitacion_id) === String(h.id)); const checklist = checklistEstado(h.id); return <div key={h.id} style={{ border: `1px solid ${colors.border}`, borderRadius: 12, padding: 16 }}>
+        {habitacionesActivas.map((h) => { const estado = estadoHabitacionVisual(h); const info = infoEstadoHabitacion(estado); const reservaOut = hoyOut.find(r => reservaIncluyeHabitacion(r, h.id)); const checklist = checklistEstado(h.id); return <div key={h.id} style={{ border: `1px solid ${colors.border}`, borderRadius: 12, padding: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}><div><strong>{h.nombre}</strong><div style={{ color: colors.muted, fontSize: 11 }}>{nombreAlojamiento(h.alojamiento_id)}</div></div><span style={{ background: info.bg, color: info.color, padding: "5px 9px", borderRadius: 999, fontSize: 11, fontWeight: 800 }}>{info.label}</span></div>
           {reservaOut && <div style={{ marginTop: 12, padding: 10, background: colors.redSoft, borderRadius: 8, fontSize: 12 }}><strong>OUT:</strong> {reservaOut.nombre_huesped} · {reservaOut.numero_reserva || "—"}{reservaOut.late_checkout ? " · Late check-out" : ""}</div>}
           <select value={estado} onChange={(e) => cambiarEstadoHabitacion(h.id, e.target.value)} style={{ ...inputStyle, marginTop: 12 }}><option value="libre">Libre / limpia</option><option value="sucia">Sucia</option><option value="en_limpieza">En limpieza</option><option value="fuera_servicio">Fuera de servicio</option></select>
@@ -2521,24 +2882,24 @@ export default function Home() {
   const permisosPorRol = {
     owner: [
       "dashboard", "reservas", "recepcion", "calendario", "housekeeping",
-      "bloqueos", "huespedes", "caja", "ventas", "comunicaciones",
+      "bloqueos", "huespedes", "administracion", "pricing", "caja", "ventas", "comunicaciones",
       "integraciones", "asistente", "asistencia", "bandeja", "configuracion",
     ],
     manager: [
       "dashboard", "reservas", "recepcion", "calendario", "housekeeping",
-      "bloqueos", "huespedes", "caja", "ventas", "comunicaciones",
+      "bloqueos", "huespedes", "administracion", "pricing", "caja", "ventas", "comunicaciones",
       "asistente", "asistencia", "bandeja",
     ],
     reception: [
       "dashboard", "reservas", "recepcion", "calendario", "housekeeping",
-      "huespedes", "comunicaciones", "asistente", "asistencia", "bandeja",
+      "huespedes", "pricing", "comunicaciones", "asistente", "asistencia", "bandeja",
     ],
     housekeeping: [
       "dashboard", "reservas", "recepcion", "calendario", "housekeeping", "asistencia",
     ],
     admin: [
       "dashboard", "reservas", "recepcion", "calendario", "huespedes",
-      "caja", "ventas", "comunicaciones", "asistente", "asistencia", "bandeja",
+      "administracion", "pricing", "caja", "ventas", "comunicaciones", "asistente", "asistencia", "bandeja", "configuracion",
     ],
   }
 
@@ -2597,6 +2958,7 @@ export default function Home() {
       ["huespedes", "👤", "Huéspedes"],
     ]
     const grupoAdministracion = [
+      ["administracion", "💼", "Visión ERP"],
       ["caja", "💰", "Caja y pagos"],
       ["ventas", "◫", "Ventas"],
     ]
@@ -2638,6 +3000,7 @@ export default function Home() {
         <div style={{ fontSize: 10, opacity: .5, padding: "0 10px 7px" }}>GESTIÓN</div>
         {navButton("dashboard", "▦", "Inicio")}
         {navButton("reservas", "▣", "Reservas")}
+        {navButton("pricing", "↗", "Pricing")}
         {navButton("recepcion", "▣", "Recepción")}
         {navButton("calendario", "▤", "Calendario")}
 
@@ -2660,7 +3023,10 @@ export default function Home() {
           {grupoComunicacion.map(([id, icon, label]) => navButton(id, icon, label))}
         </>}
 
-        <div style={{ position: "absolute", bottom: 14, left: 20, right: 20, fontSize: 9, opacity: .45, textAlign: "center" }}>Habitación Llena · MVP</div>
+        <div className="hotel-sidebar-signature" title="Un detalle inspirado en los antiguos llaveros de recepción">
+          <span className="hotel-key-tag">HL</span>
+          <span className="hotel-key-copy"><b>Recepción lista</b><small>{nombreAlojamientoActivo}</small></span>
+        </div>
       </aside>
     )
   }
@@ -2673,7 +3039,7 @@ export default function Home() {
     return (
       <header className="app-header" style={{
         height: 72,
-        background: "rgba(255,255,255,.94)",
+        background: "rgba(251,248,242,.94)",
         borderBottom: `1px solid ${colors.border}`,
         display: "flex",
         alignItems: "center",
@@ -2690,6 +3056,17 @@ export default function Home() {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button type="button" title="Reservas nuevas pendientes" onClick={() => { setReservasNuevasPendientes(0); setVista("reservas") }} style={{ ...topActionButton, position: "relative", minWidth: 42, padding: "9px 11px" }}>🔔{reservasNuevasPendientes > 0 && <span style={{ position: "absolute", right: -5, top: -6, minWidth: 18, height: 18, padding: "0 5px", borderRadius: 99, display: "grid", placeItems: "center", background: colors.red, color: "#fff", fontSize: 9, fontWeight: 900 }}>{reservasNuevasPendientes}</span>}</button>
+          {fechaHoraActual && (
+            <div className="hl-header-clock" style={{ textAlign: "right", marginRight: 5, lineHeight: 1.1 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, textTransform: "capitalize" }}>
+                {fechaHoraActual.toLocaleDateString("es-AR", { weekday: "short", day: "2-digit", month: "short" })}
+              </div>
+              <div style={{ color: colors.muted, fontSize: 10, marginTop: 4 }}>
+                {fechaHoraActual.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })} hs
+              </div>
+            </div>
+          )}
           {mostrarUsuarios && (
             <button
               onClick={() => { window.location.href = "/dashboard/usuarios" }}
@@ -2706,6 +3083,10 @@ export default function Home() {
               <span>⚙</span> Config
             </button>
           )}
+          <div className="hotel-reception-detail" title="Recepción activa">
+            <span className="hotel-bell" aria-hidden="true" />
+            <span className="hotel-reception-copy"><b>Recepción</b><small>{nombreAlojamientoActivo}</small></span>
+          </div>
           <button
             type="button"
             onClick={alternarModoOscuro}
@@ -2958,7 +3339,7 @@ export default function Home() {
         activa: h.activa !== false,
         alojamiento: nombreAlojamiento(h.alojamiento_id),
       })),
-      reservas: reservas.slice(0, 100).map((r) => ({
+      reservas: reservas.slice(0, 500).map((r) => ({
         id: r.id,
         huesped: r.nombre_huesped,
         alojamiento: nombreAlojamiento(r.alojamiento_id),
@@ -2973,10 +3354,12 @@ export default function Home() {
     }
 
     try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error("La sesión expiró. Volvé a iniciar sesión.")
       const response = await fetch("/api/assistant", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: pregunta, context: { ...contexto, plataforma: "Habitación Llena PMS", instruccionesAyuda: "Respondé también preguntas sobre cómo usar la plataforma. Explicá paso a paso dónde debe tocar el usuario para crear habitaciones, configurar tarifas, hacer reservas, bloquear habitaciones, usar housekeeping, check-in/check-out, configurar integraciones, bandeja de entrada y asistencia humana. No inventes funciones que no existan. Si la consulta requiere una conexión externa todavía no implementada, indicá que debe configurarse en la etapa de integración correspondiente." } }),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ question: pregunta, context: { ...contexto, plataforma: "Habitación Llena PMS", instruccionesAyuda: "Respondé sobre el uso integral del PMS y sobre los datos reales del alojamiento del usuario. Tenés calendario, reservas, huéspedes, habitaciones, housekeeping, bloqueos, recepción, caja, pagos divididos en varios movimientos, early check-in, late check-out, vehículos, extras, notas, reportes, comunicaciones e integraciones. Interpretá fechas, nombres y estados. Nunca mezcles datos entre tenants. No inventes datos ni funciones; si falta una integración externa, explicalo con claridad." } }),
       })
 
       const data = await response.json()
@@ -3044,10 +3427,6 @@ export default function Home() {
               <div>
                 <h2 style={{ margin: 0, fontSize: 18 }}>Operación de hoy</h2>
                 <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>{formatearFecha(fechaLocal(0))}</div>
-              </div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button onClick={() => imprimirPlanillaIn()} style={secondaryButton}>🖨 Planilla IN</button>
-                <button onClick={() => imprimirHousekeeping()} style={secondaryButton}>🧹 Housekeeping</button>
               </div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
@@ -3136,6 +3515,115 @@ export default function Home() {
               </div>
             </section>
           </div>
+        </div>
+      </>
+    )
+  }
+
+  function Pricing() {
+    const ocupacion = habitacionesActivas.length
+      ? Math.round((reservasHoy.length / habitacionesActivas.length) * 100)
+      : 0
+    const reservasConImporte = reservasActivas.filter((reserva) => Number(reserva.precio_total || 0) > 0)
+    const nochesVendidas = reservasConImporte.reduce((suma, reserva) => suma + (Number(reserva.noches) || diasEntre(reserva.fecha_entrada, reserva.fecha_salida)), 0)
+    const ingresos = reservasConImporte.reduce((suma, reserva) => suma + Number(reserva.precio_total || 0), 0)
+    const adr = nochesVendidas ? ingresos / nochesVendidas : 0
+    const revpar = habitacionesActivas.length ? ingresos / Math.max(1, habitacionesActivas.length * 30) : 0
+    const ajuste = ocupacion >= 80 ? 15 : ocupacion >= 60 ? 8 : ocupacion <= 30 ? -5 : 0
+
+    function aplicarSugerenciaPricing() {
+      if (!ajuste) {
+        alert("La ocupación actual no requiere un ajuste general de tarifa.")
+        return
+      }
+      const tarifas = { ...(config.habitacionesTarifas || {}) }
+      habitacionesActivas.forEach((habitacion) => {
+        const actual = tarifaDeHabitacion(habitacion.id)
+        if (!actual) return
+        tarifas[String(habitacion.id)] = {
+          ...(tarifas[String(habitacion.id)] || {}),
+          precio: Math.max(0, Math.round(actual * (1 + ajuste / 100))),
+        }
+      })
+      const actualizado = { ...config, habitacionesTarifas: tarifas }
+      setConfig(actualizado)
+      guardarConfiguracion(actualizado)
+    }
+
+    return (
+      <>
+        <Header titulo="Pricing y revenue" subtitulo="Tarifas, demanda y rendimiento" />
+        <div style={{ padding: 30, display: "grid", gap: 18 }}>
+          <section style={{ ...cardStyle, background: `linear-gradient(115deg, ${colors.navyDark}, ${colors.navy})`, color: "#fff" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 20, alignItems: "center", flexWrap: "wrap" }}>
+              <div style={{ maxWidth: 720 }}>
+                <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1.2, opacity: .75 }}>RMS · REVENUE MANAGEMENT SYSTEM</div>
+                <h2 style={{ margin: "8px 0", fontSize: 25 }}>Precios que acompañan la demanda real.</h2>
+                <p style={{ margin: 0, lineHeight: 1.6, opacity: .82, fontSize: 13 }}>Un RMS analiza demanda, ocupación, ritmo de reservas y competencia para recomendar la mejor tarifa en cada momento. Habitación Llena ya usa tus datos internos para una primera sugerencia; la comparación automática con el mercado se habilita al conectar fuentes externas.</p>
+              </div>
+              <button type="button" onClick={aplicarSugerenciaPricing} style={{ ...primaryButton, background: "#fff", color: colors.navyDark, minWidth: 190 }}>
+                {ajuste ? `Aplicar ${ajuste > 0 ? "+" : ""}${ajuste}% sugerido` : "Tarifa equilibrada"}
+              </button>
+            </div>
+          </section>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 14 }}>
+            {[
+              ["Ocupación hoy", `${ocupacion}%`, "demanda actual"],
+              ["ADR", `$${Math.round(adr).toLocaleString("es-AR")}`, "tarifa media diaria"],
+              ["RevPAR", `$${Math.round(revpar).toLocaleString("es-AR")}`, "ingreso por habitación disponible"],
+              ["Sugerencia", `${ajuste > 0 ? "+" : ""}${ajuste}%`, ajuste ? "ajuste recomendado" : "mantener tarifa"],
+            ].map(([titulo, valor, detalle]) => <div key={titulo} style={cardStyle}><div style={{ color: colors.muted, fontSize: 12 }}>{titulo}</div><strong style={{ display: "block", fontSize: 27, marginTop: 7 }}>{valor}</strong><div style={{ color: colors.muted, fontSize: 11, marginTop: 4 }}>{detalle}</div></div>)}
+          </div>
+
+          <section style={cardStyle}>
+            <div style={sectionHeader}>
+              <div><h2 style={{ margin: 0, fontSize: 18 }}>Tarifas por habitación</h2><div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>La sugerencia se calcula sobre la tarifa vigente de cada unidad.</div></div>
+              <button type="button" onClick={() => { setConfigSubvista("habitaciones"); setVista("configuracion") }} style={secondaryButton}>Editar tarifas</button>
+            </div>
+            <div style={{ display: "grid", gap: 9, marginTop: 16 }}>
+              {habitacionesActivas.map((habitacion) => {
+                const actual = tarifaDeHabitacion(habitacion.id)
+                const sugerida = Math.max(0, Math.round(actual * (1 + ajuste / 100)))
+                return <div key={habitacion.id} style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 24, alignItems: "center", padding: "12px 0", borderBottom: `1px solid ${colors.border}` }}><div><strong>{habitacion.nombre}</strong><div style={{ color: colors.muted, fontSize: 11, marginTop: 3 }}>{habitacion.tipo || "Sin tipo"}</div></div><div style={{ textAlign: "right" }}><div style={{ color: colors.muted, fontSize: 10 }}>ACTUAL</div><strong>${actual.toLocaleString("es-AR")}</strong></div><div style={{ textAlign: "right", minWidth: 110 }}><div style={{ color: colors.muted, fontSize: 10 }}>SUGERIDA</div><strong style={{ color: ajuste ? colors.blue : colors.text }}>${sugerida.toLocaleString("es-AR")}</strong></div></div>
+              })}
+            </div>
+          </section>
+        </div>
+      </>
+    )
+  }
+
+  function AdministracionERP() {
+    return (
+      <>
+        <Header titulo="Administración" subtitulo="La operación y los números del hotel, conectados" />
+        <div style={{ padding: 30, display: "grid", gap: 18 }}>
+          <section style={{ ...cardStyle, padding: 28 }}>
+            <div style={{ color: colors.blue, fontSize: 11, fontWeight: 900, letterSpacing: 1 }}>ERP HOTELERO</div>
+            <h2 style={{ fontSize: 27, margin: "9px 0 12px" }}>¿Qué es un ERP para hoteles?</h2>
+            <p style={{ color: colors.muted, lineHeight: 1.75, maxWidth: 900, margin: 0 }}>Un ERP es un sistema que centraliza en una sola plataforma las áreas administrativas y financieras del alojamiento: contabilidad, finanzas, compras, inventarios y presupuestos. En lugar de trabajar con planillas y herramientas desconectadas, permite que la operación y los números compartan información actualizada.</p>
+          </section>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 12 }}>
+            {[
+              ["Contabilidad", "Cobros y comprobantes vinculados a cada reserva."],
+              ["Finanzas", "Caja, saldos, ingresos y rendimiento del alojamiento."],
+              ["Compras", "Base para ordenar proveedores y gastos operativos."],
+              ["Inventario", "Control conectado con habitaciones y servicios."],
+              ["Presupuestos", "Tarifas y extras calculados antes de confirmar."],
+            ].map(([titulo, texto]) => <article key={titulo} style={{ ...cardStyle, padding: 18 }}><strong style={{ display: "block", marginBottom: 8 }}>{titulo}</strong><span style={{ color: colors.muted, fontSize: 11, lineHeight: 1.55 }}>{texto}</span></article>)}
+          </div>
+          <section style={cardStyle}>
+            <div style={sectionHeader}>
+              <div><h2 style={{ margin: 0, fontSize: 18 }}>Accesos administrativos</h2><div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>Entrá directo al área que necesitás revisar.</div></div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10, marginTop: 14 }}>
+              <button onClick={() => setVista("caja")} style={secondaryButton}>💰 Caja y pagos</button>
+              <button onClick={() => setVista("ventas")} style={secondaryButton}>◫ Ventas</button>
+              <button onClick={() => setVista("pricing")} style={secondaryButton}>↗ Pricing y revenue</button>
+              <button onClick={() => { setConfigSubvista("facturacion"); setVista("configuracion") }} style={secondaryButton}>🧾 Datos fiscales</button>
+            </div>
+          </section>
         </div>
       </>
     )
@@ -3535,6 +4023,11 @@ export default function Home() {
       tipo: habitacion.tipo || tiposHabitacionDisponibles[0] || "",
       alojamiento_id: String(habitacion.alojamiento_id || ""),
       precio: tarifa.precio,
+      cochera: tarifa.cochera,
+      earlyTipo: tarifa.earlyTipo,
+      earlyValor: tarifa.earlyValor,
+      lateTipo: tarifa.lateTipo,
+      lateValor: tarifa.lateValor,
     })
     setMostrarHabitacion(false)
   }
@@ -3562,6 +4055,12 @@ export default function Home() {
         nombre: habitacionForm.nombre.trim(),
         tipo: habitacionForm.tipo,
         alojamiento_id: Number(habitacionForm.alojamiento_id),
+        precio: Number(habitacionForm.precio) || 0,
+        cochera_precio: Number(habitacionForm.cochera) || 0,
+        early_checkin_tipo: habitacionForm.earlyTipo || "monto",
+        early_checkin_valor: Number(habitacionForm.earlyValor) || 0,
+        late_checkout_tipo: habitacionForm.lateTipo || "monto",
+        late_checkout_valor: Number(habitacionForm.lateValor) || 0,
       })
       .eq("id", habitacionEditando)
       .eq("user_id", user.id)
@@ -3591,7 +4090,7 @@ export default function Home() {
 
   async function eliminarHabitacion(habitacion) {
     const tieneReservas = reservas.some(
-      (r) => String(r.habitacion_id) === String(habitacion.id)
+      (r) => reservaIncluyeHabitacion(r, habitacion.id)
     )
 
     if (tieneReservas) {
@@ -3811,6 +4310,74 @@ export default function Home() {
       </>
     )
 
+    if (configSubvista === "operacion") return (
+      <>
+        <Header titulo="Configuración · Operación" subtitulo="Horarios y cargos predeterminados" />
+        <div style={{ padding: 30 }}>
+          <div style={{ ...cardStyle, marginBottom: 18 }}>
+            <button onClick={() => setConfigSubvista("general")} style={secondaryButton}>← Volver a configuración</button>
+          </div>
+          <section style={{ ...cardStyle, maxWidth: 950 }}>
+            <h2 style={{ margin: 0, fontSize: 18 }}>Horarios del alojamiento</h2>
+            <div style={{ color: colors.muted, fontSize: 12, marginTop: 5 }}>Estos horarios se muestran en el calendario y en cada reserva.</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 18 }}>
+              <Field label="Horario habitual de check-in">
+                <input type="time" value={config.horarios?.checkin || "14:00"} onChange={(e) => setConfig({ ...config, horarios: { ...(config.horarios || {}), checkin: e.target.value } })} style={inputStyle} />
+              </Field>
+              <Field label="Horario habitual de check-out">
+                <input type="time" value={config.horarios?.checkout || "10:00"} onChange={(e) => setConfig({ ...config, horarios: { ...(config.horarios || {}), checkout: e.target.value } })} style={inputStyle} />
+              </Field>
+            </div>
+
+            <h2 style={{ margin: "28px 0 0", fontSize: 18 }}>Cargos predeterminados</h2>
+            <div style={{ color: colors.muted, fontSize: 12, marginTop: 5 }}>Podés usar un monto fijo o un porcentaje de la tarifa de la habitación.</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 14, marginTop: 18 }}>
+              {[
+                ["earlyCheckin", "Early check-in"],
+                ["lateCheckout", "Late check-out"],
+                ["mascota", "Mascota"],
+              ].map(([clave, etiqueta]) => {
+                const valor = config[clave] || { tipo: "monto", valor: 0 }
+                return <div key={clave} style={{ border: `1px solid ${colors.border}`, borderRadius: 10, padding: 14 }}><strong style={{ fontSize: 13 }}>{etiqueta}</strong><select value={valor.tipo || "monto"} onChange={(e) => setConfig({ ...config, [clave]: { ...valor, tipo: e.target.value } })} style={{ ...inputStyle, marginTop: 10 }}><option value="monto">Monto fijo</option><option value="porcentaje">Porcentaje</option></select><input type="number" min="0" step="0.01" value={valor.valor || 0} onChange={(e) => setConfig({ ...config, [clave]: { ...valor, valor: e.target.value } })} style={{ ...inputStyle, marginTop: 8 }} /></div>
+              })}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 20 }}>
+              <button onClick={() => guardarConfiguracion(config)} style={primaryButton}>Guardar operación</button>
+              {configGuardada && <span style={{ color: colors.green, fontSize: 12, fontWeight: 700 }}>Configuración guardada ✓</span>}
+            </div>
+          </section>
+        </div>
+      </>
+    )
+
+    if (configSubvista === "facturacion") return (
+      <>
+        <Header titulo="Configuración · Facturación" subtitulo="Datos del emisor de comprobantes" />
+        <div style={{ padding: 30 }}>
+          <div style={{ ...cardStyle, marginBottom: 18 }}>
+            <button onClick={() => setConfigSubvista("general")} style={secondaryButton}>← Volver a configuración</button>
+          </div>
+          <section style={{ ...cardStyle, maxWidth: 950 }}>
+            <div style={sectionHeader}>
+              <div><h2 style={{ margin: 0, fontSize: 18 }}>Datos fiscales</h2><div style={{ color: colors.muted, fontSize: 12, marginTop: 5 }}>Se usarán como encabezado de los comprobantes del alojamiento.</div></div>
+              <span style={{ padding: "6px 9px", borderRadius: 999, background: colors.yellowSoft, color: colors.yellow, fontSize: 10, fontWeight: 850 }}>ARCA pendiente de conexión</span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 20 }}>
+              <Field label="Razón social"><input value={config.fiscal?.razonSocial || ""} onChange={(e) => setConfig({ ...config, fiscal: { ...(config.fiscal || {}), razonSocial: e.target.value } })} style={inputStyle} /></Field>
+              <Field label="CUIT"><input value={config.fiscal?.cuit || ""} onChange={(e) => setConfig({ ...config, fiscal: { ...(config.fiscal || {}), cuit: e.target.value } })} placeholder="30-00000000-0" style={inputStyle} /></Field>
+              <Field label="Condición frente al IVA"><select value={config.fiscal?.condicionIVA || ""} onChange={(e) => setConfig({ ...config, fiscal: { ...(config.fiscal || {}), condicionIVA: e.target.value } })} style={inputStyle}><option value="">Seleccionar</option><option>Responsable inscripto</option><option>Monotributista</option><option>Exento</option><option>No responsable</option></select></Field>
+              <Field label="Ingresos Brutos"><input value={config.fiscal?.ingresosBrutos || ""} onChange={(e) => setConfig({ ...config, fiscal: { ...(config.fiscal || {}), ingresosBrutos: e.target.value } })} style={inputStyle} /></Field>
+              <Field label="Inicio de actividades"><input type="date" value={config.fiscal?.inicioActividades || ""} onChange={(e) => setConfig({ ...config, fiscal: { ...(config.fiscal || {}), inicioActividades: e.target.value } })} style={inputStyle} /></Field>
+              <Field label="Punto de venta"><input value={config.fiscal?.puntoVenta || ""} onChange={(e) => setConfig({ ...config, fiscal: { ...(config.fiscal || {}), puntoVenta: e.target.value } })} placeholder="00001" style={inputStyle} /></Field>
+              <Field label="Domicilio comercial" wide><input value={config.fiscal?.domicilio || ""} onChange={(e) => setConfig({ ...config, fiscal: { ...(config.fiscal || {}), domicilio: e.target.value } })} style={inputStyle} /></Field>
+            </div>
+            <div style={{ marginTop: 16, padding: 12, borderRadius: 9, background: colors.blueSoft, color: colors.text, fontSize: 11, lineHeight: 1.55 }}>Estos datos dejan preparados los comprobantes internos. Para emitir una factura fiscal con CAE, numeración oficial e IVA discriminado todavía hay que conectar el servicio WSFE de ARCA.</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 20 }}><button onClick={() => guardarConfiguracion(config)} style={primaryButton}>Guardar datos fiscales</button>{configGuardada && <span style={{ color: colors.green, fontSize: 12, fontWeight: 700 }}>Configuración guardada ✓</span>}</div>
+          </section>
+        </div>
+      </>
+    )
+
     if (configSubvista === "habitaciones") return (
       <>
         <Header titulo="Configuración · Habitaciones" subtitulo="Unidades de tus alojamientos" />
@@ -3833,6 +4400,8 @@ export default function Home() {
               <button onClick={() => setConfigSubvista("alojamientos")} style={secondaryButton}>Alojamientos</button>
               <button onClick={() => setConfigSubvista("habitaciones")} style={secondaryButton}>Habitaciones</button>
               <button onClick={() => setConfigSubvista("vehiculos")} style={secondaryButton}>Vehículos</button>
+              <button onClick={() => setConfigSubvista("operacion")} style={secondaryButton}>Operación</button>
+              <button onClick={() => setConfigSubvista("facturacion")} style={secondaryButton}>Facturación</button>
             </div>
             <h2 style={{ margin: 0, fontSize: 18 }}>Marca</h2>
             <div style={{ color: colors.muted, fontSize: 12, marginTop: 4, marginBottom: 20 }}>
@@ -3977,6 +4546,20 @@ export default function Home() {
       .filter((r) => r.estado !== "cancelada" && r.estado !== "finalizada" && r.fecha_entrada >= fechaLocal(0))
       .sort((a, b) => String(a.fecha_entrada).localeCompare(String(b.fecha_entrada)))
       .slice(0, 5)
+    const cancelaciones = reservas.filter((reserva) => reserva.estado === "cancelada").length
+    const conflictosDetectados = new Set()
+    reservasActivas.forEach((reserva, indice) => {
+      reservasActivas.slice(indice + 1).forEach((otra) => {
+        const compartenHabitacion = idsHabitacionesReserva(reserva).some((id) => reservaIncluyeHabitacion(otra, id))
+        if (
+          compartenHabitacion &&
+          bloquesSeCruzan(reserva.fecha_entrada, reserva.fecha_salida, otra.fecha_entrada, otra.fecha_salida)
+        ) {
+          conflictosDetectados.add([reserva.id, otra.id].sort().join("-"))
+        }
+      })
+    })
+    const overbookings = conflictosDetectados.size
 
     return (
       <>
@@ -4013,6 +4596,23 @@ export default function Home() {
                 </div>
               </div>
             </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 22 }}>
+            <button onClick={() => setVista("reservas")} style={{ ...cardStyle, textAlign: "left", cursor: "pointer", borderColor: cancelaciones ? "#e8b7b0" : colors.border }}>
+              <div style={{ color: colors.muted, fontSize: 12 }}>Cancelaciones</div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 7 }}>
+                <strong style={{ fontSize: 27, color: cancelaciones ? "#a85343" : colors.text }}>{cancelaciones}</strong>
+                <span style={{ color: colors.muted, fontSize: 11 }}>en el historial</span>
+              </div>
+            </button>
+            <button onClick={() => setVista("calendario")} style={{ ...cardStyle, textAlign: "left", cursor: "pointer", borderColor: overbookings ? colors.red : colors.border }}>
+              <div style={{ color: colors.muted, fontSize: 12 }}>Control de overbooking</div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 7 }}>
+                <strong style={{ fontSize: 27, color: overbookings ? colors.red : colors.green }}>{overbookings}</strong>
+                <span style={{ color: colors.muted, fontSize: 11 }}>{overbookings ? "cruces que requieren revisión" : "sin cruces detectados"}</span>
+              </div>
+            </button>
           </div>
 
           {(habitacionesActivas.length === 0 || !config.nombreMarca || alojamientos.length === 0) && (
@@ -4065,7 +4665,7 @@ export default function Home() {
             ))}
           </div>
 
-          <section style={{ ...cardStyle, marginBottom: 18 }}><div style={sectionHeader}><div><h2 style={{ margin: 0, fontSize: 18 }}>Operación de hoy</h2><div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>{formatearFecha(fechaLocal(0))}</div></div><div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><button onClick={() => imprimirPlanillaIn()} style={secondaryButton}>🖨 Planilla IN</button><button onClick={() => imprimirHousekeeping()} style={secondaryButton}>🧹 Housekeeping</button></div></div><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 15 }}><div style={{ padding: 14, background: colors.greenSoft, borderRadius: 10 }}><div style={{ color: colors.green, fontWeight: 800, fontSize: 12 }}>IN DEL DÍA · {entradasHoy.length}</div>{entradasHoy.length ? entradasHoy.map(r => <div key={r.id} style={{ marginTop: 7, fontSize: 13 }}><strong>{nombreHabitacion(r.habitacion_id)}</strong> · {r.nombre_huesped} · {r.cantidad_huespedes || 1} pax</div>) : <div style={{ color: colors.muted, marginTop: 7, fontSize: 12 }}>Sin entradas hoy.</div>}</div><div style={{ padding: 14, background: colors.redSoft, borderRadius: 10 }}><div style={{ color: colors.red, fontWeight: 800, fontSize: 12 }}>OUT DEL DÍA · {salidasHoy.length}</div>{salidasHoy.length ? salidasHoy.map(r => <div key={r.id} style={{ marginTop: 7, fontSize: 13 }}><strong>{nombreHabitacion(r.habitacion_id)}</strong> · {r.nombre_huesped} · {r.cantidad_huespedes || 1} pax{r.late_checkout ? " · Late check-out" : ""}</div>) : <div style={{ color: colors.muted, marginTop: 7, fontSize: 12 }}>Sin salidas hoy.</div>}</div></div></section>
+          <section style={{ ...cardStyle, marginBottom: 18 }}><div style={sectionHeader}><div><h2 style={{ margin: 0, fontSize: 18 }}>Operación de hoy</h2><div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>{formatearFecha(fechaLocal(0))}</div></div></div><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 15 }}><div style={{ padding: 14, background: colors.greenSoft, borderRadius: 10 }}><div style={{ color: colors.green, fontWeight: 800, fontSize: 12 }}>IN DEL DÍA · {entradasHoy.length}</div>{entradasHoy.length ? entradasHoy.map(r => <div key={r.id} style={{ marginTop: 7, fontSize: 13 }}><strong>{nombreHabitacion(r.habitacion_id)}</strong> · {r.nombre_huesped} · {r.cantidad_huespedes || 1} pax</div>) : <div style={{ color: colors.muted, marginTop: 7, fontSize: 12 }}>Sin entradas hoy.</div>}</div><div style={{ padding: 14, background: colors.redSoft, borderRadius: 10 }}><div style={{ color: colors.red, fontWeight: 800, fontSize: 12 }}>OUT DEL DÍA · {salidasHoy.length}</div>{salidasHoy.length ? salidasHoy.map(r => <div key={r.id} style={{ marginTop: 7, fontSize: 13 }}><strong>{nombreHabitacion(r.habitacion_id)}</strong> · {r.nombre_huesped} · {r.cantidad_huespedes || 1} pax{r.late_checkout ? " · Late check-out" : ""}</div>) : <div style={{ color: colors.muted, marginTop: 7, fontSize: 12 }}>Sin salidas hoy.</div>}</div></div></section>
 
           <section style={{ ...cardStyle, marginBottom: 18 }}>
             <div style={sectionHeader}>
@@ -4146,7 +4746,7 @@ export default function Home() {
               <div style={{ marginTop: 22 }}>
                 {habitacionesActivas.map((h) => {
                   const ocupada = reservasHoy.some(
-                    (r) => String(r.habitacion_id) === String(h.id)
+                    (r) => reservaIncluyeHabitacion(r, h.id)
                   )
                   return (
                     <div key={h.id} style={{
@@ -4178,6 +4778,29 @@ export default function Home() {
     )
   }
 
+  function descargarReporteRecepcionCSV(tipo = "checkin") {
+    const esIn = tipo === "checkin"
+    const lista = reservas
+      .filter((r) => r.estado !== "cancelada" && !r.no_show)
+      .sort((a, b) => String(esIn ? a.fecha_entrada : a.fecha_salida).localeCompare(String(esIn ? b.fecha_entrada : b.fecha_salida)))
+    const filas = [["Reserva", "Huésped", "Habitación", esIn ? "Check-in" : "Check-out", "Teléfono", "Estado"], ...lista.map((r) => [
+      r.numero_reserva || "",
+      r.nombre_huesped || "",
+      nombreHabitacion(r.habitacion_id),
+      esIn ? r.fecha_entrada : r.fecha_salida,
+      r.telefono_huesped || "",
+      estadoBadge(r.estado).label,
+    ])]
+    const csv = filas.map((fila) => fila.map((v) => '"' + String(v ?? "").replaceAll('"', '""') + '"').join(",")).join("\n")
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `habitacion-llena-${tipo}-${fechaLocal(0)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   function Recepcion() {
     const q = calcularPresupuestoInicial()
     return (
@@ -4189,6 +4812,7 @@ export default function Home() {
               ["panel","🏠 Panel"],
               ["presupuesto","🧮 Presupuestar"],
               ["caja","💵 Caja diaria"],
+              ["reportes","📄 Reportes"],
             ].map(([key,label]) => (
               <button key={key} onClick={() => setRecepcionSeccion(key)} style={recepcionSeccion===key ? primaryButton : secondaryButton}>{label}</button>
             ))}
@@ -4198,10 +4822,11 @@ export default function Home() {
             <section style={cardStyle}>
               <h2 style={{marginTop:0}}>Recepción</h2>
               <p style={{color:colors.muted}}>Accesos rápidos para la operación diaria.</p>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:12}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:12}}>
                 <button onClick={() => setVista("reservas")} style={secondaryButton}>➕ Cargar reserva</button>
                 <button onClick={() => setRecepcionSeccion("presupuesto")} style={secondaryButton}>🧮 Presupuestar</button>
                 <button onClick={() => setRecepcionSeccion("caja")} style={secondaryButton}>💵 Caja diaria</button>
+                <button onClick={() => setRecepcionSeccion("reportes")} style={secondaryButton}>📄 Reportes</button>
               </div>
             </section>
           )}
@@ -4211,7 +4836,7 @@ export default function Home() {
               <h2 style={{marginTop:0}}>Presupuesto rápido</h2>
               <p style={{color:colors.muted}}>Completá los cuatro datos para calcular cuánto costaría la estadía.</p>
               <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:10}}>
-                <select required value={alojamientoSeleccionado} onChange={e=>{setAlojamientoSeleccionado(e.target.value);setHabitacionSeleccionada("")}} style={inputStyle}><option value="">Alojamiento</option>{alojamientos.map(a=><option key={a.id} value={a.id}>{a.nombre}</option>)}</select>
+                <select required value={alojamientoSeleccionado} onChange={e=>{setAlojamientoSeleccionado(e.target.value);setHabitacionSeleccionada(""); setHabitacionesAdicionales([]); setServiciosReserva([])}} style={inputStyle}><option value="">Alojamiento</option>{alojamientos.map(a=><option key={a.id} value={a.id}>{a.nombre}</option>)}</select>
                 <select required value={habitacionSeleccionada} onChange={e=>setHabitacionSeleccionada(e.target.value)} style={inputStyle}><option value="">Habitación</option>{habitacionesDisponibles.map(h=><option key={h.id} value={h.id}>{h.nombre}{h.tipo?` · ${h.tipo}`:""}</option>)}</select>
                 <input required type="date" value={fechaEntrada} onChange={e=>setFechaEntrada(e.target.value)} style={inputStyle}/>
                 <input required type="date" value={fechaSalida} onChange={e=>setFechaSalida(e.target.value)} style={inputStyle}/>
@@ -4249,6 +4874,28 @@ export default function Home() {
             </section>
           )}
 
+          {recepcionSeccion === "reportes" && (
+            <section style={cardStyle}>
+              <div style={sectionHeader}>
+                <div>
+                  <h2 style={{ margin: 0 }}>Reportes de recepción</h2>
+                  <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>Planillas operativas para el turno de hoy.</div>
+                </div>
+                <div style={{ color: colors.muted, fontSize: 12 }}>{formatearFecha(fechaLocal(0))}</div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 18 }}>
+                <button type="button" onClick={() => imprimirPlanillaIn()} style={{ ...secondaryButton, padding: 18, textAlign: "left" }}>
+                  <strong style={{ display: "block", fontSize: 14 }}>🖨 Planilla IN de hoy</strong>
+                  <span style={{ display: "block", color: colors.muted, fontSize: 11, marginTop: 5 }}>{entradasHoy.length} entradas previstas</span>
+                </button>
+                <button type="button" onClick={() => imprimirHousekeeping()} style={{ ...secondaryButton, padding: 18, textAlign: "left" }}>
+                  <strong style={{ display: "block", fontSize: 14 }}>🧹 Housekeeping de hoy</strong>
+                  <span style={{ display: "block", color: colors.muted, fontSize: 11, marginTop: 5 }}>{salidasHoy.length} salidas para preparar</span>
+                </button>
+              </div>
+            </section>
+          )}
+
           {cajaModal === "abrir" && <div style={modalOverlay}><div style={modalCard}><h3>Abrir caja</h3><p style={{fontSize:12,color:colors.muted}}>Efectivo inicial del turno</p><input type="number" min="0" step="0.01" value={cajaMontoInicial} onChange={e=>setCajaMontoInicial(e.target.value)} style={inputStyle}/><div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:14}}><button onClick={()=>setCajaModal(null)} style={secondaryButton}>Cancelar</button><button onClick={abrirCajaDiaria} style={primaryButton}>Abrir caja</button></div></div></div>}
           {cajaModal === "cerrar" && <div style={modalOverlay}><div style={modalCard}><h3>🔒 Cerrar turno</h3><p style={{fontSize:12,color:colors.muted}}>Efectivo esperado: ${totalesCaja().esperado.toLocaleString("es-AR")}</p><input type="number" min="0" step="0.01" value={cajaEfectivoContado} onChange={e=>setCajaEfectivoContado(e.target.value)} placeholder="Efectivo contado" style={inputStyle}/><div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:14}}><button onClick={()=>setCajaModal(null)} style={secondaryButton}>Cancelar</button><button onClick={cerrarCajaDiaria} style={{...primaryButton,background:colors.red}}>Confirmar cierre</button></div></div></div>}
         </div>
@@ -4258,6 +4905,10 @@ export default function Home() {
 
 
   function Reservas() {
+    const reservasVisibles = busquedaReserva.trim() || mostrarTodasReservas
+      ? reservasFiltradas
+      : reservasFiltradas.slice(0, 6)
+
     return (
       <>
         <Header
@@ -4273,13 +4924,26 @@ export default function Home() {
               alignItems: "center",
               marginBottom: 20,
             }}>
-              <div>
-                <h2 style={{ margin: 0, fontSize: 18 }}>
-                  {modoEdicion ? "Editar reserva" : "Nueva reserva"}
-                </h2>
-                <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>
-                  Los datos se guardan directamente en el sistema.
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: 18 }}>
+                    {modoEdicion ? "Editar reserva" : "Nueva reserva"}
+                  </h2>
+                  <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>
+                    Los datos se guardan directamente en el sistema.
+                  </div>
                 </div>
+                <select
+                  aria-label="Alojamiento de la reserva"
+                  value={alojamientoSeleccionado}
+                  onChange={(e) => {
+                    setAlojamientoSeleccionado(e.target.value)
+                    setHabitacionSeleccionada(""); setHabitacionesAdicionales([]); setServiciosReserva([])
+                  }}
+                  style={{ ...inputStyle, width: 220, padding: "8px 10px", fontSize: 12, fontWeight: 800 }}
+                >
+                  {alojamientos.map((alojamiento) => <option key={alojamiento.id} value={alojamiento.id}>{alojamiento.nombre}</option>)}
+                </select>
               </div>
 
               {modoEdicion && (
@@ -4290,7 +4954,7 @@ export default function Home() {
                   <button type="button" onClick={limpiarFormulario} style={{ ...secondaryButton, color: colors.red, borderColor: "#f2caca" }}>
                     Cancelar edición
                   </button>
-                  <button type="button" onClick={() => imprimirReserva(reservaSeleccionada)} style={secondaryButton}>🖨 Imprimir reserva</button>
+                  {reservaEnEdicion && <button type="button" onClick={() => imprimirReserva(reservaEnEdicion)} style={secondaryButton}>🖨 Imprimir reserva</button>}
                 </div>
               )}
             </div>
@@ -4298,26 +4962,9 @@ export default function Home() {
             <form id="form-reserva-principal" onSubmit={guardarReserva}>
               <div style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+                gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
                 gap: 14,
               }}>
-                <Field label="Alojamiento *">
-                  <select
-                    required
-                    value={alojamientoSeleccionado}
-                    onChange={(e) => {
-                      setAlojamientoSeleccionado(e.target.value)
-                      setHabitacionSeleccionada("")
-                    }}
-                    style={inputStyle}
-                  >
-                    <option value="">Seleccionar alojamiento</option>
-                    {alojamientos.map((a) => (
-                      <option key={a.id} value={a.id}>{a.nombre}</option>
-                    ))}
-                  </select>
-                </Field>
-
                 <Field label="Habitación *">
                   <select
                     required
@@ -4333,6 +4980,18 @@ export default function Home() {
                       </option>
                     ))}
                   </select>
+                </Field>
+
+                <Field label="Habitaciones adicionales">
+                  <div style={{ border: `1px solid ${colors.border}`, borderRadius: 9, padding: 10, maxHeight: 150, overflowY: "auto", background: colors.white }}>
+                    {!habitacionSeleccionada ? <div style={{ color: colors.muted, fontSize: 12 }}>Elegí primero la habitación principal.</div> : habitacionesDisponibles.filter((h) => String(h.id) !== String(habitacionSeleccionada)).map((h) => {
+                      const checked = habitacionesAdicionales.includes(String(h.id))
+                      return <label key={h.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 2px", fontSize: 12, cursor: "pointer" }}>
+                        <input type="checkbox" checked={checked} onChange={(e) => setHabitacionesAdicionales((actual) => e.target.checked ? [...new Set([...actual, String(h.id)])] : actual.filter((id) => String(id) !== String(h.id)))} />
+                        <span><strong>{h.nombre}</strong>{h.tipo ? ` · ${h.tipo}` : ""} · $ {Number(datosTarifaHabitacion(h.id).precio || 0).toLocaleString("es-AR")}/noche</span>
+                      </label>
+                    })}
+                  </div>
                 </Field>
 
                 <Field label="Fecha de entrada *">
@@ -4383,9 +5042,15 @@ export default function Home() {
                   <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej. Juan Pérez" style={inputStyle} />
                 </Field>
 
-                <Field label="DNI / documento">
+                <Field label="DNI / Pasaporte">
                   <input value={dni} onChange={(e) => setDni(e.target.value)} placeholder="Ej. 35.123.456" style={inputStyle} />
                 </Field>
+
+                <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr", gap: 12, alignItems: "end" }}>
+                  <Field label="Dirección"><input value={direccion} onChange={(e) => setDireccion(e.target.value)} placeholder="Calle y número" style={inputStyle} /></Field>
+                  <Field label="Provincia / Estado"><input value={provinciaEstado} onChange={(e) => setProvinciaEstado(e.target.value)} placeholder="Provincia o estado" style={inputStyle} /></Field>
+                  <Field label="País"><input value={pais} onChange={(e) => setPais(e.target.value)} placeholder="Argentina" style={inputStyle} /></Field>
+                </div>
 
                 <Field label="Pasajeros adicionales" wide>
                   <div style={{ display: "grid", gap: 10 }}>
@@ -4428,7 +5093,10 @@ export default function Home() {
                   min="0"
                   max="9"
                   value={vehiculos}
-                  onChange={(e) => setVehiculos(e.target.value)}
+                  onChange={(e) => {
+                    setVehiculos(e.target.value)
+                    if (Number(e.target.value) > 0 && !tipoVehiculo) setTipoVehiculo("auto")
+                  }}
                   style={{ ...inputStyle, width: "90px", boxSizing: "border-box" }}
                 />
               </Field>
@@ -4454,14 +5122,12 @@ export default function Home() {
                   maxLength={10}
                 />
               </Field>
+              {Number(vehiculos) > 0 && (
+                <div style={{ gridColumn: "1 / -1", color: colors.green, fontSize: 11, fontWeight: 750 }}>
+                  ✓ La cochera se suma automáticamente al total de la reserva.
+                </div>
+              )}
             </div>
-
-                <Field label="Extra de la reserva">
-                  <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 8 }}>
-                    <input value={extraDescripcion} onChange={(e) => setExtraDescripcion(e.target.value)} placeholder="Ej. Desayuno, mascota, traslado..." style={inputStyle} />
-                    <input type="number" min="0" step="0.01" value={extraReserva} onChange={(e) => setExtraReserva(e.target.value)} placeholder="Valor" style={inputStyle} />
-                  </div>
-                </Field>
 
                 <Field label="Descuento">
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -4493,7 +5159,7 @@ export default function Home() {
                       style={{ ...inputStyle, padding: 9 }} />
                     <div style={{ color: colors.muted, fontSize: 11 }}>
                       Foto o PDF del documento. Se guarda en un almacenamiento privado.
-                      {reservaSeleccionada?.documento_nombre ? ` Documento actual: ${reservaSeleccionada.documento_nombre}` : ""}
+                      {reservaEnEdicion?.documento_nombre ? ` Documento actual: ${reservaEnEdicion.documento_nombre}` : ""}
                     </div>
                   </div>
                 </Field>
@@ -4549,34 +5215,93 @@ export default function Home() {
                 </Field>
 
                 <Field label="Notas" wide>
-                  <input value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="Información adicional..." style={inputStyle} />
+                  <textarea value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="Indicaciones para recepción, preferencias del huésped o información importante..." rows={3} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.45 }} />
                 </Field>
               </div>
 
               {habitacionSeleccionada && fechaEntrada && fechaSalida && (
                 <div style={{
                   marginTop: 18,
-                  padding: 16,
-                  borderRadius: 10,
+                  padding: 18,
+                  borderRadius: 12,
                   background: colors.blueSoft,
                   border: `1px solid #cfe0ff`,
                 }}>
-                  <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 10 }}>Resumen de tarifa</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8, fontSize: 13 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 18, alignItems: "center", marginBottom: 14 }}>
+                    <div>
+                      <div style={{ fontWeight: 850, fontSize: 15 }}>Resumen de tarifa</div>
+                      <div style={{ color: colors.muted, fontSize: 11, marginTop: 3 }}>Todos los conceptos que figuran abajo ya están incluidos.</div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ color: colors.muted, fontSize: 11 }}>Total de la reserva</div>
+                      <strong style={{ color: colors.navy, fontSize: 24 }}>${calcularImporteReserva().total.toLocaleString("es-AR")} ARS</strong>
+                    </div>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10, fontSize: 13 }}>
                     <div>Noches: <strong>{calcularImporteReserva().noches}</strong></div>
-                    <div>Habitación / noche: <strong>${calcularImporteReserva().tarifaNoche.toLocaleString("es-AR")}</strong></div>
+                    <div>Habitaciones: <strong>{calcularImporteReserva().habitacionesIds?.length || 1}</strong></div>
                     <div>Alojamiento: <strong>${calcularImporteReserva().alojamiento.toLocaleString("es-AR")}</strong></div>
-                    <div>Cochera: <strong>${calcularImporteReserva().cochera.toLocaleString("es-AR")}</strong></div>
+                    <div>Cochera incluida: <strong>${calcularImporteReserva().cochera.toLocaleString("es-AR")}</strong></div>
                     <div>Early check-in: <strong>${calcularImporteReserva().early.toLocaleString("es-AR")}</strong></div>
                     <div>Late check-out: <strong>${calcularImporteReserva().late.toLocaleString("es-AR")}</strong></div>
-                    <div>Extra {extraDescripcion ? `(${extraDescripcion})` : ""}: <strong>${calcularImporteReserva().extra.toLocaleString("es-AR")}</strong></div>
+                    <div>Extras / servicios: <strong>$ {calcularImporteReserva().extra.toLocaleString("es-AR")}</strong></div>
                     <div>Descuento: <strong style={{ color: colors.green }}>-${calcularImporteReserva().descuento.toLocaleString("es-AR")}</strong></div>
                     <div>Subtotal: <strong>${calcularImporteReserva().subtotal.toLocaleString("es-AR")}</strong></div>
-                    <div>Total: <strong style={{ color: colors.navy, fontSize: 16 }}>${calcularImporteReserva().total.toLocaleString("es-AR")} ARS</strong></div>
                     {monedaReserva === "USD" && <div>Total en dólares: <strong style={{ color: colors.navy, fontSize: 16 }}>US$ {calcularImporteReserva().totalUSD.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></div>}
                   </div>
                 </div>
               )}
+
+              <div style={{ marginTop: 16, padding: 16, border: `1px solid ${colors.border}`, borderRadius: 12, background: colors.white }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                  <div>
+                    <div style={{ fontWeight: 850, fontSize: 14 }}>Servicios y extras</div>
+                    <div style={{ color: colors.muted, fontSize: 11, marginTop: 3 }}>Agregalos después de revisar la tarifa base.</div>
+                  </div>
+                  {Number(config.mascota?.valor || 0) > 0 && (
+                    <button type="button" onClick={aplicarTarifaMascota} style={{ ...secondaryButton, padding: "7px 10px", fontSize: 11 }}>
+                      + Mascota · {config.mascota?.tipo === "porcentaje" ? `${config.mascota.valor}%` : `$${Number(config.mascota.valor).toLocaleString("es-AR")}`}
+                    </button>
+                  )}
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1.6fr .7fr", gap: 8, marginTop: 12 }}>
+                  <input value={extraDescripcion} onChange={(e) => setExtraDescripcion(e.target.value)} placeholder="Ej. Desayuno, mascota, traslado..." style={inputStyle} />
+                  <input type="number" min="0" step="0.01" value={extraReserva} onChange={(e) => setExtraReserva(e.target.value)} placeholder="Valor" style={inputStyle} />
+                </div>
+                <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginTop: 12 }}>
+                  <button type="button" onClick={() => agregarServicioReserva("desayuno")} style={{ ...secondaryButton, padding: "7px 10px", fontSize: 11 }}>+ Desayuno</button>
+                  <button type="button" onClick={() => agregarServicioReserva("traslado")} style={{ ...secondaryButton, padding: "7px 10px", fontSize: 11 }}>+ Traslado</button>
+                  <button type="button" onClick={() => agregarServicioReserva("extra")} style={{ ...secondaryButton, padding: "7px 10px", fontSize: 11 }}>+ Otro servicio</button>
+                </div>
+                {serviciosReserva.length > 0 && (
+                  <div style={{ display: "grid", gap: 9, marginTop: 12 }}>
+                    {serviciosReserva.map((servicio) => {
+                      const totalServicio = Math.max(1, Number(servicio.cantidad || 1)) * Math.max(1, Number(servicio.dias || 1)) * Math.max(0, Number(servicio.precio_unitario || 0))
+                      return (
+                        <div key={servicio.id} style={{ display: "grid", gridTemplateColumns: "130px minmax(150px, 1fr) 75px 75px 120px 105px auto", gap: 7, alignItems: "end", padding: 10, borderRadius: 9, background: colors.bg, border: `1px solid ${colors.border}` }}>
+                          <Field label="Tipo">
+                            <select value={servicio.tipo} onChange={(e) => actualizarServicioReserva(servicio.id, "tipo", e.target.value)} style={inputStyle}>
+                              <option value="mascota">Mascota</option>
+                              <option value="desayuno">Desayuno</option>
+                              <option value="traslado">Traslado</option>
+                              <option value="extra">Otro</option>
+                            </select>
+                          </Field>
+                          <Field label="Detalle"><input value={servicio.descripcion} onChange={(e) => actualizarServicioReserva(servicio.id, "descripcion", e.target.value)} placeholder="Descripción" style={inputStyle} /></Field>
+                          <Field label="Cant."><input type="number" min="1" value={servicio.cantidad} onChange={(e) => actualizarServicioReserva(servicio.id, "cantidad", e.target.value)} style={inputStyle} /></Field>
+                          <Field label="Días"><input type="number" min="1" value={servicio.dias} onChange={(e) => actualizarServicioReserva(servicio.id, "dias", e.target.value)} style={inputStyle} /></Field>
+                          <Field label="Precio unit."><input type="number" min="0" step="0.01" value={servicio.precio_unitario} onChange={(e) => actualizarServicioReserva(servicio.id, "precio_unitario", e.target.value)} style={inputStyle} /></Field>
+                          <div style={{ paddingBottom: 11, fontSize: 12, fontWeight: 800, textAlign: "right" }}>${totalServicio.toLocaleString("es-AR")}</div>
+                          <button type="button" onClick={() => quitarServicioReserva(servicio.id)} aria-label="Quitar servicio" style={{ ...secondaryButton, padding: "9px 11px", color: colors.red }}>×</button>
+                        </div>
+                      )
+                    })}
+                    <div style={{ textAlign: "right", color: colors.muted, fontSize: 12 }}>
+                      Servicios detallados: <strong style={{ color: colors.text }}>${totalServiciosReserva().toLocaleString("es-AR")}</strong>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {mensaje && (
                 <div style={{
@@ -4614,23 +5339,24 @@ export default function Home() {
                 </div>
               </div>
               <div style={{ display: "flex", gap: 9, alignItems: "center", flexWrap: "wrap" }}>
-                <div style={{ color: colors.muted, fontSize: 13 }}>{reservasFiltradas.length} de {reservas.length} reservas</div>
+                <div style={{ color: colors.muted, fontSize: 13 }}>Mostrando {reservasVisibles.length} de {reservasFiltradas.length}</div>
+                <button onClick={() => setVista("pricing")} type="button" style={secondaryButton}>↗ Pricing y revenue</button>
                 <button onClick={imprimirReservas} type="button" style={secondaryButton}>🖨 Imprimir reservas</button>
               </div>
             </div>
             <div style={{ marginBottom: 14 }}>
               <input value={busquedaReserva} onChange={(e) => setBusquedaReserva(e.target.value)} placeholder="Buscar por nombre, Nº de reserva, DNI o email..." style={inputStyle} />
             </div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-              <button type="button" onClick={() => imprimirPlanillaIn()} style={secondaryButton}>🖨 Planilla IN de hoy</button>
-              <button type="button" onClick={() => imprimirHousekeeping()} style={secondaryButton}>🧹 Housekeeping de hoy</button>
-            </div>
-
             <div style={{ display: "grid", gap: 10 }}>
               {reservas.length === 0 ? (
                 <div style={emptyStyle}>Todavía no hay reservas cargadas.</div>
-              ) : reservasFiltradas.map((r) => ReservaCard({ reserva: r }))}
+              ) : reservasVisibles.map((r) => ReservaCard({ reserva: r }))}
             </div>
+            {!busquedaReserva.trim() && reservasFiltradas.length > 6 && (
+              <button type="button" onClick={() => setMostrarTodasReservas((actual) => !actual)} style={{ ...secondaryButton, marginTop: 14, width: "100%" }}>
+                {mostrarTodasReservas ? "Mostrar menos" : `Ver las ${reservasFiltradas.length} reservas`}
+              </button>
+            )}
           </section>
         </div>
       </div>
@@ -4644,23 +5370,6 @@ export default function Home() {
         <Header titulo="Calendario" subtitulo={`Planificación visual · ${formatearFecha(fechaCalendario)}`} />
         <div style={{ padding: 30 }}>
           <section style={cardStyle}>
-            <div style={{ marginBottom: 18 }}>
-              <h2 style={{ margin: 0, fontSize: 18 }}>Calendario de ocupación</h2>
-              <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>
-                Hacé click sobre una reserva para editarla.
-              </div>
-              <div style={{ display: "flex", gap: 9, flexWrap: "wrap", alignItems: "center", marginTop: 14 }}>
-                <button type="button" onClick={() => setFechaCalendario(fechaLocal(0))} style={secondaryButton}>Hoy</button>
-                <button type="button" onClick={() => { const d = new Date(`${fechaCalendario}T12:00:00`); d.setDate(d.getDate() - 7); setFechaCalendario(d.toISOString().slice(0,10)) }} style={secondaryButton}>← 7 días</button>
-                <input type="date" value={fechaCalendario} onChange={(e) => setFechaCalendario(e.target.value)} style={{ ...inputStyle, width: 160 }} />
-                <button type="button" onClick={() => { const d = new Date(`${fechaCalendario}T12:00:00`); d.setDate(d.getDate() + 7); setFechaCalendario(d.toISOString().slice(0,10)) }} style={secondaryButton}>7 días →</button>
-              </div>
-              <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 12, fontSize: 11, fontWeight: 700 }}>
-                <span style={{ color: colors.green }}>● IN · Alojado</span>
-                <span style={{ color: colors.red }}>● OUT · Ya salió</span>
-                <span style={{ color: "#7c3aed" }}>● FUTURA · Aún no llegó</span>
-              </div>
-            </div>
             {habitacionesActivas.length === 0 ? (
               <div style={emptyStyle}>No hay habitaciones activas cargadas.</div>
             ) : <Calendario />}
@@ -5209,16 +5918,16 @@ export default function Home() {
               Habitación Llena
             </div>
             {[
-              ["dashboard", "▦", "Inicio"], ["reservas", "▣", "Reservas"], ["recepcion", "▣", "Recepción"], ["calendario", "▤", "Calendario"]
+              ["dashboard", "▦", "Inicio"], ["reservas", "▣", "Reservas"], ["pricing", "↗", "Pricing"], ["recepcion", "▣", "Recepción"], ["calendario", "▤", "Calendario"]
             ].map(([id, icon, label]) => puedeVer(id) && <button key={id} onClick={() => { setVista(id); setMenuAbierto(false) }} style={{ width: "100%", padding: 11, border: "none", borderRadius: 8, marginBottom: 4, textAlign: "left", color: "#fff", background: vista === id ? "rgba(255,255,255,.14)" : "transparent", fontWeight: vista === id ? 700 : 500 }}>{icon} {label}</button>)}
 
             {[["housekeeping","🧹","Housekeeping"],["bloqueos","🚫","Bloqueos"],["huespedes","👤","Huéspedes"]].some(([id]) => puedeVer(id)) && <div style={{ marginTop: 8 }}>
               <div style={{ padding: "8px 11px", fontSize: 12, fontWeight: 800, opacity: .8 }}>🧹 Operación</div>
               {[['housekeeping','🧹','Housekeeping'],['bloqueos','🚫','Bloqueos'],['huespedes','👤','Huéspedes']].filter(([id]) => puedeVer(id)).map(([id,icon,label]) => <button key={id} onClick={() => { setVista(id); setMenuAbierto(false) }} style={{ width: "100%", padding: 10, border: "none", borderRadius: 8, marginBottom: 3, textAlign: "left", color: "#fff", background: vista === id ? "rgba(255,255,255,.14)" : "transparent" }}>{icon} {label}</button>)}
             </div>}
-            {[["caja","💰","Caja y pagos"],["ventas","◫","Ventas"]].some(([id]) => puedeVer(id)) && <div style={{ marginTop: 8 }}>
+            {[["administracion","💼","Visión ERP"],["caja","💰","Caja y pagos"],["ventas","◫","Ventas"]].some(([id]) => puedeVer(id)) && <div style={{ marginTop: 8 }}>
               <div style={{ padding: "8px 11px", fontSize: 12, fontWeight: 800, opacity: .8 }}>💼 Administración</div>
-              {[['caja','💰','Caja y pagos'],['ventas','◫','Ventas']].filter(([id]) => puedeVer(id)).map(([id,icon,label]) => <button key={id} onClick={() => { setVista(id); setMenuAbierto(false) }} style={{ width: "100%", padding: 10, border: "none", borderRadius: 8, marginBottom: 3, textAlign: "left", color: "#fff", background: vista === id ? "rgba(255,255,255,.14)" : "transparent" }}>{icon} {label}</button>)}
+              {[['administracion','💼','Visión ERP'],['caja','💰','Caja y pagos'],['ventas','◫','Ventas']].filter(([id]) => puedeVer(id)).map(([id,icon,label]) => <button key={id} onClick={() => { setVista(id); setMenuAbierto(false) }} style={{ width: "100%", padding: 10, border: "none", borderRadius: 8, marginBottom: 3, textAlign: "left", color: "#fff", background: vista === id ? "rgba(255,255,255,.14)" : "transparent" }}>{icon} {label}</button>)}
             </div>}
             {[["bandeja","📥","Bandeja de entrada"],["comunicaciones","✉","Comunicaciones"],["integraciones","↔","Integraciones"],["asistente","✦","Asistente IA"],["asistencia","🆘","Asistencia humana"]].filter(([id]) => puedeVer(id)).map(([id,icon,label]) => <button key={id} onClick={() => { setVista(id); setMenuAbierto(false) }} style={{ width: "100%", padding: 11, border: "none", borderRadius: 8, marginTop: 4, textAlign: "left", color: "#fff", background: vista === id ? "rgba(255,255,255,.14)" : "transparent" }}>{icon} {label}</button>)}
           </div>
@@ -5235,6 +5944,8 @@ export default function Home() {
         {vista === "huespedes" && Huespedes()}
         {vista === "caja" && Caja()}
         {vista === "ventas" && Ventas()}
+        {vista === "pricing" && Pricing()}
+        {vista === "administracion" && AdministracionERP()}
         {vista === "comunicaciones" && Comunicaciones()}
         {vista === "integraciones" && Integraciones()}
         {vista === "asistente" && Asistente()}
@@ -5242,7 +5953,14 @@ export default function Home() {
         {vista === "bandeja" && BandejaEntrada()}
         {vista === "configuracion" && Configuracion()}
       
-      <div id="barra-caja-diaria" style={{
+      <div
+        id="barra-caja-diaria"
+        role="button"
+        tabIndex={0}
+        aria-label="Abrir caja diaria"
+        onClick={() => { setVista("recepcion"); setRecepcionSeccion("caja") }}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setVista("recepcion"); setRecepcionSeccion("caja") } }}
+        style={{
         position: "fixed",
         left: 0,
         right: 0,
@@ -5258,6 +5976,7 @@ export default function Home() {
         padding: "7px 18px",
         fontSize: 11,
         boxShadow: "0 -3px 16px rgba(0,0,0,.12)",
+        cursor: "pointer",
       }}>
         <div style={{ display:"flex", alignItems:"center", gap:10, minWidth:0 }}>
           <span style={{ width:8, height:8, borderRadius:99, background:cajaDiaria.abierta ? "#22c55e" : "#94a3b8", flexShrink:0 }} />
@@ -5273,7 +5992,7 @@ export default function Home() {
             <span>Apertura: {cajaDiaria.apertura?.fecha ? new Date(cajaDiaria.apertura.fecha).toLocaleString("es-AR") : "—"}</span>
           </>}
         </div>
-        <button type="button" onClick={() => { setVista("recepcion"); setRecepcionSeccion("caja") }} style={{
+        <button type="button" onClick={(e) => { e.stopPropagation(); setVista("recepcion"); setRecepcionSeccion("caja") }} style={{
           border:"1px solid rgba(255,255,255,.25)", background:"rgba(255,255,255,.08)",
           color:"#fff", borderRadius:7, padding:"5px 10px", fontWeight:800, cursor:"pointer",
         }}>Ver caja</button>
@@ -5295,6 +6014,12 @@ export default function Home() {
           </div>
         </div>
       )}
+
+{avisoReservaNueva && <div style={{ position: "fixed", right: 18, top: 86, zIndex: 120, width: "min(380px,calc(100vw - 36px))", background: colors.white, border: `1px solid ${colors.border}`, borderRadius: 14, boxShadow: "0 18px 45px rgba(15,23,42,.2)", padding: 15 }}><div style={{ color: colors.green, fontSize: 11, fontWeight: 900 }}>● NUEVA RESERVA RECIBIDA</div><strong style={{ display: "block", marginTop: 5 }}>{avisoReservaNueva.nombre_huesped || "Nueva reserva"}</strong><div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>{avisoReservaNueva.numero_reserva || ""} · {formatearFecha(avisoReservaNueva.fecha_entrada)} → {formatearFecha(avisoReservaNueva.fecha_salida)}</div><button onClick={() => { setAvisoReservaNueva(null); setReservasNuevasPendientes(0); setVista("reservas") }} style={{ ...primaryButton, marginTop: 10, padding: "7px 11px" }}>Ver reserva</button></div>}
+
+{avisoReservaNueva && <div style={{ position: "fixed", right: 18, top: 86, zIndex: 120, width: "min(380px,calc(100vw - 36px))", background: colors.white, border: `1px solid ${colors.border}`, borderRadius: 14, boxShadow: "0 18px 45px rgba(15,23,42,.2)", padding: 15 }}><div style={{ color: colors.green, fontSize: 11, fontWeight: 900 }}>● NUEVA RESERVA RECIBIDA</div><strong style={{ display: "block", marginTop: 5 }}>{avisoReservaNueva.nombre_huesped || "Nueva reserva"}</strong><div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>{avisoReservaNueva.numero_reserva || ""} · {formatearFecha(avisoReservaNueva.fecha_entrada)} → {formatearFecha(avisoReservaNueva.fecha_salida)}</div><button onClick={() => { setAvisoReservaNueva(null); setReservasNuevasPendientes(0); setVista("reservas") }} style={{ ...primaryButton, marginTop: 10, padding: "7px 11px" }}>Ver reserva</button></div>}
+
+{avisoReservaNueva && <div style={{ position: "fixed", right: 18, top: 86, zIndex: 120, width: "min(380px,calc(100vw - 36px))", background: colors.white, border: `1px solid ${colors.border}`, borderRadius: 14, boxShadow: "0 18px 45px rgba(15,23,42,.2)", padding: 15 }}><div style={{ color: colors.green, fontSize: 11, fontWeight: 900 }}>● NUEVA RESERVA RECIBIDA</div><strong style={{ display: "block", marginTop: 5 }}>{avisoReservaNueva.nombre_huesped || "Nueva reserva"}</strong><div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>{avisoReservaNueva.numero_reserva || ""} · {formatearFecha(avisoReservaNueva.fecha_entrada)} → {formatearFecha(avisoReservaNueva.fecha_salida)}</div><button onClick={() => { setAvisoReservaNueva(null); setReservasNuevasPendientes(0); setVista("reservas") }} style={{ ...primaryButton, marginTop: 10, padding: "7px 11px" }}>Ver reserva</button></div>}
 
 </main>
 
@@ -5367,7 +6092,9 @@ export default function Home() {
               maxHeight: "calc(100vh - 58px)",
               padding: "20px 28px 18px",
               boxSizing: "border-box",
-              overflow: "hidden",
+              overflowY: "auto",
+              overflowX: "hidden",
+              overscrollBehavior: "contain",
               borderRadius: "18px 18px 0 0",
               boxShadow: "0 -10px 35px rgba(0,0,0,.18)",
               display: "flex",
@@ -5379,6 +6106,9 @@ export default function Home() {
                 <div style={{ color: colors.muted, fontSize: 11, textTransform: "uppercase", letterSpacing: 1 }}>Reserva</div>
                 <h2 style={{ margin: "5px 0 0", fontSize: 24 }}>{reservaSeleccionada.nombre_huesped}</h2>
                 <div style={{ color: colors.blue, fontWeight: 800, fontSize: 12, marginTop: 4 }}>{reservaSeleccionada.numero_reserva || "Sin número"}</div>
+                <div style={{ marginTop: 8, color: colors.muted, fontSize: 11 }}><strong style={{ color: colors.text }}>Habitaciones de esta reserva:</strong> {idsHabitacionesReserva(reservaSeleccionada).map((id) => nombreHabitacion(id)).join(", ")}</div>
+                {Array.isArray(reservaSeleccionada.servicios) && reservaSeleccionada.servicios.length > 0 && <div style={{ marginTop: 5, color: colors.muted, fontSize: 11 }}><strong style={{ color: colors.text }}>Servicios:</strong> {reservaSeleccionada.servicios.map((s) => `${s.tipo || "extra"}${s.descripcion ? ` · ${s.descripcion}` : ""} x${s.cantidad || 1} · ${s.dias || 1} día(s)`).join(" | ")}</div>}
+                <div style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 7, borderRadius: 999, padding: "7px 12px", background: reservaSeleccionada.estado === "alojado" ? "#86efac" : reservaSeleccionada.estado === "finalizada" ? "#fca5a5" : "#fde68a", color: "#111827", fontWeight: 900, fontSize: 11, boxShadow: reservaSeleccionada.estado === "alojado" ? "0 0 18px rgba(34,197,94,.45)" : reservaSeleccionada.estado === "finalizada" ? "0 0 18px rgba(239,68,68,.35)" : "0 0 18px rgba(245,158,11,.35)" }}><span style={{ width: 8, height: 8, borderRadius: 99, background: reservaSeleccionada.estado === "alojado" ? "#16a34a" : reservaSeleccionada.estado === "finalizada" ? "#dc2626" : "#d97706" }} />ESTADO ACTUAL · {reservaSeleccionada.no_show ? "NO SHOW" : estadoBadge(reservaSeleccionada.estado).label.toUpperCase()}</div>
               </div>
               <button onClick={() => setReservaSeleccionada(null)} style={{
                 border: "none",
@@ -5417,7 +6147,9 @@ export default function Home() {
               alignItems: "start",
               flex: 1,
               minHeight: 0,
-              overflow: "hidden",
+              overflowY: "auto",
+              overflowX: "auto",
+              paddingBottom: 12,
               marginTop: 8,
             }} className="reservation-sheet-grid">
             <div style={{
@@ -5466,20 +6198,40 @@ export default function Home() {
               </div>
             )}
 
-            {reservaSeleccionada.notas && (
-              <div style={{ marginTop: 20 }}>
-                <div style={{ color: colors.muted, fontSize: 12, marginBottom: 5 }}>Notas</div>
-                <div style={{ padding: 13, background: "#f8fafc", borderRadius: 8, fontSize: 14 }}>
-                  {reservaSeleccionada.notas}
-                </div>
+            <div style={{ marginTop: 20, padding: 14, border: `1px solid ${colors.border}`, borderRadius: 10, background: colors.white }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <div><strong style={{ fontSize: 13 }}>Notas operativas</strong><div style={{ color: colors.muted, fontSize: 10, marginTop: 3 }}>Visibles para recepción y el equipo.</div></div>
+                <button type="button" onClick={() => guardarNotasReserva(reservaSeleccionada)} disabled={guardandoNotas || notasFicha === (reservaSeleccionada.notas || "")} style={{ ...secondaryButton, padding: "6px 9px", fontSize: 10, opacity: guardandoNotas || notasFicha === (reservaSeleccionada.notas || "") ? .55 : 1 }}>{guardandoNotas ? "Guardando…" : "Guardar notas"}</button>
               </div>
-            )}
+              <textarea value={notasFicha} onChange={(e) => setNotasFicha(e.target.value)} placeholder="Agregá indicaciones, preferencias o pendientes de esta estadía..." rows={5} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.45 }} />
+            </div>
 
             <section style={{ marginTop: 22, padding: 16, border: `1px solid ${colors.border}`, borderRadius: 10 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div><strong>Cuenta del huésped</strong><div style={{ color: colors.muted, fontSize: 12, marginTop: 3 }}>Señas, cobros y saldo</div></div><strong style={{ color: saldoReserva(reservaSeleccionada) > 0 ? colors.red : colors.green }}>{reservaSeleccionada.moneda === "USD" ? "US$ " : "$"}{saldoReserva(reservaSeleccionada).toLocaleString("es-AR", { minimumFractionDigits: reservaSeleccionada.moneda === "USD" ? 2 : 0 })} pendiente</strong></div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 12 }}><div style={{ padding: 10, background: colors.greenSoft, borderRadius: 8 }}><div style={{ color: colors.muted, fontSize: 11 }}>Total</div><strong>{reservaSeleccionada.moneda === "USD" ? "US$ " : "$"}{Number(reservaSeleccionada.moneda === "USD" ? (reservaSeleccionada.precio_total_usd || 0) : (reservaSeleccionada.precio_total || 0)).toLocaleString("es-AR", { minimumFractionDigits: reservaSeleccionada.moneda === "USD" ? 2 : 0 })}</strong></div><div style={{ padding: 10, background: colors.blueSoft, borderRadius: 8 }}><div style={{ color: colors.muted, fontSize: 11 }}>Pagado</div><strong>{reservaSeleccionada.moneda === "USD" ? "US$ " : "$"}{totalPagado(reservaSeleccionada.id, reservaSeleccionada.moneda || "ARS").toLocaleString("es-AR", { minimumFractionDigits: reservaSeleccionada.moneda === "USD" ? 2 : 0 })}</strong></div></div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 10 }}><input type="number" min="0" step="0.01" value={pagoMonto} onChange={e=>setPagoMonto(e.target.value)} placeholder="Importe" style={inputStyle}/><select value={pagoMetodo} onChange={e=>setPagoMetodo(e.target.value)} style={inputStyle}><option>Efectivo</option><option>Transferencia</option><option>Mercado Pago</option><option>Tarjeta</option><option>Otro</option></select></div><input value={pagoNota} onChange={e=>setPagoNota(e.target.value)} placeholder="Nota del pago (opcional)" style={{ ...inputStyle, marginTop: 8 }}/><button onClick={()=>registrarPago(reservaSeleccionada)} style={{ ...primaryButton, width:"100%", marginTop:8 }} disabled={saldoReserva(reservaSeleccionada)<=0}>＋ Registrar pago</button>
-              {pagos.filter(p=>String(p.reserva_id)===String(reservaSeleccionada.id)).length>0 && <div style={{ marginTop: 12, display:"grid",gap:6 }}>{pagos.filter(p=>String(p.reserva_id)===String(reservaSeleccionada.id)).map(p=><div key={p.id} style={{fontSize:11,padding:8,background:"#f8fafc",borderRadius:7}}>{p.moneda === "USD" ? "US$ " : "$"}{Number(p.monto||0).toLocaleString("es-AR")} · {p.metodo} · {p.created_at ? new Date(p.created_at).toLocaleDateString("es-AR") : ""}</div>)}</div>}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 12, fontSize: 15 }}><div style={{ padding: 13, background: colors.greenSoft, borderRadius: 8 }}><div style={{ color: colors.muted, fontSize: 11 }}>Total</div><strong>{reservaSeleccionada.moneda === "USD" ? "US$ " : "$"}{Number(reservaSeleccionada.moneda === "USD" ? (reservaSeleccionada.precio_total_usd || 0) : (reservaSeleccionada.precio_total || 0)).toLocaleString("es-AR", { minimumFractionDigits: reservaSeleccionada.moneda === "USD" ? 2 : 0 })}</strong></div><div style={{ padding: 10, background: colors.blueSoft, borderRadius: 8 }}><div style={{ color: colors.muted, fontSize: 11 }}>Pagado</div><strong>{reservaSeleccionada.moneda === "USD" ? "US$ " : "$"}{totalPagado(reservaSeleccionada.id, reservaSeleccionada.moneda || "ARS").toLocaleString("es-AR", { minimumFractionDigits: reservaSeleccionada.moneda === "USD" ? 2 : 0 })}</strong></div></div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7, marginTop: 10 }}>
+                <button type="button" onClick={() => setModoPagoDividido(false)} style={!modoPagoDividido ? primaryButton : secondaryButton}>Pago simple</button>
+                <button type="button" onClick={() => setModoPagoDividido(true)} style={modoPagoDividido ? primaryButton : secondaryButton}>Dividir pago</button>
+              </div>
+
+              {!modoPagoDividido ? (
+                <>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 10 }}><input type="number" min="0" step="0.01" value={pagoMonto} onChange={e=>setPagoMonto(e.target.value)} placeholder="Importe" style={inputStyle}/><select value={pagoMetodo} onChange={e=>setPagoMetodo(e.target.value)} style={inputStyle}><option>Efectivo</option><option>Transferencia</option><option>Mercado Pago</option><option>Tarjeta</option><option>Otro</option></select></div>
+                  <input value={pagoNota} onChange={e=>setPagoNota(e.target.value)} placeholder="Nota del pago (opcional)" style={{ ...inputStyle, marginTop: 8 }}/>
+                  <button type="button" onClick={()=>registrarPago(reservaSeleccionada)} style={{ ...primaryButton, width:"100%", marginTop:8 }} disabled={saldoReserva(reservaSeleccionada)<=0}>＋ Registrar pago</button>
+                </>
+              ) : (
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ display: "grid", gap: 7 }}>
+                    {pagoPartes.map((parte, indice) => <div key={parte.id} style={{ display: "grid", gridTemplateColumns: "24px 1fr 1fr auto", gap: 7, alignItems: "center" }}><strong style={{ fontSize: 11 }}>{indice + 1}</strong><select value={parte.metodo} onChange={(e) => actualizarPartePago(parte.id, "metodo", e.target.value)} style={inputStyle}><option>Efectivo</option><option>Transferencia</option><option>Mercado Pago</option><option>Tarjeta</option><option>Otro</option></select><input type="number" min="0" step="0.01" value={parte.monto} onChange={(e) => actualizarPartePago(parte.id, "monto", e.target.value)} placeholder="Importe" style={inputStyle}/><button type="button" onClick={() => eliminarPartePago(parte.id)} style={{ ...secondaryButton, padding: "8px 10px", color: colors.red }} disabled={pagoPartes.length <= 2}>×</button></div>)}
+                  </div>
+                  <button type="button" onClick={agregarPartePago} style={{ ...secondaryButton, width: "100%", marginTop: 8 }}>+ Agregar otro medio</button>
+                  <input value={pagoNota} onChange={e=>setPagoNota(e.target.value)} placeholder="Nota general del pago dividido (opcional)" style={{ ...inputStyle, marginTop: 8 }}/>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 11 }}><span style={{ color: colors.muted }}>Suma cargada</span><strong>{reservaSeleccionada.moneda === "USD" ? "US$ " : "$"}{pagoPartes.reduce((suma, parte) => suma + (Number(parte.monto) || 0), 0).toLocaleString("es-AR")}</strong></div>
+                  <button type="button" onClick={() => registrarPagosDivididos(reservaSeleccionada)} style={{ ...primaryButton, width: "100%", marginTop: 8 }} disabled={saldoReserva(reservaSeleccionada)<=0}>Registrar pago dividido</button>
+                </div>
+              )}
+              {pagos.filter(p=>String(p.reserva_id)===String(reservaSeleccionada.id)).length>0 && <div style={{ marginTop: 12, display:"grid",gap:6 }}><div style={{ color: colors.muted, fontSize: 10, fontWeight: 800 }}>PAGOS REGISTRADOS</div>{pagos.filter(p=>String(p.reserva_id)===String(reservaSeleccionada.id)).map(p=><div key={p.id} style={{fontSize:11,padding:9,background:"#f8fafc",borderRadius:7,display:"grid",gridTemplateColumns:"1fr auto",gap:8}}><span><strong>{p.metodo}</strong>{p.nota ? ` · ${p.nota}` : ""}<br/><span style={{color:colors.muted}}>{p.created_at ? new Date(p.created_at).toLocaleDateString("es-AR") : ""}</span></span><strong>{p.moneda === "USD" ? "US$ " : "$"}{Number(p.monto||0).toLocaleString("es-AR")}</strong></div>)}</div>}
             </section>
 
             {saldoReserva(reservaSeleccionada) > 0.01 && reservaSeleccionada.estado !== "cancelada" && (
@@ -5496,6 +6248,9 @@ export default function Home() {
                   ✉ Enviar resumen por email
                 </button>
               )}
+              <button onClick={() => imprimirReserva(reservaSeleccionada)} style={secondaryButton}>
+                🧾 Comprobante
+              </button>
               {reservaSeleccionada.documento_path && (
                 <button
                   onClick={async () => {
@@ -5550,41 +6305,41 @@ export default function Home() {
     }
 
         :root {
-          --hl-navy: #0b4aa2;
-          --hl-navy-dark: #082f6b;
-          --hl-blue: #1677e8;
-          --hl-blue-soft: #e8f1ff;
-          --hl-green: #00875a;
-          --hl-green-soft: #e8f7f0;
-          --hl-yellow: #b78103;
-          --hl-yellow-soft: #fff7dc;
-          --hl-red: #c62828;
-          --hl-red-soft: #fff0f0;
-          --hl-text: #1f2937;
-          --hl-muted: #6b7280;
-          --hl-border: #e5e7eb;
-          --hl-bg: #f3f6fb;
-          --hl-white: #ffffff;
-          --hl-panel: #ffffff;
-          --hl-input: #ffffff;
+          --hl-navy: #173d38;
+          --hl-navy-dark: #0d2f2b;
+          --hl-blue: #55766d;
+          --hl-blue-soft: #e6ede8;
+          --hl-green: #477565;
+          --hl-green-soft: #e8f0eb;
+          --hl-yellow: #b58962;
+          --hl-yellow-soft: #f5eadf;
+          --hl-red: #a56850;
+          --hl-red-soft: #f6e7df;
+          --hl-text: #1d2925;
+          --hl-muted: #69766f;
+          --hl-border: #e3dacd;
+          --hl-bg: #f5f0e7;
+          --hl-white: #fffdf8;
+          --hl-panel: #fffdf8;
+          --hl-input: #fffdfa;
         }
         :root[data-hl-theme="dark"], body[data-hl-theme="dark"] {
-          --hl-navy: #5fa4ff;
-          --hl-navy-dark: #d9e9ff;
-          --hl-blue: #4d9cff;
-          --hl-blue-soft: #172b45;
-          --hl-green: #39d39a;
-          --hl-green-soft: #12382d;
-          --hl-yellow: #f0b83f;
-          --hl-yellow-soft: #3b2e12;
-          --hl-red: #ff6b6b;
-          --hl-red-soft: #3b1818;
-          --hl-text: #f3f4f6;
-          --hl-muted: #a7b0bf;
-          --hl-border: #303846;
-          --hl-bg: #090d13;
-          --hl-white: #111722;
-          --hl-panel: #111722;
+          --hl-navy: #c0d4c9;
+          --hl-navy-dark: #f4eadf;
+          --hl-blue: #8fa99d;
+          --hl-blue-soft: #223b35;
+          --hl-green: #7fb59d;
+          --hl-green-soft: #173b30;
+          --hl-yellow: #d5b183;
+          --hl-yellow-soft: #433525;
+          --hl-red: #d3876f;
+          --hl-red-soft: #42251d;
+          --hl-text: #f4f0e9;
+          --hl-muted: #b6c0ba;
+          --hl-border: #354740;
+          --hl-bg: #0f1e1b;
+          --hl-white: #172824;
+          --hl-panel: #172824;
           --hl-input: #0d131d;
         }
         * { box-sizing: border-box; }
@@ -5607,7 +6362,74 @@ export default function Home() {
         .hl-dark [style*="background: #fcfcfe"], .hl-dark [style*="background:#fcfcfe"] { background: var(--hl-white) !important; }
 
         .hl-dark [style*="border-color: #f5c2c2"], .hl-dark [style*="border-color: #f2caca"] { border-color: #6b2a2a !important; }
-        .app-header { box-shadow: 0 1px 0 rgba(15,23,42,.02), 0 8px 24px rgba(15,23,42,.025); }
+        .app-header { box-shadow: 0 1px 0 rgba(23,61,56,.035), 0 12px 32px rgba(46,58,51,.055); }
+        /* HL_HOSPITALITY_THEME_V9 */
+        /* HL_HOSPITALITY_CALENDAR_V10 */
+        .hl-app [style*="background: #f8fafc"], .hl-app [style*="background:#f8fafc"] { background:#f7f3ec !important; }
+        .hl-app [style*="background: #fafbfe"], .hl-app [style*="background:#fafbfe"] { background:#fbf8f2 !important; }
+        .hl-app [style*="border: 1px solid #e5e7eb"], .hl-app [style*="border:1px solid #e5e7eb"] { border-color:#e3dacd !important; }
+        .hl-app [style*="box-shadow: 0 8px 24px rgba(15,23,42"] { box-shadow:0 12px 30px rgba(46,58,51,.07) !important; }
+        .hl-dark [style*="background: #f7f3ec"], .hl-dark [style*="background:#f7f3ec"], .hl-dark [style*="background: #fbf8f2"], .hl-dark [style*="background:#fbf8f2"] { background:var(--hl-white) !important; }
+        .hl-app {
+          background:
+            radial-gradient(circle at 86% 0%, rgba(181,137,98,.08), transparent 24%),
+            linear-gradient(90deg, rgba(23,61,56,.016) 1px, transparent 1px),
+            linear-gradient(rgba(23,61,56,.012) 1px, transparent 1px),
+            var(--hl-bg);
+          background-size: auto, 54px 54px, 54px 54px, auto;
+        }
+        .desktop-sidebar > aside {
+          background: linear-gradient(180deg,#173d38 0%,#0d2f2b 100%) !important;
+          box-shadow: 14px 0 40px rgba(13,47,43,.09);
+        }
+        .desktop-sidebar button { border-radius: 10px !important; }
+        .app-header {
+          backdrop-filter: blur(18px) saturate(1.08);
+          border-bottom-color: rgba(91,103,97,.13) !important;
+        }
+        input, select, textarea {
+          border-radius: 10px !important;
+          transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+        }
+        input:focus, select:focus, textarea:focus {
+          border-color: #789087 !important;
+          box-shadow: 0 0 0 3px rgba(85,118,109,.11) !important;
+        }
+        button { border-radius: 10px; }
+        .hotel-reception-detail {
+          display:flex;align-items:center;gap:9px;padding:7px 10px 7px 9px;
+          border:1px solid rgba(181,137,98,.28);border-radius:999px;
+          background:linear-gradient(180deg,rgba(255,253,248,.94),rgba(245,234,223,.78));
+          box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 7px 20px rgba(87,68,52,.06);
+          min-width:132px;
+        }
+        .hotel-bell {
+          position:relative;display:block;width:25px;height:15px;
+          border-radius:16px 16px 4px 4px;
+          background:linear-gradient(145deg,#d3b18c,#a97851 62%,#8d6241);
+          box-shadow:inset 0 1px 0 rgba(255,255,255,.42),0 2px 5px rgba(72,50,34,.15);
+          flex:0 0 auto;
+        }
+        .hotel-bell:before { content:"";position:absolute;width:5px;height:5px;border-radius:50%;background:#a97851;left:10px;top:-5px;box-shadow:inset 0 1px 0 rgba(255,255,255,.4); }
+        .hotel-bell:after { content:"";position:absolute;left:-4px;right:-4px;height:3px;bottom:-4px;border-radius:999px;background:#8d6241;box-shadow:0 1px 2px rgba(61,40,25,.16); }
+        .hotel-reception-copy {display:grid;line-height:1.05;min-width:0}.hotel-reception-copy b{font-size:10px;color:#3d514b}.hotel-reception-copy small{font-size:8px;color:#84796c;margin-top:3px;max-width:92px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .hotel-sidebar-signature {
+          position:absolute;bottom:12px;left:13px;right:13px;display:flex;align-items:center;gap:9px;
+          padding:8px 9px;border-radius:14px;background:rgba(255,255,255,.075);
+          border:1px solid rgba(255,255,255,.09);box-shadow:inset 0 1px 0 rgba(255,255,255,.045);
+        }
+        .hotel-key-tag {
+          position:relative;width:29px;height:38px;border-radius:14px 14px 8px 8px;display:grid;place-items:center;
+          background:linear-gradient(145deg,#cfa982,#9f7653);color:#173d38;font-family:Georgia,serif;font-size:9px;font-weight:900;
+          box-shadow:0 5px 12px rgba(0,0,0,.14);transform:rotate(-3deg);flex:0 0 auto;
+        }
+        .hotel-key-tag:before {content:"";position:absolute;width:5px;height:5px;border-radius:50%;background:#173d38;top:5px;opacity:.58}
+        .hotel-key-copy{display:grid;line-height:1.1;min-width:0}.hotel-key-copy b{font-size:9px;color:#f4eadf}.hotel-key-copy small{font-size:7px;color:#b9cbc4;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .hl-dark .app-header { background: rgba(15,30,27,.94) !important; }
+        .hl-dark .desktop-sidebar > aside { background: linear-gradient(180deg,#0d2f2b,#081d1a) !important; }
+        .hl-dark .hotel-reception-detail { background:linear-gradient(180deg,rgba(35,60,53,.94),rgba(28,48,43,.94));border-color:rgba(213,177,131,.22) }
+        .hl-dark .hotel-reception-copy b{color:#f4eadf}.hl-dark .hotel-reception-copy small{color:#b6c0ba}
+        @media (max-width: 1120px) { .hotel-reception-detail { display:none; } }
         .user-chip { white-space: nowrap; }
         @media (max-width: 900px) {
           .desktop-sidebar { display: none; }
@@ -5615,6 +6437,7 @@ export default function Home() {
           main { margin-left: 0 !important; padding-top: 58px; }
           .app-header { padding: 0 16px !important; }
           .user-chip { display: none !important; }
+          .hl-header-clock { display: none !important; }
         }
         @media (min-width: 901px) {
           .mobile-topbar { display: none !important; }
@@ -5624,6 +6447,11 @@ export default function Home() {
           .reservation-sheet-grid { grid-template-columns: 1fr 1fr !important; overflow-y: auto !important; }
           .reservation-sheet-actions { margin-bottom: 4px !important; }
           .reservation-sheet-actions { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+        }
+        @media (max-width: 1180px) {
+          .app-header { gap: 10px; }
+          .app-header > div:last-child { flex-wrap: wrap; justify-content: flex-end; }
+          .hl-app main > * { max-width: 100vw; }
         }
         @media (max-width: 760px) {
           .reservation-sheet-grid { grid-template-columns: 1fr !important; overflow-y: auto !important; }
