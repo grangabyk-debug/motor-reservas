@@ -59,6 +59,24 @@ main nav a[href="/registro"]:hover{
   transform:translateY(-2px) scale(1.015)
 }
 
+main>section:first-of-type a[href="/registro"]{
+  min-height:58px!important;
+  padding:0 30px!important;
+  background:#0d3a2c!important;
+  color:#fff4df!important;
+  border:1px solid #f0c97d!important;
+  font-size:16px!important;
+  font-weight:900!important;
+  letter-spacing:.01em!important;
+  text-shadow:0 1px 8px rgba(0,0,0,.28)!important;
+  box-shadow:0 16px 40px rgba(0,0,0,.34),0 0 0 1px rgba(240,201,125,.14) inset,0 0 28px rgba(231,182,91,.18)!important
+}
+main>section:first-of-type a[href="/registro"]:hover{
+  background:#14513e!important;
+  color:#fff9ee!important;
+  transform:translateY(-2px) scale(1.015)!important
+}
+
 main section[id="oportunidad"] h2{color:#102d23!important}
 main section[id="oportunidad"] h2 em{color:#9a6629!important;text-shadow:0 1px 0 rgba(255,255,255,.4)}
 main section[id="oportunidad"] p{color:#40554c!important;font-weight:520!important}
@@ -107,6 +125,7 @@ main section[class*="finalCta"] a[href="/login"]:hover{background:rgba(11,55,41,
   main nav a[href="/"]>b::after{font-size:18px}
   main nav a[href="/login"]{min-height:40px;font-size:12px!important;padding:0 12px!important}
   main nav a[href="/registro"]{min-height:42px;font-size:12px!important;padding:0 13px!important}
+  main>section:first-of-type a[href="/registro"]{min-height:52px!important;font-size:14px!important;padding:0 22px!important}
   main section[class*="finalCta"] a[href="/registro"],main section[class*="finalCta"] a[href="/login"]{min-height:52px!important;font-size:14px!important;padding:0 20px!important}
 }
 @media(max-width:480px){
