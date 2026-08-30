@@ -91,7 +91,7 @@ const required = [
   'AdvancedHotelModules view="twin"',
 ]
 const missing = required.filter(token => !source.includes(token))
-const advancedRequired = ['hotel_rate_calendar','hotel_automations','hotel_role_permissions','hotel_automation_events','Stop Sell','Llena Intelligence']
+const advancedRequired = ['hotel_rate_calendar','hotel_automations','hotel_role_permissions','hotel_automation_events','Stop Sell','LLENA INTELLIGENCE']
 const advancedMissing = advancedRequired.filter(token => !advanced.includes(token))
 if (missing.length || advancedMissing.length) throw new Error(`Habitación Llena OS safety check failed: ${[...missing,...advancedMissing].join(", ")}`)
 console.log("Habitación Llena OS: full front-desk, advanced rates, roles, automations, Intelligence and Digital Twin verified")
