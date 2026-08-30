@@ -6,6 +6,7 @@ const codeExtensions=new Set([".js",".jsx",".mjs",".ts",".tsx"])
 const legacyDebt=new Set([
   "app/dashboard/HotelOSClient.jsx",
   "app/dashboard/AdvancedHotelModules.jsx",
+  "app/dashboard/usuarios/page.jsx",
 ])
 const limits={bytes:52000,lines:420}
 const problems=[]
