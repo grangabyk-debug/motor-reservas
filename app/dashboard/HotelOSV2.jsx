@@ -7,14 +7,18 @@ import{useHotelSession}from"./hooks/useHotelSession"
 import{useHotelData}from"./hooks/useHotelData"
 import{can}from"./core/permissions"
 import{VIEW_META}from"./core/navigation"
-import{addDays,isoDate}from"./core/formatters"
+import{addDays,isoDate,money}from"./core/formatters"
 import CommandCenter from"./features/frontdesk/CommandCenter"
 import{Lobby,Reservations,GuestCRM}from"./features/frontdesk/FrontDeskViews"
 import ReservationDrawer from"./features/frontdesk/ReservationDrawer"
 import{blankReservation,reservationToDraft}from"./features/frontdesk/reservationModel"
 import{saveReservation,moveReservation,checkinReservation,checkoutReservation,savePayment}from"./services/reservations"
 import{saveFloor,saveRoom,updateRoomStatus,saveBlock,saveHousekeepingTask,setHousekeepingStatus,saveMaintenanceTicket,setMaintenanceStatus,saveResource}from"./services/operations"
+import{saveRateCell,saveRateRange,savePartner,saveGroup,saveUpsell,prepareChannel}from"./services/commercial"
+import{openCashSession,saveCashMovement,closeCashSession,saveFinanceDocument,issueInternalDocument}from"./services/finance"
 import{RoomsView,HousekeepingView,MaintenanceView,ResourcesView,DigitalTwinView}from"./features/operations/OperationsViews"
+import{RevenueView,PartnersView,GroupsView,UpsellingView,DistributionView}from"./features/commercial/CommercialViews"
+import{CashView,BillingView,ReportsView}from"./features/finance/FinanceViews"
 import ui from"./v2.module.css"
 
 const TITLES={lobby:"Bienvenidos a casa.",calendar:"El hotel entero, en una mirada.",reservations:"Cada estadía, completamente editable.",guests:"Una memoria elegante del huésped.",keys:"La llave correcta, para la habitación correcta.",rooms:"El edificio, exactamente como existe.",housekeeping:"Habitaciones listas antes de que el huésped pregunte.",maintenance:"Resolver antes de que el huésped lo note.",resources:"Todo recurso del hotel, bajo control.",twin:"El edificio vivo.",rates:"Precio, demanda y margen bajo control.",partners:"Relaciones comerciales que sí dejan trazabilidad.",groups:"Grupos sin planillas paralelas.",upselling:"Más valor para el huésped y para el hotel.",distribution:"Una disponibilidad. Todos los canales.",cash:"Cada turno cierra con claridad.",billing:"Folios y documentos sin perder el contexto.",reports:"Decisiones con información real.",team:"Cada persona ve lo que necesita.",automations:"El hotel trabaja incluso antes de que lo pidas.",intelligence:"Una inteligencia que entiende la operación.",integrations:"Conectar sin convertir el PMS en un rompecabezas.",settings:"Tu hotel, tus reglas."}
@@ -25,7 +29,7 @@ export default function HotelOSV2(){
   const allowed=permission=>can(role,permission,permissions),settings=data.settings||{hotel_name:"Habitación Llena",motto:"La hospitalidad se siente en cada detalle."}
   const notify=message=>{setToast(String(message));setTimeout(()=>setToast(""),3200)}
   const changeView=id=>{setView(id);setMobile(false)}
-  async function action(fn,success){try{setBusy(true);await fn();await data.reload();if(success)notify(success)}catch(error){notify(error?.message||"No se pudo completar la operación.")}finally{setBusy(false)}}
+  async function action(fn,success){try{setBusy(true);const result=await fn();await data.reload();if(success)notify(typeof success==="function"?success(result):success);return result}catch(error){notify(error?.message||"No se pudo completar la operación.")}finally{setBusy(false)}}
   function openReservation(r){setDrawer(reservationToDraft(r))}
   function newReservation(roomId=activeRooms[0]?.id||"",start=today){setDrawer(blankReservation(roomId,start))}
   async function persistReservation(draft){const room=data.rooms.find(r=>String(r.id)===String(draft.roomId)),original=draft.id?data.reservations.find(r=>String(r.id)===String(draft.id)):null;if(!room)return notify("Elegí una habitación.");if(!draft.guest?.trim())return notify("Falta el nombre del huésped.");await action(async()=>{await saveReservation({draft,room,propertyId:session.propertyId,userId:session.user.id,original});setDrawer(null)},draft.id?"Reserva actualizada.":"Reserva creada.")}
@@ -49,6 +53,14 @@ export default function HotelOSV2(){
     if(view==="maintenance")return <MaintenanceView rooms={activeRooms} resources={data.operations.resources||[]} tickets={data.operations.maintenance||[]} onSave={draft=>action(()=>saveMaintenanceTicket({propertyId:session.propertyId,userId:session.user.id,draft}),"Ticket creado.")} onStatus={(ticket,status)=>action(()=>setMaintenanceStatus({propertyId:session.propertyId,id:ticket.id,status}),"Mantenimiento actualizado.")}/>
     if(view==="resources")return <ResourcesView resources={data.operations.resources||[]} onSave={draft=>action(()=>saveResource({propertyId:session.propertyId,draft}),"Recurso guardado.")}/>
     if(view==="twin")return <DigitalTwinView rooms={activeRooms} floors={data.floors} reservations={live}/>
+    if(view==="rates")return <RevenueView rooms={activeRooms} reservations={live} rates={data.commercial.rates||[]} canManage={allowed("commercial.rates.manage")} onSaveCell={draft=>action(()=>saveRateCell({propertyId:session.propertyId,draft}),"Tarifa actualizada.")} onBulk={draft=>action(()=>saveRateRange({propertyId:session.propertyId,roomId:draft.roomId,start:draft.start,end:draft.end,price:draft.price,minStay:draft.minStay,stopSell:draft.stopSell,cta:draft.cta,ctd:draft.ctd,existingRates:data.commercial.rates||[],fallbackPrice:draft.fallbackPrice}),n=>`${n||0} días tarifarios actualizados.`)}/>
+    if(view==="partners")return <PartnersView partners={data.commercial.partners||[]} canManage={allowed("commercial.partners.manage")} onSave={draft=>action(()=>savePartner({propertyId:session.propertyId,draft}),"Empresa / agencia guardada.")}/>
+    if(view==="groups")return <GroupsView groups={data.commercial.groups||[]} partners={data.commercial.partners||[]} canManage={allowed("commercial.groups.manage")} onSave={draft=>action(()=>saveGroup({propertyId:session.propertyId,draft}),"Grupo guardado.")}/>
+    if(view==="upselling")return <UpsellingView items={data.commercial.upsells||[]} canManage={allowed("commercial.upsell")} onSave={draft=>action(()=>saveUpsell({propertyId:session.propertyId,draft}),"Upsell guardado.")}/>
+    if(view==="distribution")return <DistributionView connections={data.channels||[]} onPrepare={provider=>action(()=>prepareChannel({propertyId:session.propertyId,provider}),provider==="Motor directo"?"Motor directo registrado.":`${provider}: sandbox preparado; todavía no es una conexión real.`)}/>
+    if(view==="cash")return <CashView sessions={data.finance.sessions||[]} movements={data.finance.movements||[]} reservations={live} canManage={allowed("finance.cash")} onOpen={draft=>action(()=>openCashSession({propertyId:session.propertyId,userId:session.user.id,openingAmount:draft.openingAmount,notes:draft.notes}),"Caja abierta.")} onMovement={draft=>action(()=>saveCashMovement({propertyId:session.propertyId,userId:session.user.id,sessionId:draft.sessionId,reservationId:draft.reservationId,movementType:draft.movementType,method:draft.method,amount:draft.amount,concept:draft.concept,reference:draft.reference,currency:draft.currency}),"Movimiento registrado.")} onClose={draft=>action(()=>closeCashSession({propertyId:session.propertyId,userId:session.user.id,sessionId:draft.sessionId,closingAmount:draft.closingAmount,notes:draft.notes}),r=>`Caja cerrada · diferencia ${money(r?.difference||0)}`)}/>
+    if(view==="billing")return <BillingView documents={data.finance.documents||[]} reservations={live} partners={data.commercial.partners||[]} groups={data.commercial.groups||[]} canManage={allowed("finance.folios")} onSave={draft=>action(()=>saveFinanceDocument({propertyId:session.propertyId,userId:session.user.id,draft}),"Documento guardado.")} onIssue={doc=>action(()=>issueInternalDocument({propertyId:session.propertyId,id:doc.id}),number=>`Documento interno emitido: ${number}`)}/>
+    if(view==="reports")return <ReportsView reservations={data.reservations} rooms={data.rooms} payments={data.payments} housekeeping={data.operations.housekeeping||[]}/>
     return <ModuleBridge view={view}/>
   }
 }

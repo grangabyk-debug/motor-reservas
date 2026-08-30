@@ -19,9 +19,15 @@ export function useHotelData(propertyId,view){
         const[g,p,groups]=await Promise.all([repo.guestCRM(),repo.partners(),repo.groups()])
         if(run===seq.current){setGuests(g);setCommercial(x=>({...x,partners:p,groups}))}
       }
-      if(group==="operations"){const o=await repo.operations();if(run===seq.current)setOperations(o)}
-      if(group==="commercial"){const[c,p,groups]=await Promise.all([repo.commercial(),repo.partners(),repo.groups()]);if(run===seq.current)setCommercial({...c,partners:p,groups})}
-      if(group==="finance"){const f=await repo.finance();if(run===seq.current)setFinance(f)}
+      if(group==="operations"){
+        const o=await repo.operations();if(run===seq.current)setOperations(o)
+      }
+      if(group==="commercial"){
+        const[c,p,groups]=await Promise.all([repo.commercial(),repo.partners(),repo.groups()]);if(run===seq.current)setCommercial({...c,partners:p,groups})
+      }
+      if(group==="finance"){
+        const[f,p,groups,o]=await Promise.all([repo.finance(),repo.partners(),repo.groups(),repo.operations()]);if(run===seq.current){setFinance(f);setCommercial(x=>({...x,partners:p,groups}));setOperations(o)}
+      }
       if(group==="hotel"){
         const[members,automations,events,permissions]=await Promise.all([supabase.from("property_members").select("user_id,role,created_at").eq("property_id",propertyId),supabase.from("hotel_automations").select("*").eq("property_id",propertyId).order("created_at"),supabase.from("hotel_automation_events").select("*").eq("property_id",propertyId).order("created_at",{ascending:false}).limit(80),supabase.from("hotel_role_permissions").select("*").eq("property_id",propertyId)])
         if(run===seq.current)setHotel({members:members.data||[],automations:automations.data||[],events:events.data||[],permissions:permissions.data||[]})
