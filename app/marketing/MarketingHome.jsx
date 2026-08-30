@@ -13,5 +13,57 @@ export default function MarketingHome(){
   return <>
     <script type="application/ld+json" dangerouslySetInnerHTML={{__html:JSON.stringify(schema)}}/>
     <LandingExperience/>
+
+    <a
+      className="hlWhatsappFloat"
+      href="https://wa.me/5491140540970?text=Hola%2C%20quiero%20conocer%20m%C3%A1s%20sobre%20Habitaci%C3%B3n%20Llena."
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Hablar por WhatsApp con Habitación Llena"
+      title="Hablar por WhatsApp"
+    >
+      <svg viewBox="0 0 32 32" aria-hidden="true">
+        <path fill="currentColor" d="M16.04 3C8.86 3 3.02 8.78 3.02 15.9c0 2.53.75 5 2.16 7.1L3 29l6.2-2.03a13.1 13.1 0 0 0 6.83 1.9h.01c7.18 0 13.02-5.79 13.02-12.9C29.06 8.79 23.22 3 16.04 3Zm0 23.7h-.01a10.9 10.9 0 0 1-5.56-1.52l-.4-.23-3.68 1.2 1.2-3.57-.26-.41a10.65 10.65 0 0 1-1.68-5.77c0-5.9 4.86-10.7 10.4-10.7 5.95 0 10.8 4.8 10.8 10.7 0 5.9-4.85 10.7-10.81 10.7Zm5.93-8.02c-.32-.16-1.9-.93-2.2-1.03-.29-.11-.5-.16-.71.16-.21.32-.82 1.03-1 1.24-.18.21-.37.24-.69.08-.32-.16-1.36-.5-2.59-1.58a9.66 9.66 0 0 1-1.79-2.2c-.18-.32-.02-.49.14-.65.14-.14.32-.37.48-.55.16-.19.21-.32.32-.53.1-.21.05-.4-.03-.56-.08-.16-.71-1.7-.97-2.33-.26-.61-.52-.53-.71-.54h-.61c-.21 0-.55.08-.84.4-.29.32-1.1 1.08-1.1 2.62 0 1.55 1.13 3.04 1.29 3.25.16.21 2.23 3.39 5.4 4.75.75.32 1.34.52 1.8.67.76.24 1.45.2 1.99.13.61-.09 1.9-.77 2.17-1.51.26-.75.26-1.39.18-1.52-.08-.13-.29-.21-.61-.37Z"/>
+      </svg>
+    </a>
+
+    <style>{`
+      .hlWhatsappFloat{
+        position:fixed;
+        right:22px;
+        bottom:22px;
+        width:60px;
+        height:60px;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        border-radius:50%;
+        background:#25D366;
+        color:#fff;
+        z-index:9999;
+        box-shadow:0 12px 30px rgba(0,0,0,.28),0 0 0 1px rgba(255,255,255,.24) inset;
+        transition:transform .2s ease,box-shadow .2s ease,filter .2s ease;
+        -webkit-tap-highlight-color:transparent
+      }
+      .hlWhatsappFloat svg{width:34px;height:34px;display:block}
+      .hlWhatsappFloat:hover{
+        transform:translateY(-3px) scale(1.04);
+        box-shadow:0 16px 36px rgba(0,0,0,.32),0 0 0 1px rgba(255,255,255,.32) inset;
+        filter:brightness(1.04)
+      }
+      .hlWhatsappFloat:focus-visible{
+        outline:3px solid rgba(255,255,255,.95);
+        outline-offset:3px
+      }
+      @media(max-width:700px){
+        .hlWhatsappFloat{
+          right:16px;
+          bottom:max(16px,env(safe-area-inset-bottom));
+          width:56px;
+          height:56px
+        }
+        .hlWhatsappFloat svg{width:31px;height:31px}
+      }
+    `}</style>
   </>
 }
