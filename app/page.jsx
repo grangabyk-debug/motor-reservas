@@ -121,16 +121,127 @@ main section[class*="finalCta"] a[href="/login"]{
 }
 main section[class*="finalCta"] a[href="/login"]:hover{background:rgba(11,55,41,.82)!important;border-color:#f3ce89!important}
 
+/* Legibility pass · textos que en pantallas reales quedaban demasiado pequeños */
+main nav a[href^="#"]{
+  font-size:15px!important;
+  font-weight:650!important;
+  letter-spacing:.01em!important;
+  color:rgba(255,255,255,.9)!important
+}
+main [class*="deviceTop"] span{font-size:11px!important}
+main [class*="deviceStats"] small{font-size:10px!important;letter-spacing:.11em!important}
+main [class*="deviceDiary"]>div>span,
+main [class*="deviceDiary"]>div>b{font-size:11px!important}
+main [class*="deviceFoot"] span,
+main [class*="deviceFoot"] b{font-size:10px!important}
+main [class*="floatArrival"] small{font-size:11px!important;letter-spacing:.12em!important;line-height:1.3!important}
+main [class*="floatArrival"] b{font-size:23px!important;line-height:1.08!important}
+main [class*="floatArrival"]>span{font-size:12px!important;line-height:1.45!important;color:rgba(255,255,255,.82)!important}
+main [class*="floatRoom"] b{font-size:12px!important}
+main [class*="floatRoom"] small{font-size:10px!important;line-height:1.35!important}
+
+main section[id="sistema"] figure figcaption>span{
+  font-size:13px!important;
+  font-weight:750!important;
+  letter-spacing:.11em!important
+}
+main section[id="sistema"] figure figcaption>b{
+  font-size:38px!important;
+  line-height:1.05!important;
+  margin:8px 0 9px!important
+}
+main section[id="sistema"] figure figcaption>p{
+  max-width:540px!important;
+  font-size:16px!important;
+  line-height:1.6!important;
+  color:rgba(255,255,255,.88)!important
+}
+
+main section[id="producto"] [class*="productIntro"]>p{
+  max-width:780px!important;
+  font-size:19px!important;
+  line-height:1.65!important;
+  color:rgba(255,255,255,.82)!important
+}
+main section[id="producto"] [class*="productTabs"] button{
+  padding:13px 21px!important;
+  font-size:14px!important;
+  font-weight:780!important
+}
+
+main section[id="oportunidad"] [class*="controls"] label span{
+  font-size:14px!important;
+  line-height:1.35!important
+}
+main section[id="oportunidad"] [class*="controls"] label b{
+  font-size:24px!important;
+  line-height:1.15!important
+}
+main section[id="oportunidad"] [class*="opportunity"]{
+  padding:30px 32px!important
+}
+main section[id="oportunidad"] [class*="opportunity"]>span{
+  font-size:13px!important;
+  line-height:1.4!important
+}
+main section[id="oportunidad"] [class*="opportunity"]>b{
+  font-size:44px!important;
+  line-height:1!important;
+  margin:10px 0!important
+}
+main section[id="oportunidad"] [class*="opportunity"]>small{
+  font-size:12px!important;
+  line-height:1.45!important
+}
+
+main section[class*="intelligence"] [class*="aiPrompt"]>span,
+main section[class*="intelligence"] [class*="aiAnswer"]>span{
+  font-size:12px!important;
+  font-weight:750!important;
+  letter-spacing:.1em!important
+}
+main section[class*="intelligence"] [class*="aiPrompt"]>p,
+main section[class*="intelligence"] [class*="aiAnswer"]>p{
+  font-size:17px!important;
+  line-height:1.65!important;
+  color:rgba(255,255,255,.92)!important
+}
+main section[class*="intelligence"] [class*="aiAnswer"]>div>b{
+  font-size:13px!important
+}
+main section[class*="intelligence"] [class*="aiAnswer"]>div>small{
+  font-size:12px!important;
+  line-height:1.3!important
+}
+
+main section[class*="finalCta"] p{
+  max-width:760px!important;
+  font-size:20px!important;
+  line-height:1.65!important;
+  color:rgba(255,255,255,.88)!important
+}
+
 @media(max-width:700px){
   main nav a[href="/"]>b::after{font-size:18px}
   main nav a[href="/login"]{min-height:40px;font-size:12px!important;padding:0 12px!important}
   main nav a[href="/registro"]{min-height:42px;font-size:12px!important;padding:0 13px!important}
   main>section:first-of-type a[href="/registro"]{min-height:52px!important;font-size:14px!important;padding:0 22px!important}
   main section[class*="finalCta"] a[href="/registro"],main section[class*="finalCta"] a[href="/login"]{min-height:52px!important;font-size:14px!important;padding:0 20px!important}
+  main section[id="sistema"] figure figcaption>b{font-size:34px!important}
+  main section[id="sistema"] figure figcaption>p{font-size:15px!important}
+  main section[id="producto"] [class*="productIntro"]>p{font-size:17px!important}
+  main section[id="producto"] [class*="productTabs"] button{font-size:13px!important;padding:11px 16px!important}
+  main section[id="oportunidad"] [class*="controls"] label span{font-size:13px!important}
+  main section[id="oportunidad"] [class*="controls"] label b{font-size:21px!important}
+  main section[id="oportunidad"] [class*="opportunity"]>b{font-size:38px!important}
+  main section[class*="intelligence"] [class*="aiPrompt"]>p,main section[class*="intelligence"] [class*="aiAnswer"]>p{font-size:16px!important}
+  main section[class*="finalCta"] p{font-size:18px!important}
 }
 @media(max-width:480px){
   main nav a[href="/login"]{display:none!important}
   main nav a[href="/"]>b::after{font-size:17px}
+  main section[id="producto"] [class*="productTabs"] button{font-size:12px!important;padding:10px 13px!important}
+  main section[id="oportunidad"] [class*="opportunity"]>b{font-size:36px!important}
 }
 `
 
