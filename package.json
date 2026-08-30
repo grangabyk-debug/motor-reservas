@@ -6,8 +6,8 @@
     "check:product-boundaries": "node scripts/check-product-boundaries.mjs",
     "check:hotel-architecture": "node scripts/check-hotel-os-architecture.mjs",
     "prebuild": "npm run check:product-boundaries && npm run check:hotel-architecture",
-    "dev": "node products/comanda/scripts/materialize-final.mjs && node scripts/harden-hotel-os-atomic.mjs && next dev",
-    "build": "node products/comanda/scripts/materialize-final.mjs && node scripts/harden-hotel-os-atomic.mjs && next build",
+    "dev": "node products/comanda/scripts/materialize-final.mjs && next dev",
+    "build": "node products/comanda/scripts/materialize-final.mjs && next build",
     "start": "next start"
   },
   "dependencies": {
