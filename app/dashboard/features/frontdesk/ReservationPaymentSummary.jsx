@@ -11,9 +11,12 @@ function detail(item,currency){
 }
 
 export default function ReservationPaymentSummary({draft,totals,paid,balance}){
-  const currency=draft?.currency||"ARS",lines=[]
-  const stay=Number(totals?.nights||0)*Number(totals?.rate||0)
-  if(stay>0)lines.push({key:"stay",label:`Estadía · ${totals.nights} ${Number(totals.nights)===1?"noche":"noches"}`,detail:`${money(totals.rate,currency)} por noche`,value:stay})
+  const currency=draft?.currency||"ARS",lines=[],dayUse=draft?.stayType==="day_use",units=Number(totals?.billingUnits||0)
+  const stay=units*Number(totals?.rate||0)
+  if(stay>0){
+    if(dayUse)lines.push({key:"stay",label:`Day Use · ${totals.arrivalTime||""} → ${totals.departureTime||""}`,detail:"Tarifa por uso diurno",value:stay})
+    else lines.push({key:"stay",label:`Estadía · ${totals.nights} ${Number(totals.nights)===1?"noche":"noches"}`,detail:`${money(totals.rate,currency)} por noche`,value:stay})
+  }
 
   const extras=draft?.extras||[],parkingLines=extras.filter(isParking)
   if(parkingLines.length){
