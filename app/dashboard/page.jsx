@@ -1,5 +1,6 @@
 import HotelOSV2 from "./HotelOSV2"
+import StaticCaretGuard from "../components/StaticCaretGuard"
 
 export default function DashboardPage(){
-  return <HotelOSV2/>
+  return <><StaticCaretGuard/><HotelOSV2/></>
 }

@@ -1,9 +1,10 @@
 import ui from "./hospitality-shell.module.css"
+import StaticCaretGuard from "../StaticCaretGuard"
 
 const HOTEL_IMAGE="https://images.unsplash.com/photo-1564501049412-61c2a3083791?auto=format&fit=crop&w=1800&q=88"
 
 export default function HospitalityShell({eyebrow="HABITACIÓN LLENA",title,copy,children,hotelName="Habitación Llena",compact=false,backHref=null,backOnScene=false,hideBrand=false,topAligned=false}){
-  return <main className={`${ui.page} ${compact?ui.compact:""} ${topAligned?ui.topAligned:""}`}>
+  return <><StaticCaretGuard/><main className={`${ui.page} ${compact?ui.compact:""} ${topAligned?ui.topAligned:""}`}>
     <div className={ui.ambient}/>
     <section className={ui.frame}>
       {backHref&&backOnScene&&<a href={backHref} className={`${ui.back} ${ui.backOverlay}`} aria-label="Volver"><span aria-hidden="true">←</span><b>Volver</b></a>}
@@ -22,5 +23,5 @@ export default function HospitalityShell({eyebrow="HABITACIÓN LLENA",title,copy
         <div className={ui.wood}/><div className={ui.led}/>
       </section>
     </section>
-  </main>
+  </main></>
 }
