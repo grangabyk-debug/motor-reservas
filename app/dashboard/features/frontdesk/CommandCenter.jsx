@@ -9,6 +9,27 @@ function tone(r,today){
   if(r.fecha_entrada<=today&&r.fecha_salida>today&&r.estado!=="finalizada")return"in"
   return"future"
 }
+function statusLabel(r){
+  if(r?.no_show)return"NO SHOW"
+  const status=String(r?.estado||"").toLowerCase()
+  if(status==="alojado")return"IN"
+  if(status==="finalizada")return"OUT"
+  if(status==="confirmada")return"OK"
+  if(status==="pendiente")return"PENDIENTE"
+  if(status==="cancelada")return"CANCELADA"
+  return status?status.toUpperCase():"PENDIENTE"
+}
+function channelLabel(value){
+  const raw=String(value||"Directa").trim(),channel=raw.toLowerCase()
+  if(channel.includes("booking"))return"OTA · BOOKING.COM"
+  if(channel.includes("expedia"))return"OTA · EXPEDIA"
+  if(channel.includes("airbnb"))return"OTA · AIRBNB"
+  if(channel.includes("motor"))return"MOTOR"
+  if(channel.includes("agencia"))return"AGENCIA"
+  if(channel==="directa")return"DIRECTA"
+  if(channel.includes("teléfono")||channel.includes("telefono")||channel.includes("whatsapp")||channel.includes("walk-in"))return`DIRECTA · ${raw.toUpperCase()}`
+  return raw.toUpperCase()
+}
 function dayName(d){return new Date(`${d}T12:00:00`).toLocaleDateString("es-AR",{weekday:"short"})}
 function halfRange(r,days){
   const first=days[0],lastExclusive=addDays(days.at(-1),1)
@@ -48,7 +69,7 @@ export default function CommandCenter({rooms,reservations,blocks,floors,onMove,o
     <div className={cc.resultMeta}>{filteredRooms.length} de {rooms.length} habitaciones visibles</div>
     <div className={`${ui.calendar} ${cc.calendar}`} style={timeline}>
       <div className={cc.calHead}><div className={ui.roomHead}><b>Habitación</b><small>Piso · tipo</small></div><div className={cc.days} style={tracks}>{days.map((d,i)=><div key={d} style={{gridColumn:`${i*2+1} / span 2`}} className={d===today?cc.todayHeader:""}><small>{dayName(d)}</small><b>{new Date(`${d}T12:00:00`).getDate()}</b></div>)}</div></div>
-      {filteredRooms.map(room=>{const list=reservations.filter(r=>String(r.habitacion_id)===String(room.id)&&r.fecha_salida>days[0]&&r.fecha_entrada<addDays(days.at(-1),1));return <div className={cc.calRow} key={room.id}><button className={ui.roomName}><b>{room.nombre}</b><small>{floorMap.get(String(room.floor_id))||"Sin piso"} · {room.tipo||"Habitación"}</small></button><div className={cc.dayGrid} style={tracks}>{days.map((day,i)=>{const blocked=blocks.some(b=>String(b.habitacion_id)===String(room.id)&&day<b.fecha_hasta&&addDays(day,1)>b.fecha_desde);return <div key={day} style={{gridColumn:`${i*2+1} / span 2`}} className={`${cc.dayCell} ${day===today?cc.todayCell:""} ${blocked?ui.blocked:""}`} onDoubleClick={()=>!blocked&&onNew(room,day)} onContextMenu={e=>{e.preventDefault();onBlock(room,day)}} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();const resize=e.dataTransfer.getData("application/x-hl-resize"),move=e.dataTransfer.getData("application/x-hl-move");if(resize)onResize(resize,addDays(day,1));else if(move)onMove(move,room.id,day)}}/>})}{list.map(r=>{const{startLine,endLine}=halfRange(r,days),t=tone(r,today);return <button key={r.id} draggable onDragStart={e=>e.dataTransfer.setData("application/x-hl-move",String(r.id))} onClick={()=>onOpen(r)} className={`${ui.stay} ${cc.stay} ${t==="in"?ui.stayIn:t==="out"?ui.stayOut:ui.stayFuture}`} style={{gridColumn:`${startLine} / ${endLine}`}} title={`${r.numero_reserva||"Reserva"} · ${r.nombre_huesped||"Huésped"}`}><span><b>{r.nombre_huesped}</b><small>{t.toUpperCase()}</small></span><i draggable onDragStart={e=>{e.stopPropagation();e.dataTransfer.setData("application/x-hl-resize",String(r.id))}} title="Arrastrar para cambiar salida"/></button>})}</div></div>})}
+      {filteredRooms.map(room=>{const list=reservations.filter(r=>String(r.habitacion_id)===String(room.id)&&r.fecha_salida>days[0]&&r.fecha_entrada<addDays(days.at(-1),1));return <div className={cc.calRow} key={room.id}><button className={ui.roomName}><b>{room.nombre}</b><small>{floorMap.get(String(room.floor_id))||"Sin piso"} · {room.tipo||"Habitación"}</small></button><div className={cc.dayGrid} style={tracks}>{days.map((day,i)=>{const blocked=blocks.some(b=>String(b.habitacion_id)===String(room.id)&&day<b.fecha_hasta&&addDays(day,1)>b.fecha_desde);return <div key={day} style={{gridColumn:`${i*2+1} / span 2`}} className={`${cc.dayCell} ${day===today?cc.todayCell:""} ${blocked?ui.blocked:""}`} onDoubleClick={()=>!blocked&&onNew(room,day)} onContextMenu={e=>{e.preventDefault();onBlock(room,day)}} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();const resize=e.dataTransfer.getData("application/x-hl-resize"),move=e.dataTransfer.getData("application/x-hl-move");if(resize)onResize(resize,addDays(day,1));else if(move)onMove(move,room.id,day)}}/>})}{list.map(r=>{const{startLine,endLine}=halfRange(r,days),t=tone(r,today),status=statusLabel(r),channel=channelLabel(r.canal_reserva);return <button key={r.id} draggable onDragStart={e=>e.dataTransfer.setData("application/x-hl-move",String(r.id))} onClick={()=>onOpen(r)} className={`${ui.stay} ${cc.stay} ${t==="in"?ui.stayIn:t==="out"?ui.stayOut:ui.stayFuture}`} style={{gridColumn:`${startLine} / ${endLine}`}} title={`${r.numero_reserva||"Reserva"} · ${r.nombre_huesped||"Huésped"} · ${status} · ${channel}`}><span><b>{r.nombre_huesped}</b><small>{status} · {channel}</small></span><i draggable onDragStart={e=>{e.stopPropagation();e.dataTransfer.setData("application/x-hl-resize",String(r.id))}} title="Arrastrar para cambiar salida"/></button>})}</div></div>})}
       {!filteredRooms.length&&<div className={cc.empty}>No hay habitaciones para estos filtros.</div>}
     </div>
   </section>
