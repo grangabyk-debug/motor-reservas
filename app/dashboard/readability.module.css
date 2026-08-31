@@ -1,0 +1,92 @@
+.readable{display:contents}
+
+/* Habitación Llena — global readability pass.
+   Keep editorial/display headings intact and lift the operational UI around them. */
+.readable small{font-size:12px!important;line-height:1.35}
+.readable main p{font-size:14px;line-height:1.55}
+.readable main button{font-size:14px!important;line-height:1.25}
+.readable main input:not([type="checkbox"]):not([type="radio"]),
+.readable main select,
+.readable main textarea{font-size:14px!important;line-height:1.4}
+.readable main label{font-size:13px!important;line-height:1.4}
+.readable main label>span{font-size:13px!important;line-height:1.35}
+.readable main table th{font-size:12px!important;line-height:1.35}
+.readable main table td{font-size:14px!important;line-height:1.45}
+.readable main table td small{font-size:12px!important}
+.readable main article p{font-size:14px!important;line-height:1.5}
+.readable main article>span,
+.readable main article>em{font-size:12.5px!important;line-height:1.4}
+.readable main article div span{font-size:13px!important}
+.readable main button>span{font-size:12.5px!important}
+.readable main button>em{font-size:12px!important}
+.readable main section header span{font-size:13px!important}
+
+/* Sidebar and navigation: preserve hierarchy but stop using micro-copy. */
+.readable aside nav button{font-size:14px!important}
+.readable aside nav button>span{font-size:14px!important;line-height:1.3}
+.readable aside button span>b{font-size:15px!important;line-height:1.25}
+.readable aside nav small{font-size:11.5px!important;line-height:1.3}
+
+/* Feature modals rendered inside main. Keep close controls large. */
+.readable main form>header>button:only-of-type{font-size:28px!important;line-height:1!important}
+.readable main form footer button{font-size:14px!important}
+
+/* Reservation workspace: all tabs, fields, documents and notes must be easy to scan. */
+.readable [role="dialog"]{font-size:14px;line-height:1.45}
+.readable [role="dialog"] nav button{font-size:14px!important;line-height:1.25!important;padding:10px 16px!important}
+.readable [role="dialog"] label{font-size:13px!important;line-height:1.4}
+.readable [role="dialog"] label>span{font-size:13px!important;line-height:1.35}
+.readable [role="dialog"] input:not([type="checkbox"]):not([type="radio"]),
+.readable [role="dialog"] select,
+.readable [role="dialog"] textarea{font-size:14px!important;line-height:1.4!important}
+.readable [role="dialog"] p{font-size:13.5px!important;line-height:1.5}
+.readable [role="dialog"] small{font-size:11.5px!important;line-height:1.35}
+.readable [role="dialog"] h4{font-size:18px!important}
+.readable [role="dialog"] article b{font-size:13.5px}
+.readable [role="dialog"] article span{font-size:13px}
+.readable [role="dialog"] footer span{font-size:13px!important;line-height:1.35}
+.readable [role="dialog"] footer b{font-size:18px!important;line-height:1.2}
+.readable [role="dialog"] footer small{font-size:12px!important}
+.readable [role="dialog"] footer button{font-size:13.5px!important;line-height:1.25!important;padding:11px 16px!important}
+.readable [role="dialog"]>form>header>button{font-size:28px!important;line-height:1!important}
+
+/* Existing reservations have four footer actions. Color the two operational ones. */
+.readable [role="dialog"] footer>div:last-child>button:nth-last-child(4){background:#2d6a4f!important;border-color:#2d6a4f!important;color:#fff!important}
+.readable [role="dialog"] footer>div:last-child>button:nth-last-child(3){background:#b6403a!important;border-color:#b6403a!important;color:#fff!important}
+.readable [role="dialog"] footer>div:last-child>button:nth-last-child(4):disabled,
+.readable [role="dialog"] footer>div:last-child>button:nth-last-child(3):disabled{opacity:.5!important}
+
+/* Command Center / room diary. */
+.readable main button[draggable]{min-height:44px!important}
+.readable main button[draggable] b{font-size:12px!important;line-height:1.15}
+.readable main button[draggable] small{font-size:11px!important;line-height:1.15}
+.readable [class*="roomName"] b{font-size:14px!important;line-height:1.25}
+.readable [class*="roomName"] small{font-size:12px!important;line-height:1.3}
+.readable [class*="resultMeta"]{font-size:12px!important;line-height:1.4}
+.readable [class*="tooltip"]{font-size:13px!important;line-height:1.45}
+.readable [class*="tooltip"] p{font-size:13px!important}
+.readable [class*="tooltip"] em{font-size:12px!important}
+.readable [class*="toolbar"] input,
+.readable [class*="toolbar"] select{font-size:13.5px!important}
+.readable [class*="toolbar"] button{font-size:14px!important}
+
+/* Operational cards, KPI captions, system notices and supporting copy. */
+.readable [class*="notice"],
+.readable [class*="message"],
+.readable [class*="resultMeta"],
+.readable [class*="productSignature"]{font-size:12px!important;line-height:1.4}
+.readable [class*="toast"]{font-size:14px!important;line-height:1.4}
+.readable [class*="badge"]{font-size:11.5px!important;line-height:1.25}
+.readable [class*="legend"]{font-size:11.5px!important;line-height:1.3}
+
+@media(max-width:760px){
+  .readable small{font-size:11.5px!important}
+  .readable main button{font-size:13.5px!important}
+  .readable main input:not([type="checkbox"]):not([type="radio"]),
+  .readable main select,
+  .readable main textarea{font-size:16px!important}
+  .readable [role="dialog"] nav button{font-size:13.5px!important;padding:10px 14px!important}
+  .readable [role="dialog"] input:not([type="checkbox"]):not([type="radio"]),
+  .readable [role="dialog"] select,
+  .readable [role="dialog"] textarea{font-size:16px!important}
+}
