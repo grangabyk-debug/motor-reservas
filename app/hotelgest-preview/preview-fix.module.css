@@ -1,0 +1,9 @@
+.previewFix{width:100%;min-height:100vh}
+.previewFix>div{width:100%;min-width:0}
+.previewFix>div:has(> aside + div) div:has(> aside + main){grid-template-columns:minmax(0,1fr)!important;width:100%!important}
+.previewFix>div:has(> aside + div) div:has(> aside + main)>aside{display:none!important}
+.previewFix>div:has(> aside + div) div:has(> aside + main)>main{grid-column:1!important;width:100%!important;min-width:0!important}
+.previewFix>div:has(> aside + div) main{max-width:none!important}
+@media(min-width:761px){
+  .previewFix>div:has(> aside + div)>div{min-width:0;width:100%}
+}
