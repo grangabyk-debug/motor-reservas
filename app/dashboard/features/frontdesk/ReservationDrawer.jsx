@@ -3,6 +3,7 @@ import{useEffect,useMemo,useRef,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 import{money,nightsBetween}from"../../core/formatters"
 import{reservationTotal}from"./reservationModel"
+import MercadoPagoGuaranteePanel from"./MercadoPagoGuaranteePanel"
 import{compressReservationDocument,deleteReservationDocument,listReservationDocuments,openReservationDocument}from"../../services/reservationDocuments"
 import modal from"./reservation-modal.module.css"
 
@@ -13,87 +14,23 @@ const CHANNELS=["Directa","Motor directo","Booking.com","Expedia","Airbnb","Tel�
 const size=n=>n>1048576?`${(n/1048576).toFixed(1)} MB`:`${Math.max(1,Math.round(n/1024))} KB`
 const isParkingExtra=item=>item?.resource_category==="parking"||item?.kind==="parking"
 const stayNights=draft=>draft?.start&&draft?.end?Math.max(0,nightsBetween(draft.start,draft.end)):0
-
 function resourceQuantity(resource,draft){const mode=resource?.charge_mode,nights=stayNights(draft);if(resource?.category==="parking")return Math.max(1,nights||1);if(mode==="per_night"||mode==="per_day")return Math.max(1,nights||1);if(mode==="per_person")return Math.max(1,Number(draft?.pax||1));return 1}
 function resourceLine(resource,draft,category=resource?.category){const quantity=resourceQuantity(resource,draft),unit=Number(resource?.price||0);return{name:resource?.name||"Recurso",resource_id:resource?.id||null,resource_category:category||"service",charge_mode:resource?.charge_mode||"per_use",quantity,unit_price:unit,total:unit*quantity}}
 function Field({label,wide=false,full=false,children}){return <label className={`${wide?modal.wide:""} ${full?modal.full:""}`}><span>{label}</span>{children}</label>}
 function NumberInput({value,onChange,...props}){return <input type="number" value={value??""} onFocus={()=>String(value)==="0"&&onChange("")} onChange={e=>onChange(e.target.value)} {...props}/>}
-function statusLabel(original,draft){
-  if(original?.no_show)return"NO SHOW"
-  if(!draft?.id)return"NUEVA"
-  const status=String(original?.estado||"").toLowerCase()
-  if(status==="alojado")return"IN"
-  if(status==="finalizada")return"OUT"
-  if(status==="confirmada"||status==="reservada"||status==="ok")return"OK"
-  if(status==="pendiente"||status==="pre_reserva")return"PENDIENTE"
-  if(status==="cancelada")return"CANCELADA"
-  return status?status.toUpperCase():"PENDIENTE"
-}
-function channelLabel(value){
-  const raw=String(value||"").trim(),channel=raw.toLowerCase()
-  if(!raw)return"CANAL PENDIENTE"
-  if(channel.includes("booking"))return"OTA · BOOKING.COM"
-  if(channel.includes("expedia"))return"OTA · EXPEDIA"
-  if(channel.includes("airbnb"))return"OTA · AIRBNB"
-  if(channel.includes("motor"))return"MOTOR"
-  if(channel.includes("agencia"))return"AGENCIA"
-  if(channel==="directa")return"DIRECTA"
-  if(channel.includes("teléfono")||channel.includes("telefono")||channel.includes("whatsapp")||channel.includes("walk-in"))return`DIRECTA · ${raw.toUpperCase()}`
-  return raw.toUpperCase()
-}
-function inferCardBrand(number){
-  if(/^4/.test(number))return"Visa"
-  if(/^(5[1-5]|2[2-7])/.test(number))return"Mastercard"
-  if(/^3[47]/.test(number))return"American Express"
-  if(/^6/.test(number))return"Discover"
-  return""
-}
-function formatCardNumber(value){return String(value||"").replace(/\D/g,"").slice(0,16).replace(/(.{4})/g,"$1 ").trim()}
+function statusLabel(original,draft){if(original?.no_show)return"NO SHOW";if(!draft?.id)return"NUEVA";const status=String(original?.estado||"").toLowerCase();if(status==="alojado")return"IN";if(status==="finalizada")return"OUT";if(status==="confirmada"||status==="reservada"||status==="ok")return"OK";if(status==="pendiente"||status==="pre_reserva")return"PENDIENTE";if(status==="cancelada")return"CANCELADA";return status?status.toUpperCase():"PENDIENTE"}
+function channelLabel(value){const raw=String(value||"").trim(),channel=raw.toLowerCase();if(!raw)return"CANAL PENDIENTE";if(channel.includes("booking"))return"OTA · BOOKING.COM";if(channel.includes("expedia"))return"OTA · EXPEDIA";if(channel.includes("airbnb"))return"OTA · AIRBNB";if(channel.includes("motor"))return"MOTOR";if(channel.includes("agencia"))return"AGENCIA";if(channel==="directa")return"DIRECTA";if(channel.includes("teléfono")||channel.includes("telefono")||channel.includes("whatsapp")||channel.includes("walk-in"))return`DIRECTA · ${raw.toUpperCase()}`;return raw.toUpperCase()}
 
 export default function ReservationDrawer({initial,original,rooms,partners=[],groups=[],charges=[],payments=[],busy=false,onClose,onSave,onCheckin,onCheckout,onPayment,onPrint,onEmail,onKey,onWebCheckin}){
-  const[draft,setDraft]=useState(initial)
-  const[tab,setTab]=useState("guest")
-  const[payment,setPayment]=useState({amount:"",method:"",currency:"ARS",note:""})
-  const[paymentMessage,setPaymentMessage]=useState("")
-  const[cardCapture,setCardCapture]=useState({number:"",cvv:""})
-  const[documents,setDocuments]=useState([])
-  const[docBusy,setDocBusy]=useState(false)
-  const[docMessage,setDocMessage]=useState("")
-  const[resources,setResources]=useState([])
-  const[resourceError,setResourceError]=useState("")
-  const[parkingDaysManual,setParkingDaysManual]=useState(false)
-  const parkingDates=useRef({start:initial?.start||"",end:initial?.end||""})
-  const propertyId=original?.property_id||rooms.find(r=>r.property_id)?.property_id||null
-
-  useEffect(()=>{
-    setDraft(initial);setTab("guest");setDocuments([]);setDocMessage("");setPayment({amount:"",method:"",currency:initial?.currency||"ARS",note:""});setPaymentMessage("");setCardCapture({number:"",cvv:""})
-    parkingDates.current={start:initial?.start||"",end:initial?.end||""}
-    const linked=(initial?.extras||[]).find(isParkingExtra),expected=stayNights(initial)
-    setParkingDaysManual(!!linked&&expected>0&&Number(linked.quantity||0)!==expected)
-  },[initial?.id,initial?.start,initial?.end,initial?.roomId])
+  const[draft,setDraft]=useState(initial),[tab,setTab]=useState("guest"),[payment,setPayment]=useState({amount:"",method:"",currency:"ARS",note:""}),[paymentMessage,setPaymentMessage]=useState(""),[documents,setDocuments]=useState([]),[docBusy,setDocBusy]=useState(false),[docMessage,setDocMessage]=useState(""),[resources,setResources]=useState([]),[resourceError,setResourceError]=useState(""),[parkingDaysManual,setParkingDaysManual]=useState(false)
+  const parkingDates=useRef({start:initial?.start||"",end:initial?.end||""}),propertyId=original?.property_id||rooms.find(r=>r.property_id)?.property_id||null
+  useEffect(()=>{setDraft(initial);setTab("guest");setDocuments([]);setDocMessage("");setPayment({amount:"",method:"",currency:initial?.currency||"ARS",note:""});setPaymentMessage("");parkingDates.current={start:initial?.start||"",end:initial?.end||""};const linked=(initial?.extras||[]).find(isParkingExtra),expected=stayNights(initial);setParkingDaysManual(!!linked&&expected>0&&Number(linked.quantity||0)!==expected)},[initial?.id,initial?.start,initial?.end,initial?.roomId])
   useEffect(()=>{let active=true;if(!original?.id||!original?.property_id)return;listReservationDocuments({propertyId:original.property_id,reservationId:original.id}).then(x=>active&&setDocuments(x)).catch(e=>active&&setDocMessage(e.message));return()=>{active=false}},[original?.id,original?.property_id])
   useEffect(()=>{let active=true;if(!propertyId){setResources([]);return()=>{active=false}}setResourceError("");supabase.from("hotel_resources").select("*").eq("property_id",propertyId).eq("active",true).order("category").order("name").then(({data,error})=>{if(!active)return;if(error){setResourceError("No pudimos cargar los recursos configurados.");setResources([])}else setResources(data||[])});return()=>{active=false}},[propertyId])
   useEffect(()=>{if(!draft)return;const next={start:draft.start||"",end:draft.end||""},prev=parkingDates.current,changed=prev.start!==next.start||prev.end!==next.end;parkingDates.current=next;if(!changed||parkingDaysManual)return;const nights=stayNights(draft);if(nights<1)return;setDraft(x=>{const extras=x.extras||[],index=extras.findIndex(isParkingExtra);if(index<0)return x;const item=extras[index],unit=Number(item.unit_price??((Number(item.total||0)/Math.max(1,Number(item.quantity||1)))||0)),updated={...item,quantity:nights,total:unit*nights},copy=[...extras];copy[index]=updated;return{...x,extras:copy,parking:updated.total}})},[draft?.start,draft?.end,parkingDaysManual])
-
-  const room=rooms.find(r=>String(r.id)===String(draft?.roomId))
-  const totals=useMemo(()=>reservationTotal(draft||{},room),[draft,room])
-  const reservationPayments=useMemo(()=>payments.filter(p=>String(p.reserva_id)===String(draft?.id)),[payments,draft?.id])
-  const persistedPaid=reservationPayments.reduce((a,p)=>a+Number(p.monto||0),0)
-  const stagedPayments=draft?.initialPayments||[]
-  const stagedPaid=stagedPayments.reduce((a,p)=>a+Number(p.amount||0),0)
-  const paid=persistedPaid+stagedPaid
-  const balance=Math.max(0,totals.total-paid)
-  const overpaid=Math.max(0,paid-totals.total)
-  const parkingItem=useMemo(()=>(draft?.extras||[]).find(isParkingExtra)||null,[draft?.extras])
-  const parkingResources=useMemo(()=>resources.filter(r=>r.category==="parking"),[resources])
-  const petResources=useMemo(()=>resources.filter(r=>r.category==="pet"),[resources])
-  const otherResources=useMemo(()=>resources.filter(r=>!["parking","pet"].includes(r.category)),[resources])
+  const room=rooms.find(r=>String(r.id)===String(draft?.roomId)),totals=useMemo(()=>reservationTotal(draft||{},room),[draft,room]),reservationPayments=useMemo(()=>payments.filter(p=>String(p.reserva_id)===String(draft?.id)),[payments,draft?.id]),persistedPaid=reservationPayments.reduce((a,p)=>a+Number(p.monto||0),0),stagedPayments=draft?.initialPayments||[],stagedPaid=stagedPayments.reduce((a,p)=>a+Number(p.amount||0),0),paid=persistedPaid+stagedPaid,balance=Math.max(0,totals.total-paid),overpaid=Math.max(0,paid-totals.total),parkingItem=useMemo(()=>(draft?.extras||[]).find(isParkingExtra)||null,[draft?.extras]),parkingResources=useMemo(()=>resources.filter(r=>r.category==="parking"),[resources]),petResources=useMemo(()=>resources.filter(r=>r.category==="pet"),[resources]),otherResources=useMemo(()=>resources.filter(r=>!["parking","pet"].includes(r.category)),[resources])
   if(!draft)return null
-
-  const set=(key,value)=>setDraft(x=>({...x,[key]:value}))
-  const pending=draft.pendingDocuments||[]
-  const currentStatus=statusLabel(original,draft),currentChannel=channelLabel(draft.channel||original?.canal_reserva)
-
+  const set=(key,value)=>setDraft(x=>({...x,[key]:value})),pending=draft.pendingDocuments||[],currentStatus=statusLabel(original,draft),currentChannel=channelLabel(draft.channel||original?.canal_reserva)
   function addCompanion(){set("companions",[...(draft.companions||[]),{nombre:"",dni:"",es_menor:false}])}
   function updateCompanion(i,key,value){set("companions",draft.companions.map((p,j)=>j===i?{...p,[key]:value}:p))}
   function addPet(){set("pets",[...(draft.pets||[]),{name:"",amount:"",resource_id:""}])}
@@ -102,152 +39,24 @@ export default function ReservationDrawer({initial,original,rooms,partners=[],gr
   function addResource(item){setDraft(x=>({...x,extras:[...(x.extras||[]),resourceLine(item,x,item.category)]}))}
   function selectParking(id){const resource=parkingResources.find(r=>String(r.id)===String(id));setParkingDaysManual(false);setDraft(x=>{const others=(x.extras||[]).filter(extra=>!isParkingExtra(extra));if(!resource)return{...x,parking:0,extras:others};const line={...resourceLine(resource,x,"parking"),kind:"parking"},inferred=String(resource.name||"").replace(/^cochera\s*/i,"").trim();return{...x,parking:line.total,vehicleType:x.vehicleType||inferred,extras:[...others,line]}})}
   function updateParkingField(key,value){if(key==="quantity")setParkingDaysManual(true);setDraft(x=>{const extras=x.extras||[],index=extras.findIndex(isParkingExtra);if(index<0)return key==="total"?{...x,parking:value}:x;const item=extras[index],quantity=key==="quantity"?Math.max(0,Number(value||0)):Math.max(0,Number(item.quantity||0)),currentUnit=Number(item.unit_price??((Number(item.total||0)/Math.max(1,Number(item.quantity||1)))||0));let unit=key==="unit_price"?Math.max(0,Number(value||0)):currentUnit,total=unit*quantity;if(key==="total"){total=Math.max(0,Number(value||0));unit=quantity?total/quantity:total}const updated={...item,quantity,unit_price:unit,total},copy=[...extras];copy[index]=updated;return{...x,extras:copy,parking:total}})}
-  function updateCardNumber(value){
-    const number=String(value||"").replace(/\D/g,"").slice(0,16),brand=inferCardBrand(number)
-    setCardCapture(x=>({...x,number}))
-    setDraft(x=>({...x,guaranteeLast4:number.slice(-4),guaranteeBrand:brand||x.guaranteeBrand}))
-  }
-  async function registerPayment(){
-    setPaymentMessage("")
-    const amount=Number(payment.amount||0)
-    if(!totals.total)return setPaymentMessage("Primero completá habitación, fechas y tarifa para calcular el total.")
-    if(!(amount>0))return setPaymentMessage("Ingresá un monto mayor a cero.")
-    if(!payment.method)return setPaymentMessage("Elegí el medio de pago.")
-    if(amount>balance+.01)return setPaymentMessage(`El monto supera el saldo pendiente de ${money(balance,draft.currency)}.`)
-    const entry={amount,method:payment.method,currency:draft.currency||"ARS",note:payment.note||""}
-    if(draft.id)await onPayment(entry)
-    else setDraft(x=>({...x,initialPayments:[...(x.initialPayments||[]),entry]}))
-    setPayment({amount:"",method:"",currency:draft.currency||"ARS",note:""})
-  }
+  async function registerPayment(){setPaymentMessage("");const amount=Number(payment.amount||0);if(!totals.total)return setPaymentMessage("Primero completá habitación, fechas y tarifa para calcular el total.");if(!(amount>0))return setPaymentMessage("Ingresá un monto mayor a cero.");if(!payment.method)return setPaymentMessage("Elegí el medio de pago.");if(amount>balance+.01)return setPaymentMessage(`El monto supera el saldo pendiente de ${money(balance,draft.currency)}.`);const entry={amount,method:payment.method,currency:draft.currency||"ARS",note:payment.note||""};if(draft.id)await onPayment(entry);else setDraft(x=>({...x,initialPayments:[...(x.initialPayments||[]),entry]}));setPayment({amount:"",method:"",currency:draft.currency||"ARS",note:""})}
   function removeStagedPayment(index){set("initialPayments",stagedPayments.filter((_,i)=>i!==index))}
+  function guaranteeChanged(guarantee){if(!guarantee)return;const exp=guarantee.expiration_month&&guarantee.expiration_year?`${String(guarantee.expiration_month).padStart(2,"0")}/${String(guarantee.expiration_year).slice(-2)}`:"";setDraft(x=>({...x,guaranteeType:"Tarjeta",guaranteeBrand:guarantee.card_brand||x.guaranteeBrand,guaranteeLast4:guarantee.last_four||x.guaranteeLast4,guaranteeExpiry:exp||x.guaranteeExpiry}))}
   async function selectDocuments(files){setDocBusy(true);setDocMessage("");try{const next=[];for(const source of Array.from(files||[])){const file=await compressReservationDocument(source);next.push({file,kind:"documento",originalSize:source.size})}set("pendingDocuments",[...pending,...next])}catch(e){setDocMessage(e.message||"No se pudo preparar el documento.")}finally{setDocBusy(false)}}
   async function removeStored(document){if(!original?.property_id)return;setDocBusy(true);try{await deleteReservationDocument({propertyId:original.property_id,document});setDocuments(x=>x.filter(d=>d.id!==document.id))}catch(e){setDocMessage(e.message)}finally{setDocBusy(false)}}
-
   const stayLabel=draft.start&&draft.end?`${draft.start} → ${draft.end}`:"Completá las fechas de estadía"
-  return <div className={modal.shade} onMouseDown={e=>e.target===e.currentTarget&&onClose()}>
-    <section className={modal.dialog} role="dialog" aria-modal="true" aria-label={draft.id?"Editar reserva":"Nueva reserva"}>
-      <form className={modal.form} onSubmit={e=>{e.preventDefault();onSave(draft)}}>
-        <header className={modal.head}>
-          <div>
-            <small>{original?.numero_reserva||"NUEVA RESERVA"}{original?.codigo_canal?` · ${original.codigo_canal}`:""}</small>
-            <h2>{draft.guest||"Nueva reserva"}</h2>
-            <p>{stayLabel}</p>
-            <div className={modal.headerBadges}><span className={modal.statusBadge}>{currentStatus}</span><span className={modal.channelBadge}>{currentChannel}</span></div>
-          </div>
-          <button type="button" className={modal.close} onClick={onClose}>×</button>
-        </header>
-        <nav className={modal.tabs}>{TABS.map(([id,label])=><button type="button" key={id} className={tab===id?modal.active:""} onClick={()=>setTab(id)}>{label}</button>)}</nav>
-        <main className={modal.body}>
-          {tab==="guest"&&<section className={modal.panel}>
-            <h3>Ficha del pasajero</h3>
-            <div className={modal.grid}>
-              <Field label="Nombre y apellido" wide><input autoFocus value={draft.guest} onChange={e=>set("guest",e.target.value)}/></Field>
-              <Field label="Email" wide><input type="email" value={draft.email} onChange={e=>set("email",e.target.value)}/></Field>
-              <Field label="Teléfono"><input value={draft.phone} onChange={e=>set("phone",e.target.value)}/></Field>
-              <Field label="DNI / Pasaporte"><input value={draft.document} onChange={e=>set("document",e.target.value)}/></Field>
-              <Field label="País"><input value={draft.country} onChange={e=>set("country",e.target.value)}/></Field>
-              <Field label="Provincia"><input value={draft.province} onChange={e=>set("province",e.target.value)}/></Field>
-              <Field label="Dirección" full><input value={draft.address} onChange={e=>set("address",e.target.value)}/></Field>
-            </div>
-            <div className={modal.subhead}><h4>Acompañantes</h4><button className={modal.miniButton} type="button" onClick={addCompanion}>＋ Agregar</button></div>
-            <div className={modal.rows}>{(draft.companions||[]).map((p,i)=><div className={modal.row} key={i}><input placeholder="Nombre" value={p.nombre||""} onChange={e=>updateCompanion(i,"nombre",e.target.value)}/><input placeholder="Documento" value={p.dni||""} onChange={e=>updateCompanion(i,"dni",e.target.value)}/><label><input type="checkbox" checked={!!p.es_menor} onChange={e=>updateCompanion(i,"es_menor",e.target.checked)}/> Menor</label><button className={modal.remove} type="button" onClick={()=>set("companions",draft.companions.filter((_,j)=>j!==i))}>×</button></div>)}</div>
-          </section>}
-
-          {tab==="stay"&&<section className={modal.panel}>
-            <h3>Estadía</h3>
-            <div className={modal.grid}>
-              <Field label="Habitación" wide><select value={draft.roomId} onChange={e=>set("roomId",e.target.value)}><option value="">Elegir habitación</option>{rooms.map(r=><option key={r.id} value={r.id}>{r.nombre} · {r.tipo||"Habitación"}</option>)}</select></Field>
-              <Field label="Pax"><NumberInput min="1" value={draft.pax} onChange={v=>set("pax",v)}/></Field>
-              <Field label="Hora llegada"><input type="time" value={draft.arrivalTime||""} onChange={e=>set("arrivalTime",e.target.value)}/></Field>
-              <Field label="Entrada"><input type="date" value={draft.start} onChange={e=>set("start",e.target.value)}/></Field>
-              <Field label="Salida"><input type="date" value={draft.end} onChange={e=>set("end",e.target.value)}/></Field>
-              <Field label="Canal"><select value={draft.channel} onChange={e=>set("channel",e.target.value)}><option value="">Elegir canal</option>{CHANNELS.map(channel=><option key={channel}>{channel}</option>)}</select></Field>
-              <Field label="Código canal / OTA"><input value={draft.channelCode||""} onChange={e=>set("channelCode",e.target.value)} placeholder="Si corresponde"/></Field>
-              <Field label="Tarifa/noche"><NumberInput min="0" value={draft.rate} onChange={v=>set("rate",v)}/></Field>
-              <Field label="Empresa / Agencia"><select value={draft.partnerId||""} onChange={e=>set("partnerId",e.target.value)}><option value="">Sin empresa/agencia</option>{partners.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
-              <Field label="Grupo"><select value={draft.groupId||""} onChange={e=>set("groupId",e.target.value)}><option value="">Sin grupo</option>{groups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select></Field>
-              <Field label="Vehículos"><NumberInput min="0" value={draft.vehicles} onChange={v=>set("vehicles",v)}/></Field>
-              <Field label="Tipo vehículo"><input value={draft.vehicleType||""} onChange={e=>set("vehicleType",e.target.value)}/></Field>
-              <Field label="Dominio"><input value={draft.vehiclePlate||""} onChange={e=>set("vehiclePlate",e.target.value.toUpperCase())}/></Field>
-              <Field label="Cochera" wide><select value={parkingItem?.resource_id||""} onChange={e=>selectParking(e.target.value)}><option value="">Sin recurso / monto manual</option>{parkingResources.map(r=><option key={r.id} value={r.id}>{r.name} · {money(r.price)}{r.charge_mode==="per_night"?" / noche":""}</option>)}</select></Field>
-              <Field label="Días cochera"><NumberInput min="0" disabled={!parkingItem} value={parkingItem?.quantity??""} onChange={v=>updateParkingField("quantity",v)}/></Field>
-              <Field label="Precio por día"><NumberInput min="0" disabled={!parkingItem} value={parkingItem?.unit_price??""} onChange={v=>updateParkingField("unit_price",v)}/></Field>
-              <Field label="Total cochera"><NumberInput min="0" value={parkingItem?.total??draft.parking} onChange={v=>parkingItem?updateParkingField("total",v):set("parking",v)}/></Field>
-            </div>
-            <div className={modal.guaranteeBox}>
-              <div className={modal.guaranteeTitle}><h4>Garantía de la reserva</h4><small>La garantía queda separada de los pagos de la estadía.</small></div>
-              <div className={modal.grid}>
-                <Field label="Tipo de garantía" wide><select value={draft.guaranteeType||""} onChange={e=>set("guaranteeType",e.target.value)}><option value="">Elegir garantía</option><option>Sin garantía</option><option>Tarjeta</option><option>Transferencia</option><option>Seña</option><option>Voucher</option></select></Field>
-                {draft.guaranteeType==="Tarjeta"&&<>
-                  <Field label="Número de tarjeta" wide><input inputMode="numeric" autoComplete="cc-number" maxLength="19" value={formatCardNumber(cardCapture.number)} onChange={e=>updateCardNumber(e.target.value)} placeholder={draft.guaranteeLast4?`•••• •••• •••• ${draft.guaranteeLast4}`:"0000 0000 0000 0000"}/></Field>
-                  <Field label="CCV / CVV"><input type="password" inputMode="numeric" autoComplete="cc-csc" maxLength="4" value={cardCapture.cvv} onChange={e=>setCardCapture(x=>({...x,cvv:e.target.value.replace(/\D/g,"").slice(0,4)}))} placeholder="•••"/></Field>
-                  <Field label="Marca"><input value={draft.guaranteeBrand||""} onChange={e=>set("guaranteeBrand",e.target.value)}/></Field>
-                  <Field label="Últimos 4 guardados"><input readOnly value={draft.guaranteeLast4||""} placeholder="Se completa con la tarjeta"/></Field>
-                  <Field label="Vencimiento"><input value={draft.guaranteeExpiry||""} onChange={e=>set("guaranteeExpiry",e.target.value.replace(/[^0-9/]/g,"").slice(0,5))} placeholder="MM/AA"/></Field>
-                </>}
-              </div>
-              {draft.guaranteeType==="Tarjeta"&&<p className={modal.securityNote}>Seguridad: podés ingresar los 16 números y el CCV durante la carga, pero Habitación Llena no guarda el número completo ni el CCV. Se conservan marca, últimos 4 y vencimiento. Para retener una tarjeta completa de forma segura hace falta tokenización con un proveedor de pagos.</p>}
-            </div>
-            {resourceError&&<div className={modal.message}>{resourceError}</div>}
-          </section>}
-
-          {tab==="money"&&<section className={modal.panel}>
-            <h3>Pagos · cuenta del huésped</h3>
-            <div className={modal.grid}><Field label="Medio preferido" wide><select value={draft.preferredPayment||""} onChange={e=>set("preferredPayment",e.target.value)}><option value="">Elegir medio</option>{PAYMENT_METHODS.map(method=><option key={method}>{method}</option>)}</select></Field></div>
-            <div className={modal.paymentBox}>
-              <div><span>Total estadía</span><b>{money(totals.total,draft.currency)}</b></div>
-              <div><span>Pagado</span><b>{money(paid,draft.currency)}</b></div>
-              <div><span>Saldo pendiente</span><b>{money(balance,draft.currency)}</b></div>
-              <div className={modal.paymentFields}>
-                <NumberInput min="0.01" step="0.01" max={balance||undefined} placeholder="Monto" value={payment.amount} onChange={v=>setPayment(x=>({...x,amount:v}))}/>
-                <select value={payment.method} onChange={e=>setPayment(x=>({...x,method:e.target.value}))}><option value="">Medio de pago</option>{PAYMENT_METHODS.map(method=><option key={method}>{method}</option>)}</select>
-                <input placeholder="Nota / referencia (opcional)" value={payment.note} onChange={e=>setPayment(x=>({...x,note:e.target.value}))}/>
-                <button type="button" disabled={!totals.total||balance<=.01} onClick={registerPayment}>{draft.id?"Registrar pago":"Agregar pago"}</button>
-              </div>
-              {overpaid>.01?<div className={`${modal.paymentState} ${modal.balanceOpen}`}>Los pagos superan el total en {money(overpaid,draft.currency)}. Revisá los importes antes de guardar.</div>:balance>.01?<div className={`${modal.paymentState} ${modal.balanceOpen}`}>Quedan {money(balance,draft.currency)} pendientes. Podés guardar la reserva y completar el saldo más adelante; el check-out queda bloqueado mientras exista deuda.</div>:totals.total>0?<div className={`${modal.paymentState} ${modal.balanceClear}`}>Cuenta cubierta. No queda saldo pendiente.</div>:null}
-            </div>
-            {paymentMessage&&<div className={modal.message}>{paymentMessage}</div>}
-            <div className={modal.paymentHistory}>
-              <h4>Movimientos de pago</h4>
-              {stagedPayments.map((item,i)=><div className={modal.paymentRow} key={`staged-${i}`}><span><b>{item.method}</b><small>{item.note||"Se registrará al crear la reserva"}</small></span><strong>{money(item.amount,draft.currency)}</strong><button type="button" title="Quitar pago" onClick={()=>removeStagedPayment(i)}>×</button></div>)}
-              {reservationPayments.map(item=><div className={modal.paymentRow} key={item.id}><span><b>{item.metodo||"Pago"}</b><small>{item.nota||"Pago registrado"}</small></span><strong>{money(item.monto,item.moneda||draft.currency)}</strong><span/></div>)}
-              {!stagedPayments.length&&!reservationPayments.length&&<div className={modal.paymentEmpty}>Todavía no hay pagos registrados. Podés cargar un pago total, parcial o combinar varios medios.</div>}
-            </div>
-          </section>}
-
-          {tab==="extras"&&<section className={modal.panel}>
-            <div className={modal.subhead}><h3>Mascotas y extras</h3><button className={modal.miniButton} type="button" onClick={addPet}>＋ Mascota</button></div>
-            <div className={modal.rows}>{(draft.pets||[]).map((pet,i)=><div className={modal.row} key={`pet-${i}`}><input placeholder="Nombre mascota" value={pet.name||""} onChange={e=>set("pets",draft.pets.map((p,j)=>j===i?{...p,name:e.target.value}:p))}/><select value={pet.resource_id||""} onChange={e=>updatePetResource(i,e.target.value)}><option value="">Tarifa manual</option>{petResources.map(r=><option key={r.id} value={r.id}>{r.name} · {money(r.price)}</option>)}</select><NumberInput min="0" placeholder="Valor" value={pet.amount??""} onChange={v=>set("pets",draft.pets.map((p,j)=>j===i?{...p,amount:v}:p))}/><button className={modal.remove} type="button" onClick={()=>set("pets",draft.pets.filter((_,j)=>j!==i))}>×</button></div>)}</div>
-            {otherResources.length>0&&<div className={modal.chips}>{otherResources.map(r=><button type="button" key={`resource-${r.id}`} onClick={()=>addResource(r)}>＋ {r.name} · {money(r.price)}</button>)}</div>}
-            <div className={modal.chips}>{charges.filter(c=>c.active!==false).map(c=><button type="button" key={c.id} onClick={()=>addCharge(c)}>＋ {c.name} · {money(c.amount)}</button>)}</div>
-            <div className={modal.rows}>{(draft.extras||[]).map((extra,i)=>isParkingExtra(extra)?null:<div className={`${modal.row} ${modal.three}`} key={`extra-${i}`}><input value={extra.name||""} onChange={e=>set("extras",draft.extras.map((p,j)=>j===i?{...p,name:e.target.value}:p))}/><NumberInput min="0" value={extra.total??""} onChange={v=>set("extras",draft.extras.map((p,j)=>j===i?{...p,total:v}:p))}/><button className={modal.remove} type="button" onClick={()=>set("extras",draft.extras.filter((_,j)=>j!==i))}>×</button></div>)}</div>
-            {resourceError&&<div className={modal.message}>{resourceError}</div>}
-          </section>}
-
-          {tab==="documents"&&<section className={modal.panel}>
-            <h3>Documentos asociados</h3>
-            <div className={modal.documents}>
-              <label className={modal.drop}><input type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf" disabled={docBusy} onChange={e=>{selectDocuments(e.target.files);e.target.value=""}}/><span><strong>{docBusy?"Optimizando…":"Subir documentos"}</strong><p>JPG, PNG, WEBP o PDF. Las imágenes se comprimen antes de guardarse. Máximo 12 MB por archivo.</p></span></label>
-              <div className={modal.docList}>
-                {pending.map((item,i)=><article className={modal.doc} key={`pending-${i}`}><span><b>{item.file.name}</b><small>Nuevo · {size(item.originalSize)} → {size(item.file.size)}</small></span><div className={modal.docActions}><select className={modal.kindSelect} value={item.kind} onChange={e=>set("pendingDocuments",pending.map((x,j)=>j===i?{...x,kind:e.target.value}:x))}>{DOC_KINDS.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select><button type="button" onClick={()=>set("pendingDocuments",pending.filter((_,j)=>j!==i))}>Quitar</button></div></article>)}
-                {documents.map(doc=><article className={modal.doc} key={doc.id}><span><b>{doc.file_name}</b><small>{doc.kind} · {size(doc.stored_size_bytes)}</small></span><div className={modal.docActions}><button type="button" onClick={()=>openReservationDocument(doc)}>Abrir</button><button type="button" onClick={()=>removeStored(doc)}>Eliminar</button></div></article>)}
-                {!pending.length&&!documents.length&&<div className={modal.message}>Todavía no hay documentos asociados.</div>}
-              </div>
-            </div>
-            {docMessage&&<div className={modal.message}>{docMessage}</div>}
-          </section>}
-
-          {tab==="notes"&&<section className={modal.panel}>
-            <h3>Observaciones</h3>
-            <label className={modal.wideField}><span>Notas internas</span><textarea value={draft.notes||""} onChange={e=>set("notes",e.target.value)} placeholder="Preferencias, incidencias, pedidos especiales…"/></label>
-            {draft.id&&<div className={modal.tools}><button type="button" onClick={onWebCheckin}>Web Check-in</button><button type="button" onClick={onPrint}>Imprimir</button><button type="button" disabled={!draft.email} onClick={onEmail}>Email</button><button type="button" onClick={onKey}>Llave / tarjeta</button></div>}
-          </section>}
-        </main>
-        <footer className={modal.footer}>
-          <div className={modal.summary}>{totals.nights?<><span>{totals.nights} noches</span><b>{money(totals.total,draft.currency)}</b><small>Saldo {money(balance,draft.currency)}</small></>:<span>Completá habitación y fechas para calcular la estadía.</span>}</div>
-          <div className={modal.actions}>{draft.id&&<><button type="button" disabled={original?.estado==="alojado"||original?.estado==="finalizada"} onClick={onCheckin}>Check-in</button><button type="button" disabled={original?.estado==="finalizada"||balance>.01} title={balance>.01?`Saldo pendiente: ${money(balance,draft.currency)}`:""} onClick={onCheckout}>Check-out</button></>}<button type="button" onClick={onClose}>Cancelar</button><button className={modal.primary} disabled={busy||docBusy||overpaid>.01}>{busy?"Guardando…":draft.id?"Guardar cambios":"Crear reserva"}</button></div>
-        </footer>
-      </form>
-    </section>
-  </div>
+  return <div className={modal.shade} onMouseDown={e=>e.target===e.currentTarget&&onClose()}><section className={modal.dialog} role="dialog" aria-modal="true" aria-label={draft.id?"Editar reserva":"Nueva reserva"}><form className={modal.form} onSubmit={e=>{e.preventDefault();onSave(draft)}}>
+    <header className={modal.head}><div><small>{original?.numero_reserva||"NUEVA RESERVA"}{original?.codigo_canal?` · ${original.codigo_canal}`:""}</small><h2>{draft.guest||"Nueva reserva"}</h2><p>{stayLabel}</p><div className={modal.headerBadges}><span className={modal.statusBadge}>{currentStatus}</span><span className={modal.channelBadge}>{currentChannel}</span></div></div><button type="button" className={modal.close} onClick={onClose}>×</button></header>
+    <nav className={modal.tabs}>{TABS.map(([id,label])=><button type="button" key={id} className={tab===id?modal.active:""} onClick={()=>setTab(id)}>{label}</button>)}</nav>
+    <main className={modal.body}>
+      {tab==="guest"&&<section className={modal.panel}><h3>Ficha del pasajero</h3><div className={modal.grid}><Field label="Nombre y apellido" wide><input autoFocus value={draft.guest} onChange={e=>set("guest",e.target.value)}/></Field><Field label="Email" wide><input type="email" value={draft.email} onChange={e=>set("email",e.target.value)}/></Field><Field label="Teléfono"><input value={draft.phone} onChange={e=>set("phone",e.target.value)}/></Field><Field label="DNI / Pasaporte"><input value={draft.document} onChange={e=>set("document",e.target.value)}/></Field><Field label="País"><input value={draft.country} onChange={e=>set("country",e.target.value)}/></Field><Field label="Provincia"><input value={draft.province} onChange={e=>set("province",e.target.value)}/></Field><Field label="Dirección" full><input value={draft.address} onChange={e=>set("address",e.target.value)}/></Field></div><div className={modal.subhead}><h4>Acompañantes</h4><button className={modal.miniButton} type="button" onClick={addCompanion}>＋ Agregar</button></div><div className={modal.rows}>{(draft.companions||[]).map((p,i)=><div className={modal.row} key={i}><input placeholder="Nombre" value={p.nombre||""} onChange={e=>updateCompanion(i,"nombre",e.target.value)}/><input placeholder="Documento" value={p.dni||""} onChange={e=>updateCompanion(i,"dni",e.target.value)}/><label><input type="checkbox" checked={!!p.es_menor} onChange={e=>updateCompanion(i,"es_menor",e.target.checked)}/> Menor</label><button className={modal.remove} type="button" onClick={()=>set("companions",draft.companions.filter((_,j)=>j!==i))}>×</button></div>)}</div></section>}
+      {tab==="stay"&&<section className={modal.panel}><h3>Estadía</h3><div className={modal.grid}><Field label="Habitación" wide><select value={draft.roomId} onChange={e=>set("roomId",e.target.value)}><option value="">Elegir habitación</option>{rooms.map(r=><option key={r.id} value={r.id}>{r.nombre} · {r.tipo||"Habitación"}</option>)}</select></Field><Field label="Pax"><NumberInput min="1" value={draft.pax} onChange={v=>set("pax",v)}/></Field><Field label="Hora llegada"><input type="time" value={draft.arrivalTime||""} onChange={e=>set("arrivalTime",e.target.value)}/></Field><Field label="Entrada"><input type="date" value={draft.start} onChange={e=>set("start",e.target.value)}/></Field><Field label="Salida"><input type="date" value={draft.end} onChange={e=>set("end",e.target.value)}/></Field><Field label="Canal"><select value={draft.channel} onChange={e=>set("channel",e.target.value)}><option value="">Elegir canal</option>{CHANNELS.map(channel=><option key={channel}>{channel}</option>)}</select></Field><Field label="Código canal / OTA"><input value={draft.channelCode||""} onChange={e=>set("channelCode",e.target.value)} placeholder="Si corresponde"/></Field><Field label="Tarifa/noche"><NumberInput min="0" value={draft.rate} onChange={v=>set("rate",v)}/></Field><Field label="Empresa / Agencia"><select value={draft.partnerId||""} onChange={e=>set("partnerId",e.target.value)}><option value="">Sin empresa/agencia</option>{partners.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></Field><Field label="Grupo"><select value={draft.groupId||""} onChange={e=>set("groupId",e.target.value)}><option value="">Sin grupo</option>{groups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select></Field><Field label="Vehículos"><NumberInput min="0" value={draft.vehicles} onChange={v=>set("vehicles",v)}/></Field><Field label="Tipo vehículo"><input value={draft.vehicleType||""} onChange={e=>set("vehicleType",e.target.value)}/></Field><Field label="Dominio"><input value={draft.vehiclePlate||""} onChange={e=>set("vehiclePlate",e.target.value.toUpperCase())}/></Field><Field label="Cochera" wide><select value={parkingItem?.resource_id||""} onChange={e=>selectParking(e.target.value)}><option value="">Sin recurso / monto manual</option>{parkingResources.map(r=><option key={r.id} value={r.id}>{r.name} · {money(r.price)}{r.charge_mode==="per_night"?" / noche":""}</option>)}</select></Field><Field label="Días cochera"><NumberInput min="0" disabled={!parkingItem} value={parkingItem?.quantity??""} onChange={v=>updateParkingField("quantity",v)}/></Field><Field label="Precio por día"><NumberInput min="0" disabled={!parkingItem} value={parkingItem?.unit_price??""} onChange={v=>updateParkingField("unit_price",v)}/></Field><Field label="Total cochera"><NumberInput min="0" value={parkingItem?.total??draft.parking} onChange={v=>parkingItem?updateParkingField("total",v):set("parking",v)}/></Field></div>
+        <div className={modal.guaranteeBox}><div className={modal.guaranteeTitle}><h4>Garantía de la reserva</h4><small>La garantía queda separada de los pagos de la estadía.</small></div><div className={modal.grid}><Field label="Tipo de garantía" wide><select value={draft.guaranteeType||""} onChange={e=>{set("guaranteeType",e.target.value);if(e.target.value!=="Tarjeta")set("guaranteeTokenPayload",null)}}><option value="">Elegir garantía</option><option>Sin garantía</option><option>Tarjeta</option><option>Transferencia</option><option>Seña</option><option>Voucher</option></select></Field></div>{draft.guaranteeType==="Tarjeta"&&<MercadoPagoGuaranteePanel propertyId={propertyId} reservationId={draft.id} guest={{name:draft.guest,email:draft.email,document:draft.document}} currency={draft.currency||"ARS"} stayTotal={totals.total} stagedToken={draft.guaranteeTokenPayload||null} onStagedToken={payload=>set("guaranteeTokenPayload",payload)} onClearStaged={()=>set("guaranteeTokenPayload",null)} onGuaranteeChanged={guaranteeChanged}/>}</div>{resourceError&&<div className={modal.message}>{resourceError}</div>}</section>}
+      {tab==="money"&&<section className={modal.panel}><h3>Pagos · cuenta del huésped</h3><div className={modal.grid}><Field label="Medio preferido" wide><select value={draft.preferredPayment||""} onChange={e=>set("preferredPayment",e.target.value)}><option value="">Elegir medio</option>{PAYMENT_METHODS.map(method=><option key={method}>{method}</option>)}</select></Field></div><div className={modal.paymentBox}><div><span>Total estadía</span><b>{money(totals.total,draft.currency)}</b></div><div><span>Pagado</span><b>{money(paid,draft.currency)}</b></div><div><span>Saldo pendiente</span><b>{money(balance,draft.currency)}</b></div><div className={modal.paymentFields}><NumberInput min="0.01" step="0.01" max={balance||undefined} placeholder="Monto" value={payment.amount} onChange={v=>setPayment(x=>({...x,amount:v}))}/><select value={payment.method} onChange={e=>setPayment(x=>({...x,method:e.target.value}))}><option value="">Medio de pago</option>{PAYMENT_METHODS.map(method=><option key={method}>{method}</option>)}</select><input placeholder="Nota / referencia (opcional)" value={payment.note} onChange={e=>setPayment(x=>({...x,note:e.target.value}))}/><button type="button" disabled={!totals.total||balance<=.01} onClick={registerPayment}>{draft.id?"Registrar pago":"Agregar pago"}</button></div>{overpaid>.01?<div className={`${modal.paymentState} ${modal.balanceOpen}`}>Los pagos superan el total en {money(overpaid,draft.currency)}. Revisá los importes antes de guardar.</div>:balance>.01?<div className={`${modal.paymentState} ${modal.balanceOpen}`}>Quedan {money(balance,draft.currency)} pendientes. Podés guardar la reserva y completar el saldo más adelante; el check-out queda bloqueado mientras exista deuda.</div>:totals.total>0?<div className={`${modal.paymentState} ${modal.balanceClear}`}>Cuenta cubierta. No queda saldo pendiente.</div>:null}</div>{paymentMessage&&<div className={modal.message}>{paymentMessage}</div>}<div className={modal.paymentHistory}><h4>Movimientos de pago</h4>{stagedPayments.map((item,i)=><div className={modal.paymentRow} key={`staged-${i}`}><span><b>{item.method}</b><small>{item.note||"Se registrará al crear la reserva"}</small></span><strong>{money(item.amount,draft.currency)}</strong><button type="button" title="Quitar pago" onClick={()=>removeStagedPayment(i)}>×</button></div>)}{reservationPayments.map(item=><div className={modal.paymentRow} key={item.id}><span><b>{item.metodo||"Pago"}</b><small>{item.nota||"Pago registrado"}</small></span><strong>{money(item.monto,item.moneda||draft.currency)}</strong><span/></div>)}{!stagedPayments.length&&!reservationPayments.length&&<div className={modal.paymentEmpty}>Todavía no hay pagos registrados. Podés cargar un pago total, parcial o combinar varios medios.</div>}</div></section>}
+      {tab==="extras"&&<section className={modal.panel}><div className={modal.subhead}><h3>Mascotas y extras</h3><button className={modal.miniButton} type="button" onClick={addPet}>＋ Mascota</button></div><div className={modal.rows}>{(draft.pets||[]).map((pet,i)=><div className={modal.row} key={`pet-${i}`}><input placeholder="Nombre mascota" value={pet.name||""} onChange={e=>set("pets",draft.pets.map((p,j)=>j===i?{...p,name:e.target.value}:p))}/><select value={pet.resource_id||""} onChange={e=>updatePetResource(i,e.target.value)}><option value="">Tarifa manual</option>{petResources.map(r=><option key={r.id} value={r.id}>{r.name} · {money(r.price)}</option>)}</select><NumberInput min="0" placeholder="Valor" value={pet.amount??""} onChange={v=>set("pets",draft.pets.map((p,j)=>j===i?{...p,amount:v}:p))}/><button className={modal.remove} type="button" onClick={()=>set("pets",draft.pets.filter((_,j)=>j!==i))}>×</button></div>)}</div>{otherResources.length>0&&<div className={modal.chips}>{otherResources.map(r=><button type="button" key={`resource-${r.id}`} onClick={()=>addResource(r)}>＋ {r.name} · {money(r.price)}</button>)}</div>}<div className={modal.chips}>{charges.filter(c=>c.active!==false).map(c=><button type="button" key={c.id} onClick={()=>addCharge(c)}>＋ {c.name} · {money(c.amount)}</button>)}</div><div className={modal.rows}>{(draft.extras||[]).map((extra,i)=>isParkingExtra(extra)?null:<div className={`${modal.row} ${modal.three}`} key={`extra-${i}`}><input value={extra.name||""} onChange={e=>set("extras",draft.extras.map((p,j)=>j===i?{...p,name:e.target.value}:p))}/><NumberInput min="0" value={extra.total??""} onChange={v=>set("extras",draft.extras.map((p,j)=>j===i?{...p,total:v}:p))}/><button className={modal.remove} type="button" onClick={()=>set("extras",draft.extras.filter((_,j)=>j!==i))}>×</button></div>)}</div>{resourceError&&<div className={modal.message}>{resourceError}</div>}</section>}
+      {tab==="documents"&&<section className={modal.panel}><h3>Documentos asociados</h3><div className={modal.documents}><label className={modal.drop}><input type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf" disabled={docBusy} onChange={e=>{selectDocuments(e.target.files);e.target.value=""}}/><span><strong>{docBusy?"Optimizando…":"Subir documentos"}</strong><p>JPG, PNG, WEBP o PDF. Las imágenes se comprimen antes de guardarse. Máximo 12 MB por archivo.</p></span></label><div className={modal.docList}>{pending.map((item,i)=><article className={modal.doc} key={`pending-${i}`}><span><b>{item.file.name}</b><small>Nuevo · {size(item.originalSize)} → {size(item.file.size)}</small></span><div className={modal.docActions}><select className={modal.kindSelect} value={item.kind} onChange={e=>set("pendingDocuments",pending.map((x,j)=>j===i?{...x,kind:e.target.value}:x))}>{DOC_KINDS.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select><button type="button" onClick={()=>set("pendingDocuments",pending.filter((_,j)=>j!==i))}>Quitar</button></div></article>)}{documents.map(doc=><article className={modal.doc} key={doc.id}><span><b>{doc.file_name}</b><small>{doc.kind} · {size(doc.stored_size_bytes)}</small></span><div className={modal.docActions}><button type="button" onClick={()=>openReservationDocument(doc)}>Abrir</button><button type="button" onClick={()=>removeStored(doc)}>Eliminar</button></div></article>)}{!pending.length&&!documents.length&&<div className={modal.message}>Todavía no hay documentos asociados.</div>}</div></div>{docMessage&&<div className={modal.message}>{docMessage}</div>}</section>}
+      {tab==="notes"&&<section className={modal.panel}><h3>Observaciones</h3><label className={modal.wideField}><span>Notas internas</span><textarea value={draft.notes||""} onChange={e=>set("notes",e.target.value)} placeholder="Preferencias, incidencias, pedidos especiales…"/></label>{draft.id&&<div className={modal.tools}><button type="button" onClick={onWebCheckin}>Web Check-in</button><button type="button" onClick={onPrint}>Imprimir</button><button type="button" disabled={!draft.email} onClick={onEmail}>Email</button><button type="button" onClick={onKey}>Llave / tarjeta</button></div>}</section>}
+    </main>
+    <footer className={modal.footer}><div className={modal.summary}>{totals.nights?<><span>{totals.nights} noches</span><b>{money(totals.total,draft.currency)}</b><small>Saldo {money(balance,draft.currency)}</small></>:<span>Completá habitación y fechas para calcular la estadía.</span>}</div><div className={modal.actions}>{draft.id&&<><button type="button" disabled={original?.estado==="alojado"||original?.estado==="finalizada"} onClick={onCheckin}>Check-in</button><button type="button" disabled={original?.estado==="finalizada"||balance>.01} title={balance>.01?`Saldo pendiente: ${money(balance,draft.currency)}`:""} onClick={onCheckout}>Check-out</button></>}<button type="button" onClick={onClose}>Cancelar</button><button className={modal.primary} disabled={busy||docBusy||overpaid>.01}>{busy?"Guardando…":draft.id?"Guardar cambios":"Crear reserva"}</button></div></footer>
+  </form></section></div>
 }
