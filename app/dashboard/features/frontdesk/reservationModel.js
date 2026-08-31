@@ -1,5 +1,7 @@
 import{nightsBetween,safeJson}from"../../core/formatters"
 
+const isParkingLine=item=>item?.resource_category==="parking"||item?.kind==="parking"
+
 export function blankReservation(){
   return{id:null,guest:"",email:"",phone:"",document:"",address:"",province:"",country:"",roomId:"",start:"",end:"",pax:"",channel:"",channelCode:"",rate:"",currency:"ARS",notes:"",partnerId:"",groupId:"",guaranteeType:"",guaranteeBrand:"",guaranteeLast4:"",guaranteeExpiry:"",preferredPayment:"",vehicles:"",vehicleType:"",vehiclePlate:"",parking:"",pets:[],extras:[],companions:[],arrivalTime:"",pendingDocuments:[]}
 }
@@ -11,8 +13,9 @@ export function reservationToDraft(r){
 export function reservationTotal(draft,room){
   const nights=draft.start&&draft.end?nightsBetween(draft.start,draft.end):0
   const rate=draft.rate!==""&&draft.rate!=null?Number(draft.rate||0):Number(room?.precio||0)
-  const extras=(draft.extras||[]).reduce((a,x)=>a+Number(x.total||x.amount||0),0)
+  const allExtras=draft.extras||[],parkingLines=allExtras.filter(isParkingLine)
+  const extras=allExtras.filter(x=>!isParkingLine(x)).reduce((a,x)=>a+Number(x.total||x.amount||0),0)
   const pets=(draft.pets||[]).reduce((a,x)=>a+Number(x.amount||0),0)
-  const parking=Number(draft.parking||0)
-  return{nights,rate,total:nights?Math.max(0,nights*rate+extras+pets+parking):0}
+  const parking=parkingLines.length?parkingLines.reduce((a,x)=>a+Number(x.total||x.amount||0),0):Number(draft.parking||0)
+  return{nights,rate,extras,pets,parking,total:nights?Math.max(0,nights*rate+extras+pets+parking):0}
 }
