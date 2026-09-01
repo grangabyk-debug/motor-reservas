@@ -1,6 +1,6 @@
 "use client"
 
-import{useEffect,useMemo,useState}from"react"
+import{useEffect,useMemo,useRef,useState}from"react"
 import{isoDate}from"../../core/formatters"
 import{
   assignHousekeepingTask,
@@ -45,6 +45,7 @@ export default function HousekeepingPremium({rooms=[],floors=[],reservations=[],
   const[rulesOpen,setRulesOpen]=useState(false)
   const[ruleDraft,setRuleDraft]=useState({scope_type:"all",scope_value:"",assignee_id:"",priority:100,active:true})
   const[autoBusy,setAutoBusy]=useState(false)
+  const autoSelectedRoom=useRef(false)
 
   useEffect(()=>{if(workspaceError)setMessage(workspaceError)},[workspaceError])
 
@@ -83,9 +84,17 @@ export default function HousekeepingPremium({rooms=[],floors=[],reservations=[],
   const lastClean=selected?history.find(row=>String(row.room_id)===String(selected.room.id)&&["limpia","inspeccionada","inspeccion"].includes(String(row.to_status||"").toLowerCase())):null
   const primaryTask=selected?.openTasks.find(task=>task.assigned_to)||selected?.openTasks[0]||null
 
-  useEffect(()=>{if(selectedRoomId||!daily.some(section=>section.items.length))return;const first=daily.find(section=>section.items.length)?.items[0];if(first)setSelectedRoomId(first.room.id)},[selectedRoomId,daily])
+  useEffect(()=>{if(autoSelectedRoom.current||selectedRoomId||!daily.some(section=>section.items.length))return;const first=daily.find(section=>section.items.length)?.items[0];if(first){autoSelectedRoom.current=true;setSelectedRoomId(first.room.id)}},[selectedRoomId,daily])
   useEffect(()=>{if(!selectedReservation){setScheduleDraft({mode:"periodic",every:2,weekdays:[],active:true,notes:""});return}setScheduleDraft({mode:selectedSchedule?.mode||"periodic",every:selectedSchedule?.every_n_nights||2,weekdays:selectedSchedule?.weekdays||[],active:selectedSchedule?.active!==false,notes:selectedSchedule?.notes||""})},[selectedReservation?.id,selectedSchedule?.updated_at])
   useEffect(()=>{if(!selectedRoomId)return;const next={};checklist.forEach(item=>{next[item.id]=false});setCheckState(next)},[selectedRoomId,checklist])
+  useEffect(()=>{
+    if(!selectedRoomId)return
+    const previousOverflow=document.body.style.overflow
+    const onKeyDown=event=>{if(event.key!=="Escape")return;if(reportDraft)setReportDraft(null);else setSelectedRoomId(null)}
+    document.body.style.overflow="hidden"
+    window.addEventListener("keydown",onKeyDown)
+    return()=>{document.body.style.overflow=previousOverflow;window.removeEventListener("keydown",onKeyDown)}
+  },[selectedRoomId,reportDraft])
 
   function matchRule(room){
     return [...rules].filter(rule=>rule.active!==false).sort(byPriority).find(rule=>{

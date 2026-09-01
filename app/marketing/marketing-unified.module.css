@@ -1,0 +1,75 @@
+.system{
+  --hl-mkt-ink:#11162a;
+  --hl-mkt-muted:#60677b;
+  --hl-mkt-accent:#6b4cf2;
+  --hl-mkt-accent-strong:#5637de;
+  --hl-mkt-accent-soft:#f0edff;
+  --hl-mkt-surface:#ffffff;
+  --hl-mkt-soft:#f8f7fc;
+  --hl-mkt-border:#ebe8f4;
+}
+
+.system :global(main){background:var(--hl-mkt-soft)!important;color:var(--hl-mkt-ink)!important}
+.system :global(main nav){background:rgba(255,255,255,.94)!important;border-bottom:1px solid rgba(26,31,52,.08)!important;backdrop-filter:blur(18px)!important}
+.system :global(main nav a[href="/"]>b::after){color:#172044!important;text-shadow:none!important}
+.system :global(main nav a[href^="#"]){color:#42475a!important;font-size:15px!important}
+.system :global(main nav a[href="/login"]){background:var(--hl-mkt-accent-soft)!important;border-color:transparent!important;color:var(--hl-mkt-accent)!important;text-shadow:none!important;box-shadow:none!important}
+.system :global(main nav a[href="/registro"]){background:var(--hl-mkt-accent)!important;border-color:var(--hl-mkt-accent)!important;color:#fff!important;box-shadow:0 10px 24px rgba(107,76,242,.2)!important}
+.system :global(main nav a[href="/registro"]:hover){background:var(--hl-mkt-accent-strong)!important}
+
+.system :global(main h1),
+.system :global(main h2),
+.system :global(main h3){font-family:Arial,Helvetica,sans-serif!important;color:var(--hl-mkt-ink)!important;letter-spacing:-.045em!important}
+.system :global(main h2){font-size:clamp(42px,5vw,72px)!important;line-height:1.02!important}
+.system :global(main p){font-size:18px!important;line-height:1.65!important}
+.system :global(main small){font-size:12px!important;line-height:1.4!important}
+
+/* Keep the hotel photography, but simplify the surrounding UI like Noovy:
+   soft white/lilac surfaces, one purple interaction color, generous type. */
+.system :global(main section[id="sistema"]),
+.system :global(main section[id="producto"]),
+.system :global(main section[id="hotelero"]),
+.system :global(main section[id="oportunidad"]){background:var(--hl-mkt-soft)!important}
+.system :global(main section[id="producto"] [class*="productIntro"] h2),
+.system :global(main section[id="producto"] [class*="productIntro"] p),
+.system :global(main section[id="producto"] [class*="productIntro"] small){color:var(--hl-mkt-ink)!important}
+.system :global(main section[id="producto"] [class*="productIntro"] p){color:var(--hl-mkt-muted)!important}
+.system :global(main section[id="producto"] [class*="productTabs"] button){background:#fff!important;border:1px solid var(--hl-mkt-border)!important;color:#555b70!important;border-radius:12px!important;font-size:15px!important;padding:13px 20px!important}
+.system :global(main section[id="producto"] [class*="productTabs"] button[class*="active"]){background:var(--hl-mkt-accent)!important;color:#fff!important;border-color:var(--hl-mkt-accent)!important}
+.system :global(main section[id="producto"] [class*="productMock"]){background:#fff!important;border:1px solid var(--hl-mkt-border)!important;box-shadow:0 28px 70px rgba(47,39,86,.09)!important}
+
+.system :global(main section[id="oportunidad"] h2),
+.system :global(main section[id="oportunidad"] h2 em),
+.system :global(main section[id="oportunidad"] p),
+.system :global(main section[id="oportunidad"] small){color:var(--hl-mkt-ink)!important;text-shadow:none!important}
+.system :global(main section[id="oportunidad"] p),
+.system :global(main section[id="oportunidad"] small){color:var(--hl-mkt-muted)!important}
+.system :global(main section[id="oportunidad"] [class*="bigMoney"]>b){color:var(--hl-mkt-accent)!important;text-shadow:none!important}
+.system :global(main section[id="oportunidad"] [class*="opportunity"]){background:var(--hl-mkt-accent)!important;border-color:var(--hl-mkt-accent)!important;box-shadow:0 24px 55px rgba(107,76,242,.16)!important}
+.system :global(main section[id="oportunidad"] [class*="opportunity"] span),
+.system :global(main section[id="oportunidad"] [class*="opportunity"] small),
+.system :global(main section[id="oportunidad"] [class*="opportunity"] b){color:#fff!important}
+.system :global(main section[id="oportunidad"] input[type="range"]){accent-color:var(--hl-mkt-accent)!important}
+
+.system :global(main>section:first-of-type a[href="/registro"]),
+.system :global(main section[class*="finalCta"] a[href="/registro"]){background:var(--hl-mkt-accent)!important;border-color:var(--hl-mkt-accent)!important;color:#fff!important;text-shadow:none!important;box-shadow:0 16px 34px rgba(107,76,242,.22)!important}
+.system :global(main>section:first-of-type a[href="/registro"]:hover),
+.system :global(main section[class*="finalCta"] a[href="/registro"]:hover){background:var(--hl-mkt-accent-strong)!important;color:#fff!important}
+.system :global(main section[class*="finalCta"] a[href="/login"]){background:#fff!important;color:var(--hl-mkt-accent)!important;border-color:var(--hl-mkt-border)!important;text-shadow:none!important;box-shadow:none!important}
+
+.system :global(main [class*="momentPhoto"]),
+.system :global(main [class*="humanMain"]),
+.system :global(main [class*="humanInset"]),
+.system :global(main [class*="productMock"]),
+.system :global(main [class*="aiScene"]){border-radius:24px!important;overflow:hidden}
+.system :global(main [class*="momentsHead"] small),
+.system :global(main [class*="productIntro"] small),
+.system :global(main [class*="humanCopy"]>small),
+.system :global(main [class*="pulseIntro"]>small){color:var(--hl-mkt-accent)!important;font-weight:800!important;letter-spacing:.12em!important}
+
+@media(max-width:760px){
+  .system :global(main nav){background:rgba(255,255,255,.97)!important}
+  .system :global(main h2){font-size:clamp(34px,10vw,50px)!important}
+  .system :global(main p){font-size:16px!important}
+  .system :global(main nav a[href="/"]>b::after){font-size:18px!important}
+}

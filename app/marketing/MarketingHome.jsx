@@ -1,5 +1,6 @@
 import LandingExperience from "./LandingExperience"
 import StaticCaretGuard from "../components/StaticCaretGuard"
+import visual from "./marketing-unified.module.css"
 
 export default function MarketingHome(){
   const schema={
@@ -14,7 +15,7 @@ export default function MarketingHome(){
   return <>
     <StaticCaretGuard/>
     <script type="application/ld+json" dangerouslySetInnerHTML={{__html:JSON.stringify(schema)}}/>
-    <LandingExperience/>
+    <div className={visual.system}><LandingExperience/></div>
 
     <a
       className="hlWhatsappFloat"

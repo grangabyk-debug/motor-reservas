@@ -1,0 +1,128 @@
+.system{
+  --hl-ui-bg:#f7f8fc;
+  --hl-ui-surface:#ffffff;
+  --hl-ui-surface-soft:#f3f2ff;
+  --hl-ui-ink:#17213b;
+  --hl-ui-muted:#69738a;
+  --hl-ui-border:#e4e7f0;
+  --hl-ui-accent:#5c55e8;
+  --hl-ui-accent-strong:#463ed4;
+  --hl-ui-accent-soft:#eeedff;
+  --hl-ui-shadow:0 10px 30px rgba(36,43,79,.055);
+}
+
+.system :global(main){font-size:15px}
+.system :global(main p){font-size:15px!important;line-height:1.6!important;color:var(--hl-ui-muted)}
+.system :global(main small){font-size:12px!important;line-height:1.4!important}
+.system :global(main button){font-size:14px!important;line-height:1.25!important}
+.system :global(main input:not([type="checkbox"]):not([type="radio"])),
+.system :global(main select),
+.system :global(main textarea){font-size:14px!important;line-height:1.4!important}
+.system :global(main h1){font-size:34px!important;line-height:1.08!important;letter-spacing:-.035em!important;color:var(--hl-ui-ink)}
+.system :global(main h2){letter-spacing:-.03em!important;color:var(--hl-ui-ink)}
+.system :global(main h3){font-size:19px!important;line-height:1.2!important;color:var(--hl-ui-ink)}
+.system :global(main h4){font-size:15px!important;line-height:1.3!important;color:var(--hl-ui-ink)}
+
+/* Noovy-inspired discipline: one neutral surface system + one UI accent.
+   Semantic room/payment states keep their own green/amber/red meaning. */
+.system :global([class*="frontdesk-polish-module"][class*="__dashboard"]),
+.system :global([class*="housekeeping-premium-module"][class*="__page"]){background:var(--hl-ui-bg)!important}
+.system :global([class*="frontdesk-polish-module"][class*="__card"]),
+.system :global([class*="frontdesk-polish-module"][class*="__kpiCard"]),
+.system :global([class*="housekeeping-premium-module"][class*="__turnList"]),
+.system :global([class*="housekeeping-premium-module"][class*="__rack"]),
+.system :global([class*="housekeeping-premium-module"][class*="__quickTask"]),
+.system :global([class*="housekeeping-premium-module"][class*="__statusPanel"]),
+.system :global([class*="housekeeping-premium-module"][class*="__contextCard"]),
+.system :global([class*="housekeeping-premium-module"][class*="__checklistPanel"]),
+.system :global([class*="housekeeping-premium-module"][class*="__schedulePanel"]),
+.system :global([class*="housekeeping-premium-module"][class*="__taskPanel"]),
+.system :global([class*="housekeeping-premium-module"][class*="__historyPanel"]){
+  background:var(--hl-ui-surface)!important;
+  border-color:var(--hl-ui-border)!important;
+  box-shadow:var(--hl-ui-shadow)!important;
+}
+.system :global([class*="frontdesk-polish-module"][class*="__primaryAction"]),
+.system :global([class*="frontdesk-polish-module"][class*="__doneButton"]),
+.system :global([class*="housekeeping-premium-module"][class*="__daySwitch"] [class*="__active"]),
+.system :global([class*="housekeeping-premium-module"][class*="__filterActive"]),
+.system :global([class*="housekeeping-premium-module"][class*="__saveSchedule"]){
+  background:var(--hl-ui-accent)!important;
+  border-color:var(--hl-ui-accent)!important;
+  color:#fff!important;
+}
+.system :global([class*="frontdesk-polish-module"][class*="__searchBox"]),
+.system :global([class*="frontdesk-polish-module"][class*="__customizeButton"]),
+.system :global([class*="housekeeping-premium-module"][class*="__toolbar"]){
+  border-color:var(--hl-ui-border)!important;
+  box-shadow:none!important;
+}
+
+/* Dashboard: hierarchy like a control hub, not a mosaic of unrelated modules. */
+.system :global([class*="frontdesk-polish-module"][class*="__dashboardTop"]){padding-bottom:4px}
+.system :global([class*="frontdesk-polish-module"][class*="__dashboardTop"]>div>small){font-size:12px!important;letter-spacing:.12em!important;color:#7770d7!important}
+.system :global([class*="frontdesk-polish-module"][class*="__dashboardTop"] h1){font-size:38px!important;margin-top:5px!important}
+.system :global([class*="frontdesk-polish-module"][class*="__dashboardTop"] p){font-size:15px!important}
+.system :global([class*="frontdesk-polish-module"][class*="__widgetGrid"]){gap:16px!important}
+.system :global([class*="frontdesk-polish-module"][class*="__card"]),
+.system :global([class*="frontdesk-polish-module"][class*="__kpiCard"]){border-radius:18px!important}
+.system :global([class*="frontdesk-polish-module"][class*="__kpiCard"]>small){font-size:12px!important;letter-spacing:.06em!important}
+.system :global([class*="frontdesk-polish-module"][class*="__kpiCard"]>b){font-size:30px!important;color:var(--hl-ui-ink)!important}
+.system :global([class*="frontdesk-polish-module"][class*="__kpiCard"]>span){font-size:13px!important;color:var(--hl-ui-muted)!important}
+.system :global([class*="frontdesk-polish-module"][class*="__statusPill"]){font-size:11px!important;padding:5px 8px!important}
+.system :global([class*="frontdesk-polish-module"][class*="__guestRow"] b),
+.system :global([class*="frontdesk-polish-module"][class*="__taskRow"] b){font-size:14px!important}
+.system :global([class*="frontdesk-polish-module"][class*="__guestRow"] small),
+.system :global([class*="frontdesk-polish-module"][class*="__taskRow"] small){font-size:12px!important}
+
+/* Housekeeping: eliminate 7–9px microcopy and make the drawer comfortable on desktop. */
+.system :global([class*="housekeeping-premium-module"] small){font-size:12px!important;line-height:1.4!important}
+.system :global([class*="housekeeping-premium-module"] button){font-size:13px!important;line-height:1.25!important}
+.system :global([class*="housekeeping-premium-module"] select),
+.system :global([class*="housekeeping-premium-module"] input),
+.system :global([class*="housekeeping-premium-module"] textarea){font-size:13px!important}
+.system :global([class*="housekeeping-premium-module"][class*="__hero"] h2){font-size:36px!important;line-height:1.05!important}
+.system :global([class*="housekeeping-premium-module"][class*="__hero"] p){font-size:15px!important;max-width:820px!important}
+.system :global([class*="housekeeping-premium-module"][class*="__summary"] b){font-size:26px!important}
+.system :global([class*="housekeeping-premium-module"][class*="__summary"] small){font-size:12px!important}
+.system :global([class*="housekeeping-premium-module"][class*="__dayTop"] b){font-size:17px!important}
+.system :global([class*="housekeeping-premium-module"][class*="__dayTop"] em),
+.system :global([class*="housekeeping-premium-module"][class*="__dayMeta"]),
+.system :global([class*="housekeeping-premium-module"][class*="__legend"]){font-size:12px!important}
+.system :global([class*="housekeeping-premium-module"][class*="__dayCard"]){padding:13px!important;border-radius:15px!important}
+.system :global([class*="housekeeping-premium-module"][class*="__rackCard"]){min-height:118px!important;padding:12px!important;border-radius:15px!important}
+.system :global([class*="housekeeping-premium-module"][class*="__rackNumber"]){font-size:21px!important}
+.system :global([class*="housekeeping-premium-module"][class*="__rackCard"]>strong){font-size:11px!important;margin:0 -12px -12px!important;padding:9px 12px!important}
+.system :global([class*="housekeeping-premium-module"][class*="__drawerBackdrop"]){overflow:hidden!important;background:rgba(25,30,54,.28)!important}
+.system :global([class*="housekeeping-premium-module"][class*="__drawer"]){width:min(680px,100vw)!important;max-width:100vw!important;background:var(--hl-ui-bg)!important}
+.system :global([class*="housekeeping-premium-module"][class*="__drawerBody"]){overflow-y:auto!important;overflow-x:hidden!important;padding:16px!important;gap:12px!important}
+.system :global([class*="housekeeping-premium-module"][class*="__drawer"]>header){min-height:94px!important;padding:16px 20px!important}
+.system :global([class*="housekeeping-premium-module"][class*="__drawer"]>header h3){font-size:27px!important}
+.system :global([class*="housekeeping-premium-module"][class*="__drawer"]>header h3 span){font-size:12px!important}
+.system :global([class*="housekeeping-premium-module"][class*="__drawer"]>header p){font-size:13px!important}
+.system :global([class*="housekeeping-premium-module"][class*="__drawer"]>header>button){width:38px!important;height:38px!important;font-size:24px!important;background:var(--hl-ui-accent-soft)!important;color:var(--hl-ui-accent-strong)!important}
+.system :global([class*="housekeeping-premium-module"][class*="__statusFlow"] span){font-size:12px!important;padding:7px 10px!important}
+.system :global([class*="housekeeping-premium-module"][class*="__contextGrid"] small){font-size:11px!important}
+.system :global([class*="housekeeping-premium-module"][class*="__contextGrid"] b){font-size:14px!important}
+.system :global([class*="housekeeping-premium-module"][class*="__checkRows"] b){font-size:13px!important}
+.system :global([class*="housekeeping-premium-module"][class*="__checkRows"] small){font-size:11px!important}
+.system :global([class*="housekeeping-premium-module"][class*="__confirmInspect"]){font-size:13px!important;min-height:40px!important}
+
+/* Extended housekeeping cards are part of the same visual language. */
+.system :global([class*="housekeeping-extended-module"] small){font-size:12px!important;line-height:1.4!important}
+.system :global([class*="housekeeping-extended-module"] b){font-size:13px!important;line-height:1.35!important}
+.system :global([class*="housekeeping-extended-module"] button){font-size:13px!important}
+.system :global([class*="housekeeping-extended-module"] article){border-color:var(--hl-ui-border)!important}
+
+@media(max-width:900px){
+  .system :global(main h1){font-size:30px!important}
+  .system :global([class*="frontdesk-polish-module"][class*="__dashboardTop"] h1){font-size:32px!important}
+  .system :global([class*="housekeeping-premium-module"][class*="__drawer"]){width:100vw!important}
+}
+
+@media(max-width:620px){
+  .system :global(main small){font-size:11.5px!important}
+  .system :global(main button){font-size:13.5px!important}
+  .system :global([class*="housekeeping-premium-module"] small){font-size:11.5px!important}
+  .system :global([class*="housekeeping-premium-module"][class*="__drawerBody"]){padding:12px!important}
+}
