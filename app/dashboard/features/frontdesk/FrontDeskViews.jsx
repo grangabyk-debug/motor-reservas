@@ -3,6 +3,8 @@
 import{useEffect,useMemo,useState}from"react"
 import{addDays,money,shortDate,isoDate}from"../../core/formatters"
 import{loadUserPreference,saveUserPreference}from"../../services/preferences"
+import{DASHBOARD_WIDGETS,DEFAULT_WIDGET_ORDER,DEFAULT_WIDGET_SIZES,normalizeWidgetOrder,normalizeWidgetSizes,presetLayout}from"./DashboardWidgetLayout"
+import{DashboardCustomizer,WidgetSlot}from"./DashboardWidgetLibrary"
 import ui from"../../v2.module.css"
 import polish from"./frontdesk-polish.module.css"
 import GuestCRMWorkspace from"./GuestCRM"
@@ -12,23 +14,7 @@ const channelLabel=value=>{const raw=String(value||"Directa").trim(),v=raw.toLow
 const channelColor=value=>{const v=String(value||"").toLowerCase();if(v.includes("booking"))return channelTone.booking;if(v.includes("expedia"))return channelTone.expedia;if(v.includes("airbnb"))return channelTone.airbnb;if(v.includes("agencia"))return channelTone.agencia;if(v.includes("direct")||v.includes("motor")||v.includes("whatsapp")||v.includes("tel"))return channelTone.directa;return channelTone.otro}
 const pct=(part,total)=>total?Math.round(part/total*100):0
 const reservationTotal=r=>Number(r.precio_total||0)
-
-const DASHBOARD_WIDGETS=[
-  {id:"turn-pulse",label:"Resumen del turno",span:12},
-  {id:"occupancy",label:"Ocupación y tendencia",span:8},
-  {id:"priorities",label:"Tareas prioritarias",span:4},
-  {id:"kpi-occupancy",label:"Ocupación hoy",span:3},
-  {id:"kpi-production",label:"Producción",span:3},
-  {id:"kpi-reservations",label:"Reservas",span:3},
-  {id:"kpi-housekeeping",label:"Housekeeping",span:3},
-  {id:"channels",label:"Origen de reservas",span:4},
-  {id:"reservation-metrics",label:"Métricas de reservas",span:4},
-  {id:"cleaning",label:"Estado de habitaciones",span:4},
-  {id:"arrivals",label:"Llegadas",span:4},
-  {id:"inhouse",label:"Huéspedes en casa",span:4},
-  {id:"departures",label:"Salidas",span:4},
-]
-const DEFAULT_WIDGET_ORDER=DASHBOARD_WIDGETS.map(x=>x.id)
+const DASHBOARD_PRESET_IDS=["reception","management","housekeeping"]
 
 function StatusPill({children,tone="neutral"}){return <span className={`${polish.statusPill} ${polish[`status_${tone}`]||""}`}>{children}</span>}
 function GuestAvatar({name}){const initials=String(name||"H").trim().split(/\s+/).slice(0,2).map(x=>x[0]).join("").toUpperCase();return <span className={polish.guestAvatar}>{initials||"H"}</span>}
@@ -57,28 +43,23 @@ function OperationalColumn({title,count,items,rooms,onOpen,kind}){
 
 function KpiCard({label,value,detail,icon,onClick,ring}){return <button className={polish.kpiCard} onClick={onClick}><small>{label}</small><b>{value}</b><span>{detail}</span>{ring?<i className={polish.kpiRing} style={{"--value":`${ring*3.6}deg`}}/>:<i className={polish.kpiIcon}>{icon}</i>}</button>}
 
-function WidgetSlot({widget,editing,onDragStart,onDrop,children}){
-  return <div className={`${polish.widgetSlot} ${editing?polish.widgetEditing:""}`} style={{"--widget-span":widget.span}} draggable={editing} onDragStart={e=>{e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",widget.id);onDragStart(widget.id)}} onDragOver={e=>{if(editing){e.preventDefault();e.dataTransfer.dropEffect="move"}}} onDrop={e=>{if(!editing)return;e.preventDefault();onDrop(widget.id)}}>{editing&&<div className={polish.widgetHandle}><span>⠿</span><b>{widget.label}</b><small>Arrastrar</small></div>}{children}</div>
-}
-
-function DashboardCustomizer({hidden,onToggle,onReset,onDone}){
-  return <section className={polish.customizer}><div className={polish.customizerIntro}><span>PERSONALIZAR PANEL</span><b>Ordená los widgets como trabaja tu hotel.</b><small>Arrastrá las tarjetas para cambiar el orden. Podés ocultar módulos sin perder ningún dato.</small></div><div className={polish.widgetToggles}>{DASHBOARD_WIDGETS.map(widget=><button key={widget.id} className={hidden.includes(widget.id)?polish.widgetOff:polish.widgetOn} onClick={()=>onToggle(widget.id)}>{hidden.includes(widget.id)?"＋":"✓"} {widget.label}</button>)}</div><div className={polish.customizerActions}><button onClick={onReset}>Restablecer</button><button className={polish.doneButton} onClick={onDone}>Listo</button></div></section>
-}
-
 export function Lobby({settings,rooms,reservations,payments,onView,onOpen,search,onSearch,onNewReservation,onMenu,onCommand,userId}){
   const today=isoDate(),live=reservations.filter(r=>r.estado!=="cancelada"&&!r.no_show),arrivals=live.filter(r=>r.fecha_entrada===today&&r.estado!=="alojado"),departures=live.filter(r=>r.fecha_salida===today&&r.estado!=="finalizada"),inhouse=live.filter(r=>r.fecha_entrada<=today&&r.fecha_salida>today&&r.estado!=="finalizada"),noShows=reservations.filter(r=>r.no_show&&r.fecha_entrada===today).length,sellable=rooms.filter(r=>r.activa!==false&&!['mantenimiento','fuera_servicio'].includes(String(r.estado).toLowerCase())),occupied=new Set(inhouse.map(r=>String(r.habitacion_id))).size,occupancy=pct(occupied,sellable.length),paid=useMemo(()=>{const map=new Map();payments.forEach(p=>map.set(String(p.reserva_id),(map.get(String(p.reserva_id))||0)+Number(p.monto||0)));return map},[payments]),[clock,setClock]=useState(null)
-  const propertyId=settings?.property_id||"",storageKey=`hl-dashboard-${propertyId||settings?.hotel_name||"hotel"}`,[widgetOrder,setWidgetOrder]=useState(DEFAULT_WIDGET_ORDER),[hiddenWidgets,setHiddenWidgets]=useState([]),[editing,setEditing]=useState(false),[dragging,setDragging]=useState(""),[prefsReady,setPrefsReady]=useState(false)
+  const propertyId=settings?.property_id||"",storageKey=`hl-dashboard-${propertyId||settings?.hotel_name||"hotel"}`,[widgetOrder,setWidgetOrder]=useState(DEFAULT_WIDGET_ORDER),[hiddenWidgets,setHiddenWidgets]=useState([]),[widgetSizes,setWidgetSizes]=useState(DEFAULT_WIDGET_SIZES),[activePreset,setActivePreset]=useState("custom"),[editing,setEditing]=useState(false),[dragging,setDragging]=useState(""),[prefsReady,setPrefsReady]=useState(false)
   useEffect(()=>{const tick=()=>setClock(new Date()),id=setInterval(tick,30000);tick();return()=>clearInterval(id)},[])
-  useEffect(()=>{let cancelled=false;setPrefsReady(false);const apply=saved=>{if(saved?.order&&Array.isArray(saved.order)){const known=saved.order.filter(id=>DEFAULT_WIDGET_ORDER.includes(id)),missing=DEFAULT_WIDGET_ORDER.filter(id=>!known.includes(id));setWidgetOrder([...missing,...known])}if(Array.isArray(saved?.hidden))setHiddenWidgets(saved.hidden.filter(id=>DEFAULT_WIDGET_ORDER.includes(id)))};try{apply(JSON.parse(localStorage.getItem(storageKey)||"null"))}catch{};(async()=>{if(!propertyId||!userId){if(!cancelled)setPrefsReady(true);return}try{const value=await loadUserPreference({propertyId,userId,key:"dashboard_layout"});if(!cancelled&&value)apply(value)}catch{}finally{if(!cancelled)setPrefsReady(true)}})();return()=>{cancelled=true}},[storageKey,propertyId,userId])
-  useEffect(()=>{const payload={order:widgetOrder,hidden:hiddenWidgets};try{localStorage.setItem(storageKey,JSON.stringify(payload))}catch{}if(!prefsReady||!propertyId||!userId)return;const timer=setTimeout(()=>{saveUserPreference({propertyId,userId,key:"dashboard_layout",value:payload}).catch(()=>{})},450);return()=>clearTimeout(timer)},[storageKey,widgetOrder,hiddenWidgets,prefsReady,propertyId,userId])
+  useEffect(()=>{let cancelled=false;setPrefsReady(false);const apply=saved=>{if(saved?.order)setWidgetOrder(normalizeWidgetOrder(saved.order));if(Array.isArray(saved?.hidden))setHiddenWidgets(saved.hidden.filter(id=>DEFAULT_WIDGET_ORDER.includes(id)));if(saved?.sizes)setWidgetSizes(normalizeWidgetSizes(saved.sizes));if(DASHBOARD_PRESET_IDS.includes(saved?.preset))setActivePreset(saved.preset);else setActivePreset("custom")};try{apply(JSON.parse(localStorage.getItem(storageKey)||"null"))}catch{};(async()=>{if(!propertyId||!userId){if(!cancelled)setPrefsReady(true);return}try{const value=await loadUserPreference({propertyId,userId,key:"dashboard_layout"});if(!cancelled&&value)apply(value)}catch{}finally{if(!cancelled)setPrefsReady(true)}})();return()=>{cancelled=true}},[storageKey,propertyId,userId])
+  useEffect(()=>{const payload={version:2,order:widgetOrder,hidden:hiddenWidgets,sizes:widgetSizes,preset:activePreset};try{localStorage.setItem(storageKey,JSON.stringify(payload))}catch{}if(!prefsReady||!propertyId||!userId)return;const timer=setTimeout(()=>{saveUserPreference({propertyId,userId,key:"dashboard_layout",value:payload}).catch(()=>{})},450);return()=>clearTimeout(timer)},[storageKey,widgetOrder,hiddenWidgets,widgetSizes,activePreset,prefsReady,propertyId,userId])
   const clockDate=clock?new Intl.DateTimeFormat("es-AR",{weekday:"long",day:"2-digit",month:"long"}).format(clock):"",clockTime=clock?new Intl.DateTimeFormat("es-AR",{hour:"2-digit",minute:"2-digit"}).format(clock):""
   const forecast=useMemo(()=>Array.from({length:12},(_,i)=>{const day=addDays(today,i-3),count=new Set(live.filter(r=>r.fecha_entrada<=day&&r.fecha_salida>day).map(r=>String(r.habitacion_id))).size;return pct(count,sellable.length)}),[today,live,sellable.length]),previous=useMemo(()=>Array.from({length:12},(_,i)=>{const day=addDays(today,i-10),count=new Set(live.filter(r=>r.fecha_entrada<=day&&r.fecha_salida>day).map(r=>String(r.habitacion_id))).size;return pct(count,sellable.length)}),[today,live,sellable.length])
   const todayRevenue=live.filter(r=>r.fecha_entrada<=today&&r.fecha_salida>today).reduce((sum,r)=>sum+(reservationTotal(r)/Math.max(1,Math.round((new Date(`${r.fecha_salida}T12:00:00`)-new Date(`${r.fecha_entrada}T12:00:00`))/86400000))),0),monthKey=today.slice(0,7),monthReservations=live.filter(r=>String(r.fecha_entrada||"").startsWith(monthKey)),newToday=reservations.filter(r=>String(r.created_at||r.fecha_creacion||"").startsWith(today)).length,cancelled=reservations.filter(r=>r.estado==="cancelada"&&String(r.updated_at||r.fecha_entrada||"").startsWith(monthKey)).length
   const roomClean={ready:rooms.filter(r=>["limpia","inspeccionada","disponible"].includes(String(r.estado||"").toLowerCase())).length,cleaning:rooms.filter(r=>["limpieza","inspeccion"].includes(String(r.estado||"").toLowerCase())).length,dirty:rooms.filter(r=>String(r.estado||"").toLowerCase()==="sucia").length}
   const channelMap=new Map();monthReservations.forEach(r=>{const label=channelLabel(r.canal_reserva);channelMap.set(label,(channelMap.get(label)||0)+1)});const channelSegments=[...channelMap.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5).map(([label,value])=>({label,value,color:channelColor(label)})),otherCount=Math.max(0,monthReservations.length-channelSegments.reduce((s,x)=>s+x.value,0));if(otherCount)channelSegments.push({label:"Otros",value:otherCount,color:channelTone.otro})
-  function moveWidget(target){if(!dragging||dragging===target)return;setWidgetOrder(current=>{const next=current.filter(id=>id!==dragging),index=next.indexOf(target);next.splice(index<0?next.length:index,0,dragging);return next});setDragging("")}
-  function toggleWidget(id){setHiddenWidgets(current=>current.includes(id)?current.filter(x=>x!==id):[...current,id])}
-  function resetWidgets(){setWidgetOrder(DEFAULT_WIDGET_ORDER);setHiddenWidgets([])}
+  function markCustom(){setActivePreset("custom")}
+  function moveWidget(target){if(!dragging||dragging===target)return;setWidgetOrder(current=>{const next=current.filter(id=>id!==dragging),index=next.indexOf(target);next.splice(index<0?next.length:index,0,dragging);return next});setDragging("");markCustom()}
+  function toggleWidget(id){setHiddenWidgets(current=>current.includes(id)?current.filter(x=>x!==id):[...current,id]);markCustom()}
+  function resizeWidget(id,size){const widget=DASHBOARD_WIDGETS.find(item=>item.id===id);if(!widget?.sizes.includes(size))return;setWidgetSizes(current=>({...current,[id]:size}));markCustom()}
+  function resetWidgets(){setWidgetOrder(DEFAULT_WIDGET_ORDER);setHiddenWidgets([]);setWidgetSizes(DEFAULT_WIDGET_SIZES);setActivePreset("custom")}
+  function applyPreset(id){const layout=presetLayout(id);if(!layout)return;setWidgetOrder(layout.order);setHiddenWidgets(layout.hidden);setWidgetSizes(layout.sizes);setActivePreset(layout.preset)}
   const widgetById=Object.fromEntries(DASHBOARD_WIDGETS.map(widget=>[widget.id,widget]))
   function widgetContent(id){
     if(id==="turn-pulse")return <section className={`${polish.card} ${polish.reservationMetrics}`}><small>OPERACIÓN · HOY</small><div><span><b>{arrivals.length}</b><small>Llegadas</small></span><span><b>{inhouse.length}</b><small>En casa</small></span><span><b>{departures.length}</b><small>Salidas</small></span><span><b>{noShows}</b><small>No-show</small></span></div><button onClick={()=>onView("reservations")}>Ver movimiento del día →</button></section>
@@ -98,8 +79,8 @@ export function Lobby({settings,rooms,reservations,payments,onView,onOpen,search
   }
   return <div className={`${ui.content} ${polish.dashboard}`}>
     <header className={polish.dashboardTop}><div><button className={polish.mobileMenu} onClick={onMenu}>☰</button><small>HABITACIÓN LLENA · PMS</small><h1>Panel operativo</h1><p>{clockDate}{clockTime?` · ${clockTime}`:""} · {settings?.hotel_name||"Hotel"}</p></div><div className={polish.topActions}><div className={polish.searchBox} role="button" tabIndex={0} onClick={onCommand} onKeyDown={e=>(e.key==="Enter"||e.key===" ")&&onCommand?.()} aria-label="Abrir búsqueda global"><span>⌕</span><input readOnly value="" placeholder="Buscar en todo el PMS…" tabIndex={-1}/><kbd>⌘K</kbd></div><button className={`${polish.customizeButton} ${editing?polish.customizeButtonActive:""}`} onClick={()=>setEditing(v=>!v)}>⌘ Personalizar</button>{onNewReservation&&<button className={polish.primaryAction} onClick={onNewReservation}>＋ Nueva reserva</button>}</div></header>
-    {editing&&<DashboardCustomizer hidden={hiddenWidgets} onToggle={toggleWidget} onReset={resetWidgets} onDone={()=>setEditing(false)}/>} 
-    <section className={polish.widgetGrid}>{widgetOrder.filter(id=>!hiddenWidgets.includes(id)).map(id=>{const widget=widgetById[id];if(!widget)return null;return <WidgetSlot key={id} widget={widget} editing={editing} onDragStart={setDragging} onDrop={moveWidget}>{widgetContent(id)}</WidgetSlot>})}</section>
+    {editing&&<DashboardCustomizer hidden={hiddenWidgets} activePreset={activePreset} onPreset={applyPreset} onToggle={toggleWidget} onReset={resetWidgets} onDone={()=>setEditing(false)} customizerClass={polish.customizer} introClass={polish.customizerIntro} togglesClass={polish.widgetToggles} onClass={polish.widgetOn} offClass={polish.widgetOff} actionsClass={polish.customizerActions} doneClass={polish.doneButton}/>} 
+    <section className={polish.widgetGrid}>{widgetOrder.filter(id=>!hiddenWidgets.includes(id)).map(id=>{const widget=widgetById[id];if(!widget)return null;return <WidgetSlot key={id} widget={widget} size={widgetSizes[id]} editing={editing} onDragStart={setDragging} onDrop={moveWidget} onSize={resizeWidget} slotClass={polish.widgetSlot} editingClass={polish.widgetEditing} handleClass={polish.widgetHandle}>{widgetContent(id)}</WidgetSlot>})}</section>
   </div>
 }
 
