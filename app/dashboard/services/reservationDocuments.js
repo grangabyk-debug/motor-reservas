@@ -4,6 +4,7 @@ import{requirePropertyId}from"../data/tenant"
 const BUCKET="hotel-reservation-documents"
 const MAX_BYTES=12*1024*1024
 const ALLOWED=new Set(["image/jpeg","image/png","image/webp","application/pdf"])
+const HOLDER_ROLES=new Set(["reservation","primary","companion","company"])
 
 function extFor(file){const fromName=String(file.name||"").split(".").pop()?.toLowerCase();if(fromName&&/^[a-z0-9]{2,5}$/.test(fromName))return fromName;return file.type==="application/pdf"?"pdf":file.type==="image/png"?"png":file.type==="image/webp"?"webp":"jpg"}
 async function imageBitmap(file){if("createImageBitmap"in window)return createImageBitmap(file);return new Promise((resolve,reject)=>{const img=new Image(),url=URL.createObjectURL(file);img.onload=()=>{URL.revokeObjectURL(url);resolve(img)};img.onerror=e=>{URL.revokeObjectURL(url);reject(e)};img.src=url})}
@@ -25,9 +26,9 @@ export async function listReservationDocuments({propertyId,reservationId}){
 
 export async function uploadReservationDocuments({propertyId,reservationId,userId,items=[]}){
   const pid=requirePropertyId(propertyId),created=[]
-  for(const item of items){const file=item.file||item,kind=item.kind||"documento",safeName=String(file.name||"documento").replace(/[^a-zA-Z0-9._-]+/g,"-").slice(-90),path=`${pid}/${Number(reservationId)}/${crypto.randomUUID()}-${safeName}`
+  for(const item of items){const file=item.file||item,kind=item.kind||"documento",holderRole=HOLDER_ROLES.has(item.holderRole)?item.holderRole:"reservation",holderName=String(item.holderName||"").trim()||null,guestProfileId=item.guestProfileId||null,passengerIndex=Number.isInteger(item.passengerIndex)?item.passengerIndex:null,metadata=item.metadata&&typeof item.metadata==="object"&&!Array.isArray(item.metadata)?item.metadata:{},safeName=String(file.name||"documento").replace(/[^a-zA-Z0-9._-]+/g,"-").slice(-90),path=`${pid}/${Number(reservationId)}/${crypto.randomUUID()}-${safeName}`
     const{error:uploadError}=await supabase.storage.from(BUCKET).upload(path,file,{contentType:file.type,upsert:false,cacheControl:"3600"});if(uploadError)throw uploadError
-    const{data,error}=await supabase.from("hotel_reservation_documents").insert({property_id:pid,reserva_id:Number(reservationId),kind,file_name:file.name||safeName,storage_path:path,mime_type:file.type||"application/octet-stream",original_size_bytes:Number(item.originalSize??file.size),stored_size_bytes:Number(file.size),uploaded_by:userId}).select("*").single()
+    const{data,error}=await supabase.from("hotel_reservation_documents").insert({property_id:pid,reserva_id:Number(reservationId),guest_profile_id:guestProfileId,holder_role:holderRole,holder_name:holderName,passenger_index:passengerIndex,metadata,kind,file_name:file.name||safeName,storage_path:path,mime_type:file.type||"application/octet-stream",original_size_bytes:Number(item.originalSize??file.size),stored_size_bytes:Number(file.size),uploaded_by:userId}).select("*").single()
     if(error){await supabase.storage.from(BUCKET).remove([path]);throw error}created.push(data)
   }
   return created
