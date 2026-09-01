@@ -26,11 +26,12 @@ const pkg=JSON.parse(fs.readFileSync("package.json","utf8"))
 for(const script of ["dev","build"]){if(/harden-hotel-os-atomic/.test(pkg.scripts?.[script]||""))problems.push(`package.json: ${script} still depends on legacy Hotel OS hardener`)}
 
 const reservationService=fs.existsSync("app/dashboard/services/reservations.js")?fs.readFileSync("app/dashboard/services/reservations.js","utf8"):""
-for(const rpc of ["hl_move_reservation_atomic","hl_checkout_reservation_atomic"]){if(!reservationService.includes(rpc))problems.push(`app/dashboard/services/reservations.js: missing required atomic RPC ${rpc}`)}
+for(const rpc of ["hl_planning_move_reservation_atomic","hl_checkout_reservation_atomic"]){if(!reservationService.includes(rpc))problems.push(`app/dashboard/services/reservations.js: missing required atomic RPC ${rpc}`)}
+for(const rpc of ["hl_planning_change_room_atomic","hl_planning_swap_reservations_atomic","hl_undo_planning_operation_atomic"]){if(!reservationService.includes(rpc))problems.push(`app/dashboard/services/reservations.js: missing audited Planning RPC ${rpc}`)}
 
 const hotelService=fs.existsSync("app/dashboard/services/hotel.js")?fs.readFileSync("app/dashboard/services/hotel.js","utf8"):""
 if(!hotelService.includes("hl_create_web_checkin_token"))problems.push("app/dashboard/services/hotel.js: secure Web Check-in RPC is missing")
 if(!hotelService.includes("Authorization:`Bearer ${token}`")&&!hotelService.includes("Authorization:`Bearer ${session.access_token}`"))problems.push("app/dashboard/services/hotel.js: authenticated server calls must carry the session bearer token")
 
 if(problems.length){console.error("Habitación Llena architecture guard failed:\n- "+problems.join("\n- "));process.exit(1)}
-console.log("Habitación Llena architecture guard OK: modular shell, tenant/client boundaries, atomic operations and legacy removal verified")
+console.log("Habitación Llena architecture guard OK: modular shell, tenant/client boundaries, audited atomic operations and legacy removal verified")
