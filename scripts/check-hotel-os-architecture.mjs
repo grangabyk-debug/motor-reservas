@@ -9,7 +9,6 @@ const legacyBudgets=new Map([
   ["app/dashboard/features/operations/HousekeepingPremium.jsx",{bytes:36000,lines:780}],
   ["app/dashboard/features/commercial/GroupsPremium.jsx",{bytes:28000,lines:700}],
   ["app/dashboard/features/hotel/AccessKeysPremium.jsx",{bytes:25000,lines:600}],
-  ["app/dashboard/HotelOSV2.jsx",{bytes:30000,lines:700}],
 ])
 const forbiddenLegacy=["app/dashboard/HotelOSClient.jsx","app/dashboard/AdvancedHotelModules.jsx","app/dashboard/advanced.module.css","scripts/harden-hotel-os-atomic.mjs"]
 const uiMustNotUseSupabase=[
@@ -40,6 +39,13 @@ for(const file of uiMustNotUseSupabase){
   else if(hasDirectSupabase(source))problems.push(`${file}: direct Supabase access reintroduced after service/hook refactor`)
 }
 for(const file of forbiddenLegacy){if(fs.existsSync(file))problems.push(`${file}: legacy Hotel OS artifact must not exist`)}
+
+const shell=read("app/dashboard/HotelOSV2.jsx")
+const viewRouter=read("app/dashboard/components/shell/HotelViewRouter.jsx")
+if(!shell.includes('from"./components/shell/HotelViewRouter"')||!shell.includes("<HotelViewRouter"))problems.push("HotelOSV2 must delegate module rendering to HotelViewRouter")
+if(/function\s+renderView\s*\(/.test(shell))problems.push("HotelOSV2 must stay a shell/orchestrator; renderView belongs in HotelViewRouter")
+if(!viewRouter.includes("export default function HotelViewRouter"))problems.push("HotelViewRouter is missing or not exported")
+if(hasDirectSupabase(viewRouter))problems.push("HotelViewRouter must stay presentation/orchestration only; no direct Supabase access")
 
 const reservationWorkspace=read("app/dashboard/services/reservationWorkspace.js")
 const reservationHook=read("app/dashboard/hooks/useReservationWorkspace.js")
@@ -89,4 +95,4 @@ if(!hotelService.includes("Authorization:`Bearer ${token}`")&&!hotelService.incl
 
 if(warnings.length)console.warn("Architecture debt still tracked:\n- "+warnings.join("\n- "))
 if(problems.length){console.error("Habitación Llena architecture guard failed:\n- "+problems.join("\n- "));process.exit(1)}
-console.log("Habitación Llena architecture guard OK: product boundaries, tenant services, UI/Supabase separation, Group Desk atomicity, Access isolation, Reports engine separation, component budgets, atomic operations and server-secret rules verified")
+console.log("Habitación Llena architecture guard OK: modular shell router, product boundaries, tenant services, UI/Supabase separation, Group Desk atomicity, Access isolation, Reports engine separation, component budgets, atomic operations and server-secret rules verified")
