@@ -6,7 +6,6 @@ const codeExtensions=new Set([".js",".jsx",".mjs",".ts",".tsx"])
 const defaultBudget={bytes:24000,lines:520}
 const legacyBudgets=new Map([
   ["app/dashboard/features/frontdesk/ReservationDrawer.jsx",{bytes:38000,lines:820}],
-  ["app/dashboard/features/operations/HousekeepingPremium.jsx",{bytes:36000,lines:780}],
 ])
 const forbiddenLegacy=["app/dashboard/HotelOSClient.jsx","app/dashboard/AdvancedHotelModules.jsx","app/dashboard/advanced.module.css","scripts/harden-hotel-os-atomic.mjs"]
 const uiMustNotUseSupabase=[
@@ -49,6 +48,12 @@ const reservationWorkspace=read("app/dashboard/services/reservationWorkspace.js"
 const reservationHook=read("app/dashboard/hooks/useReservationWorkspace.js")
 if(!reservationWorkspace.includes("requirePropertyId")||!reservationWorkspace.includes('.eq("property_id",property)'))problems.push("reservationWorkspace service must enforce property_id through requirePropertyId")
 if(!reservationHook.includes("loadReservationWorkspace")||hasDirectSupabase(reservationHook))problems.push("useReservationWorkspace must orchestrate the service without direct Supabase access")
+
+const housekeepingUi=read("app/dashboard/features/operations/HousekeepingPremium.jsx")
+const housekeepingView=read("app/dashboard/features/operations/components/HousekeepingWorkspaceView.jsx")
+if(!housekeepingUi.includes('from"./components/HousekeepingWorkspaceView"'))problems.push("HousekeepingPremium must delegate presentation to HousekeepingWorkspaceView")
+if(!housekeepingView.includes("export default function HousekeepingWorkspaceView"))problems.push("HousekeepingWorkspaceView is missing or not exported")
+if(hasDirectSupabase(housekeepingView))problems.push("HousekeepingWorkspaceView must stay presentation-only; no direct Supabase access")
 
 const housekeepingWorkspace=read("app/dashboard/services/housekeepingWorkspace.js")
 const housekeepingHook=read("app/dashboard/hooks/useHousekeepingWorkspace.js")
