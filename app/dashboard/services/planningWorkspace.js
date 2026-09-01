@@ -30,7 +30,7 @@ export async function applyPlanningRestriction({propertyId,draft}){
   const property=requirePropertyId(propertyId)
   const{error}=await supabase.rpc("hl_apply_planning_restriction_atomic",{p_property_id:property,p_date_from:draft.dateFrom,p_date_to:draft.dateTo,p_action:draft.action,p_nights:draft.nights,p_room_type:draft.roomType,p_room_ids:draft.roomIds,p_channels:draft.channels,p_weekdays:draft.weekdays,p_note:draft.note})
   if(error)throw error
-  return loadPlanningRestrictions(property)
+  try{return await loadPlanningRestrictions(property)}catch{return[]}
 }
 
 export async function splitPlanningReservation({reservationId,draft}){
