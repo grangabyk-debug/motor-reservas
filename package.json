@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "check:product-boundaries": "node scripts/check-product-boundaries.mjs",
     "check:hotel-architecture": "node scripts/check-hotel-os-architecture.mjs",
     "prebuild": "npm run check:hotel-architecture",
     "dev": "next dev",
