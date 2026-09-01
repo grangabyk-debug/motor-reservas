@@ -24,6 +24,11 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Verify lockfile matches package.json
+        run: |
+          cp package-lock.json /tmp/package-lock.before.json
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          diff --exit-code /tmp/package-lock.before.json package-lock.json
       - name: Install dependencies reproducibly
         run: npm ci --no-audit --no-fund
       - name: Product boundaries
