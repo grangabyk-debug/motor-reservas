@@ -49,3 +49,5 @@ export async function saveReservation({draft,room,propertyId,userId,original}){
   return saved
 }
 export async function savePayment({propertyId,userId,reservationId,amount,method,currency="ARS",note=""}){const{error}=await supabase.from("pagos").insert({property_id:requirePropertyId(propertyId),user_id:userId,reserva_id:Number(reservationId),monto:Number(amount),metodo:method,moneda:currency,nota:note||null});if(error)throw error}
+export async function changeReservationRoom({reservationId,roomId,reprice=false}){const{data,error}=await supabase.rpc("hl_change_reservation_room_atomic",{p_reserva_id:Number(reservationId),p_habitacion_id:Number(roomId),p_reprice:!!reprice});if(error)throw error;return Array.isArray(data)?data[0]:data}
+export async function swapReservations({reservationId,otherReservationId}){const{data,error}=await supabase.rpc("hl_swap_reservations_atomic",{p_reserva_a:Number(reservationId),p_reserva_b:Number(otherReservationId)});if(error)throw error;return data}
