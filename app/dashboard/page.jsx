@@ -6,7 +6,8 @@ import design from"./dashboard-design.module.css"
 import"./planning-stage-now.css"
 import"./dashboard-stage-now.css"
 import"./module-stage-now.css"
+import"./hotelgest-theme.css"
 
 export default function DashboardPage(){
-  return <><StaticCaretGuard/><MercadoPagoOAuthBridge/><div className={`hlStageNow ${readability.readable} ${design.system}`}><HotelOSV2/></div></>
+  return <><StaticCaretGuard/><MercadoPagoOAuthBridge/><div className={`hlStageNow hlHotelgest ${readability.readable} ${design.system}`}><HotelOSV2/></div></>
 }
