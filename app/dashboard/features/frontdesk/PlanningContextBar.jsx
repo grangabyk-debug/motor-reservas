@@ -1,8 +1,8 @@
 "use client"
 
 import{useEffect,useMemo,useState}from"react"
-import{supabase}from"../../../../lib/supabase"
 import{shortDate}from"../../core/formatters"
+import{loadPlanningContext}from"../../services/planningWorkspace"
 import PlanningHistory from"./PlanningHistory"
 import pc from"./planning-context.module.css"
 
@@ -31,10 +31,7 @@ function roomScore(room,incoming,reservations){
 export default function PlanningContextBar({rooms=[],reservations=[],blocks=[],onMove,onOpen}){
   const propertyId=rooms.find(r=>r.property_id)?.property_id||reservations.find(r=>r.property_id)?.property_id||null
   const[groupBlocks,setGroupBlocks]=useState([]),[groups,setGroups]=useState([]),[open,setOpen]=useState(true),[assigning,setAssigning]=useState(false),[assignMessage,setAssignMessage]=useState("")
-  useEffect(()=>{let active=true;if(!propertyId){setGroupBlocks([]);setGroups([]);return()=>{active=false}}Promise.all([
-    supabase.from("hotel_group_inventory_blocks").select("*").eq("property_id",propertyId).neq("status","released").order("arrival_date"),
-    supabase.from("hotel_groups").select("id,name,code,sales_stage,arrival_date,departure_date").eq("property_id",propertyId),
-  ]).then(([b,g])=>{if(!active)return;if(!b.error)setGroupBlocks(b.data||[]);if(!g.error)setGroups(g.data||[])});return()=>{active=false}},[propertyId])
+  useEffect(()=>{let active=true;if(!propertyId){setGroupBlocks([]);setGroups([]);return()=>{active=false}}loadPlanningContext(propertyId).then(data=>{if(!active)return;setGroupBlocks(data.groupBlocks);setGroups(data.groups)}).catch(()=>{if(active){setGroupBlocks([]);setGroups([])}});return()=>{active=false}},[propertyId])
 
   const unassigned=useMemo(()=>reservations.filter(r=>activeReservation(r)&&(!r.habitacion_id||!rooms.some(room=>String(room.id)===String(r.habitacion_id)))).sort((a,b)=>occupancyStart(a).localeCompare(occupancyStart(b))),[reservations,rooms])
   const visibleBlocks=useMemo(()=>groupBlocks.filter(b=>b.departure_date>=new Date().toISOString().slice(0,10)).slice(0,8),[groupBlocks])

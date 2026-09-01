@@ -1,8 +1,8 @@
 "use client"
 
 import{useEffect,useMemo,useState}from"react"
-import{supabase}from"../../../../lib/supabase"
 import{addDays,isoDate}from"../../core/formatters"
+import{loadAvailabilityGroupBlocks}from"../../services/planningWorkspace"
 import rack from"./availability-rack.module.css"
 
 const activeReservation=r=>r&&r.estado!=="cancelada"&&!r.no_show
@@ -18,7 +18,7 @@ export default function AvailabilityRack({rooms=[],reservations=[],blocks=[]}){
   const days=useMemo(()=>Array.from({length:7},(_,i)=>addDays(today,i)),[today])
   const types=useMemo(()=>[...new Set(rooms.map(roomType))].sort((a,b)=>a.localeCompare(b,"es")),[rooms])
 
-  useEffect(()=>{let active=true;if(!propertyId){setGroupBlocks([]);return()=>{active=false}}supabase.from("hotel_group_inventory_blocks").select("id,group_id,room_type,quantity,arrival_date,departure_date,status").eq("property_id",propertyId).neq("status","released").then(({data,error})=>{if(active&&!error)setGroupBlocks(data||[])});return()=>{active=false}},[propertyId])
+  useEffect(()=>{let active=true;if(!propertyId){setGroupBlocks([]);return()=>{active=false}}loadAvailabilityGroupBlocks(propertyId).then(data=>{if(active)setGroupBlocks(data)}).catch(()=>{if(active)setGroupBlocks([])});return()=>{active=false}},[propertyId])
 
   function statFor(type,day){
     const typeRooms=rooms.filter(r=>roomType(r)===type),ids=new Set(typeRooms.map(r=>String(r.id))),unavailable=new Set()

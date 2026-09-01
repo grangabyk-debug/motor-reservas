@@ -11,7 +11,8 @@ const serviceChecks=[
  ["app/dashboard/services/preferences.js",["requirePropertyId","hotel_user_preferences",'.eq("property_id",property)']],
  ["app/dashboard/services/resourceCatalog.js",["requirePropertyId","hotel_resources",'.eq("property_id",property)']],
  ["app/dashboard/services/mercadoPagoOAuth.js",["mercadoPagoAuthFetch","supabase.auth.getSession","Authorization:`Bearer ${session.access_token}`"]],
+ ["app/dashboard/services/planningWorkspace.js",["requirePropertyId","hotel_group_inventory_blocks","hotel_groups","hotel_planning_restrictions","hotel_planning_operation_log",'.eq("property_id",property)',"hl_apply_planning_restriction_atomic","hl_split_reservation_atomic","hl_clone_reservation_atomic","hl_undo_planning_operation_atomic"]],
 ]
 for(const[file,markers]of serviceChecks){const source=read(file);if(!source){problems.push(`${file}: required service is missing`);continue}for(const marker of markers)if(!source.includes(marker))problems.push(`${file}: missing boundary marker ${marker}`)}
 if(problems.length){console.error("Habitación Llena feature data boundary guard failed:\n- "+problems.join("\n- "));process.exit(1)}
-console.log("Habitación Llena feature data boundary guard OK: features are presentation-only and data/auth access stays in services")
+console.log("Habitación Llena feature data boundary guard OK: features are presentation-only and data/auth access stays in tenant-aware services")
