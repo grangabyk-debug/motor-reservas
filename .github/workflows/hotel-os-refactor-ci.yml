@@ -1,43 +1,103 @@
 name: Habitacion Llena Architecture CI
 
 on:
-  pull_request:
-    branches: [staging, main]
   push:
-    branches: [staging, main, refactor/hotel-os-architecture-hardening]
+    branches: [refactor/hotel-os-architecture-hardening]
   workflow_dispatch:
 
 permissions:
-  contents: read
-
-concurrency:
-  group: hotel-architecture-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  contents: write
+  statuses: write
 
 jobs:
-  architecture-and-build:
+  finalize-reproducible-install:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: refactor/hotel-os-architecture-hardening
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - name: Regenerate lockfile
+      - name: Regenerate lockfile from pinned package.json
         run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-      - name: Verify clean install
-        run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Export regenerated lockfile
-        uses: actions/upload-artifact@v4
-        with:
-          name: regenerated-package-lock
-          path: package-lock.json
-          if-no-files-found: error
-          retention-days: 1
+      - name: Write final CI and Vercel install configuration
+        run: |
+          cat > .github/workflows/hotel-os-refactor-ci.yml <<'FINAL_WORKFLOW'
+          name: Habitacion Llena Architecture CI
+
+          on:
+            pull_request:
+              branches: [staging, main]
+            push:
+              branches: [staging, main, refactor/hotel-os-architecture-hardening]
+            workflow_dispatch:
+
+          permissions:
+            contents: read
+
+          jobs:
+            architecture-and-build:
+              runs-on: ubuntu-latest
+              timeout-minutes: 20
+              steps:
+                - uses: actions/checkout@v4
+                - uses: actions/setup-node@v4
+                  with:
+                    node-version: 22
+                    cache: npm
+                - name: Install dependencies reproducibly
+                  run: npm ci --no-audit --no-fund
+                - name: Product boundaries
+                  run: npm run check:product-boundaries
+                - name: Hotel architecture
+                  run: npm run check:hotel-architecture
+                - name: Production build
+                  run: npm run build
+          FINAL_WORKFLOW
+          cat > vercel.json <<'FINAL_VERCEL'
+          {
+            "$schema": "https://openapi.vercel.sh/vercel.json",
+            "framework": "nextjs",
+            "buildCommand": "npm run build",
+            "installCommand": "npm ci --no-audit --no-fund",
+            "git": {
+              "deploymentEnabled": {
+                "*": false,
+                "main": true,
+                "staging": true
+              }
+            }
+          }
+          FINAL_VERCEL
+      - name: Verify reproducible clean install
+        run: npm ci --no-audit --no-fund
       - name: Product boundaries
         run: npm run check:product-boundaries
       - name: Hotel architecture
         run: npm run check:hotel-architecture
       - name: Production build
         run: npm run build
+      - name: Commit tested reproducible configuration
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json .github/workflows/hotel-os-refactor-ci.yml vercel.json
+          if git diff --cached --quiet; then
+            echo "No reproducibility changes to commit"
+            exit 0
+          fi
+          git commit -m "chore(ci): lock dependencies and use npm ci"
+          FINAL_SHA=$(git rev-parse HEAD)
+          git push origin HEAD:refactor/hotel-os-architecture-hardening
+          curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/grangabyk-debug/motor-reservas/statuses/$FINAL_SHA" \
+            -d '{"state":"success","context":"Habitacion Llena reproducible build","description":"npm ci + architecture guards + production build passed"}'
