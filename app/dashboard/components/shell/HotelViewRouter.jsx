@@ -12,7 +12,8 @@ import ChannelHubPremium from"../../features/commercial/ChannelHubPremium"
 import PackagesView from"../../features/commercial/PackagesView"
 import GroupsPremium from"../../features/commercial/GroupsPremium"
 import{CashView,BillingView,ReportsView}from"../../features/finance/FinanceViews"
-import{KeysView,TeamView,AutomationsView,IntelligenceView,IntegrationsView,SettingsView}from"../../features/hotel/HotelViews"
+import{KeysView,TeamView,AutomationsView,IntelligenceView,SettingsView}from"../../features/hotel/HotelViews"
+import IntegrationMarketplace from"../../features/hotel/IntegrationMarketplace"
 import SupportView from"../../features/hotel/SupportView"
 import{saveFloor,saveRoom,updateRoomStatus,saveHousekeepingTask,setHousekeepingStatus,saveMaintenanceTicket,setMaintenanceStatus,saveResource}from"../../services/operations"
 import{saveRateCell,saveRateRange,savePartner,saveUpsell}from"../../services/commercial"
@@ -21,13 +22,8 @@ import{openCashSession,saveCashMovement,closeCashSession,saveFinanceDocument,iss
 import{updateMemberRole,saveRolePermission,saveAutomation,toggleAutomation,deleteAutomation,resolveAutomationEvent,saveHotelSettings,prepareKey,revokeKey,askIntelligence}from"../../services/hotel"
 import ui from"../../v2.module.css"
 
-export default function HotelViewRouter({
-  view,data,session,settings,permissions,role,live,committed,activeRooms,packages,
-  search,setSearch,allowed,action,changeView,openReservation,openReservationTab,
-  newReservation,newReservationAction,move,resize,setBlockDraft,onMenu,onCommand,hotelName,
-}){
+export default function HotelViewRouter({view,data,session,settings,permissions,role,live,committed,activeRooms,packages,search,setSearch,allowed,action,changeView,openReservation,openReservationTab,newReservation,newReservationAction,move,resize,setBlockDraft,onMenu,onCommand,hotelName}){
   const today=isoDate()
-
   if(view==="lobby")return <><LobbyTentativeStrip reservations={live} rooms={data.rooms} onOpen={openReservation}/><Lobby settings={settings} rooms={data.rooms} reservations={committed} payments={data.payments} onView={changeView} onOpen={openReservation} search={search} onSearch={setSearch} onNewReservation={newReservationAction} onMenu={onMenu} onCommand={onCommand} userId={session.user?.id}/></>
   if(view==="calendar")return <CommandCenter rooms={activeRooms} reservations={live} payments={data.payments} blocks={data.blocks} floors={data.floors} onMove={move} onResize={resize} onOpen={openReservation} onOpenExternal={openReservationTab} onNew={(room,day)=>newReservation(room.id,day)} onBlock={(room,day)=>setBlockDraft({roomId:String(room.id),start:day,end:addDays(day,1),reason:"Bloqueo operativo",detail:""})}/>
   if(view==="reservations")return <Reservations reservations={data.reservations} rooms={data.rooms} search={search} onOpen={openReservation}/>
@@ -50,10 +46,9 @@ export default function HotelViewRouter({
   if(view==="team")return <TeamView members={data.hotel.members||[]} permissions={permissions} currentRole={role} onRole={(member,nextRole)=>action(()=>updateMemberRole({propertyId:session.propertyId,userId:member.user_id,role:nextRole}),"Rol actualizado.")} onPermission={(targetRole,permission,value)=>action(()=>saveRolePermission({propertyId:session.propertyId,role:targetRole,permission,allowed:value}),"Permiso actualizado.")}/>
   if(view==="automations")return <AutomationsView rules={data.hotel.automations||[]} events={data.hotel.events||[]} canManage={allowed("hotel.automations")} onSave={draft=>action(()=>saveAutomation({propertyId:session.propertyId,userId:session.user.id,draft}),"Automatización guardada.")} onToggle={(rule,enabled)=>action(()=>toggleAutomation({propertyId:session.propertyId,id:rule.id,enabled}),enabled?"Automatización activada.":"Automatización pausada.")} onDelete={rule=>action(()=>deleteAutomation({propertyId:session.propertyId,id:rule.id}),"Automatización eliminada.")} onResolve={event=>action(()=>resolveAutomationEvent({propertyId:session.propertyId,id:event.id}),"Evento resuelto.")}/>
   if(view==="intelligence")return <IntelligenceView settings={settings} rooms={activeRooms} reservations={live} payments={data.payments} onAsk={(question,context)=>askIntelligence({question,context})}/>
-  if(view==="integrations")return <IntegrationsView settings={settings} channels={data.channels||[]}/>
+  if(view==="integrations")return <IntegrationMarketplace settings={settings} channels={data.channels||[]}/>
   if(view==="settings")return <SettingsView settings={settings} canManage={allowed("hotel.settings")} onSave={draft=>action(()=>saveHotelSettings({propertyId:session.propertyId,draft}),"Configuración guardada.")}/>
   if(view==="support")return <SupportView propertyId={session.propertyId} hotelName={hotelName}/>
   return <ModuleBridge view={view}/>
 }
-
 function ModuleBridge({view}){return <div className={ui.content}><section className={ui.placeholder}><div><span>MIGRACIÓN MODULAR SEGURA</span><h2>{VIEW_META[view]?.label||"Módulo"}</h2><p>Este dominio todavía está en migración y no se simula funcionalidad.</p></div></section></div>}
