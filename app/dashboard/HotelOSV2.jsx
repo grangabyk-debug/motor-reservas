@@ -1,6 +1,6 @@
 "use client"
 
-import{useEffect,useMemo,useState}from"react"
+import{useEffect,useMemo,useRef,useState}from"react"
 import HotelSidebar from"./components/shell/HotelSidebar"
 import HotelTopbar from"./components/shell/HotelTopbar"
 import CommandPalette from"./components/shell/CommandPalette"
@@ -32,17 +32,19 @@ const TITLES={lobby:"Inicio",calendar:"Planning",reservations:"Reservas",guests:
 const esc=value=>String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))
 
 export default function HotelOSV2(){
-  const session=useHotelSession(),[view,setView]=useState("lobby"),[search,setSearch]=useState(""),[mobile,setMobile]=useState(false),[drawer,setDrawer]=useState(null),[blockDraft,setBlockDraft]=useState(null),[busy,setBusy]=useState(false),[toast,setToast]=useState(""),[commandOpen,setCommandOpen]=useState(false)
+  const session=useHotelSession(),[view,setView]=useState("lobby"),[search,setSearch]=useState(""),[mobile,setMobile]=useState(false),[drawer,setDrawer]=useState(null),[blockDraft,setBlockDraft]=useState(null),[busy,setBusy]=useState(false),[toast,setToast]=useState(""),[commandOpen,setCommandOpen]=useState(false),deepLinkHandled=useRef(false)
   const data=useHotelData(session.propertyId,view),permissions=data.hotel?.permissions||[],role=session.role,today=isoDate(),live=useMemo(()=>data.reservations.filter(r=>r.estado!=="cancelada"&&!r.no_show),[data.reservations]),activeRooms=data.rooms.filter(r=>r.activa!==false),currentProperty=session.properties.find(p=>String(p.id)===String(session.propertyId))
   const settings=data.settings||{hotel_name:currentProperty?.hotel_name||currentProperty?.name||"Hotel",motto:"La hospitalidad se siente en cada detalle.",logo_data_url:currentProperty?.logo_data_url||""},allowed=permission=>can(role,permission,permissions),ops=settings.operational_settings&&typeof settings.operational_settings==="object"?settings.operational_settings:{}
   const notify=message=>{setToast(String(message));setTimeout(()=>setToast(""),3200)},changeView=id=>{setView(id);setMobile(false)}
   useEffect(()=>{const handler=e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){e.preventDefault();setCommandOpen(v=>!v)}else if(e.key==="Escape")setCommandOpen(false)};window.addEventListener("keydown",handler);return()=>window.removeEventListener("keydown",handler)},[])
+  useEffect(()=>{if(deepLinkHandled.current||typeof window==="undefined"||!data.reservations.length)return;const id=new URLSearchParams(window.location.search).get("reservation");if(!id)return;const reservation=data.reservations.find(r=>String(r.id)===String(id));deepLinkHandled.current=true;if(!reservation)return;setView("calendar");setDrawer(reservationToDraft(reservation));const url=new URL(window.location.href);url.searchParams.delete("reservation");window.history.replaceState({},"",`${url.pathname}${url.search}${url.hash}`)},[data.reservations])
   async function action(fn,success){try{setBusy(true);const result=await fn();await data.reload();if(success)notify(typeof success==="function"?success(result):success);return result}catch(error){notify(error?.message||"No se pudo completar la operación.")}finally{setBusy(false)}}
   function openReservation(r){setDrawer(reservationToDraft(r))}
+  function openReservationTab(r){if(typeof window!=="undefined"&&r?.id)window.open(`/dashboard?reservation=${encodeURIComponent(r.id)}`,"_blank","noopener,noreferrer")}
   function newReservation(roomId="",start=""){const draft=blankReservation();if(roomId)draft.roomId=String(roomId);if(start)draft.start=start;setDrawer(draft)}
   async function persistReservation(draft){const room=data.rooms.find(r=>String(r.id)===String(draft.roomId)),original=draft.id?data.reservations.find(r=>String(r.id)===String(draft.id)):null;if(!room)return notify("Elegí una habitación.");if(!draft.guest?.trim())return notify("Falta el nombre del huésped.");await action(async()=>{await saveReservation({draft,room,propertyId:session.propertyId,userId:session.user.id,original});setDrawer(null)},draft.id?"Reserva actualizada.":"Reserva creada.")}
-  async function move(id,roomId,start){const r=data.reservations.find(x=>String(x.id)===String(id));if(r)await action(()=>moveReservation({reservationId:r.id,roomId,start,end:null}),"Reserva movida.")}
-  async function resize(id,end){const r=data.reservations.find(x=>String(x.id)===String(id));if(r)await action(()=>moveReservation({reservationId:r.id,roomId:r.habitacion_id,start:r.fecha_entrada,end}),"Fecha de salida actualizada.")}
+  async function move(id,roomId,start){const r=data.reservations.find(x=>String(x.id)===String(id));if(r)return action(()=>moveReservation({reservationId:r.id,roomId,start,end:null}),"Reserva movida.")}
+  async function resize(id,end){const r=data.reservations.find(x=>String(x.id)===String(id));if(r)return action(()=>moveReservation({reservationId:r.id,roomId:r.habitacion_id,start:r.fecha_entrada,end}),"Fecha de salida actualizada.")}
   async function pay(payment){if(drawer?.id)await action(()=>savePayment({propertyId:session.propertyId,userId:session.user.id,reservationId:drawer.id,amount:payment.amount,method:payment.method,currency:payment.currency||"ARS",note:payment.note||""}),"Pago registrado.")}
   async function checkin(){if(drawer?.id)await action(async()=>{await checkinReservation({id:drawer.id,propertyId:session.propertyId});setDrawer(null)},"Check-in realizado.")}
   async function checkout(){if(drawer?.id)await action(async()=>{await checkoutReservation(drawer.id);setDrawer(null)},"Check-out realizado. La habitación pasó a Housekeeping.")}
@@ -58,7 +60,7 @@ export default function HotelOSV2(){
 
   function renderView(){
     if(view==="lobby")return <Lobby settings={settings} rooms={data.rooms} reservations={live} payments={data.payments} onView={changeView} onOpen={openReservation} search={search} onSearch={setSearch} onNewReservation={newReservationAction} onMenu={()=>setMobile(v=>!v)} onCommand={()=>setCommandOpen(true)} userId={session.user?.id}/>
-    if(view==="calendar")return <CommandCenter rooms={activeRooms} reservations={live} payments={data.payments} blocks={data.blocks} floors={data.floors} onMove={move} onResize={resize} onOpen={openReservation} onNew={(room,day)=>newReservation(room.id,day)} onBlock={(room,day)=>setBlockDraft({roomId:String(room.id),start:day,end:addDays(day,1),reason:"Bloqueo operativo",detail:""})}/>
+    if(view==="calendar")return <CommandCenter rooms={activeRooms} reservations={live} payments={data.payments} blocks={data.blocks} floors={data.floors} onMove={move} onResize={resize} onOpen={openReservation} onOpenExternal={openReservationTab} onNew={(room,day)=>newReservation(room.id,day)} onBlock={(room,day)=>setBlockDraft({roomId:String(room.id),start:day,end:addDays(day,1),reason:"Bloqueo operativo",detail:""})}/>
     if(view==="reservations")return <Reservations reservations={data.reservations} rooms={data.rooms} search={search} onOpen={openReservation}/>
     if(view==="guests")return <GuestCRM guests={data.guests} search={search}/>
     if(view==="keys")return <KeysView reservations={live} rooms={data.rooms} issues={data.keyIssues||[]} settings={settings} onPrepare={(reservation,room,encoder,count)=>action(()=>prepareKey({propertyId:session.propertyId,userId:session.user.id,reservation,room,encoder,count}),r=>r?.physical?"Llave codificada.":"Emisión registrada; falta confirmación física.")} onRevoke={issue=>action(()=>revokeKey({propertyId:session.propertyId,id:issue.id}),"Llave revocada en el PMS.")}/>
