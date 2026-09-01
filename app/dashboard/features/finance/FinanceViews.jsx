@@ -1,14 +1,13 @@
 "use client"
 
-import{useMemo,useState}from"react"
-import{isoDate,money}from"../../core/formatters"
-import{buildFrontDeskReport}from"../../services/finance"
+import{useState}from"react"
+import{money}from"../../core/formatters"
 import PaymentsPremium from"./PaymentsPremium"
 import AccountingPremium from"./AccountingPremium"
+import ReportsPremium from"./ReportsPremium"
 import ui from"../../v2.module.css"
 import b from"../business.module.css"
 
-const REPORTS=[["arrivals","Llegadas / IN"],["departures","Salidas / OUT"],["inhouse","Alojados"],["housekeeping","Housekeeping"],["reservations","Reservas"],["balances","Saldos"]]
 function Modal({title,onClose,onSubmit,children}){return <div className={ui.shade} onMouseDown={e=>e.target===e.currentTarget&&onClose()}><form className={ui.modal} onSubmit={onSubmit}><header><h3>{title}</h3><button type="button" onClick={onClose}>×</button></header>{children}</form></div>}
 function Field({label,wide=false,children}){return <label className={wide?ui.wide:""}><span>{label}</span>{children}</label>}
 
@@ -25,9 +24,4 @@ export function CashView({sessions=[],movements=[],reservations=[],canManage,onO
 }
 
 export function BillingView(props){return <AccountingPremium {...props}/>}
-
-export function ReportsView({reservations=[],rooms=[],payments=[],housekeeping=[]}){
-  const[type,setType]=useState("arrivals"),[date,setDate]=useState(isoDate()),data=useMemo(()=>buildFrontDeskReport(type,date,{reservations,rooms,payments,housekeeping}),[type,date,reservations,rooms,payments,housekeeping])
-  function print(){const w=window.open("","_blank","width=1000,height=760");if(!w)return;const head=data.columns.map(c=>`<th>${String(c)}</th>`).join(""),rows=data.rows.map(row=>`<tr>${row.map((v,i)=>`<td>${typeof v==="number"&&type==="balances"&&i>=2?money(v):typeof v==="number"&&type==="departures"&&i===4?money(v):String(v??"")}</td>`).join("")}</tr>`).join("");w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Reporte</title><style>body{font-family:Arial;padding:30px;color:#173126}h1{font-family:Georgia;font-weight:400}table{border-collapse:collapse;width:100%}th,td{padding:9px;border-bottom:1px solid #ddd;text-align:left;font-size:12px}</style></head><body><h1>${REPORTS.find(x=>x[0]===type)?.[1]}</h1><p>${date}</p><table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table><script>onload=()=>print()</script></body></html>`);w.document.close()}
-  return <div className={ui.content}><div className={ui.editorial}><div><small>FRONT DESK REPORTS</small><h2>El turno termina con información clara.</h2><p>IN, OUT, alojados, housekeeping, reservas y saldos imprimibles.</p></div><div className={ui.inline}><input type="date" value={date} onChange={e=>setDate(e.target.value)}/><button onClick={print}>Imprimir</button></div></div><div className={b.reportTabs}>{REPORTS.map(([id,label])=><button key={id} className={type===id?b.activeTab:""} onClick={()=>setType(id)}>{label}</button>)}</div><div className={ui.tableWrap}><table><thead><tr>{data.columns.map(c=><th key={c}>{c}</th>)}</tr></thead><tbody>{data.rows.map((row,i)=><tr key={i}>{row.map((v,j)=><td key={j}>{typeof v==="number"&&type==="balances"&&j>=2?money(v):typeof v==="number"&&type==="departures"&&j===4?money(v):String(v??"")}</td>)}</tr>)}</tbody></table>{!data.rows.length&&<div className={b.empty}>Sin movimientos para este reporte.</div>}</div></div>
-}
+export function ReportsView(props){return <ReportsPremium {...props}/>}
