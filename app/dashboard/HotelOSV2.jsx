@@ -18,14 +18,15 @@ import ReservationActionDock from"./features/frontdesk/ReservationActionDock"
 import{blankReservation,reservationToDraft}from"./features/frontdesk/reservationModel"
 import{saveReservation,moveReservation,checkinReservation,checkoutReservation,savePayment}from"./services/reservations"
 import{saveFloor,saveRoom,updateRoomStatus,saveBlock,saveHousekeepingTask,setHousekeepingStatus,saveMaintenanceTicket,setMaintenanceStatus,saveResource}from"./services/operations"
-import{saveRateCell,saveRateRange,savePartner,saveUpsell,prepareChannel}from"./services/commercial"
+import{saveRateCell,saveRateRange,savePartner,saveUpsell}from"./services/commercial"
 import{savePackage,setPackageActive,applyPackageToReservation,removePackageFromReservation}from"./services/packages"
 import{setReservationTentative,confirmTentativeReservation}from"./services/tentatives"
 import{openCashSession,saveCashMovement,closeCashSession,saveFinanceDocument,issueInternalDocument}from"./services/finance"
 import{updateMemberRole,saveRolePermission,saveAutomation,toggleAutomation,deleteAutomation,resolveAutomationEvent,saveHotelSettings,prepareKey,revokeKey,createWebCheckin,sendReservationEmail,askIntelligence}from"./services/hotel"
 import{RoomsView,MaintenanceView,ResourcesView,DigitalTwinView}from"./features/operations/OperationsViews"
 import HousekeepingPremium from"./features/operations/HousekeepingPremium"
-import{RevenueView,PartnersView,UpsellingView,DistributionView}from"./features/commercial/CommercialViews"
+import{RevenueView,PartnersView,UpsellingView}from"./features/commercial/CommercialViews"
+import ChannelHubPremium from"./features/commercial/ChannelHubPremium"
 import PackagesView from"./features/commercial/PackagesView"
 import GroupsPremium from"./features/commercial/GroupsPremium"
 import{CashView,BillingView,ReportsView}from"./features/finance/FinanceViews"
@@ -86,7 +87,7 @@ export default function HotelOSV2(){
     if(view==="partners")return <PartnersView partners={data.commercial.partners||[]} canManage={allowed("commercial.partners.manage")} onSave={draft=>action(()=>savePartner({propertyId:session.propertyId,draft}),"Empresa / agencia guardada.")}/>
     if(view==="groups")return <GroupsPremium propertyId={session.propertyId} userId={session.user?.id} partners={data.commercial.partners||[]} rooms={activeRooms} canManage={allowed("commercial.groups.manage")} onOpenPlanning={()=>changeView("calendar")}/>
     if(view==="upselling")return <UpsellingView items={data.commercial.upsells||[]} canManage={allowed("commercial.upsell")} onSave={draft=>action(()=>saveUpsell({propertyId:session.propertyId,draft}),"Upsell guardado.")}/>
-    if(view==="distribution")return <DistributionView connections={data.channels||[]} onPrepare={provider=>action(()=>prepareChannel({propertyId:session.propertyId,provider}),provider==="Motor directo"?"Motor directo registrado.":`${provider}: sandbox preparado; todavía no es una conexión real.`)}/>
+    if(view==="distribution")return <ChannelHubPremium propertyId={session.propertyId} userId={session.user?.id} canManage={allowed("commercial.rates.manage")||allowed("hotel.settings")}/>
     if(view==="cash")return <CashView sessions={data.finance.sessions||[]} movements={data.finance.movements||[]} reservations={live} canManage={allowed("finance.cash")} onOpen={draft=>action(()=>openCashSession({propertyId:session.propertyId,userId:session.user.id,openingAmount:draft.openingAmount,notes:draft.notes}),"Caja abierta.")} onMovement={draft=>action(()=>saveCashMovement({propertyId:session.propertyId,userId:session.user.id,sessionId:draft.sessionId,reservationId:draft.reservationId,movementType:draft.movementType,method:draft.method,amount:draft.amount,concept:draft.concept,reference:draft.reference,currency:draft.currency}),"Movimiento registrado.")} onClose={draft=>action(()=>closeCashSession({propertyId:session.propertyId,userId:session.user.id,sessionId:draft.sessionId,closingAmount:draft.closingAmount,notes:draft.notes}),r=>`Caja cerrada · diferencia ${money(r?.difference||0)}`)}/>
     if(view==="billing")return <BillingView documents={data.finance.documents||[]} reservations={live} partners={data.commercial.partners||[]} groups={data.commercial.groups||[]} canManage={allowed("finance.folios")} onSave={draft=>action(()=>saveFinanceDocument({propertyId:session.propertyId,userId:session.user.id,draft}),"Documento guardado.")} onIssue={doc=>action(()=>issueInternalDocument({propertyId:session.propertyId,id:doc.id}),number=>`Documento interno emitido: ${number}`)}/>
     if(view==="reports")return <ReportsView reservations={data.reservations} rooms={data.rooms} payments={data.payments} housekeeping={data.operations.housekeeping||[]}/>
