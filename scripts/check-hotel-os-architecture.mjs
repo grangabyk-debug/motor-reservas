@@ -9,6 +9,7 @@ const legacyBudgets=new Map([
   ["app/dashboard/features/operations/HousekeepingPremium.jsx",{bytes:44000,lines:900}],
   ["app/dashboard/features/commercial/GroupsPremium.jsx",{bytes:38000,lines:800}],
   ["app/dashboard/features/finance/ReportsPremium.jsx",{bytes:32000,lines:700}],
+  ["app/dashboard/features/hotel/AccessKeysPremium.jsx",{bytes:30000,lines:650}],
   ["app/dashboard/HotelOSV2.jsx",{bytes:30000,lines:700}],
 ])
 const forbiddenLegacy=["app/dashboard/HotelOSClient.jsx","app/dashboard/AdvancedHotelModules.jsx","app/dashboard/advanced.module.css","scripts/harden-hotel-os-atomic.mjs"]
