@@ -1,45 +1,30 @@
 name: Habitacion Llena Architecture CI
 
 on:
+  pull_request:
+    branches: [staging, main]
   push:
-    branches: [refactor/hotel-os-architecture-hardening]
+    branches: [staging, main, refactor/hotel-os-architecture-hardening]
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: hotel-architecture-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  commit-reproducible-lock:
+  architecture-and-build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: refactor/hotel-os-architecture-hardening
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - name: Regenerate lockfile from pinned package.json
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-      - name: Configure Vercel reproducible install
-        run: |
-          cat > vercel.json <<'FINAL_VERCEL'
-          {
-            "$schema": "https://openapi.vercel.sh/vercel.json",
-            "framework": "nextjs",
-            "buildCommand": "npm run build",
-            "installCommand": "npm ci --no-audit --no-fund",
-            "git": {
-              "deploymentEnabled": {
-                "*": false,
-                "main": true,
-                "staging": true
-              }
-            }
-          }
-          FINAL_VERCEL
-      - name: Verify reproducible clean install
+      - name: Install dependencies reproducibly
         run: npm ci --no-audit --no-fund
       - name: Product boundaries
         run: npm run check:product-boundaries
@@ -47,14 +32,3 @@ jobs:
         run: npm run check:hotel-architecture
       - name: Production build
         run: npm run build
-      - name: Commit tested lockfile and Vercel config
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package-lock.json vercel.json
-          if git diff --cached --quiet; then
-            echo "No lockfile/Vercel changes to commit"
-            exit 0
-          fi
-          git commit -m "chore(ci): lock dependencies for reproducible installs"
-          git push origin HEAD:refactor/hotel-os-architecture-hardening
