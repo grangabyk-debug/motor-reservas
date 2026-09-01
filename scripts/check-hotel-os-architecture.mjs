@@ -7,7 +7,7 @@ const defaultBudget={bytes:24000,lines:520}
 const legacyBudgets=new Map([
   ["app/dashboard/features/frontdesk/ReservationDrawer.jsx",{bytes:38000,lines:820}],
   ["app/dashboard/features/operations/HousekeepingPremium.jsx",{bytes:36000,lines:780}],
-  ["app/dashboard/features/commercial/GroupsPremium.jsx",{bytes:38000,lines:800}],
+  ["app/dashboard/features/commercial/GroupsPremium.jsx",{bytes:31000,lines:700}],
   ["app/dashboard/features/finance/ReportsPremium.jsx",{bytes:32000,lines:700}],
   ["app/dashboard/features/hotel/AccessKeysPremium.jsx",{bytes:30000,lines:650}],
   ["app/dashboard/HotelOSV2.jsx",{bytes:30000,lines:700}],
@@ -16,6 +16,7 @@ const forbiddenLegacy=["app/dashboard/HotelOSClient.jsx","app/dashboard/Advanced
 const uiMustNotUseSupabase=[
   "app/dashboard/features/frontdesk/ReservationDrawer.jsx",
   "app/dashboard/features/operations/HousekeepingPremium.jsx",
+  "app/dashboard/features/commercial/GroupsPremium.jsx",
 ]
 const problems=[],warnings=[]
 
@@ -51,6 +52,15 @@ if(!housekeepingWorkspace.includes("requirePropertyId")||!housekeepingWorkspace.
 if(!housekeepingWorkspace.includes("filter:`property_id=eq.${property}`"))problems.push("housekeeping realtime subscription must stay filtered by property_id")
 if(!housekeepingHook.includes("loadHousekeepingWorkspace")||!housekeepingHook.includes("subscribeHousekeepingWorkspace")||hasDirectSupabase(housekeepingHook))problems.push("useHousekeepingWorkspace must own orchestration/realtime without direct Supabase access")
 
+const groupsWorkspace=read("app/dashboard/services/groupsWorkspace.js")
+const groupsHook=read("app/dashboard/hooks/useGroupsWorkspace.js")
+if(!groupsWorkspace.includes("requirePropertyId")||!groupsWorkspace.includes('.eq("property_id",property)'))problems.push("groupsWorkspace service must enforce property_id for Group Desk data")
+for(const rpc of ["hl_group_create_quote_atomic","hl_group_mark_quote_atomic"]){if(!groupsWorkspace.includes(rpc))problems.push(`groupsWorkspace service must use atomic RPC ${rpc}`)}
+if(!groupsHook.includes("loadGroupsWorkspace")||hasDirectSupabase(groupsHook))problems.push("useGroupsWorkspace must orchestrate Group Desk without direct Supabase access")
+const groupMigration=read("supabase/migrations/20260901160500_group_desk_atomic_operations.sql")
+for(const rpc of ["hl_group_create_quote_atomic","hl_group_mark_quote_atomic"]){if(!groupMigration.includes(rpc))problems.push(`Group Desk migration missing ${rpc}`)}
+if(!/security invoker/i.test(groupMigration))problems.push("Group Desk atomic RPCs must remain security invoker so RLS stays authoritative")
+
 const pagePath="app/dashboard/page.jsx",page=read(pagePath)
 if(!/HotelOSV2/.test(page))problems.push("app/dashboard/page.jsx: dashboard must use HotelOSV2 modular shell")
 
@@ -67,4 +77,4 @@ if(!hotelService.includes("Authorization:`Bearer ${token}`")&&!hotelService.incl
 
 if(warnings.length)console.warn("Architecture debt still tracked:\n- "+warnings.join("\n- "))
 if(problems.length){console.error("Habitación Llena architecture guard failed:\n- "+problems.join("\n- "));process.exit(1)}
-console.log("Habitación Llena architecture guard OK: product boundaries, tenant services, UI/Supabase separation, component budgets, atomic operations and server-secret rules verified")
+console.log("Habitación Llena architecture guard OK: product boundaries, tenant services, UI/Supabase separation, Group Desk atomicity, component budgets, atomic operations and server-secret rules verified")
