@@ -1,0 +1,53 @@
+/* Etapa Ahora · Planning visual layer. Sólo estiliza CommandCenter; no altera lógica ni eventos. */
+[class*="commandPage"]{--plan-ink:#1b2924;--plan-muted:#718079;--plan-line:#e2e6e3;--plan-green:#163f33;--plan-violet:#6d5dfc;background:linear-gradient(180deg,#f7f6f1,#f1f0ea)!important;color:var(--plan-ink)!important;padding:18px 20px!important;gap:12px!important}
+[class*="commandPage"] [class*="topline"]{padding:2px 2px 6px}
+[class*="commandPage"] [class*="topline"] small{font-size:11px!important;letter-spacing:.16em!important;color:#7d6d51!important}
+[class*="commandPage"] [class*="topline"] h2{font-size:34px!important;line-height:1.02!important;font-weight:680!important;letter-spacing:-.035em!important;color:#1a2e27!important}
+[class*="commandPage"] [class*="topline"] p{max-width:760px;font-size:12px!important;line-height:1.55!important;color:#718079!important}
+[class*="commandPage"] [class*="viewSwitch"]{padding:4px!important;border-radius:14px!important;background:rgba(255,255,255,.86)!important;border:1px solid var(--plan-line)!important;box-shadow:0 10px 25px rgba(29,44,37,.05)!important}
+[class*="commandPage"] [class*="viewSwitch"] button{height:38px!important;border-radius:10px!important;padding:0 15px!important;font-size:11px!important}
+[class*="commandPage"] [class*="activeView"]{background:var(--plan-green)!important;color:#fff!important;box-shadow:0 7px 18px rgba(22,63,51,.16)!important}
+[class*="commandPage"] [class*="toolbar"]{padding:11px 12px!important;border-radius:17px!important;border:1px solid var(--plan-line)!important;background:rgba(255,255,255,.95)!important;box-shadow:0 14px 32px rgba(29,44,37,.06)!important;backdrop-filter:blur(14px)}
+[class*="commandPage"] [class*="toolbar"] button,[class*="commandPage"] [class*="toolbar"] input,[class*="commandPage"] [class*="toolbar"] select{min-height:38px!important;font-size:10px!important;border-radius:10px!important}
+[class*="commandPage"] [class*="todayButton"]{background:#eef3ef!important;color:#21503f!important;border-color:#d6e2dc!important}
+[class*="commandPage"] [class*="filterActive"]{background:#eeeaff!important;color:#594bc5!important;border-color:#d8d1ff!important}
+[class*="commandPage"] [class*="calendar"]{border-radius:22px!important;border:1px solid #dce2de!important;box-shadow:0 24px 58px rgba(31,49,41,.09)!important;background:#fff!important}
+[class*="commandPage"] [class*="days"]>div{min-height:58px!important}
+[class*="commandPage"] [class*="days"] small{font-size:9px!important;color:#7d8a84!important}
+[class*="commandPage"] [class*="days"] b{font-size:16px!important;color:#263b33!important}
+[class*="commandPage"] [class*="days"] em{font-size:8px!important;color:#9ca6a1!important}
+[class*="commandPage"] [class*="occupancyRow"]{top:58px!important;background:#f8faf8!important}
+[class*="commandPage"] [class*="occupancyRow"] b,[class*="commandPage"] [class*="typeOccupancy"] b{font-size:9px!important}
+[class*="commandPage"] [class*="occupancyRow"] small,[class*="commandPage"] [class*="typeOccupancy"] small{font-size:8px!important}
+[class*="commandPage"] [class*="groupHeader"]{height:38px!important;background:#f2f5f2!important;color:#293c35!important}
+[class*="commandPage"] [class*="groupHeader"] b{font-size:11px!important}
+[class*="commandPage"] [class*="groupHeader"] small,[class*="commandPage"] [class*="groupHeader"] em{font-size:9px!important}
+[class*="commandPage"] [class*="roomName"]{background:#fbfcfa!important}
+[class*="commandPage"] [class*="roomName"] b{font-size:11px!important;color:#24362f!important}
+[class*="commandPage"] [class*="roomName"] small{font-size:8px!important;color:#839089!important}
+[class*="commandPage"] [class*="dayCell"]{transition:background .13s ease,box-shadow .13s ease}
+[class*="commandPage"] [class*="dayCell"]:hover{background:#f0f6f2!important;box-shadow:inset 0 0 0 1px rgba(37,94,70,.08)}
+[class*="commandPage"] [class*="todayHeader"],[class*="commandPage"] [class*="todayCell"]{background:#eef3ff!important}
+[class*="commandPage"] [class*="stay"]{height:40px!important;border-radius:10px!important;margin:0 3px!important;padding:6px 9px!important;box-shadow:0 6px 15px rgba(31,49,41,.08),inset 0 0 0 1px color-mix(in srgb,var(--channel) 20%,#d9e1dc)!important;transition:transform .16s ease,box-shadow .16s ease,filter .16s ease!important;will-change:transform}
+[class*="commandPage"] [class*="stay"]:hover{transform:translateY(-2px) scale(1.012);z-index:9!important;box-shadow:0 12px 24px rgba(31,49,41,.15),inset 0 0 0 1px color-mix(in srgb,var(--channel) 34%,#d9e1dc)!important}
+[class*="commandPage"] [class*="stay"]:active{cursor:grabbing!important;transform:translateY(0) scale(.995)}
+[class*="commandPage"] [class*="stay"] b{font-size:10px!important;line-height:1.2!important}
+[class*="commandPage"] [class*="stay"] small{font-size:8px!important;line-height:1.25!important}
+[class*="commandPage"] [class*="compactRow"] [class*="stay"]{height:34px!important}
+[class*="commandPage"] [class*="staySelected"]{outline:2px solid var(--plan-violet)!important;outline-offset:2px!important}
+[class*="commandPage"] [class*="inspector"]{border-radius:20px!important;border:1px solid #dfe5e1!important;box-shadow:0 20px 50px rgba(31,49,41,.11)!important}
+[class*="commandPage"] [class*="inspector"]>header{padding:13px 14px!important;min-height:76px!important;background:linear-gradient(180deg,#fff,#fafbf9)!important}
+[class*="commandPage"] [class*="guestIdentity"] h3{font-size:17px!important;color:#263a32!important}
+[class*="commandPage"] [class*="guestIdentity"] p{font-size:10px!important}
+[class*="commandPage"] [class*="guestIdentity"] small{font-size:9px!important}
+[class*="commandPage"] [class*="guestIdentity"]>span{background:#e9f2ed!important;color:#24553f!important;box-shadow:inset 0 0 0 1px #cfe0d7!important}
+[class*="commandPage"] [class*="inspectorActions"] button{height:34px!important;font-size:9px!important;border-radius:9px!important}
+[class*="commandPage"] [class*="inspectorActions"] button:nth-child(2){background:var(--plan-green)!important;border-color:var(--plan-green)!important}
+[class*="commandPage"] [class*="inspectorBody"] small{font-size:8px!important}
+[class*="commandPage"] [class*="inspectorBody"] b{font-size:11px!important;color:#2c3d36!important}
+[class*="commandPage"] [class*="legend"]{font-size:9px!important;color:#728079!important}
+[class*="commandPage"] [class*="legend"] i{width:8px!important;height:8px!important;border-radius:50%!important}
+[class*="commandPage"] [class*="searchInput"] input{font-size:10px!important}
+[class*="commandPage"] button{cursor:pointer}
+[class*="commandPage"] button:focus-visible,[class*="commandPage"] input:focus-visible,[class*="commandPage"] select:focus-visible{outline:3px solid rgba(109,93,252,.17)!important;outline-offset:1px}
+@media(max-width:900px){[class*="commandPage"]{padding:12px!important}[class*="commandPage"] [class*="topline"] h2{font-size:29px!important}[class*="commandPage"] [class*="topline"] p{font-size:11px!important}[class*="commandPage"] [class*="stay"]{height:36px!important}[class*="commandPage"] [class*="toolbar"]{border-radius:14px!important}[class*="commandPage"] [class*="calendar"]{border-radius:17px!important}}
