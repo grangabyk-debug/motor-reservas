@@ -1,6 +1,7 @@
 "use client"
+
 import{useMemo,useState}from"react"
-import{addDays,isoDate,shortDate}from"../../core/formatters"
+import{addDays,isoDate,money,shortDate}from"../../core/formatters"
 import ui from"../../v2.module.css"
 import cc from"./command-center.module.css"
 
@@ -8,83 +9,48 @@ function localNowKey(){const d=new Date(),y=d.getFullYear(),m=String(d.getMonth(
 function occupancyStart(r){return String(r?.ocupacion_desde_local||`${r?.fecha_entrada||""}T${r?.hora_llegada_estimada||"14:00"}:00`).replace(" ","T")}
 function occupancyEnd(r){return String(r?.ocupacion_hasta_local||`${r?.fecha_salida||""}T${r?.hora_salida_estimada||"10:00"}:00`).replace(" ","T")}
 function parts(value){const raw=String(value||"").replace(" ","T"),[date,time="00:00:00"]=raw.split("T");return{date,time:time.slice(0,5)}}
-function tone(r,now){
-  if(r.estado==="finalizada")return"out"
-  if(r.estado==="alojado")return"in"
-  const start=occupancyStart(r),end=occupancyEnd(r)
-  if(end&&now>=end)return"out"
-  if(start&&end&&now>=start&&now<end)return"in"
-  return"future"
-}
-function statusLabel(r,now){
-  if(r?.no_show)return"NO SHOW"
-  const status=String(r?.estado||"").toLowerCase()
-  if(status==="cancelada")return"CANCELADA"
-  if(status==="finalizada")return"OUT"
-  if(status==="alojado")return"IN"
-  const t=tone(r,now)
-  if(t==="in")return"IN"
-  if(t==="out")return"OUT"
-  return"FUTURA"
-}
-function channelLabel(value){
-  const raw=String(value||"Directa").trim(),channel=raw.toLowerCase()
-  if(channel.includes("booking"))return"OTA · BOOKING.COM"
-  if(channel.includes("expedia"))return"OTA · EXPEDIA"
-  if(channel.includes("airbnb"))return"OTA · AIRBNB"
-  if(channel.includes("motor"))return"MOTOR"
-  if(channel.includes("agencia"))return"AGENCIA"
-  if(channel==="directa")return"DIRECTA"
-  if(channel.includes("teléfono")||channel.includes("telefono")||channel.includes("whatsapp")||channel.includes("walk-in"))return`DIRECTA · ${raw.toUpperCase()}`
-  return raw.toUpperCase()
-}
-function dayName(d){return new Date(`${d}T12:00:00`).toLocaleDateString("es-AR",{weekday:"short"})}
-function halfRange(r,days){
-  const first=days[0],lastExclusive=addDays(days.at(-1),1),maxLine=days.length*2+1,start=parts(occupancyStart(r)),end=parts(occupancyEnd(r))
-  let startLine
-  if(start.date<first)startLine=1
-  else{const i=days.indexOf(start.date);startLine=i<0?1:i*2+(start.time<"12:00"?1:2)}
-  let endLine
-  if(end.date>=lastExclusive)endLine=maxLine
-  else{const i=days.indexOf(end.date);endLine=i<0?maxLine:i*2+(end.time<="12:00"?2:3)}
-  startLine=Math.max(1,Math.min(maxLine-1,startLine));endLine=Math.max(startLine+1,Math.min(maxLine,endLine))
-  return{startLine,endLine}
-}
+function tone(r,now){if(r.estado==="finalizada")return"out";if(r.estado==="alojado")return"in";const start=occupancyStart(r),end=occupancyEnd(r);if(end&&now>=end)return"out";if(start&&end&&now>=start&&now<end)return"in";return"future"}
+function statusLabel(r,now){if(r?.no_show)return"NO SHOW";const status=String(r?.estado||"").toLowerCase();if(status==="cancelada")return"CANCELADA";if(status==="finalizada")return"OUT";if(status==="alojado")return"IN";const t=tone(r,now);if(t==="in")return"IN";if(t==="out")return"OUT";return"FUTURA"}
+function channelLabel(value){const raw=String(value||"Directa").trim(),channel=raw.toLowerCase();if(channel.includes("booking"))return"BOOKING.COM";if(channel.includes("expedia"))return"EXPEDIA";if(channel.includes("airbnb"))return"AIRBNB";if(channel.includes("motor"))return"MOTOR";if(channel.includes("agencia"))return"AGENCIA";if(channel==="directa")return"DIRECTA";if(channel.includes("teléfono")||channel.includes("telefono")||channel.includes("whatsapp")||channel.includes("walk-in"))return raw.toUpperCase();return raw.toUpperCase()}
+function channelColor(value){const v=String(value||"").toLowerCase();if(v.includes("booking"))return"#2868dc";if(v.includes("expedia"))return"#f3a31c";if(v.includes("airbnb"))return"#ef5f6c";if(v.includes("agencia"))return"#8064d8";if(v.includes("motor"))return"#0eaa83";if(v.includes("direct")||v.includes("whatsapp")||v.includes("tel")||v.includes("walk"))return"#11a67c";return"#8290a4"}
+function dayName(d){return new Date(`${d}T12:00:00`).toLocaleDateString("es-AR",{weekday:"short"}).replace(".","")}
+function monthName(d){return new Date(`${d}T12:00:00`).toLocaleDateString("es-AR",{month:"short"}).replace(".","")}
+function halfRange(r,days){const first=days[0],lastExclusive=addDays(days.at(-1),1),maxLine=days.length*2+1,start=parts(occupancyStart(r)),end=parts(occupancyEnd(r));let startLine;if(start.date<first)startLine=1;else{const i=days.indexOf(start.date);startLine=i<0?1:i*2+(start.time<"12:00"?1:2)}let endLine;if(end.date>=lastExclusive)endLine=maxLine;else{const i=days.indexOf(end.date);endLine=i<0?maxLine:i*2+(end.time<="12:00"?2:3)}startLine=Math.max(1,Math.min(maxLine-1,startLine));endLine=Math.max(startLine+1,Math.min(maxLine,endLine));return{startLine,endLine}}
 function stayKind(r){return r?.tipo_estadia==="day_use"?"DAY USE":"NOCHE HOTELERA"}
+function dayRangeLabel(days){if(!days.length)return"";const first=days[0],last=days.at(-1),a=new Date(`${first}T12:00:00`),b=new Date(`${last}T12:00:00`);if(a.getMonth()===b.getMonth())return`${a.getDate()}–${b.getDate()} ${monthName(last)}`;return`${a.getDate()} ${monthName(first)} – ${b.getDate()} ${monthName(last)}`}
+function overlapDay(r,day){return occupancyStart(r)<`${addDays(day,1)}T00:00:00`&&occupancyEnd(r)>`${day}T00:00:00`&&r.estado!=="cancelada"&&!r.no_show}
+function pct(part,total){return total?Math.round(part/total*100):0}
+function cleanPhone(value){return String(value||"").replace(/\D/g,"")}
 
-export default function CommandCenter({rooms,reservations,blocks,floors,onMove,onResize,onOpen,onNew,onBlock}){
-  const today=isoDate(),now=localNowKey(),[start,setStart]=useState(today),[dayCount,setDayCount]=useState(15),[type,setType]=useState(""),[floor,setFloor]=useState(""),[roomQuery,setRoomQuery]=useState("")
-  const days=useMemo(()=>Array.from({length:dayCount},(_,i)=>addDays(start,i)),[start,dayCount])
-  const floorMap=useMemo(()=>new Map(floors.map(f=>[String(f.id),f.name])),[floors])
-  const types=useMemo(()=>[...new Set(rooms.map(r=>String(r.tipo||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es")),[rooms])
-  const filteredRooms=useMemo(()=>rooms.filter(room=>{
-    if(type&&String(room.tipo||"")!==type)return false
-    if(floor&&String(room.floor_id||"")!==floor)return false
-    const q=roomQuery.trim().toLowerCase();if(q&&!`${room.nombre||""} ${room.tipo||""}`.toLowerCase().includes(q))return false
-    return true
-  }),[rooms,type,floor,roomQuery])
-  const tracks={gridTemplateColumns:`repeat(${dayCount*2},minmax(31px,1fr))`}
-  const timeline={"--timeline-min":`${Math.max(620,dayCount*64)}px`},windowStart=`${days[0]}T00:00:00`,windowEnd=`${addDays(days.at(-1),1)}T00:00:00`
-  return <section className={`${ui.content} ${cc.commandPage}`}>
-    <div className={cc.toolbar}>
-      <div className={cc.rangeBlock}><small>ROOM DIARY</small><strong>{shortDate(days[0])} — {shortDate(days.at(-1))}</strong></div>
-      <div className={cc.filters}>
-        <input aria-label="Filtrar habitación" value={roomQuery} onChange={e=>setRoomQuery(e.target.value)} placeholder="Habitación…"/>
-        <select aria-label="Tipo de habitación" value={type} onChange={e=>setType(e.target.value)}><option value="">Todos los tipos</option>{types.map(x=><option key={x}>{x}</option>)}</select>
-        <select aria-label="Piso" value={floor} onChange={e=>setFloor(e.target.value)}><option value="">Todos los pisos</option>{floors.filter(f=>f.active!==false).map(f=><option key={f.id} value={f.id}>{f.name}</option>)}</select>
-        <input className={cc.dateInput} aria-label="Ir a fecha" type="date" value={start} onChange={e=>e.target.value&&setStart(e.target.value)}/>
-        <select aria-label="Días visibles" value={dayCount} onChange={e=>setDayCount(Number(e.target.value))}><option value="7">7 días</option><option value="10">10 días</option><option value="15">15 días</option><option value="21">21 días</option></select>
-      </div>
-      <div className={cc.navActions}>
-        <button onClick={()=>setStart(addDays(start,-Math.min(7,dayCount)))} aria-label="Fechas anteriores">←</button><button onClick={()=>setStart(today)}>Hoy</button><button onClick={()=>setStart(addDays(start,Math.min(7,dayCount)))} aria-label="Fechas siguientes">→</button>
-        <span className={cc.help}><button aria-label="Ayuda del calendario">i</button><span className={cc.tooltip}><b>Cómo leer y usar el calendario</b><em><i className={cc.inDot}/>IN / ocupada</em><em><i className={cc.outDot}/>OUT</em><em><i className={cc.futureDot}/>FUTURA</em><em><i className={cc.blockDot}/>Bloqueo</em><p>Cada día tiene mitad AM y PM. Así una llegada de madrugada, un check-out por la mañana y un Day Use posterior pueden convivir sin perder la hora real. Arrastrá una reserva para moverla y su borde derecho para cambiar la salida.</p></span></span>
-      </div>
+export default function CommandCenter({rooms,reservations,payments=[],blocks,floors,onMove,onResize,onOpen,onNew,onBlock}){
+  const today=isoDate(),now=localNowKey(),[start,setStart]=useState(today),[dayCount,setDayCount]=useState(21),[type,setType]=useState(""),[floor,setFloor]=useState(""),[roomQuery,setRoomQuery]=useState(""),[collapsed,setCollapsed]=useState({}),[compact,setCompact]=useState(false),[selectedId,setSelectedId]=useState("")
+  const days=useMemo(()=>Array.from({length:dayCount},(_,i)=>addDays(start,i)),[start,dayCount]),floorMap=useMemo(()=>new Map(floors.map(f=>[String(f.id),f.name])),[floors]),types=useMemo(()=>[...new Set(rooms.map(r=>String(r.tipo||"Habitación").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es")),[rooms])
+  const filteredRooms=useMemo(()=>rooms.filter(room=>{if(type&&String(room.tipo||"Habitación")!==type)return false;if(floor&&String(room.floor_id||"")!==floor)return false;const q=roomQuery.trim().toLowerCase();if(q&&!`${room.nombre||""} ${room.tipo||""}`.toLowerCase().includes(q))return false;return true}),[rooms,type,floor,roomQuery])
+  const grouped=useMemo(()=>{const map=new Map();filteredRooms.forEach(room=>{const key=String(room.tipo||"Habitación").trim()||"Habitación";if(!map.has(key))map.set(key,[]);map.get(key).push(room)});return[...map.entries()].sort((a,b)=>a[0].localeCompare(b[0],"es"))},[filteredRooms])
+  const tracks={gridTemplateColumns:`repeat(${dayCount*2},minmax(${compact?24:31}px,1fr))`},timeline={"--timeline-min":`${Math.max(620,dayCount*(compact?50:64))}px`},windowStart=`${days[0]}T00:00:00`,windowEnd=`${addDays(days.at(-1),1)}T00:00:00`
+  const setPreset=count=>{setDayCount(count);if(count===30){const d=new Date(`${today}T12:00:00`);d.setDate(1);setStart(isoDate(d))}}
+  const isOccupiedToday=room=>reservations.some(r=>String(r.habitacion_id)===String(room.id)&&overlapDay(r,today))
+  const selected=reservations.find(r=>String(r.id)===String(selectedId))||null,selectedRoom=selected?rooms.find(r=>String(r.id)===String(selected.habitacion_id)):null,selectedPaid=selected?payments.filter(p=>String(p.reserva_id)===String(selected.id)).reduce((sum,p)=>sum+Number(p.monto||0),0):0,selectedBalance=selected?Math.max(0,Number(selected.precio_total||0)-selectedPaid):0
+  const occupancyFor=(roomList,day)=>{const ids=new Set(roomList.map(r=>String(r.id))),occupied=new Set(reservations.filter(r=>ids.has(String(r.habitacion_id))&&overlapDay(r,day)).map(r=>String(r.habitacion_id))).size;return{occupied,total:roomList.length,percent:pct(occupied,roomList.length)}}
+  const averagePrice=roomList=>roomList.length?roomList.reduce((sum,r)=>sum+Number(r.precio||0),0)/roomList.length:0
+  return <section className={`${ui.content} ${cc.commandPage} ${selected?cc.withInspector:""}`}>
+    <div className={cc.topline}>
+      <div><small>PLANNING</small><h2>Calendario de habitaciones</h2><p>Arrastrá para mover · estirá para alargar · doble click en un hueco para reservar · click en una reserva para abrir su cuenta debajo.</p></div>
+      <div className={cc.viewSwitch}><button className={dayCount===7?cc.activeView:""} onClick={()=>setPreset(7)}>Semana</button><button className={dayCount===21?cc.activeView:""} onClick={()=>setPreset(21)}>3 semanas</button><button className={dayCount===30?cc.activeView:""} onClick={()=>setPreset(30)}>Mes</button></div>
     </div>
-    <div className={cc.resultMeta}>{filteredRooms.length} de {rooms.length} habitaciones visibles</div>
+
+    <div className={cc.toolbar}>
+      <div className={cc.rangeBlock}><button onClick={()=>setStart(addDays(start,-Math.min(7,dayCount)))}>‹</button><strong>{dayRangeLabel(days)}</strong><button onClick={()=>setStart(addDays(start,Math.min(7,dayCount)))}>›</button><button className={cc.todayButton} onClick={()=>setStart(today)}>Hoy</button></div>
+      <div className={cc.filters}><div className={cc.searchInput}><span>⌕</span><input aria-label="Filtrar habitación" value={roomQuery} onChange={e=>setRoomQuery(e.target.value)} placeholder="Buscar habitación…"/></div><select aria-label="Tipo de habitación" value={type} onChange={e=>setType(e.target.value)}><option value="">Todos los tipos</option>{types.map(x=><option key={x}>{x}</option>)}</select><select aria-label="Piso" value={floor} onChange={e=>setFloor(e.target.value)}><option value="">Todos los pisos</option>{floors.filter(f=>f.active!==false).map(f=><option key={f.id} value={f.id}>{f.name}</option>)}</select><input className={cc.dateInput} aria-label="Ir a fecha" type="date" value={start} onChange={e=>e.target.value&&setStart(e.target.value)}/><button className={compact?cc.filterActive:""} onClick={()=>setCompact(v=>!v)}>Compacto</button></div>
+      <div className={cc.legend}><span><i className={cc.directDot}/>Directa</span><span><i className={cc.bookingDot}/>Booking</span><span><i className={cc.airbnbDot}/>Airbnb</span><span><i className={cc.agencyDot}/>Agencia</span><span><i className={cc.blockDot}/>Bloqueo</span></div>
+    </div>
+
     <div className={`${ui.calendar} ${cc.calendar}`} style={timeline}>
-      <div className={cc.calHead}><div className={ui.roomHead}><b>Habitación</b><small>Piso · tipo</small></div><div className={cc.days} style={tracks}>{days.map((d,i)=><div key={d} style={{gridColumn:`${i*2+1} / span 2`}} className={d===today?cc.todayHeader:""}><small>{dayName(d)}</small><b>{new Date(`${d}T12:00:00`).getDate()}</b></div>)}</div></div>
-      {filteredRooms.map(room=>{const list=reservations.filter(r=>String(r.habitacion_id)===String(room.id)&&occupancyEnd(r)>windowStart&&occupancyStart(r)<windowEnd);return <div className={cc.calRow} key={room.id}><button className={ui.roomName}><b>{room.nombre}</b><small>{floorMap.get(String(room.floor_id))||"Sin piso"} · {room.tipo||"Habitación"}</small></button><div className={cc.dayGrid} style={tracks}>{days.map((day,i)=>{const blocked=blocks.some(b=>String(b.habitacion_id)===String(room.id)&&day<b.fecha_hasta&&addDays(day,1)>b.fecha_desde);return <div key={day} style={{gridColumn:`${i*2+1} / span 2`}} className={`${cc.dayCell} ${day===today?cc.todayCell:""} ${blocked?ui.blocked:""}`} onDoubleClick={()=>!blocked&&onNew(room,day)} onContextMenu={e=>{e.preventDefault();onBlock(room,day)}} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();const resize=e.dataTransfer.getData("application/x-hl-resize"),move=e.dataTransfer.getData("application/x-hl-move");if(resize)onResize(resize,addDays(day,1));else if(move)onMove(move,room.id,day)}}/>})}{list.map(r=>{const{startLine,endLine}=halfRange(r,days),t=tone(r,now),status=statusLabel(r,now),channel=channelLabel(r.canal_reserva),from=parts(occupancyStart(r)),to=parts(occupancyEnd(r));return <button key={r.id} draggable onDragStart={e=>e.dataTransfer.setData("application/x-hl-move",String(r.id))} onClick={()=>onOpen(r)} className={`${ui.stay} ${cc.stay} ${t==="in"?ui.stayIn:t==="out"?ui.stayOut:ui.stayFuture}`} style={{gridColumn:`${startLine} / ${endLine}`}} title={`${r.numero_reserva||"Reserva"} · ${r.nombre_huesped||"Huésped"} · ${stayKind(r)} · ${from.date} ${from.time} → ${to.date} ${to.time} · ${status} · ${channel}`}><span><b>{r.nombre_huesped}</b><small>{status} · {r.tipo_estadia==="day_use"?"DAY USE":channel}</small></span><i draggable onDragStart={e=>{e.stopPropagation();e.dataTransfer.setData("application/x-hl-resize",String(r.id))}} title="Arrastrar para cambiar salida"/></button>})}</div></div>})}
+      <div className={cc.calHead}><div className={ui.roomHead}><b>Habitación</b><small>{filteredRooms.length} visibles</small></div><div className={cc.days} style={tracks}>{days.map((d,i)=><div key={d} style={{gridColumn:`${i*2+1} / span 2`}} className={`${d===today?cc.todayHeader:""} ${[0,6].includes(new Date(`${d}T12:00:00`).getDay())?cc.weekend:""}`}><small>{dayName(d)}</small><b>{new Date(`${d}T12:00:00`).getDate()}</b><em>{monthName(d)}</em></div>)}</div></div>
+      <div className={cc.occupancyRow}><div><b>OCUP. TOTAL</b><small>{filteredRooms.length} hab.</small></div><div className={cc.occupancyTrack} style={tracks}>{days.map((day,i)=>{const stat=occupancyFor(filteredRooms,day);return <div key={day} style={{gridColumn:`${i*2+1} / span 2`}} className={stat.percent>=90?cc.occHigh:stat.percent>=65?cc.occMedium:cc.occLow}><b>{stat.percent}%</b><small>{stat.occupied}/{stat.total}</small></div>})}</div></div>
+      {grouped.map(([groupName,groupRooms])=>{const closed=collapsed[groupName],freeToday=groupRooms.filter(r=>!isOccupiedToday(r)).length,base=averagePrice(groupRooms);return <div key={groupName} className={cc.groupBlock}><button className={cc.groupHeader} onClick={()=>setCollapsed(x=>({...x,[groupName]:!x[groupName]}))}><span><i>{closed?"›":"⌄"}</i><b>{groupName}</b><small>{groupRooms.length} {groupRooms.length===1?"habitación":"habitaciones"}</small></span><em>{freeToday} libres hoy</em></button>{!closed&&<><div className={cc.typeOccupancy}><div><b>{groupName}</b><small>ocupación · tarifa base</small></div><div style={tracks}>{days.map((day,i)=>{const stat=occupancyFor(groupRooms,day);return <div key={day} style={{gridColumn:`${i*2+1} / span 2`}}><b>{stat.percent}%</b><small>{base?money(base):"—"}</small></div>})}</div></div>{groupRooms.map(room=>{const list=reservations.filter(r=>String(r.habitacion_id)===String(room.id)&&occupancyEnd(r)>windowStart&&occupancyStart(r)<windowEnd&&r.estado!=="cancelada");return <div className={`${cc.calRow} ${compact?cc.compactRow:""}`} key={room.id}><button className={ui.roomName}><b>{room.nombre}</b><small>{floorMap.get(String(room.floor_id))||"Sin piso"}</small></button><div className={cc.dayGrid} style={tracks}>{days.map((day,i)=>{const blocked=blocks.some(b=>String(b.habitacion_id)===String(room.id)&&day<b.fecha_hasta&&addDays(day,1)>b.fecha_desde);return <div key={day} style={{gridColumn:`${i*2+1} / span 2`}} className={`${cc.dayCell} ${day===today?cc.todayCell:""} ${[0,6].includes(new Date(`${day}T12:00:00`).getDay())?cc.weekendCell:""} ${blocked?ui.blocked:""}`} onDoubleClick={()=>!blocked&&onNew(room,day)} onContextMenu={e=>{e.preventDefault();onBlock(room,day)}} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();const resize=e.dataTransfer.getData("application/x-hl-resize"),move=e.dataTransfer.getData("application/x-hl-move");if(resize)onResize(resize,addDays(day,1));else if(move)onMove(move,room.id,day)}}/>})}{list.map(r=>{const{startLine,endLine}=halfRange(r,days),t=tone(r,now),status=statusLabel(r,now),channel=channelLabel(r.canal_reserva),from=parts(occupancyStart(r)),to=parts(occupancyEnd(r)),channelHex=channelColor(r.canal_reserva);return <button key={r.id} draggable onDragStart={e=>e.dataTransfer.setData("application/x-hl-move",String(r.id))} onClick={()=>setSelectedId(String(r.id))} onDoubleClick={()=>onOpen(r)} className={`${ui.stay} ${cc.stay} ${selectedId&&String(r.id)===String(selectedId)?cc.staySelected:""}`} style={{gridColumn:`${startLine} / ${endLine}`,"--channel":channelHex}} title={`${r.numero_reserva||"Reserva"} · ${r.nombre_huesped||"Huésped"} · ${stayKind(r)} · ${from.date} ${from.time} → ${to.date} ${to.time} · ${status} · ${channel}`}><span><b>{r.nombre_huesped}</b><small>{channel} · {status}</small></span><em className={t==="in"?cc.statusIn:t==="out"?cc.statusOut:cc.statusFuture}/><i draggable onDragStart={e=>{e.stopPropagation();e.dataTransfer.setData("application/x-hl-resize",String(r.id))}} title="Arrastrar para cambiar salida"/></button>})}</div></div>})}</>}</div>})}
       {!filteredRooms.length&&<div className={cc.empty}>No hay habitaciones para estos filtros.</div>}
     </div>
+    {selected&&<aside className={cc.inspector}><header><div className={cc.guestIdentity}><span>{String(selected.nombre_huesped||"H").split(/\s+/).slice(0,2).map(x=>x[0]).join("").toUpperCase()}</span><div><small>RESERVA {selected.numero_reserva||selected.id}</small><h3>{selected.nombre_huesped}</h3><p>{selectedRoom?.nombre||"Sin habitación"} · {channelLabel(selected.canal_reserva)}</p></div></div><div className={cc.inspectorActions}><button onClick={()=>{const phone=cleanPhone(selected.telefono_huesped);if(phone)window.open(`https://wa.me/${phone}`,"_blank")}} disabled={!cleanPhone(selected.telefono_huesped)}>WhatsApp</button><button onClick={()=>onOpen(selected)}>Abrir ficha completa</button><button className={cc.closeInspector} onClick={()=>setSelectedId("")}>×</button></div></header><div className={cc.inspectorBody}><section><small>LLEGADA</small><b>{shortDate(selected.fecha_entrada)} · {selected.hora_llegada_estimada||"14:00"}</b></section><section><small>SALIDA</small><b>{shortDate(selected.fecha_salida)} · {selected.hora_salida_estimada||"10:00"}</b></section><section><small>OCUPACIÓN</small><b>{selected.cantidad_huespedes||1} huésped(es)</b></section><section><small>ESTADO</small><b>{statusLabel(selected,now)}</b></section><section className={cc.account}><div><small>TOTAL</small><b>{money(selected.precio_total||0,selected.moneda)}</b></div><div><small>PAGADO</small><b>{money(selectedPaid,selected.moneda)}</b></div><div><small>PENDIENTE</small><b className={selectedBalance>0?cc.balanceDue:""}>{money(selectedBalance,selected.moneda)}</b></div></section><section className={cc.note}><small>NOTAS DEL HUÉSPED</small><p>{selected.notas||"Sin notas cargadas."}</p></section></div></aside>}
   </section>
 }
