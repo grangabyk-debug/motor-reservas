@@ -1,4 +1,5 @@
 import{money}from"../../core/formatters"
+import ReservationHistory from"./ReservationHistory"
 import s from"./reservation-payment-summary.module.css"
 
 const isParking=item=>item?.resource_category==="parking"||item?.kind==="parking"
@@ -42,5 +43,6 @@ export default function ReservationPaymentSummary({draft,totals,paid,balance}){
         {!lines.length&&<div className={s.empty}>Completá la estadía o agregá extras para ver el desglose de la cuenta.</div>}
       </div>
     </div>
+    {draft?.id&&<ReservationHistory reservationId={draft.id} guestIdentity={{document:draft.document,email:draft.email,phone:draft.phone}}/>}
   </section>
 }
