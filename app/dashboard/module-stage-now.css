@@ -1,0 +1,32 @@
+/* Etapa Ahora · coherencia visual transversal del PMS. Scope deliberado al dashboard. */
+.hlStageNow{--hl-ink:#20372f;--hl-muted:#748179;--hl-border:#dfe4e0;--hl-paper:#fffefa;--hl-cream:#f5f2ea;--hl-green:#173f33;--hl-gold:#c8a66b;--hl-violet:#6b5bd2;color:var(--hl-ink)}
+.hlStageNow :where(button,input,select,textarea){font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.hlStageNow :where(input,select,textarea){border-color:var(--hl-border);border-radius:10px;color:#304139;background:#fff;transition:border-color .15s ease,box-shadow .15s ease,background .15s ease}
+.hlStageNow :where(input,select,textarea):focus{outline:0;border-color:#b9b1e8;box-shadow:0 0 0 3px rgba(107,91,210,.09)}
+.hlStageNow :where(input,select,textarea):disabled{background:#f4f4f0;color:#89928d}
+.hlStageNow :where(textarea){line-height:1.5;resize:vertical}
+.hlStageNow [class*="editorial"]{align-items:flex-end!important;padding-bottom:16px!important;border-bottom:1px solid rgba(31,57,48,.09)}
+.hlStageNow [class*="editorial"] small{font-size:9px!important;font-weight:900!important;letter-spacing:.15em!important;color:#8b7550!important}
+.hlStageNow [class*="editorial"] h2{margin-top:6px!important;color:#1c372e!important;letter-spacing:-.04em!important}
+.hlStageNow [class*="editorial"] p{max-width:760px;color:var(--hl-muted)!important;line-height:1.6!important}
+.hlStageNow [class*="editorial"]>button,.hlStageNow [class*="editorial"]>a{min-height:40px!important;padding:0 14px!important;border-radius:11px!important;border:1px solid #d7ded9!important;background:#fff!important;color:#42534b!important;font-size:10px!important;font-weight:800!important;text-decoration:none;box-shadow:0 6px 16px rgba(38,55,47,.04)}
+.hlStageNow [class*="editorial"]>button:hover,.hlStageNow [class*="editorial"]>a:hover{border-color:#bfc8c2!important;transform:translateY(-1px)}
+.hlStageNow [class*="tableWrap"]{overflow:auto;border:1px solid var(--hl-border)!important;border-radius:17px!important;background:rgba(255,255,255,.97)!important;box-shadow:0 12px 30px rgba(35,52,45,.045)!important}
+.hlStageNow [class*="tableWrap"] table{width:100%;border-collapse:collapse}
+.hlStageNow [class*="tableWrap"] thead{background:#f7f6f1}
+.hlStageNow [class*="tableWrap"] th{height:40px;padding:0 13px!important;border-bottom:1px solid #e2e6e2!important;color:#7f8a83!important;font-size:8px!important;font-weight:900!important;letter-spacing:.09em!important;text-transform:uppercase;text-align:left}
+.hlStageNow [class*="tableWrap"] td{min-height:50px;padding:11px 13px!important;border-bottom:1px solid #eef0ed!important;color:#3d4c45;font-size:11px!important}
+.hlStageNow [class*="tableWrap"] tbody tr{transition:background .12s ease}
+.hlStageNow [class*="tableWrap"] tbody tr:hover{background:#faf9f4}
+.hlStageNow [class*="tableWrap"] td b{color:#243a31}.hlStageNow [class*="tableWrap"] td small{display:block;margin-top:3px;color:#8a948e;font-size:9px!important}
+.hlStageNow [class*="shade"]{backdrop-filter:blur(8px);background:rgba(16,33,27,.36)!important}
+.hlStageNow [class*="modal"]{border:1px solid rgba(255,255,255,.7)!important;border-radius:23px!important;box-shadow:0 30px 90px rgba(20,35,29,.22)!important;overflow:hidden}
+.hlStageNow [class*="modal"]>header{border-bottom-color:#e8ebe7!important;background:linear-gradient(180deg,#fff,#fbfaf6)!important}
+.hlStageNow [class*="modal"]>header h3{color:#213a31!important;letter-spacing:-.02em}
+.hlStageNow [class*="modal"]>footer{border-top-color:#e8ebe7!important;background:#fbfaf6!important}
+.hlStageNow [class*="modal"]>footer button{min-height:38px;border-radius:10px!important;font-size:10px!important;font-weight:800!important}
+.hlStageNow [class*="fieldGrid"] label>span{font-size:9px!important;font-weight:800!important;color:#76837c!important}
+.hlStageNow :where([class*="statePill"],[class*="statusPill"],[class*="countBadge"]){font-weight:850!important;letter-spacing:.03em}
+.hlStageNow :where(button){transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease,background .15s ease}
+.hlStageNow :where(button):active{transform:translateY(1px)}
+@media(max-width:800px){.hlStageNow [class*="editorial"]{align-items:flex-start!important;gap:14px!important}.hlStageNow [class*="editorial"] h2{font-size:32px!important}.hlStageNow [class*="tableWrap"] th,.hlStageNow [class*="tableWrap"] td{padding-left:10px!important;padding-right:10px!important}}
