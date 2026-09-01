@@ -12,6 +12,22 @@ const channelColor=value=>{const v=String(value||"").toLowerCase();if(v.includes
 const pct=(part,total)=>total?Math.round(part/total*100):0
 const reservationTotal=r=>Number(r.precio_total||0)
 
+const DASHBOARD_WIDGETS=[
+  {id:"occupancy",label:"Ocupación y tendencia",span:8},
+  {id:"priorities",label:"Tareas prioritarias",span:4},
+  {id:"kpi-occupancy",label:"Ocupación hoy",span:3},
+  {id:"kpi-production",label:"Producción",span:3},
+  {id:"kpi-reservations",label:"Reservas",span:3},
+  {id:"kpi-housekeeping",label:"Housekeeping",span:3},
+  {id:"channels",label:"Origen de reservas",span:4},
+  {id:"reservation-metrics",label:"Métricas de reservas",span:4},
+  {id:"cleaning",label:"Estado de habitaciones",span:4},
+  {id:"arrivals",label:"Llegadas",span:4},
+  {id:"inhouse",label:"Huéspedes en casa",span:4},
+  {id:"departures",label:"Salidas",span:4},
+]
+const DEFAULT_WIDGET_ORDER=DASHBOARD_WIDGETS.map(x=>x.id)
+
 function StatusPill({children,tone="neutral"}){return <span className={`${polish.statusPill} ${polish[`status_${tone}`]||""}`}>{children}</span>}
 function GuestAvatar({name}){const initials=String(name||"H").trim().split(/\s+/).slice(0,2).map(x=>x[0]).join("").toUpperCase();return <span className={polish.guestAvatar}>{initials||"H"}</span>}
 
@@ -37,36 +53,50 @@ function OperationalColumn({title,count,items,rooms,onOpen,kind}){
   return <section className={`${polish.card} ${polish.operationColumn}`}><header><div><small>{title}</small><span className={polish.countBadge}>{count}</span></div><button type="button">Ver todas</button></header><div className={polish.operationList}>{items.slice(0,5).map(r=>{const room=rooms.find(x=>String(x.id)===String(r.habitacion_id));return <button type="button" className={polish.guestRow} key={`${kind}-${r.id}`} onClick={()=>onOpen(r)}><GuestAvatar name={r.nombre_huesped}/><span><b>{r.nombre_huesped}</b><small>{r.numero_reserva||r.id} · {room?.nombre||"Sin asignar"}</small></span><em>{kind==="arrivals"?(r.hora_llegada_estimada||"IN"):kind==="departures"?(r.hora_salida_estimada||"OUT"):"En casa"}</em><StatusPill tone={kind==="departures"?"warn":kind==="arrivals"?"info":"ok"}>{kind==="departures"?"Check-out":kind==="arrivals"?"Check-in":"IN"}</StatusPill></button>})}{!items.length&&<div className={polish.emptyColumn}>No hay movimientos.</div>}</div></section>
 }
 
+function KpiCard({label,value,detail,icon,onClick,ring}){return <button className={polish.kpiCard} onClick={onClick}><small>{label}</small><b>{value}</b><span>{detail}</span>{ring?<i className={polish.kpiRing} style={{"--value":`${ring*3.6}deg`}}/>:<i className={polish.kpiIcon}>{icon}</i>}</button>}
+
+function WidgetSlot({widget,editing,onDragStart,onDrop,children}){
+  return <div className={`${polish.widgetSlot} ${editing?polish.widgetEditing:""}`} style={{"--widget-span":widget.span}} draggable={editing} onDragStart={e=>{e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",widget.id);onDragStart(widget.id)}} onDragOver={e=>{if(editing){e.preventDefault();e.dataTransfer.dropEffect="move"}}} onDrop={e=>{if(!editing)return;e.preventDefault();onDrop(widget.id)}}>{editing&&<div className={polish.widgetHandle}><span>⠿</span><b>{widget.label}</b><small>Arrastrar</small></div>}{children}</div>
+}
+
+function DashboardCustomizer({hidden,onToggle,onReset,onDone}){
+  return <section className={polish.customizer}><div className={polish.customizerIntro}><span>PERSONALIZAR PANEL</span><b>Ordená los widgets como trabaja tu hotel.</b><small>Arrastrá las tarjetas para cambiar el orden. Podés ocultar módulos sin perder ningún dato.</small></div><div className={polish.widgetToggles}>{DASHBOARD_WIDGETS.map(widget=><button key={widget.id} className={hidden.includes(widget.id)?polish.widgetOff:polish.widgetOn} onClick={()=>onToggle(widget.id)}>{hidden.includes(widget.id)?"＋":"✓"} {widget.label}</button>)}</div><div className={polish.customizerActions}><button onClick={onReset}>Restablecer</button><button className={polish.doneButton} onClick={onDone}>Listo</button></div></section>
+}
+
 export function Lobby({settings,rooms,reservations,payments,onView,onOpen,search,onSearch,onNewReservation,onMenu}){
   const today=isoDate(),live=reservations.filter(r=>r.estado!=="cancelada"&&!r.no_show),arrivals=live.filter(r=>r.fecha_entrada===today&&r.estado!=="alojado"),departures=live.filter(r=>r.fecha_salida===today&&r.estado!=="finalizada"),inhouse=live.filter(r=>r.fecha_entrada<=today&&r.fecha_salida>today&&r.estado!=="finalizada"),sellable=rooms.filter(r=>r.activa!==false&&!['mantenimiento','fuera_servicio'].includes(String(r.estado).toLowerCase())),occupied=new Set(inhouse.map(r=>String(r.habitacion_id))).size,occupancy=pct(occupied,sellable.length),paid=useMemo(()=>{const map=new Map();payments.forEach(p=>map.set(String(p.reserva_id),(map.get(String(p.reserva_id))||0)+Number(p.monto||0)));return map},[payments]),[clock,setClock]=useState(null)
+  const storageKey=`hl-dashboard-${settings?.property_id||settings?.hotel_name||"hotel"}`,[widgetOrder,setWidgetOrder]=useState(DEFAULT_WIDGET_ORDER),[hiddenWidgets,setHiddenWidgets]=useState([]),[editing,setEditing]=useState(false),[dragging,setDragging]=useState("")
   useEffect(()=>{const tick=()=>setClock(new Date()),id=setInterval(tick,30000);tick();return()=>clearInterval(id)},[])
+  useEffect(()=>{try{const saved=JSON.parse(localStorage.getItem(storageKey)||"null");if(saved?.order&&Array.isArray(saved.order)){const known=saved.order.filter(id=>DEFAULT_WIDGET_ORDER.includes(id)),missing=DEFAULT_WIDGET_ORDER.filter(id=>!known.includes(id));setWidgetOrder([...known,...missing])}if(Array.isArray(saved?.hidden))setHiddenWidgets(saved.hidden.filter(id=>DEFAULT_WIDGET_ORDER.includes(id)))}catch{}},[storageKey])
+  useEffect(()=>{try{localStorage.setItem(storageKey,JSON.stringify({order:widgetOrder,hidden:hiddenWidgets}))}catch{}},[storageKey,widgetOrder,hiddenWidgets])
   const clockDate=clock?new Intl.DateTimeFormat("es-AR",{weekday:"long",day:"2-digit",month:"long"}).format(clock):"",clockTime=clock?new Intl.DateTimeFormat("es-AR",{hour:"2-digit",minute:"2-digit"}).format(clock):""
   const forecast=useMemo(()=>Array.from({length:12},(_,i)=>{const day=addDays(today,i-3),count=new Set(live.filter(r=>r.fecha_entrada<=day&&r.fecha_salida>day).map(r=>String(r.habitacion_id))).size;return pct(count,sellable.length)}),[today,live,sellable.length]),previous=useMemo(()=>Array.from({length:12},(_,i)=>{const day=addDays(today,i-10),count=new Set(live.filter(r=>r.fecha_entrada<=day&&r.fecha_salida>day).map(r=>String(r.habitacion_id))).size;return pct(count,sellable.length)}),[today,live,sellable.length])
   const todayRevenue=live.filter(r=>r.fecha_entrada<=today&&r.fecha_salida>today).reduce((sum,r)=>sum+(reservationTotal(r)/Math.max(1,Math.round((new Date(`${r.fecha_salida}T12:00:00`)-new Date(`${r.fecha_entrada}T12:00:00`))/86400000))),0),monthKey=today.slice(0,7),monthReservations=live.filter(r=>String(r.fecha_entrada||"").startsWith(monthKey)),newToday=reservations.filter(r=>String(r.created_at||r.fecha_creacion||"").startsWith(today)).length,cancelled=reservations.filter(r=>r.estado==="cancelada"&&String(r.updated_at||r.fecha_entrada||"").startsWith(monthKey)).length
   const roomClean={ready:rooms.filter(r=>["limpia","inspeccionada","disponible"].includes(String(r.estado||"").toLowerCase())).length,cleaning:rooms.filter(r=>["limpieza","inspeccion"].includes(String(r.estado||"").toLowerCase())).length,dirty:rooms.filter(r=>String(r.estado||"").toLowerCase()==="sucia").length}
-  const channelMap=new Map();monthReservations.forEach(r=>{const label=channelLabel(r.canal_reserva),key=label;channelMap.set(key,(channelMap.get(key)||0)+1)});const channelSegments=[...channelMap.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5).map(([label,value])=>({label,value,color:channelColor(label)})),otherCount=Math.max(0,monthReservations.length-channelSegments.reduce((s,x)=>s+x.value,0));if(otherCount)channelSegments.push({label:"Otros",value:otherCount,color:channelTone.otro})
+  const channelMap=new Map();monthReservations.forEach(r=>{const label=channelLabel(r.canal_reserva);channelMap.set(label,(channelMap.get(label)||0)+1)});const channelSegments=[...channelMap.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5).map(([label,value])=>({label,value,color:channelColor(label)})),otherCount=Math.max(0,monthReservations.length-channelSegments.reduce((s,x)=>s+x.value,0));if(otherCount)channelSegments.push({label:"Otros",value:otherCount,color:channelTone.otro})
+  function moveWidget(target){if(!dragging||dragging===target)return;setWidgetOrder(current=>{const next=current.filter(id=>id!==dragging),index=next.indexOf(target);next.splice(index<0?next.length:index,0,dragging);return next});setDragging("")}
+  function toggleWidget(id){setHiddenWidgets(current=>current.includes(id)?current.filter(x=>x!==id):[...current,id])}
+  function resetWidgets(){setWidgetOrder(DEFAULT_WIDGET_ORDER);setHiddenWidgets([])}
+  const widgetById=Object.fromEntries(DASHBOARD_WIDGETS.map(widget=>[widget.id,widget]))
+  function widgetContent(id){
+    if(id==="occupancy")return <section className={`${polish.card} ${polish.occupancyCard}`}><div className={polish.chartHeading}><div><small>OCUPACIÓN</small><strong>{occupancy}%</strong><p>{occupied} de {sellable.length} habitaciones ocupadas</p></div><div className={polish.chartLegend}><span><i className={polish.legendBlue}/>Actual / proyectada</span><span><i className={polish.legendDash}/>Período anterior</span></div></div><Sparkline values={forecast} comparison={previous}/><div className={polish.chartAxis}><span>{shortDate(addDays(today,-3))}</span><span>Hoy</span><span>{shortDate(addDays(today,8))}</span></div></section>
+    if(id==="priorities")return <PriorityPanel arrivals={arrivals} rooms={rooms} paid={paid}/>
+    if(id==="kpi-occupancy")return <KpiCard label="OCUPACIÓN HOY" value={`${occupancy}%`} detail={`${occupied}/${sellable.length} hab.`} ring={occupancy} onClick={()=>onView("calendar")}/>
+    if(id==="kpi-production")return <KpiCard label="PRODUCCIÓN ESTIMADA" value={money(todayRevenue)} detail="noche hotelera de hoy" icon="$" onClick={()=>onView("cash")}/>
+    if(id==="kpi-reservations")return <KpiCard label="RESERVAS" value={monthReservations.length} detail={`${newToday} nuevas hoy`} icon="▣" onClick={()=>onView("reservations")}/>
+    if(id==="kpi-housekeeping")return <KpiCard label="HOUSEKEEPING" value={roomClean.ready} detail={`${roomClean.dirty} sucias · ${roomClean.cleaning} en proceso`} icon="◇" onClick={()=>onView("housekeeping")}/>
+    if(id==="channels")return <section className={`${polish.card} ${polish.sourceCard}`}><header><div><small>ORIGEN DE RESERVAS</small><h3>Canales · mes actual</h3></div><Donut segments={channelSegments} total={monthReservations.length}/></header><div className={polish.sourceRows}>{channelSegments.map(item=><div key={item.label}><span><i style={{background:item.color}}/>{item.label}</span><b>{pct(item.value,monthReservations.length)}%</b><em><i style={{width:`${pct(item.value,monthReservations.length)}%`,background:item.color}}/></em></div>)}</div></section>
+    if(id==="reservation-metrics")return <section className={`${polish.card} ${polish.reservationMetrics}`}><small>RESERVAS · MES ACTUAL</small><div><span><b>{monthReservations.length}</b><small>Totales</small></span><span><b>{arrivals.length}</b><small>Llegadas hoy</small></span><span><b>{departures.length}</b><small>Salidas hoy</small></span><span><b>{cancelled}</b><small>Canceladas</small></span></div><button onClick={()=>onView("reports")}>Abrir reportes →</button></section>
+    if(id==="cleaning")return <section className={`${polish.card} ${polish.cleaningCard}`}><small>ESTADO DE HABITACIONES</small><h3>Housekeeping en vivo</h3><div><button onClick={()=>onView("housekeeping")}><b>{roomClean.ready}</b><span>Listas</span></button><button onClick={()=>onView("housekeeping")}><b>{roomClean.cleaning}</b><span>En proceso</span></button><button onClick={()=>onView("housekeeping")}><b>{roomClean.dirty}</b><span>Sucias</span></button></div></section>
+    if(id==="arrivals")return <OperationalColumn title="LLEGADAS" count={arrivals.length} items={arrivals} rooms={rooms} onOpen={onOpen} kind="arrivals"/>
+    if(id==="inhouse")return <OperationalColumn title="HUÉSPEDES EN CASA" count={inhouse.length} items={inhouse} rooms={rooms} onOpen={onOpen} kind="inhouse"/>
+    if(id==="departures")return <OperationalColumn title="SALIDAS" count={departures.length} items={departures} rooms={rooms} onOpen={onOpen} kind="departures"/>
+    return null
+  }
   return <div className={`${ui.content} ${polish.dashboard}`}>
-    <header className={polish.dashboardTop}><div><button className={polish.mobileMenu} onClick={onMenu}>☰</button><small>HABITACIÓN LLENA · PMS</small><h1>Panel operativo</h1><p>{clockDate}{clockTime?` · ${clockTime}`:""} · {settings?.hotel_name||"Hotel"}</p></div><div className={polish.topActions}><form onSubmit={e=>{e.preventDefault();onView("reservations")}} className={polish.searchBox}><span>⌕</span><input value={search||""} onChange={e=>onSearch?.(e.target.value)} placeholder="Buscar reserva, huésped o habitación…"/><button>Buscar</button></form>{onNewReservation&&<button className={polish.primaryAction} onClick={onNewReservation}>＋ Nueva reserva</button>}</div></header>
-
-    <div className={polish.heroGrid}>
-      <section className={`${polish.card} ${polish.occupancyCard}`}><div className={polish.chartHeading}><div><small>OCUPACIÓN</small><strong>{occupancy}%</strong><p>{occupied} de {sellable.length} habitaciones ocupadas</p></div><div className={polish.chartLegend}><span><i className={polish.legendBlue}/>Actual / proyectada</span><span><i className={polish.legendDash}/>Período anterior</span></div></div><Sparkline values={forecast} comparison={previous}/><div className={polish.chartAxis}><span>{shortDate(addDays(today,-3))}</span><span>Hoy</span><span>{shortDate(addDays(today,8))}</span></div></section>
-      <PriorityPanel arrivals={arrivals} rooms={rooms} paid={paid}/>
-    </div>
-
-    <section className={polish.kpis}>
-      <button onClick={()=>onView("calendar")}><small>OCUPACIÓN HOY</small><b>{occupancy}%</b><span>{occupied}/{sellable.length} hab.</span><i className={polish.kpiRing} style={{"--value":`${occupancy*3.6}deg`}}/></button>
-      <button onClick={()=>onView("cash")}><small>PRODUCCIÓN ESTIMADA</small><b>{money(todayRevenue)}</b><span>noche hotelera de hoy</span><i className={polish.kpiIcon}>$</i></button>
-      <button onClick={()=>onView("reservations")}><small>RESERVAS</small><b>{monthReservations.length}</b><span>{newToday} nuevas hoy</span><i className={polish.kpiIcon}>▣</i></button>
-      <button onClick={()=>onView("housekeeping")}><small>HOUSEKEEPING</small><b>{roomClean.ready}</b><span>{roomClean.dirty} sucias · {roomClean.cleaning} en proceso</span><i className={polish.kpiIcon}>◇</i></button>
-    </section>
-
-    <section className={polish.midGrid}>
-      <div className={`${polish.card} ${polish.sourceCard}`}><header><div><small>ORIGEN DE RESERVAS</small><h3>Canales · mes actual</h3></div><Donut segments={channelSegments} total={monthReservations.length}/></header><div className={polish.sourceRows}>{channelSegments.map(item=><div key={item.label}><span><i style={{background:item.color}}/>{item.label}</span><b>{pct(item.value,monthReservations.length)}%</b><em><i style={{width:`${pct(item.value,monthReservations.length)}%`,background:item.color}}/></em></div>)}</div></div>
-      <div className={`${polish.card} ${polish.reservationMetrics}`}><small>RESERVAS · MES ACTUAL</small><div><span><b>{monthReservations.length}</b><small>Totales</small></span><span><b>{arrivals.length}</b><small>Llegadas hoy</small></span><span><b>{departures.length}</b><small>Salidas hoy</small></span><span><b>{cancelled}</b><small>Canceladas</small></span></div><button onClick={()=>onView("reports")}>Abrir reportes →</button></div>
-      <div className={`${polish.card} ${polish.cleaningCard}`}><small>ESTADO DE HABITACIONES</small><h3>Housekeeping en vivo</h3><div><button onClick={()=>onView("housekeeping")}><b>{roomClean.ready}</b><span>Listas</span></button><button onClick={()=>onView("housekeeping")}><b>{roomClean.cleaning}</b><span>En proceso</span></button><button onClick={()=>onView("housekeeping")}><b>{roomClean.dirty}</b><span>Sucias</span></button></div></div>
-    </section>
-
-    <section className={polish.operationsGrid}><OperationalColumn title="LLEGADAS" count={arrivals.length} items={arrivals} rooms={rooms} onOpen={onOpen} kind="arrivals"/><OperationalColumn title="HUÉSPEDES EN CASA" count={inhouse.length} items={inhouse} rooms={rooms} onOpen={onOpen} kind="inhouse"/><OperationalColumn title="SALIDAS" count={departures.length} items={departures} rooms={rooms} onOpen={onOpen} kind="departures"/></section>
+    <header className={polish.dashboardTop}><div><button className={polish.mobileMenu} onClick={onMenu}>☰</button><small>HABITACIÓN LLENA · PMS</small><h1>Panel operativo</h1><p>{clockDate}{clockTime?` · ${clockTime}`:""} · {settings?.hotel_name||"Hotel"}</p></div><div className={polish.topActions}><form onSubmit={e=>{e.preventDefault();onView("reservations")}} className={polish.searchBox}><span>⌕</span><input value={search||""} onChange={e=>onSearch?.(e.target.value)} placeholder="Buscar reserva, huésped o habitación…"/><button>Buscar</button></form><button className={`${polish.customizeButton} ${editing?polish.customizeButtonActive:""}`} onClick={()=>setEditing(v=>!v)}>⌘ Personalizar</button>{onNewReservation&&<button className={polish.primaryAction} onClick={onNewReservation}>＋ Nueva reserva</button>}</div></header>
+    {editing&&<DashboardCustomizer hidden={hiddenWidgets} onToggle={toggleWidget} onReset={resetWidgets} onDone={()=>setEditing(false)}/>} 
+    <section className={polish.widgetGrid}>{widgetOrder.filter(id=>!hiddenWidgets.includes(id)).map(id=>{const widget=widgetById[id];if(!widget)return null;return <WidgetSlot key={id} widget={widget} editing={editing} onDragStart={setDragging} onDrop={moveWidget}>{widgetContent(id)}</WidgetSlot>})}</section>
   </div>
 }
 
