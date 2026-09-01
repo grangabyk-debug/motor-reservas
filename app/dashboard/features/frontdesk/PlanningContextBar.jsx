@@ -3,6 +3,7 @@
 import{useEffect,useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 import{shortDate}from"../../core/formatters"
+import PlanningHistory from"./PlanningHistory"
 import pc from"./planning-context.module.css"
 
 function roomName(rooms,id){return rooms.find(r=>String(r.id)===String(id))?.nombre||`Hab. ${id}`}
@@ -47,13 +48,14 @@ export default function PlanningContextBar({rooms=[],reservations=[],blocks=[],o
     }
     return output.slice(0,8)
   },[unassigned,rooms,reservations,blocks])
+  const hasOperationalCards=!!(unassigned.length||visibleBlocks.length||suggestions.length)
 
   async function assignBest(){if(assigning||!suggestions.length||!onMove)return;setAssigning(true);setAssignMessage("");let done=0;for(const item of suggestions){const result=await onMove(item.incoming.id,item.room.id,item.incoming.fecha_entrada);if(!result)break;done++}setAssignMessage(done===suggestions.length?`${done} reservas asignadas automáticamente.`:`Se asignaron ${done} de ${suggestions.length}. Revisá las restantes.`);setAssigning(false)}
 
-  if(!unassigned.length&&!visibleBlocks.length&&!suggestions.length)return null
+  if(!propertyId&&!hasOperationalCards)return null
   return <section className={pc.context}>
-    <header className={pc.head}><div><small>OPERACIÓN DEL PLANNING</small><b>{unassigned.length?`${unassigned.length} sin habitación`:"Sin pendientes"}{visibleBlocks.length?` · ${visibleBlocks.length} cupos de grupo`:""}</b></div><button onClick={()=>setOpen(v=>!v)}>{open?"Ocultar":"Mostrar"}</button></header>
-    {open&&<div className={pc.body}>
+    <header className={pc.head}><div><small>OPERACIÓN DEL PLANNING</small><b>{unassigned.length?`${unassigned.length} sin habitación`:"Sin pendientes"}{visibleBlocks.length?` · ${visibleBlocks.length} cupos de grupo`:""}</b></div><div className={pc.headActions}>{propertyId&&<PlanningHistory propertyId={propertyId} rooms={rooms}/>} {hasOperationalCards&&<button onClick={()=>setOpen(v=>!v)}>{open?"Ocultar":"Mostrar"}</button>}</div></header>
+    {open&&hasOperationalCards&&<div className={pc.body}>
       {unassigned.length>0&&<article className={pc.playground}><div className={pc.title}><span><i/>Playground</span><small>Arrastrá una reserva al calendario para asignarla.</small></div><div className={pc.cards}>{unassigned.slice(0,10).map(r=><button key={r.id} draggable onDragStart={e=>e.dataTransfer.setData("application/x-hl-move",String(r.id))} onDoubleClick={()=>onOpen?.(r)} title="Arrastrar al planning"><span><b>{r.nombre_huesped||"Sin nombre"}</b><small>{shortDate(r.fecha_entrada)} → {shortDate(r.fecha_salida)} · {r.cantidad_huespedes||1} pax</small></span><em>↕</em></button>)}</div></article>}
       {suggestions.length>0&&<article className={pc.outin}><div className={pc.title}><span><i/>Out → In inteligente</span><div className={pc.titleActions}><small>Prioriza salida del mismo día, tipología y capacidad.</small>{suggestions.length>1&&<button className={pc.bulkAssign} disabled={assigning} onClick={assignBest}>{assigning?"Asignando…":`Asignar ${suggestions.length} mejores`}</button>}</div></div><div className={pc.suggestions}>{suggestions.map(x=><div key={`${x.incoming.id}-${x.room.id}`}><span><b>{x.incoming.nombre_huesped}</b><small>{x.room.nombre||roomName(rooms,x.room.id)} · {x.room.tipo||"Habitación"}{x.outgoing?` · OUT ${x.outgoing.nombre_huesped||"previo"}`:""}</small><em className={pc.reason}>{x.reason}</em></span><button onClick={()=>onMove?.(x.incoming.id,x.room.id,x.incoming.fecha_entrada)}>Asignar {x.room.nombre||"hab."}</button></div>)}{assignMessage&&<p className={pc.assignmentFeedback}>{assignMessage}</p>}</div></article>}
       {visibleBlocks.length>0&&<article className={pc.groups}><div className={pc.title}><span><i/>Cupos de grupos</span><small>Inventario firme/tentativo que debe respetar disponibilidad.</small></div><div className={pc.groupRows}>{visibleBlocks.map(b=>{const g=groups.find(x=>String(x.id)===String(b.group_id));return <div key={b.id}><span><b>{g?.name||"Grupo"}</b><small>{b.room_type} · {shortDate(b.arrival_date)} → {shortDate(b.departure_date)}</small></span><strong>{b.quantity} hab.</strong><em data-status={b.status}>{b.status==="firm"?"FIRME":"TENTATIVO"}</em></div>})}</div></article>}
