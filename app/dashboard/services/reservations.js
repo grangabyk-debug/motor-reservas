@@ -2,6 +2,7 @@ import{supabase}from"../../../lib/supabase"
 import{requirePropertyId}from"../data/tenant"
 import{dateSpan,reservationTotal,shiftDate,stayOccupancy}from"../features/frontdesk/reservationModel"
 import{uploadReservationDocuments}from"./reservationDocuments"
+import{expireTentativeReservations}from"./tentatives"
 
 const text=v=>String(v??"").trim()
 const roomInReservation=(reservation,roomId)=>String(reservation?.habitacion_id??"")===String(roomId)||(reservation?.habitaciones_ids||[]).some(id=>String(id)===String(roomId))
@@ -15,6 +16,7 @@ function payload(draft,room,propertyId,userId){
 export async function checkReservationAvailability({propertyId,roomId,draft,excludeReservationId=null}){
   const pid=requirePropertyId(propertyId),rid=Number(roomId),occupancy=stayOccupancy(draft)
   if(!rid||!occupancy.valid)return{available:false,type:"invalid",message:occupancy.message||"Elegí una habitación y un período válido antes de guardar."}
+  await expireTentativeReservations({propertyId:pid})
   const blockQueryEnd=shiftDate(draft.end,1)
   const[{data:reservations,error:reservationError},{data:blocks,error:blockError}]=await Promise.all([
     supabase.from("reservas").select("id,numero_reserva,nombre_huesped,fecha_entrada,fecha_salida,hora_llegada_estimada,hora_salida_estimada,tipo_estadia,ocupacion_desde_local,ocupacion_hasta_local,habitacion_id,habitaciones_ids,estado,no_show").eq("property_id",pid).neq("estado","cancelada").eq("no_show",false).lt("ocupacion_desde_local",occupancy.endAt).gt("ocupacion_hasta_local",occupancy.startAt),
