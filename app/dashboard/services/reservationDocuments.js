@@ -34,6 +34,11 @@ export async function uploadReservationDocuments({propertyId,reservationId,userI
   return created
 }
 
+export async function updateReservationDocumentHolder({propertyId,documentId,holderRole="reservation",holderName=null,passengerIndex=null,guestProfileId=null}){
+  const pid=requirePropertyId(propertyId),role=HOLDER_ROLES.has(holderRole)?holderRole:"reservation",row={holder_role:role,holder_name:String(holderName||"").trim()||null,passenger_index:Number.isInteger(passengerIndex)?passengerIndex:null,guest_profile_id:role==="primary"?guestProfileId||null:null}
+  const{data,error}=await supabase.from("hotel_reservation_documents").update(row).eq("id",documentId).eq("property_id",pid).select("*").single();if(error)throw error;return data
+}
+
 export async function openReservationDocument(document){const{data,error}=await supabase.storage.from(BUCKET).createSignedUrl(document.storage_path,90);if(error)throw error;window.open(data.signedUrl,"_blank","noopener,noreferrer")}
 
 export async function deleteReservationDocument({propertyId,document}){const pid=requirePropertyId(propertyId);const{error}=await supabase.from("hotel_reservation_documents").delete().eq("id",document.id).eq("property_id",pid);if(error)throw error;const{error:storageError}=await supabase.storage.from(BUCKET).remove([document.storage_path]);if(storageError)console.warn("No se pudo eliminar el objeto del storage",storageError.message)}
