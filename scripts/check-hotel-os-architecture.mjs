@@ -41,7 +41,7 @@ const groupsWorkspace=read("app/dashboard/services/groupsWorkspace.js"),groupsHo
 if(!groupsWorkspace.includes("requirePropertyId")||!groupsWorkspace.includes('.eq("property_id",property)'))problems.push("groupsWorkspace service must enforce property_id for Group Desk data")
 for(const rpc of ["hl_group_create_quote_atomic","hl_group_mark_quote_atomic"])if(!groupsWorkspace.includes(rpc))problems.push(`groupsWorkspace service must use atomic RPC ${rpc}`)
 if(!groupsHook.includes("loadGroupsWorkspace")||hasDirectSupabase(groupsHook))problems.push("useGroupsWorkspace must orchestrate Group Desk without direct Supabase access")
-const groupMigration=read("supabase/migrations/20260901160500_group_desk_atomic_operations.sql")
+const groupMigration=read("supabase/migrations/20260901160605_group_desk_atomic_operations.sql")
 for(const rpc of ["hl_group_create_quote_atomic","hl_group_mark_quote_atomic"])if(!groupMigration.includes(rpc))problems.push(`Group Desk migration missing ${rpc}`)
 if(!/security invoker/i.test(groupMigration))problems.push("Group Desk atomic RPCs must remain security invoker so RLS stays authoritative")
 const accessUi=read("app/dashboard/features/hotel/AccessKeysPremium.jsx"),accessEditor=read("app/dashboard/features/hotel/components/AccessPointEditor.jsx")
