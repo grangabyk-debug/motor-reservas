@@ -5,6 +5,7 @@ import{commerceRegion,regionalProviderLabel,regionalProviderState}from"../../cor
 import{loadPaymentProviderStatus,startPaymentProviderConnection}from"../../services/paymentProviders"
 import ui from"../../v2.module.css"
 import s from"./integration-marketplace.module.css"
+import OnboardingCenter from"./OnboardingCenter"
 
 const CATALOG=[
   {id:"web-checkin",name:"Web Check-in",group:"Experiencia",region:"Global",kind:"native",desc:"Registro previo, datos del huésped y firma mediante link seguro."},
@@ -21,29 +22,18 @@ const CATALOG=[
   {id:"scanner",name:"Escáner DNI",group:"Recepción",region:"Regional",kind:"hardware",desc:"Captura de identidad para acelerar el check-in."},
 ]
 
-const STEPS=[
-  {id:"config",week:"Semana 1",title:"Construimos tu hotel",detail:"Habitaciones, categorías, tarifas, impuestos, usuarios, caja, extras, housekeeping y reglas."},
-  {id:"data",week:"Semana 2",title:"Traemos tus datos",detail:"Reservas futuras, huéspedes, empresas, agencias y saldos con conciliación."},
-  {id:"training",week:"Semana 3",title:"Entrenamos en paralelo",detail:"Recepción, reservas, administración y pisos trabajan en shadow mode sin cortar ventas."},
-  {id:"golive",week:"Semana 4",title:"Go-live controlado",detail:"Delta final, pruebas y cambio de conexiones recién cuando todo está conciliado."},
-]
-
 function operational(settings){const v=settings?.operational_settings;return v&&typeof v==="object"?v:{}}
 function initials(name){return String(name||"HL").replace(/[^a-z0-9]/gi,"").slice(0,2).toUpperCase()||"HL"}
 function stateText(state){return state==="ready"?"CONECTADO":state==="roadmap"?"ROADMAP":state==="setup"?"CONFIGURAR":state==="country"?"SEGÚN PAÍS":state==="region"?"OTRA REGIÓN":"DISPONIBLE"}
 
 export default function IntegrationMarketplace({settings,channels=[]}){
-  const ops=operational(settings),region=commerceRegion(ops),propertyId=settings?.property_id||"",storageKey=`hl-onboarding-${propertyId||"hotel"}`,[group,setGroup]=useState("Todos"),[done,setDone]=useState([]),[mpStatus,setMpStatus]=useState(null),[providerBusy,setProviderBusy]=useState(false),[providerMessage,setProviderMessage]=useState("")
-  useEffect(()=>{try{setDone(JSON.parse(localStorage.getItem(storageKey)||"[]"))}catch{}},[storageKey])
-  useEffect(()=>{try{localStorage.setItem(storageKey,JSON.stringify(done))}catch{}},[storageKey,done])
+  const ops=operational(settings),region=commerceRegion(ops),propertyId=settings?.property_id||"",[group,setGroup]=useState("Todos"),[mpStatus,setMpStatus]=useState(null),[providerBusy,setProviderBusy]=useState(false),[providerMessage,setProviderMessage]=useState("")
   const groups=["Todos",...new Set(CATALOG.map(x=>x.group))],motorConnected=channels.some(c=>String(c.provider).toLowerCase().includes("motor")&&c.status==="connected"),encoder=ops.key_encoder||{},email=ops.email||{},mpRegionalState=regionalProviderState("mercadopago",ops)
   const refreshMercadoPago=useCallback(async()=>{if(!propertyId||mpRegionalState!=="available"){setMpStatus(null);return}setProviderMessage("");try{setMpStatus(await loadPaymentProviderStatus({providerId:"mercadopago",propertyId}))}catch(error){setMpStatus(null);setProviderMessage(error.message||"No pudimos revisar Mercado Pago.")}},[propertyId,mpRegionalState])
   useEffect(()=>{refreshMercadoPago();const handler=()=>refreshMercadoPago();window.addEventListener("hl:mercadopago-connected",handler);return()=>window.removeEventListener("hl:mercadopago-connected",handler)},[refreshMercadoPago])
   async function connectMercadoPago(){setProviderBusy(true);setProviderMessage("");try{const data=await startPaymentProviderConnection({providerId:"mercadopago",propertyId});window.location.href=data.url}catch(error){setProviderMessage(error.message||"No se pudo iniciar la conexión con Mercado Pago.");setProviderBusy(false)}}
   const cards=useMemo(()=>CATALOG.filter(item=>group==="Todos"||item.group===group).map(item=>{let state="available",detail=item.desc,regionLabel=item.region;if(item.id==="web-checkin")state="ready";if(item.id==="motor")state=motorConnected?"ready":"available";if(item.id==="locks")state=encoder.enabled&&encoder.bridge_url?"ready":"setup";if(item.kind==="roadmap")state="roadmap";if(["mercadopago","arca","stripe"].includes(item.id)){state=regionalProviderState(item.id,ops);detail=regionalProviderLabel(item.id,ops);regionLabel=region.name}if(item.id==="mercadopago"&&state==="available"){if(mpStatus?.connected){state="ready";detail="La cuenta Mercado Pago de esta propiedad está conectada."}else if(mpStatus&&mpStatus.platformReady===false){state="setup";detail="El conector está instalado, pero faltan credenciales de plataforma en el servidor."}}return{...item,state,desc:detail,region:regionLabel}}),[group,motorConnected,encoder.enabled,encoder.bridge_url,region.country,region.currency,region.locale,region.timezone,mpStatus?.connected,mpStatus?.platformReady])
-  const completed=STEPS.filter(step=>done.includes(step.id)).length,progress=Math.round(completed/STEPS.length*100)
   const paymentBase=region.payments.includes("mercadopago")?"Mercado Pago":region.payments.includes("stripe")?"Stripe":"Proveedor según país",fiscalBase=region.country==="AR"?"ARCA":"Proveedor fiscal local"
-  function toggle(id){setDone(current=>current.includes(id)?current.filter(x=>x!==id):[...current,id])}
   return <div className={ui.content}>
     <section className={s.hero}><div><small>HOTEL APP MARKETPLACE</small><h2>Conectar sin convertirlo en un proyecto técnico.</h2><p>Un único lugar para ver qué está conectado, qué está disponible, qué depende del país, qué requiere hardware y qué sigue en roadmap.</p></div><div className={s.heroStats}><span><b>{cards.filter(x=>x.state==="ready").length}</b>Listas</span><span><b>{CATALOG.length}</b>Catálogo</span><span><b>{region.country==="OTHER"?"GL":region.country}</b>{region.name}</span></div></section>
 
@@ -53,7 +43,7 @@ export default function IntegrationMarketplace({settings,channels=[]}){
 
     <section className={s.localFirst}><div><small>{region.country==="AR"?"ARGENTINA PRIMERO":"BASE REGIONAL"}</small><h3>{paymentBase} + {fiscalBase}.</h3><p>La capa local se deriva del país configurado para esta propiedad. Moneda, fiscalidad y cobros no se mezclan con integraciones de otra jurisdicción.</p></div><div><small>GLOBAL READY</small><h3>Stripe sólo donde corresponda.</h3><p>La disponibilidad se evalúa según país y modalidad. Configurar una región no conecta cuentas ni guarda credenciales.</p></div></section>
 
-    <section className={s.launch}><header><div><small>CENTRO DE PUESTA EN MARCHA</small><h2>Migración Llena · sin cerrar el hotel</h2><p>El hotel anterior sigue productivo mientras configuramos, importamos, entrenamos y conciliamos.</p></div><div className={s.progress}><strong>{progress}%</strong><span><i style={{width:`${progress}%`}}/></span><small>{completed} de {STEPS.length} etapas confirmadas</small></div></header><div className={s.steps}>{STEPS.map(step=><button key={step.id} className={done.includes(step.id)?s.stepDone:""} onClick={()=>toggle(step.id)}><i>{done.includes(step.id)?"✓":step.week.replace("Semana ","")}</i><span><small>{step.week}</small><b>{step.title}</b><p>{step.detail}</p></span><em>{done.includes(step.id)?"Completado":"Marcar listo"}</em></button>)}</div><div className={s.noDowntime}><span>●</span><div><b>Cero interrupción operativa</b><p>No significa conectar dos channel managers a la vez. Significa preparar todo antes del corte y cambiar las conexiones sólo en el go-live.</p></div></div></section>
+    {propertyId&&<OnboardingCenter propertyId={propertyId}/>} 
 
     <section className={s.runtime}><div><small>CONFIGURACIÓN ACTUAL · {region.name.toUpperCase()}</small><h3>{region.currency} · {region.locale} · {region.timezone}</h3></div><span className={email.mode==="api"?s.ok:s.pending}>Email {email.mode==="api"?"servidor":"por configurar"}</span><span className={encoder.enabled&&encoder.bridge_url?s.ok:s.pending}>Llaves {encoder.enabled&&encoder.bridge_url?"con bridge":"por configurar"}</span><span className={motorConnected?s.ok:s.pending}>Motor {motorConnected?"conectado":"disponible"}</span><span className={mpStatus?.connected?s.ok:s.pending}>Mercado Pago {mpStatus?.connected?"conectado":mpRegionalState==="available"?"disponible":"otra región"}</span></section>
   </div>
