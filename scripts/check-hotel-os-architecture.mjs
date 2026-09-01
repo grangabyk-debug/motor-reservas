@@ -7,7 +7,6 @@ const defaultBudget={bytes:24000,lines:520}
 const legacyBudgets=new Map([
   ["app/dashboard/features/frontdesk/ReservationDrawer.jsx",{bytes:38000,lines:820}],
   ["app/dashboard/features/operations/HousekeepingPremium.jsx",{bytes:36000,lines:780}],
-  ["app/dashboard/features/commercial/GroupsPremium.jsx",{bytes:28000,lines:700}],
 ])
 const forbiddenLegacy=["app/dashboard/HotelOSClient.jsx","app/dashboard/AdvancedHotelModules.jsx","app/dashboard/advanced.module.css","scripts/harden-hotel-os-atomic.mjs"]
 const uiMustNotUseSupabase=[
@@ -56,6 +55,12 @@ const housekeepingHook=read("app/dashboard/hooks/useHousekeepingWorkspace.js")
 if(!housekeepingWorkspace.includes("requirePropertyId")||!housekeepingWorkspace.includes('.eq("property_id",property)'))problems.push("housekeepingWorkspace service must enforce property_id for tenant-scoped reads")
 if(!housekeepingWorkspace.includes("filter:`property_id=eq.${property}`"))problems.push("housekeeping realtime subscription must stay filtered by property_id")
 if(!housekeepingHook.includes("loadHousekeepingWorkspace")||!housekeepingHook.includes("subscribeHousekeepingWorkspace")||hasDirectSupabase(housekeepingHook))problems.push("useHousekeepingWorkspace must own orchestration/realtime without direct Supabase access")
+
+const groupsUi=read("app/dashboard/features/commercial/GroupsPremium.jsx")
+const groupEditors=read("app/dashboard/features/commercial/components/GroupDeskEditors.jsx")
+if(!groupsUi.includes('from"./components/GroupDeskEditors"'))problems.push("GroupsPremium must keep editor modals outside the main workspace UI")
+if(!groupEditors.includes("export default function GroupDeskEditors"))problems.push("GroupDeskEditors is missing or not exported")
+if(hasDirectSupabase(groupEditors))problems.push("GroupDeskEditors must stay presentation-only; no direct Supabase access")
 
 const groupsWorkspace=read("app/dashboard/services/groupsWorkspace.js")
 const groupsHook=read("app/dashboard/hooks/useGroupsWorkspace.js")
