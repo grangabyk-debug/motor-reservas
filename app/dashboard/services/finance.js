@@ -23,11 +23,24 @@ export async function closeCashSession({propertyId,userId,sessionId,closingAmoun
 
 export async function saveFinanceDocument({propertyId,userId,draft}){
   const property=tenant(propertyId),items=Array.isArray(draft.items)?draft.items:[],subtotal=items.reduce((a,x)=>a+Number(x.total??Number(x.quantity||1)*Number(x.unit_price||0)),0),tax=Math.max(0,Number(draft.tax||0)),total=Math.max(0,Number(draft.total||subtotal+tax)),row={property_id:property,reservation_id:draft.reservation_id?Number(draft.reservation_id):null,group_id:draft.group_id||null,partner_id:draft.partner_id||null,document_type:draft.document_type||"receipt",number:draft.number||null,status:draft.status||"draft",currency:draft.currency||"ARS",subtotal,tax,total,balance:Math.max(0,Number(draft.balance??total)),billing_to:draft.billing_to||{},items,issued_at:draft.issued_at||null,due_at:draft.due_at||null,external_ref:draft.external_ref||null,notes:draft.notes||null,created_by:userId,updated_at:new Date().toISOString()}
-  const query=draft.id?supabase.from("hotel_finance_documents").update(row).eq("id",draft.id).eq("property_id",property):supabase.from("hotel_finance_documents").insert(row);const{error}=await query;if(error)throw error
+  const query=draft.id?supabase.from("hotel_finance_documents").update(row).eq("id",draft.id).eq("property_id",property).select("*").single():supabase.from("hotel_finance_documents").insert(row).select("*").single();const{data,error}=await query;if(error)throw error;return data
 }
 
 export async function issueInternalDocument({propertyId,id}){
-  const property=tenant(propertyId),number=`HL-${new Date().getFullYear()}-${Date.now().toString().slice(-8)}`;const{error}=await supabase.from("hotel_finance_documents").update({status:"issued",number,issued_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",id).eq("property_id",property);if(error)throw error;return number
+  const property=tenant(propertyId),number=`HL-${new Date().getFullYear()}-${Date.now().toString().slice(-8)}`;const{data,error}=await supabase.from("hotel_finance_documents").update({status:"issued",number,issued_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",id).eq("property_id",property).select("*").single();if(error)throw error;return data
+}
+
+export async function loadReservationFinanceDocuments({reservationId}){
+  const rid=Number(reservationId);if(!rid)return[]
+  const{data:reservation,error:reservationError}=await supabase.from("reservas").select("property_id").eq("id",rid).single();if(reservationError)throw reservationError
+  const property=tenant(reservation.property_id),{data,error}=await supabase.from("hotel_finance_documents").select("id,property_id,reservation_id,document_type,number,status,currency,subtotal,tax,total,balance,billing_to,items,issued_at,due_at,external_ref,notes,created_at,updated_at").eq("property_id",property).eq("reservation_id",rid).order("created_at",{ascending:false});if(error)throw error;return data||[]
+}
+
+export async function createReservationProforma({reservationId,guestName,currency="ARS",items=[]}){
+  const rid=Number(reservationId);if(!rid)throw new Error("Reserva inválida.")
+  const[{data:reservation,error:reservationError},{data:{user}}]=await Promise.all([supabase.from("reservas").select("property_id,nombre_huesped").eq("id",rid).single(),supabase.auth.getUser()]);if(reservationError)throw reservationError;if(!user)throw new Error("Tenés que iniciar sesión.")
+  const normalized=(items||[]).filter(item=>Number(item.total||0)>0).map(item=>({description:item.description||item.name||"Concepto",quantity:Number(item.quantity||1),unit_price:Number(item.unit_price??item.total??0),total:Number(item.total||0)}));if(!normalized.length)throw new Error("La cuenta todavía no tiene conceptos para generar una proforma.")
+  return saveFinanceDocument({propertyId:reservation.property_id,userId:user.id,draft:{reservation_id:rid,document_type:"invoice_draft",status:"draft",currency,billing_to:{name:guestName||reservation.nombre_huesped||"Huésped"},items:normalized,notes:"Proforma generada desde la ficha de reserva."}})
 }
 
 export function buildFrontDeskReport(type,date,{reservations=[],rooms=[],payments=[],housekeeping=[]}){
