@@ -36,6 +36,7 @@ export function useHotelData(propertyId,view){
     finally{if(run===seq.current)setLoading(false)}
   },[propertyId,group])
   useEffect(()=>{reload()},[reload])
+  useEffect(()=>{if(!propertyId)return;const timer=setInterval(()=>{expireTentativeReservations({propertyId}).catch(()=>{})},60000);return()=>clearInterval(timer)},[propertyId])
   useEffect(()=>{if(!propertyId)return;const channel=supabase.channel(`hl-v2-${propertyId}`).on("postgres_changes",{event:"*",schema:"public",table:"reservas",filter:`property_id=eq.${propertyId}`},reload).on("postgres_changes",{event:"*",schema:"public",table:"habitaciones",filter:`property_id=eq.${propertyId}`},reload).on("postgres_changes",{event:"*",schema:"public",table:"pagos",filter:`property_id=eq.${propertyId}`},reload).on("postgres_changes",{event:"*",schema:"public",table:"hotel_packages",filter:`property_id=eq.${propertyId}`},reload).subscribe();return()=>{supabase.removeChannel(channel)}},[propertyId,reload])
   return{...core,settings,guests,operations,commercial,finance,hotel,loading,error,reload}
 }
