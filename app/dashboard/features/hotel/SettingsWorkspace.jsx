@@ -11,7 +11,7 @@ function operational(settings){const value=settings?.operational_settings;return
 export default function SettingsWorkspace({settings,canManage,onSave}){
   const[draft,setDraft]=useState(settings),[busy,setBusy]=useState(false),[saved,setSaved]=useState(false)
   useEffect(()=>setDraft(settings),[settings?.property_id,settings?.updated_at])
-  const ops=operational(draft)
+  const ops=operational(draft),settingsKey=`${ops?.region?.country||"AR"}:${ops.currency||"ARS"}:${ops?.region?.locale||""}:${ops?.region?.timezone||""}`
   const setOps=patch=>{setSaved(false);setDraft(current=>({...current,operational_settings:{...operational(current),...patch}}))}
   async function saveRegional(){if(!canManage)return;setBusy(true);setSaved(false);try{await onSave(draft);setSaved(true)}finally{setBusy(false)}}
   return <div className={s.workspace}>
@@ -20,6 +20,6 @@ export default function SettingsWorkspace({settings,canManage,onSave}){
       <RegionalCommerceSettings ops={ops} canManage={canManage} onChange={setOps}/>
       {canManage&&<div className={s.actions}><span>{saved?"✓ Región guardada":"Cambiar país ajusta valores recomendados; podés editarlos antes de guardar."}</span><button type="button" disabled={busy} onClick={saveRegional}>{busy?"Guardando…":"Guardar región y comercio"}</button></div>}
     </div>
-    <SettingsView settings={draft} canManage={canManage} onSave={onSave}/>
+    <SettingsView key={settingsKey} settings={draft} canManage={canManage} onSave={onSave}/>
   </div>
 }
