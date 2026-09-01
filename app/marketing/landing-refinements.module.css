@@ -1,0 +1,30 @@
+.scope :global([class*="__heroVisual"])>figure{inset:10px 0 34px 122px!important;border-radius:38px!important}
+.scope :global([class*="__heroApp"]){left:34px!important;right:20px!important;bottom:2px!important;opacity:.9;transform:scale(.91);transform-origin:right bottom;transition:opacity .2s ease,transform .2s ease}
+.scope :global([class*="__heroApp"]):hover{opacity:.96;transform:scale(.925)}
+.scope :global([class*="__heroApp"]) :global([class*="__appMock"]){background:rgba(255,255,255,.82)!important;backdrop-filter:blur(9px) saturate(1.08);-webkit-backdrop-filter:blur(9px) saturate(1.08);border-color:rgba(255,255,255,.62)!important;box-shadow:0 28px 68px rgba(21,55,97,.16)!important}
+.scope :global([class*="__heroApp"]) :global([class*="__appMock"])>header{background:rgba(255,255,255,.84)!important;border-bottom-color:rgba(207,219,234,.75)!important}
+.scope :global([class*="__heroApp"]) :global([class*="__mockBody"])>main{background:rgba(245,248,252,.78)!important}
+.scope :global([class*="__heroApp"]) :global([class*="__chartCard"]),
+.scope :global([class*="__heroApp"]) :global([class*="__taskCard"]),
+.scope :global([class*="__heroApp"]) :global([class*="__mockStats"]) article,
+.scope :global([class*="__heroApp"]) :global([class*="__guestColumns"]) article{background:rgba(255,255,255,.88)!important}
+.scope :global([class*="__heroApp"]) :global([class*="__mockBody"])>aside{background:rgba(6,45,92,.92)!important}
+.scope :global([class*="__toastCard"]){background:rgba(255,255,255,.86)!important;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+
+.scope :global([class*="__integrationGrid"]) article{min-height:98px!important;padding:14px 15px!important;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+.scope :global([class*="__integrationGrid"]) article:hover{transform:translateY(-2px);border-color:#ccd9e8!important;box-shadow:0 16px 34px rgba(28,60,96,.08)!important}
+.scope :global([class*="__integrationGrid"]) article>span{position:relative!important;width:46px!important;height:46px!important;border:1px solid #e5ebf3!important;border-radius:14px!important;background:#fff!important;font-size:0!important;color:transparent!important;overflow:hidden!important;box-shadow:0 5px 14px rgba(26,57,94,.05)}
+.scope :global([class*="__integrationGrid"]) article>span::before{content:"";display:block;width:31px;height:31px;background-position:center;background-repeat:no-repeat;background-size:contain}
+.scope :global([class*="__integrationGrid"]) article:nth-child(1)>span::before{background-image:url("https://cdn.simpleicons.org/mercadopago/009EE3")}
+.scope :global([class*="__integrationGrid"]) article:nth-child(2)>span::before{width:38px;height:26px;background-image:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/ARCA%20logo.png")}
+.scope :global([class*="__integrationGrid"]) article:nth-child(3)>span::before{background-image:url("https://cdn.simpleicons.org/stripe/635BFF")}
+.scope :global([class*="__integrationGrid"]) article:nth-child(4)>span::before{background-image:url("https://cdn.simpleicons.org/bookingdotcom/003580")}
+.scope :global([class*="__integrationGrid"]) article:nth-child(5)>span::before{background-image:url("https://cdn.simpleicons.org/expedia/191E3B")}
+.scope :global([class*="__integrationGrid"]) article:nth-child(6)>span::before{background-image:url("https://cdn.simpleicons.org/airbnb/FF5A5F")}
+.scope :global([class*="__integrationGrid"]) article:nth-child(7)>span::before{background-image:url("https://cdn.simpleicons.org/whatsapp/25D366")}
+.scope :global([class*="__integrationGrid"]) article:nth-child(8)>span::before{width:29px;height:29px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230b5fae' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='10' width='14' height='10' rx='2.5'/%3E%3Cpath d='M8 10V7a4 4 0 0 1 8 0v3'/%3E%3Ccircle cx='12' cy='15' r='1.2' fill='%230b5fae' stroke='none'/%3E%3Cpath d='M12 16.2V18'/%3E%3C/svg%3E")}
+.scope :global([class*="__integrationGrid"]) b{font-size:12.5px!important}
+.scope :global([class*="__integrationGrid"]) small{font-size:8.5px!important}
+
+@media(max-width:1120px){.scope :global([class*="__heroVisual"])>figure{left:18%!important}.scope :global([class*="__heroApp"]){left:22px!important;right:12px!important;transform:scale(.93)}}
+@media(max-width:760px){.scope :global([class*="__heroVisual"])>figure{inset:0 0 86px 0!important}.scope :global([class*="__heroApp"]){left:4px!important;right:4px!important;bottom:-4px!important;opacity:.94;transform:scale(.9)}.scope :global([class*="__heroApp"]):hover{transform:scale(.9)}.scope :global([class*="__integrationGrid"]) article>span{width:48px!important;height:48px!important}}

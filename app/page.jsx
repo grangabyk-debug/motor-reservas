@@ -1,3 +1,4 @@
 import MarketingHome from"./marketing/MarketingHome"
+import refinements from"./marketing/landing-refinements.module.css"
 export const metadata={title:"Habitación Llena | PMS hotelero para operar, vender y recibir mejor",description:"PMS hotelero para recepción, reservas, huéspedes, habitaciones, housekeeping, ingresos, migración y venta directa desde una sola operación.",keywords:["PMS hotelero","software hotelero","sistema para hoteles","motor de reservas","housekeeping hotel","revenue management hotel"],alternates:{canonical:"https://www.habitacionllena.com/"},openGraph:{title:"Habitación Llena · Hotel Operating System",description:"Un PMS moderno que se adapta al hotel, no al revés.",type:"website"}}
-export default function Home(){return <MarketingHome/>}
+export default function Home(){return <div className={refinements.scope}><MarketingHome/></div>}
