@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "check:product-boundaries": "node scripts/check-product-boundaries.mjs",
-    "check:hotel-architecture": "node scripts/check-hotel-os-architecture.mjs",
+    "check:hotel-db-migrations": "node scripts/check-hotel-db-migrations.mjs",
+    "check:hotel-architecture": "node scripts/check-hotel-os-architecture.mjs && npm run check:hotel-db-migrations",
     "prebuild": "npm run check:hotel-architecture",
     "dev": "next dev",
     "build": "next build",
