@@ -1,7 +1,6 @@
 "use client"
 
 import{useEffect,useMemo,useState}from"react"
-import{supabase}from"../../../../lib/supabase"
 import{isoDate,shortDate}from"../../core/formatters"
 import{
   assignHousekeepingTask,
@@ -12,6 +11,8 @@ import{
   deleteHousekeepingAssignmentRule,
   reportHousekeepingMaintenance,
 }from"../../services/operations"
+import{saveHousekeepingSchedule,setHousekeepingRoomState}from"../../services/housekeepingWorkspace"
+import{useHousekeepingWorkspace}from"../../hooks/useHousekeepingWorkspace"
 import hk from"./housekeeping-premium.module.css"
 import ex from"./housekeeping-extended.module.css"
 
@@ -69,20 +70,13 @@ function RackCard({item,selected,onSelect,staffName}){
 export default function HousekeepingPremium({rooms=[],floors=[],reservations=[],tasks=[],onSaveTask,onTaskStatus}){
   const propertyId=rooms.find(r=>r.property_id)?.property_id||reservations.find(r=>r.property_id)?.property_id||null
   const today=isoDate()
+  const{ schedules,history,checklist,reports,rules,tasks:localTasks,maintenance,staff,error:workspaceError,refresh:loadHousekeepingMeta }=useHousekeepingWorkspace(propertyId,tasks)
   const[dayOffset,setDayOffset]=useState(0)
   const selectedDate=datePlus(today,dayOffset)
   const[selectedFloor,setSelectedFloor]=useState("all")
   const[statusFilter,setStatusFilter]=useState("all")
   const[selectedRoomId,setSelectedRoomId]=useState(null)
-  const[schedules,setSchedules]=useState([])
-  const[history,setHistory]=useState([])
-  const[checklist,setChecklist]=useState([])
   const[checkState,setCheckState]=useState({})
-  const[localTasks,setLocalTasks]=useState(tasks)
-  const[reports,setReports]=useState([])
-  const[maintenance,setMaintenance]=useState([])
-  const[rules,setRules]=useState([])
-  const[staff,setStaff]=useState([])
   const[scheduleDraft,setScheduleDraft]=useState({mode:"periodic",every:2,weekdays:[],active:true,notes:""})
   const[message,setMessage]=useState("")
   const[busyRoom,setBusyRoom]=useState(null)
@@ -93,51 +87,7 @@ export default function HousekeepingPremium({rooms=[],floors=[],reservations=[],
   const[ruleDraft,setRuleDraft]=useState({scope_type:"all",scope_value:"",assignee_id:"",priority:100,active:true})
   const[autoBusy,setAutoBusy]=useState(false)
 
-  useEffect(()=>setLocalTasks(tasks),[tasks])
-
-  async function loadHousekeepingMeta(){
-    if(!propertyId)return
-    const[s,h,c,r,a,t,m,members]=await Promise.all([
-      supabase.from("hotel_housekeeping_schedules").select("*").eq("property_id",propertyId).order("next_cleaning_date"),
-      supabase.from("hotel_housekeeping_history").select("*").eq("property_id",propertyId).order("created_at",{ascending:false}).limit(600),
-      supabase.from("hotel_housekeeping_checklist_catalog").select("*").eq("property_id",propertyId).eq("active",true).order("sort_order").order("label"),
-      supabase.from("hotel_housekeeping_room_reports").select("*").eq("property_id",propertyId).order("created_at",{ascending:false}).limit(300),
-      supabase.from("hotel_housekeeping_assignment_rules").select("*").eq("property_id",propertyId).order("priority").order("created_at"),
-      supabase.from("hotel_housekeeping_tasks").select("*").eq("property_id",propertyId).order("scheduled_for",{ascending:false}).limit(400),
-      supabase.from("hotel_maintenance_tickets").select("*").eq("property_id",propertyId).order("created_at",{ascending:false}).limit(300),
-      supabase.from("property_members").select("user_id,role,created_at").eq("property_id",propertyId),
-    ])
-    const error=[s,h,c,r,a,t,m,members].find(x=>x.error)?.error
-    if(error)throw error
-    const memberRows=members.data||[],ids=memberRows.map(x=>x.user_id).filter(Boolean)
-    let profiles=[]
-    if(ids.length){const p=await supabase.from("profiles").select("id,full_name,role").in("id",ids);if(p.error)throw p.error;profiles=p.data||[]}
-    setSchedules(s.data||[])
-    setHistory(h.data||[])
-    setChecklist(c.data||[])
-    setReports(r.data||[])
-    setRules(a.data||[])
-    setLocalTasks(t.data||[])
-    setMaintenance(m.data||[])
-    setStaff(memberRows.map(member=>({...member,profile:profiles.find(profile=>profile.id===member.user_id)||null})))
-  }
-
-  useEffect(()=>{
-    if(!propertyId)return
-    let alive=true
-    loadHousekeepingMeta().catch(e=>alive&&setMessage(e.message||"No pudimos cargar la operación de pisos."))
-    const refresh=()=>loadHousekeepingMeta().catch(()=>{})
-    const channel=supabase.channel(`hl-housekeeping-plus-${propertyId}`)
-      .on("postgres_changes",{event:"*",schema:"public",table:"hotel_housekeeping_schedules",filter:`property_id=eq.${propertyId}`},refresh)
-      .on("postgres_changes",{event:"*",schema:"public",table:"hotel_housekeeping_history",filter:`property_id=eq.${propertyId}`},refresh)
-      .on("postgres_changes",{event:"*",schema:"public",table:"hotel_housekeeping_checklist_catalog",filter:`property_id=eq.${propertyId}`},refresh)
-      .on("postgres_changes",{event:"*",schema:"public",table:"hotel_housekeeping_room_reports",filter:`property_id=eq.${propertyId}`},refresh)
-      .on("postgres_changes",{event:"*",schema:"public",table:"hotel_housekeeping_assignment_rules",filter:`property_id=eq.${propertyId}`},refresh)
-      .on("postgres_changes",{event:"*",schema:"public",table:"hotel_housekeeping_tasks",filter:`property_id=eq.${propertyId}`},refresh)
-      .on("postgres_changes",{event:"*",schema:"public",table:"hotel_maintenance_tickets",filter:`property_id=eq.${propertyId}`},refresh)
-      .subscribe()
-    return()=>{alive=false;supabase.removeChannel(channel)}
-  },[propertyId])
+  useEffect(()=>{if(workspaceError)setMessage(workspaceError)},[workspaceError])
 
   const floorNames=useMemo(()=>new Map(floors.map(f=>[String(f.id),f.name])),[floors])
   const scheduleByReservation=useMemo(()=>new Map(schedules.map(s=>[String(s.reservation_id),s])),[schedules])
@@ -191,15 +141,14 @@ export default function HousekeepingPremium({rooms=[],floors=[],reservations=[],
   async function setRoomState(room,status,checklistPayload=[]){
     setMessage("");setBusyRoom(room.id)
     try{
-      const{error}=await supabase.rpc("hl_housekeeping_set_room_state",{p_room_id:Number(room.id),p_status:status,p_checklist:checklistPayload,p_source:"manual",p_note:null})
-      if(error)throw error
+      await setHousekeepingRoomState({roomId:room.id,status,checklist:checklistPayload,source:"manual",note:null})
       setMessage(status==="inspeccionada"?`Habitación ${room.nombre} inspeccionada y lista.`:`Habitación ${room.nombre}: ${statusLabel(status)}.`)
       await loadHousekeepingMeta()
     }catch(e){setMessage(e.message||"No pudimos cambiar el estado.")}finally{setBusyRoom(null)}
   }
   function inspectRoom(roomId){setSelectedRoomId(roomId);setTimeout(()=>document.getElementById("hl-housekeeping-checklist")?.scrollIntoView({behavior:"smooth",block:"center"}),20)}
   async function confirmInspection(){if(!selected)return;const payload=checklist.map(item=>({id:item.id,label:item.label,required:item.required,done:!!checkState[item.id]}));await setRoomState(selected.room,"inspeccionada",payload)}
-  async function saveSchedule(){if(!selectedReservation)return;setMessage("");try{const{error}=await supabase.rpc("hl_housekeeping_save_schedule",{p_reservation_id:Number(selectedReservation.id),p_mode:scheduleDraft.mode,p_every_n_nights:Math.max(1,Number(scheduleDraft.every||2)),p_weekdays:scheduleDraft.weekdays.map(Number),p_active:scheduleDraft.active!==false,p_notes:scheduleDraft.notes||null});if(error)throw error;await loadHousekeepingMeta();setMessage("Rutina de limpieza guardada. La próxima fecha se recalculó.")}catch(e){setMessage(e.message||"No pudimos guardar la rutina.")}}
+  async function saveSchedule(){if(!selectedReservation)return;setMessage("");try{await saveHousekeepingSchedule({reservationId:selectedReservation.id,draft:scheduleDraft});await loadHousekeepingMeta();setMessage("Rutina de limpieza guardada. La próxima fecha se recalculó.")}catch(e){setMessage(e.message||"No pudimos guardar la rutina.")}}
   async function quickTask(){if(!taskRoom)return;const room=rooms.find(r=>String(r.id)===String(taskRoom)),rule=room?matchRule(room):null;await onSaveTask?.({room_id:taskRoom,task_type:"cleaning",priority:"normal",status:"pending",assigned_to:rule?.assignee_id||null,scheduled_for:new Date().toISOString(),notes:"Tarea creada desde Housekeeping"});setTaskRoom("");await loadHousekeepingMeta()}
   async function finishTask(task){await onTaskStatus?.(task,"done");await loadHousekeepingMeta()}
   async function changeAssignee(task,assigneeId){try{await assignHousekeepingTask({taskId:task.id,assigneeId:assigneeId||null});await loadHousekeepingMeta();setMessage(assigneeId?`Tarea asignada a ${staffName(assigneeId)}.`:"Tarea sin responsable fijo.")}catch(e){setMessage(e.message||"No pudimos asignar la tarea.")}}
