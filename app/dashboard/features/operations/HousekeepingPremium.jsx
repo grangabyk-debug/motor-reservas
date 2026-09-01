@@ -1,28 +1,234 @@
 "use client"
 
-import{useMemo,useState}from"react"
-import{isoDate,shortDate}from"../../core/formatters"
-import hk from"./housekeeping-premium.module.css"
+import { useMemo, useState } from "react"
+import { isoDate, shortDate } from "../../core/formatters"
+import hk from "./housekeeping-premium.module.css"
 
-const labelStatus=value=>{const v=String(value||"").toLowerCase();if(v==="sucia")return"Sucia";if(v==="limpieza"||v==="en_limpieza")return"En limpieza";if(v==="limpia")return"Limpia";if(v==="inspeccion"||v==="inspeccionada")return"Inspeccionada";if(v==="mantenimiento")return"Mantenimiento";if(v==="fuera_servicio")return"Fuera de servicio";return"Disponible"}
-const tone=value=>{const v=String(value||"").toLowerCase();if(v==="sucia")return"dirty";if(v==="limpieza"||v==="en_limpieza")return"working";if(v==="limpia")return"clean";if(v==="inspeccion"||v==="inspeccionada"||v==="disponible"||v==="libre")return"ready";return"blocked"}
-const toMinutes=value=>{const [h="0",m="0"]=String(value||"00:00").split(":");return Number(h)*60+Number(m)}
+const labelStatus = value => {
+  const v = String(value || "").toLowerCase()
+  if (v === "sucia") return "Sucia"
+  if (v === "limpieza" || v === "en_limpieza") return "En limpieza"
+  if (v === "limpia") return "Limpia"
+  if (v === "inspeccion" || v === "inspeccionada") return "Inspeccionada"
+  if (v === "mantenimiento") return "Mantenimiento"
+  if (v === "fuera_servicio") return "Fuera de servicio"
+  return "Disponible"
+}
 
-export default function HousekeepingPremium({rooms=[],floors=[],reservations=[],tasks=[],onRoomStatus,onSaveTask,onTaskStatus}){
-  const today=isoDate(),[filter,setFilter]=useState("priority"),[selectedFloor,setSelectedFloor]=useState("all"),[taskRoom,setTaskRoom]=useState("")
-  const floorName=useMemo(()=>new Map(floors.map(f=>[String(f.id),f.name])),[floors])
-  const details=useMemo(()=>rooms.map(room=>{const roomReservations=reservations.filter(r=>String(r.habitacion_id)===String(room.id)&&r.estado!=="cancelada"&&!r.no_show),arrival=roomReservations.filter(r=>r.fecha_entrada===today&&r.estado!=="alojado").sort((a,b)=>toMinutes(a.hora_llegada_estimada)-toMinutes(b.hora_llegada_estimada))[0],departure=roomReservations.find(r=>r.fecha_salida===today&&r.estado!=="finalizada"),stay=roomReservations.find(r=>r.fecha_entrada<today&&r.fecha_salida>today&&r.estado!=="finalizada"),roomTasks=tasks.filter(t=>String(t.room_id)===String(room.id)&&t.status!=="done"),state=tone(room.estado),priority=state==="dirty"&&arrival?0:state==="dirty"&&departure?1:state==="working"?2:arrival?3:roomTasks.some(t=>t.priority==="urgent")?0:roomTasks.some(t=>t.priority==="high")?2:4;return{room,arrival,departure,stay,roomTasks,state,priority,floor:floorName.get(String(room.floor_id))||"Sin piso"}}),[rooms,reservations,tasks,today,floorName])
-  const filtered=useMemo(()=>details.filter(item=>{if(selectedFloor!=="all"&&String(item.room.floor_id||"orphan")!==selectedFloor)return false;if(filter==="dirty")return item.state==="dirty";if(filter==="working")return item.state==="working";if(filter==="ready")return item.state==="ready"||item.state==="clean";return true}).sort((a,b)=>a.priority-b.priority||String(a.room.nombre).localeCompare(String(b.room.nombre),"es")),[details,filter,selectedFloor])
-  const counts=details.reduce((acc,item)=>{acc[item.state]=(acc[item.state]||0)+1;return acc},{})
-  const groups=useMemo(()=>{const map=new Map();filtered.forEach(item=>{if(!map.has(item.floor))map.set(item.floor,[]);map.get(item.floor).push(item)});return[...map.entries()]},[filtered])
-  const priorityList=details.filter(x=>x.priority<=2).sort((a,b)=>a.priority-b.priority).slice(0,10)
-  const quickTask=async roomId=>{if(!roomId)return;await onSaveTask?.({room_id:roomId,task_type:"cleaning",priority:"normal",status:"pending",scheduled_for:new Date().toISOString(),notes:"Tarea creada desde Housekeeping"});setTaskRoom("")}
-  return <div className={hk.page}>
-    <header className={hk.hero}><div><small>HOUSEKEEPING · EN TIEMPO REAL</small><h2>La próxima llegada manda.</h2><p>Recepción y pisos comparten el mismo estado. Cada cambio se refleja en el planning sin recargar.</p></div><div className={hk.summary}><span className={hk.ready}><b>{(counts.ready||0)+(counts.clean||0)}</b><small>Listas / limpias</small></span><span className={hk.working}><b>{counts.working||0}</b><small>En limpieza</small></span><span className={hk.dirty}><b>{counts.dirty||0}</b><small>Sucias</small></span></div></header>
-    <div className={hk.toolbar}><div className={hk.tabs}>{[["priority","Prioridad"],["dirty","Sucias"],["working","En proceso"],["ready","Listas"]].map(([id,label])=><button key={id} className={filter===id?hk.active:""} onClick={()=>setFilter(id)}>{label}</button>)}</div><div className={hk.filters}><select value={selectedFloor} onChange={e=>setSelectedFloor(e.target.value)}><option value="all">Todos los pisos</option>{floors.filter(f=>f.active!==false).map(f=><option key={f.id} value={String(f.id)}>{f.name}</option>)}<option value="orphan">Sin piso</option></select><select value={taskRoom} onChange={e=>setTaskRoom(e.target.value)}><option value="">Nueva tarea…</option>{rooms.map(r=><option key={r.id} value={r.id}>Hab. {r.nombre}</option>)}</select><button disabled={!taskRoom} onClick={()=>quickTask(taskRoom)}>＋ Crear tarea</button></div></div>
-    <div className={hk.layout}>
-      <aside className={hk.priority}><header><div><small>QUÉ URGE AHORA</small><h3>Cola operativa</h3></div><span>{priorityList.length}</span></header><div>{priorityList.map(item=><article key={item.room.id}><div className={`${hk.roomBadge} ${hk[item.state]}`}>{item.room.nombre}</div><span><b>{item.arrival?`Llega ${item.arrival.hora_llegada_estimada||"14:00"}`:item.departure?"Salida de hoy":item.state==="working"?"Limpieza en curso":"Tarea pendiente"}</b><small>{item.arrival?`${item.arrival.nombre_huesped} · ${shortDate(item.arrival.fecha_entrada)}`:item.roomTasks[0]?.notes||labelStatus(item.room.estado)}</small></span><div className={hk.rowActions}>{item.state==="dirty"&&<button onClick={()=>onRoomStatus?.(item.room,"limpieza")}>Comenzar</button>}{item.state==="working"&&<button onClick={()=>onRoomStatus?.(item.room,"limpia")}>Terminé</button>}{item.state==="clean"&&<button onClick={()=>onRoomStatus?.(item.room,"inspeccionada")}>Inspeccionar</button>}{item.roomTasks[0]&&<button onClick={()=>onTaskStatus?.(item.roomTasks[0],"done")}>✓</button>}</div></article>})}{!priorityList.length&&<div className={hk.empty}>No hay habitaciones urgentes.</div>}</div></aside>
-      <main className={hk.rack}><header><div><small>RACK DE PISOS</small><h3>Estado de habitaciones</h3></div><div className={hk.legend}><span><i className={hk.ready}/>Lista</span><span><i className={hk.clean}/>Limpia</span><span><i className={hk.working}/>En limpieza</span><span><i className={hk.dirty}/>Sucia</span></div></header>{groups.map(([name,items])=><section key={name}><div className={hk.floorTitle}><b>{name}</b><span>{items.length} habitaciones</span></div><div className={hk.roomGrid}>{items.map(item=><article key={item.room.id} className={`${hk.roomCard} ${hk[item.state]}`}><header><span>Hab.</span><b>{item.room.nombre}</b></header><p>{labelStatus(item.room.estado)}</p><small>{item.arrival?`Próxima llegada ${item.arrival.hora_llegada_estimada||"14:00"}`:item.stay?`En casa · sale ${shortDate(item.stay.fecha_salida)}`:item.departure?"Salida de hoy":"Sin llegada inmediata"}</small><div className={hk.cardActions}>{item.state==="dirty"&&<button onClick={()=>onRoomStatus?.(item.room,"limpieza")}>Limpiar</button>}{item.state==="working"&&<button onClick={()=>onRoomStatus?.(item.room,"limpia")}>Marcar limpia</button>}{item.state==="clean"&&<button onClick={()=>onRoomStatus?.(item.room,"inspeccionada")}>Inspeccionar</button>}{item.state==="ready"&&<button onClick={()=>onRoomStatus?.(item.room,"sucia")}>Marcar sucia</button>}</div></article>)}</div></section>)}{!groups.length&&<div className={hk.empty}>No hay habitaciones para este filtro.</div>}</main>
+const tone = value => {
+  const v = String(value || "").toLowerCase()
+  if (v === "sucia") return "dirty"
+  if (v === "limpieza" || v === "en_limpieza") return "working"
+  if (v === "limpia") return "clean"
+  if (["inspeccion", "inspeccionada", "disponible", "libre"].includes(v)) return "ready"
+  return "blocked"
+}
+
+const toMinutes = value => {
+  const [h = "0", m = "0"] = String(value || "00:00").split(":")
+  return Number(h) * 60 + Number(m)
+}
+
+function PriorityRoom({ item, onRoomStatus, onTaskStatus }) {
+  const description = item.arrival
+    ? `${item.arrival.nombre_huesped} · ${shortDate(item.arrival.fecha_entrada)}`
+    : item.roomTasks[0]?.notes || labelStatus(item.room.estado)
+  const title = item.arrival
+    ? `Llega ${item.arrival.hora_llegada_estimada || "14:00"}`
+    : item.departure
+      ? "Salida de hoy"
+      : item.state === "working"
+        ? "Limpieza en curso"
+        : "Tarea pendiente"
+
+  return (
+    <article>
+      <div className={`${hk.roomBadge} ${hk[item.state]}`}>{item.room.nombre}</div>
+      <span>
+        <b>{title}</b>
+        <small>{description}</small>
+      </span>
+      <div className={hk.rowActions}>
+        {item.state === "dirty" && <button onClick={() => onRoomStatus?.(item.room, "limpieza")}>Comenzar</button>}
+        {item.state === "working" && <button onClick={() => onRoomStatus?.(item.room, "limpia")}>Terminé</button>}
+        {item.state === "clean" && <button onClick={() => onRoomStatus?.(item.room, "inspeccionada")}>Inspeccionar</button>}
+        {item.roomTasks[0] && <button onClick={() => onTaskStatus?.(item.roomTasks[0], "done")}>✓</button>}
+      </div>
+    </article>
+  )
+}
+
+function RoomCard({ item, onRoomStatus }) {
+  const detail = item.arrival
+    ? `Próxima llegada ${item.arrival.hora_llegada_estimada || "14:00"}`
+    : item.stay
+      ? `En casa · sale ${shortDate(item.stay.fecha_salida)}`
+      : item.departure
+        ? "Salida de hoy"
+        : "Sin llegada inmediata"
+
+  return (
+    <article className={`${hk.roomCard} ${hk[item.state]}`}>
+      <header><span>Hab.</span><b>{item.room.nombre}</b></header>
+      <p>{labelStatus(item.room.estado)}</p>
+      <small>{detail}</small>
+      <div className={hk.cardActions}>
+        {item.state === "dirty" && <button onClick={() => onRoomStatus?.(item.room, "limpieza")}>Limpiar</button>}
+        {item.state === "working" && <button onClick={() => onRoomStatus?.(item.room, "limpia")}>Marcar limpia</button>}
+        {item.state === "clean" && <button onClick={() => onRoomStatus?.(item.room, "inspeccionada")}>Inspeccionar</button>}
+        {item.state === "ready" && <button onClick={() => onRoomStatus?.(item.room, "sucia")}>Marcar sucia</button>}
+      </div>
+    </article>
+  )
+}
+
+export default function HousekeepingPremium({ rooms = [], floors = [], reservations = [], tasks = [], onRoomStatus, onSaveTask, onTaskStatus }) {
+  const today = isoDate()
+  const [filter, setFilter] = useState("priority")
+  const [selectedFloor, setSelectedFloor] = useState("all")
+  const [taskRoom, setTaskRoom] = useState("")
+
+  const floorName = useMemo(() => new Map(floors.map(f => [String(f.id), f.name])), [floors])
+
+  const details = useMemo(() => rooms.map(room => {
+    const roomReservations = reservations.filter(r => String(r.habitacion_id) === String(room.id) && r.estado !== "cancelada" && !r.no_show)
+    const arrival = roomReservations
+      .filter(r => r.fecha_entrada === today && r.estado !== "alojado")
+      .sort((a, b) => toMinutes(a.hora_llegada_estimada) - toMinutes(b.hora_llegada_estimada))[0]
+    const departure = roomReservations.find(r => r.fecha_salida === today && r.estado !== "finalizada")
+    const stay = roomReservations.find(r => r.fecha_entrada < today && r.fecha_salida > today && r.estado !== "finalizada")
+    const roomTasks = tasks.filter(t => String(t.room_id) === String(room.id) && t.status !== "done")
+    const state = tone(room.estado)
+    const priority = state === "dirty" && arrival
+      ? 0
+      : state === "dirty" && departure
+        ? 1
+        : state === "working"
+          ? 2
+          : roomTasks.some(t => t.priority === "urgent")
+            ? 0
+            : roomTasks.some(t => t.priority === "high")
+              ? 2
+              : arrival
+                ? 3
+                : 4
+
+    return {
+      room,
+      arrival,
+      departure,
+      stay,
+      roomTasks,
+      state,
+      priority,
+      floor: floorName.get(String(room.floor_id)) || "Sin piso",
+    }
+  }), [rooms, reservations, tasks, today, floorName])
+
+  const filtered = useMemo(() => details
+    .filter(item => {
+      if (selectedFloor !== "all" && String(item.room.floor_id || "orphan") !== selectedFloor) return false
+      if (filter === "dirty") return item.state === "dirty"
+      if (filter === "working") return item.state === "working"
+      if (filter === "ready") return item.state === "ready" || item.state === "clean"
+      return true
+    })
+    .sort((a, b) => a.priority - b.priority || String(a.room.nombre).localeCompare(String(b.room.nombre), "es")), [details, filter, selectedFloor])
+
+  const counts = details.reduce((acc, item) => {
+    acc[item.state] = (acc[item.state] || 0) + 1
+    return acc
+  }, {})
+
+  const groups = useMemo(() => {
+    const map = new Map()
+    filtered.forEach(item => {
+      if (!map.has(item.floor)) map.set(item.floor, [])
+      map.get(item.floor).push(item)
+    })
+    return [...map.entries()]
+  }, [filtered])
+
+  const priorityList = details.filter(item => item.priority <= 2).sort((a, b) => a.priority - b.priority).slice(0, 10)
+
+  async function quickTask(roomId) {
+    if (!roomId) return
+    await onSaveTask?.({
+      room_id: roomId,
+      task_type: "cleaning",
+      priority: "normal",
+      status: "pending",
+      scheduled_for: new Date().toISOString(),
+      notes: "Tarea creada desde Housekeeping",
+    })
+    setTaskRoom("")
+  }
+
+  return (
+    <div className={hk.page}>
+      <header className={hk.hero}>
+        <div>
+          <small>HOUSEKEEPING · EN TIEMPO REAL</small>
+          <h2>La próxima llegada manda.</h2>
+          <p>Recepción y pisos comparten el mismo estado. Cada cambio se refleja en el planning sin recargar.</p>
+        </div>
+        <div className={hk.summary}>
+          <span className={hk.ready}><b>{(counts.ready || 0) + (counts.clean || 0)}</b><small>Listas / limpias</small></span>
+          <span className={hk.working}><b>{counts.working || 0}</b><small>En limpieza</small></span>
+          <span className={hk.dirty}><b>{counts.dirty || 0}</b><small>Sucias</small></span>
+        </div>
+      </header>
+
+      <div className={hk.toolbar}>
+        <div className={hk.tabs}>
+          {[["priority", "Prioridad"], ["dirty", "Sucias"], ["working", "En proceso"], ["ready", "Listas"]].map(([id, label]) => (
+            <button key={id} className={filter === id ? hk.active : ""} onClick={() => setFilter(id)}>{label}</button>
+          ))}
+        </div>
+        <div className={hk.filters}>
+          <select value={selectedFloor} onChange={e => setSelectedFloor(e.target.value)}>
+            <option value="all">Todos los pisos</option>
+            {floors.filter(f => f.active !== false).map(f => <option key={f.id} value={String(f.id)}>{f.name}</option>)}
+            <option value="orphan">Sin piso</option>
+          </select>
+          <select value={taskRoom} onChange={e => setTaskRoom(e.target.value)}>
+            <option value="">Nueva tarea…</option>
+            {rooms.map(r => <option key={r.id} value={r.id}>Hab. {r.nombre}</option>)}
+          </select>
+          <button disabled={!taskRoom} onClick={() => quickTask(taskRoom)}>＋ Crear tarea</button>
+        </div>
+      </div>
+
+      <div className={hk.layout}>
+        <aside className={hk.priority}>
+          <header><div><small>QUÉ URGE AHORA</small><h3>Cola operativa</h3></div><span>{priorityList.length}</span></header>
+          <div>
+            {priorityList.map(item => <PriorityRoom key={item.room.id} item={item} onRoomStatus={onRoomStatus} onTaskStatus={onTaskStatus} />)}
+            {!priorityList.length && <div className={hk.empty}>No hay habitaciones urgentes.</div>}
+          </div>
+        </aside>
+
+        <main className={hk.rack}>
+          <header>
+            <div><small>RACK DE PISOS</small><h3>Estado de habitaciones</h3></div>
+            <div className={hk.legend}>
+              <span><i className={hk.ready}/>Lista</span>
+              <span><i className={hk.clean}/>Limpia</span>
+              <span><i className={hk.working}/>En limpieza</span>
+              <span><i className={hk.dirty}/>Sucia</span>
+            </div>
+          </header>
+          {groups.map(([name, items]) => (
+            <section key={name}>
+              <div className={hk.floorTitle}><b>{name}</b><span>{items.length} habitaciones</span></div>
+              <div className={hk.roomGrid}>
+                {items.map(item => <RoomCard key={item.room.id} item={item} onRoomStatus={onRoomStatus} />)}
+              </div>
+            </section>
+          ))}
+          {!groups.length && <div className={hk.empty}>No hay habitaciones para este filtro.</div>}
+        </main>
+      </div>
     </div>
-  </div>
+  )
 }
