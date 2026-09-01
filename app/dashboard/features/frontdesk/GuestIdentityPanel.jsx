@@ -1,7 +1,7 @@
 "use client"
 
 import modal from"./reservation-modal.module.css"
-import ws from"./reservation-workspace.module.css"
+import s from"./guest-identity-panel.module.css"
 
 const DOC_TYPES=["DNI","Pasaporte","CUIL","Cédula","Otro"]
 
@@ -30,9 +30,14 @@ export function holderPatch(value,draft){
   return{holderRole:"reservation",holderName:null,passengerIndex:null}
 }
 
+export function holderValue(item){
+  if(item?.holderRole==="companion"||item?.holder_role==="companion")return`companion:${Number(item?.passengerIndex??item?.passenger_index??0)}`
+  return item?.holderRole||item?.holder_role||"reservation"
+}
+
 export default function GuestIdentityPanel({draft,set,addCompanion,updateCompanion,removeCompanion}){
   return <section className={modal.panel}>
-    <div className={modal.subhead}><div><h3>Huésped e identidad</h3><p className={ws.identityHint}>La ficha queda reutilizable para futuras estadías y Web Check-in.</p></div></div>
+    <div className={modal.subhead}><div><h3>Huésped e identidad</h3><p className={s.hint}>La ficha queda reutilizable para futuras estadías y Web Check-in.</p></div></div>
     <div className={modal.grid}>
       <label className={modal.wide}><span>Nombre y apellido</span><input autoFocus value={draft.guest||""} onChange={e=>set("guest",e.target.value)}/></label>
       <label className={modal.wide}><span>Email</span><input type="email" value={draft.email||""} onChange={e=>set("email",e.target.value)}/></label>
@@ -48,9 +53,9 @@ export default function GuestIdentityPanel({draft,set,addCompanion,updateCompani
       <label className={modal.full}><span>Dirección</span><input value={draft.address||""} onChange={e=>set("address",e.target.value)}/></label>
     </div>
 
-    <div className={modal.subhead}><div><h4>Acompañantes</h4><p className={ws.identityHint}>Cada pasajero puede tener documento, nacimiento, nacionalidad y relación con el titular.</p></div><button className={modal.miniButton} type="button" onClick={addCompanion}>＋ Agregar pasajero</button></div>
-    <div className={ws.companionStack}>{(draft.companions||[]).map((p,index)=><article className={ws.companionCard} key={index}>
-      <div className={ws.companionHead}><b>Pasajero {index+1}</b><button type="button" onClick={()=>removeCompanion(index)}>Quitar</button></div>
+    <div className={modal.subhead}><div><h4>Acompañantes</h4><p className={s.hint}>Cada pasajero puede tener documento, nacimiento, nacionalidad y relación con el titular.</p></div><button className={modal.miniButton} type="button" onClick={addCompanion}>＋ Agregar pasajero</button></div>
+    <div className={s.stack}>{(draft.companions||[]).map((p,index)=><article className={s.card} key={index}>
+      <div className={s.head}><b>Pasajero {index+1}</b><button type="button" onClick={()=>removeCompanion(index)}>Quitar</button></div>
       <div className={modal.grid}>
         <label className={modal.wide}><span>Nombre y apellido</span><input value={p.nombre||p.name||""} onChange={e=>updateCompanion(index,"nombre",e.target.value)}/></label>
         <label><span>Tipo documento</span><select value={documentType(p)} onChange={e=>updateCompanion(index,"tipo_documento",e.target.value)}><option value="">Elegir…</option>{DOC_TYPES.map(type=><option key={type}>{type}</option>)}</select></label>
