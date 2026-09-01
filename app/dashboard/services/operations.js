@@ -18,7 +18,11 @@ export async function saveRoom({propertyId,draft}){
 }
 
 export async function updateRoomStatus({propertyId,roomId,status}){
-  const{error}=await supabase.from("habitaciones").update({estado:status}).eq("id",roomId).eq("property_id",tenant(propertyId));if(error)throw error
+  const target=String(status||"").toLowerCase(),housekeepingStates=new Set(["sucia","limpieza","en_limpieza","limpia","inspeccion","inspeccionada"])
+  if(housekeepingStates.has(target)){
+    const{data,error}=await supabase.rpc("hl_housekeeping_set_room_state",{p_room_id:Number(roomId),p_status:target,p_checklist:[],p_source:"manual",p_note:null});if(error)throw error;return Array.isArray(data)?data[0]:data
+  }
+  const{data,error}=await supabase.from("habitaciones").update({estado:status}).eq("id",roomId).eq("property_id",tenant(propertyId)).select("*").single();if(error)throw error;return data
 }
 
 export async function saveBlock({propertyId,userId,draft}){
