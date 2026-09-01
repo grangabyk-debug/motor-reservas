@@ -16,12 +16,13 @@ import ReservationDrawer from"./features/frontdesk/ReservationDrawer"
 import{blankReservation,reservationToDraft}from"./features/frontdesk/reservationModel"
 import{saveReservation,moveReservation,checkinReservation,checkoutReservation,savePayment}from"./services/reservations"
 import{saveFloor,saveRoom,updateRoomStatus,saveBlock,saveHousekeepingTask,setHousekeepingStatus,saveMaintenanceTicket,setMaintenanceStatus,saveResource}from"./services/operations"
-import{saveRateCell,saveRateRange,savePartner,saveGroup,saveUpsell,prepareChannel}from"./services/commercial"
+import{saveRateCell,saveRateRange,savePartner,saveUpsell,prepareChannel}from"./services/commercial"
 import{openCashSession,saveCashMovement,closeCashSession,saveFinanceDocument,issueInternalDocument}from"./services/finance"
 import{updateMemberRole,saveRolePermission,saveAutomation,toggleAutomation,deleteAutomation,resolveAutomationEvent,saveHotelSettings,prepareKey,revokeKey,createWebCheckin,sendReservationEmail,askIntelligence}from"./services/hotel"
 import{RoomsView,MaintenanceView,ResourcesView,DigitalTwinView}from"./features/operations/OperationsViews"
 import HousekeepingPremium from"./features/operations/HousekeepingPremium"
-import{RevenueView,PartnersView,GroupsView,UpsellingView,DistributionView}from"./features/commercial/CommercialViews"
+import{RevenueView,PartnersView,UpsellingView,DistributionView}from"./features/commercial/CommercialViews"
+import GroupsPremium from"./features/commercial/GroupsPremium"
 import{CashView,BillingView,ReportsView}from"./features/finance/FinanceViews"
 import{KeysView,TeamView,AutomationsView,IntelligenceView,IntegrationsView,SettingsView}from"./features/hotel/HotelViews"
 import SupportView from"./features/hotel/SupportView"
@@ -68,7 +69,7 @@ export default function HotelOSV2(){
     if(view==="twin")return <DigitalTwinView rooms={activeRooms} floors={data.floors} reservations={live}/>
     if(view==="rates")return <RevenueView rooms={activeRooms} reservations={live} rates={data.commercial.rates||[]} canManage={allowed("commercial.rates.manage")} onSaveCell={draft=>action(()=>saveRateCell({propertyId:session.propertyId,draft}),"Tarifa actualizada.")} onBulk={draft=>action(()=>saveRateRange({propertyId:session.propertyId,roomId:draft.roomId,start:draft.start,end:draft.end,price:draft.price,minStay:draft.minStay,stopSell:draft.stopSell,cta:draft.cta,ctd:draft.ctd,existingRates:data.commercial.rates||[],fallbackPrice:draft.fallbackPrice}),n=>`${n||0} días tarifarios actualizados.`)}/>
     if(view==="partners")return <PartnersView partners={data.commercial.partners||[]} canManage={allowed("commercial.partners.manage")} onSave={draft=>action(()=>savePartner({propertyId:session.propertyId,draft}),"Empresa / agencia guardada.")}/>
-    if(view==="groups")return <GroupsView groups={data.commercial.groups||[]} partners={data.commercial.partners||[]} canManage={allowed("commercial.groups.manage")} onSave={draft=>action(()=>saveGroup({propertyId:session.propertyId,draft}),"Grupo guardado.")}/>
+    if(view==="groups")return <GroupsPremium propertyId={session.propertyId} userId={session.user?.id} partners={data.commercial.partners||[]} rooms={activeRooms} canManage={allowed("commercial.groups.manage")} onOpenPlanning={()=>changeView("calendar")}/>
     if(view==="upselling")return <UpsellingView items={data.commercial.upsells||[]} canManage={allowed("commercial.upsell")} onSave={draft=>action(()=>saveUpsell({propertyId:session.propertyId,draft}),"Upsell guardado.")}/>
     if(view==="distribution")return <DistributionView connections={data.channels||[]} onPrepare={provider=>action(()=>prepareChannel({propertyId:session.propertyId,provider}),provider==="Motor directo"?"Motor directo registrado.":`${provider}: sandbox preparado; todavía no es una conexión real.`)}/>
     if(view==="cash")return <CashView sessions={data.finance.sessions||[]} movements={data.finance.movements||[]} reservations={live} canManage={allowed("finance.cash")} onOpen={draft=>action(()=>openCashSession({propertyId:session.propertyId,userId:session.user.id,openingAmount:draft.openingAmount,notes:draft.notes}),"Caja abierta.")} onMovement={draft=>action(()=>saveCashMovement({propertyId:session.propertyId,userId:session.user.id,sessionId:draft.sessionId,reservationId:draft.reservationId,movementType:draft.movementType,method:draft.method,amount:draft.amount,concept:draft.concept,reference:draft.reference,currency:draft.currency}),"Movimiento registrado.")} onClose={draft=>action(()=>closeCashSession({propertyId:session.propertyId,userId:session.user.id,sessionId:draft.sessionId,closingAmount:draft.closingAmount,notes:draft.notes}),r=>`Caja cerrada · diferencia ${money(r?.difference||0)}`)}/>
