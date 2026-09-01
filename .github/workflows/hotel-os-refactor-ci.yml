@@ -1,25 +1,39 @@
-name: Hotel OS Refactor CI
+name: Habitacion Llena Architecture CI
 
 on:
+  pull_request:
+    branches: [staging, main]
   push:
-    branches:
-      - refactor/hotel-os-modular-foundation
+    branches: [staging, main, refactor/hotel-os-architecture-hardening]
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: hotel-architecture-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
+  architecture-and-build:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - run: npm install
-      - run: npm run check:product-boundaries
-      - run: npm run check:hotel-architecture
-      - run: npm run build
+      - name: Verify lockfile matches package.json
+        run: |
+          cp package-lock.json /tmp/package-lock.before.json
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          cmp -s /tmp/package-lock.before.json package-lock.json
+      - name: Install dependencies reproducibly
+        run: npm ci --no-audit --no-fund
+      - name: Product boundaries
+        run: npm run check:product-boundaries
+      - name: Hotel architecture
+        run: npm run check:hotel-architecture
+      - name: Production build
+        run: npm run build

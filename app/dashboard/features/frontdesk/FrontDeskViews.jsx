@@ -1,25 +1,103 @@
 "use client"
-import{useEffect,useState}from"react"
-import{money,shortDate,isoDate}from"../../core/formatters"
+
+import{useEffect,useMemo,useState}from"react"
+import{addDays,money,shortDate,isoDate}from"../../core/formatters"
+import{loadUserPreference,saveUserPreference}from"../../services/preferences"
 import ui from"../../v2.module.css"
 import polish from"./frontdesk-polish.module.css"
 import GuestCRMWorkspace from"./GuestCRM"
 
-export function Lobby({settings,rooms,reservations,payments,onView,onOpen,search,onSearch,onNewReservation,onMenu}){
-  const today=isoDate(),live=reservations.filter(r=>r.estado!=="cancelada"&&!r.no_show),arrivals=live.filter(r=>r.fecha_entrada===today&&r.estado!=="alojado"),departures=live.filter(r=>r.fecha_salida===today&&r.estado!=="finalizada"),inhouse=live.filter(r=>r.fecha_entrada<=today&&r.fecha_salida>today&&r.estado!=="finalizada"),sellable=rooms.filter(r=>r.activa!==false&&!['mantenimiento','fuera_servicio'].includes(String(r.estado).toLowerCase())),occupancy=sellable.length?Math.round(new Set(inhouse.map(r=>r.habitacion_id)).size/sellable.length*100):0,paid=new Map();payments.forEach(p=>paid.set(String(p.reserva_id),(paid.get(String(p.reserva_id))||0)+Number(p.monto||0)));const balance=live.reduce((a,r)=>a+Math.max(0,Number(r.precio_total||0)-(paid.get(String(r.id))||0)),0),attention=rooms.filter(r=>['sucia','inspeccion','mantenimiento'].includes(String(r.estado).toLowerCase())).length,[clock,setClock]=useState(null)
+const channelTone={booking:"#4c82ee",directa:"#16a98a",motor:"#16a98a",expedia:"#f5a524",airbnb:"#ef5f6c",agencia:"#8b6dd7",otro:"#9ba7ba"}
+const channelLabel=value=>{const raw=String(value||"Directa").trim(),v=raw.toLowerCase();if(v.includes("booking"))return"Booking.com";if(v.includes("expedia"))return"Expedia";if(v.includes("airbnb"))return"Airbnb";if(v.includes("motor"))return"Motor directo";if(v.includes("agencia"))return"Agencias";if(v==="directa"||v.includes("whatsapp")||v.includes("tel")||v.includes("walk"))return"Directa";return raw||"Otros"}
+const channelColor=value=>{const v=String(value||"").toLowerCase();if(v.includes("booking"))return channelTone.booking;if(v.includes("expedia"))return channelTone.expedia;if(v.includes("airbnb"))return channelTone.airbnb;if(v.includes("agencia"))return channelTone.agencia;if(v.includes("direct")||v.includes("motor")||v.includes("whatsapp")||v.includes("tel"))return channelTone.directa;return channelTone.otro}
+const pct=(part,total)=>total?Math.round(part/total*100):0
+const reservationTotal=r=>Number(r.precio_total||0)
+
+const DASHBOARD_WIDGETS=[
+  {id:"occupancy",label:"Ocupación y tendencia",span:8},
+  {id:"priorities",label:"Tareas prioritarias",span:4},
+  {id:"kpi-occupancy",label:"Ocupación hoy",span:3},
+  {id:"kpi-production",label:"Producción",span:3},
+  {id:"kpi-reservations",label:"Reservas",span:3},
+  {id:"kpi-housekeeping",label:"Housekeeping",span:3},
+  {id:"channels",label:"Origen de reservas",span:4},
+  {id:"reservation-metrics",label:"Métricas de reservas",span:4},
+  {id:"cleaning",label:"Estado de habitaciones",span:4},
+  {id:"arrivals",label:"Llegadas",span:4},
+  {id:"inhouse",label:"Huéspedes en casa",span:4},
+  {id:"departures",label:"Salidas",span:4},
+]
+const DEFAULT_WIDGET_ORDER=DASHBOARD_WIDGETS.map(x=>x.id)
+
+function StatusPill({children,tone="neutral"}){return <span className={`${polish.statusPill} ${polish[`status_${tone}`]||""}`}>{children}</span>}
+function GuestAvatar({name}){const initials=String(name||"H").trim().split(/\s+/).slice(0,2).map(x=>x[0]).join("").toUpperCase();return <span className={polish.guestAvatar}>{initials||"H"}</span>}
+
+function Sparkline({values,comparison=[]}){
+  const width=620,height=134,pad=8,all=[...values,...comparison,1],max=Math.max(...all),min=Math.min(...all,0),scaleX=i=>pad+i*((width-pad*2)/Math.max(1,values.length-1)),scaleY=v=>height-pad-((v-min)/Math.max(1,max-min))*(height-pad*2),points=values.map((v,i)=>`${scaleX(i)},${scaleY(v)}`).join(" "),prev=comparison.map((v,i)=>`${scaleX(i)},${scaleY(v)}`).join(" "),area=values.length?`M ${scaleX(0)} ${height-pad} L ${values.map((v,i)=>`${scaleX(i)} ${scaleY(v)}`).join(" L ")} L ${scaleX(values.length-1)} ${height-pad} Z`:""
+  return <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className={polish.sparkline} aria-hidden="true"><defs><linearGradient id="hlOccFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2f71ef" stopOpacity=".2"/><stop offset="100%" stopColor="#2f71ef" stopOpacity="0"/></linearGradient></defs>{comparison.length>1&&<polyline points={prev} fill="none" stroke="#bac9df" strokeWidth="2" strokeDasharray="6 7"/>}<path d={area} fill="url(#hlOccFill)"/><polyline points={points} fill="none" stroke="#2f71ef" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+}
+
+function Donut({segments,total}){
+  let cursor=0;const stops=segments.map(item=>{const start=cursor,end=cursor+(total?item.value/total*100:0);cursor=end;return`${item.color} ${start}% ${end}%`}).join(", ")
+  return <div className={polish.donut} style={{background:stops?`conic-gradient(${stops})`:"#e8edf5"}}><span><b>{total}</b><small>reservas</small></span></div>
+}
+
+function PriorityPanel({arrivals,rooms,paid}){
+  const priorities=[]
+  arrivals.forEach(r=>{const balance=Math.max(0,reservationTotal(r)-(paid.get(String(r.id))||0));priorities.push({kind:balance>0?"Pago pendiente":"Llegada de hoy",detail:balance>0?`${r.nombre_huesped} · ${money(balance,r.moneda)}`:`${r.nombre_huesped} · ${r.hora_llegada_estimada||"Horario sin confirmar"}`,tone:balance>0?"high":"medium"})})
+  rooms.filter(r=>["sucia","inspeccion","mantenimiento","fuera_servicio"].includes(String(r.estado||"").toLowerCase())).slice(0,4).forEach(room=>priorities.push({kind:String(room.estado).toLowerCase()==="mantenimiento"?"Mantenimiento":"Habitación para revisar",detail:`${room.nombre} · ${room.tipo||"Habitación"}`,tone:String(room.estado).toLowerCase()==="mantenimiento"?"high":"medium"}))
+  const visible=priorities.slice(0,5)
+  return <section className={`${polish.card} ${polish.tasksCard}`}><header><div><small>TAREAS PRIORITARIAS</small><h3>Turno de recepción</h3></div><span className={polish.countBadge}>{priorities.length}</span></header><div className={polish.taskList}>{visible.length?visible.map((item,index)=><div className={polish.taskRow} key={`${item.kind}-${index}`}><i>{item.tone==="high"?"!":"·"}</i><span><b>{item.kind}</b><small>{item.detail}</small></span><StatusPill tone={item.tone}>{item.tone==="high"?"ALTA":"MEDIA"}</StatusPill></div>):<div className={polish.emptyTask}>Sin pendientes críticos para este turno.</div>}</div></section>
+}
+
+function OperationalColumn({title,count,items,rooms,onOpen,kind}){
+  return <section className={`${polish.card} ${polish.operationColumn}`}><header><div><small>{title}</small><span className={polish.countBadge}>{count}</span></div><button type="button">Ver todas</button></header><div className={polish.operationList}>{items.slice(0,5).map(r=>{const room=rooms.find(x=>String(x.id)===String(r.habitacion_id));return <button type="button" className={polish.guestRow} key={`${kind}-${r.id}`} onClick={()=>onOpen(r)}><GuestAvatar name={r.nombre_huesped}/><span><b>{r.nombre_huesped}</b><small>{r.numero_reserva||r.id} · {room?.nombre||"Sin asignar"}</small></span><em>{kind==="arrivals"?(r.hora_llegada_estimada||"IN"):kind==="departures"?(r.hora_salida_estimada||"OUT"):"En casa"}</em><StatusPill tone={kind==="departures"?"warn":kind==="arrivals"?"info":"ok"}>{kind==="departures"?"Check-out":kind==="arrivals"?"Check-in":"IN"}</StatusPill></button>})}{!items.length&&<div className={polish.emptyColumn}>No hay movimientos.</div>}</div></section>
+}
+
+function KpiCard({label,value,detail,icon,onClick,ring}){return <button className={polish.kpiCard} onClick={onClick}><small>{label}</small><b>{value}</b><span>{detail}</span>{ring?<i className={polish.kpiRing} style={{"--value":`${ring*3.6}deg`}}/>:<i className={polish.kpiIcon}>{icon}</i>}</button>}
+
+function WidgetSlot({widget,editing,onDragStart,onDrop,children}){
+  return <div className={`${polish.widgetSlot} ${editing?polish.widgetEditing:""}`} style={{"--widget-span":widget.span}} draggable={editing} onDragStart={e=>{e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",widget.id);onDragStart(widget.id)}} onDragOver={e=>{if(editing){e.preventDefault();e.dataTransfer.dropEffect="move"}}} onDrop={e=>{if(!editing)return;e.preventDefault();onDrop(widget.id)}}>{editing&&<div className={polish.widgetHandle}><span>⠿</span><b>{widget.label}</b><small>Arrastrar</small></div>}{children}</div>
+}
+
+function DashboardCustomizer({hidden,onToggle,onReset,onDone}){
+  return <section className={polish.customizer}><div className={polish.customizerIntro}><span>PERSONALIZAR PANEL</span><b>Ordená los widgets como trabaja tu hotel.</b><small>Arrastrá las tarjetas para cambiar el orden. Podés ocultar módulos sin perder ningún dato.</small></div><div className={polish.widgetToggles}>{DASHBOARD_WIDGETS.map(widget=><button key={widget.id} className={hidden.includes(widget.id)?polish.widgetOff:polish.widgetOn} onClick={()=>onToggle(widget.id)}>{hidden.includes(widget.id)?"＋":"✓"} {widget.label}</button>)}</div><div className={polish.customizerActions}><button onClick={onReset}>Restablecer</button><button className={polish.doneButton} onClick={onDone}>Listo</button></div></section>
+}
+
+export function Lobby({settings,rooms,reservations,payments,onView,onOpen,search,onSearch,onNewReservation,onMenu,onCommand,userId}){
+  const today=isoDate(),live=reservations.filter(r=>r.estado!=="cancelada"&&!r.no_show),arrivals=live.filter(r=>r.fecha_entrada===today&&r.estado!=="alojado"),departures=live.filter(r=>r.fecha_salida===today&&r.estado!=="finalizada"),inhouse=live.filter(r=>r.fecha_entrada<=today&&r.fecha_salida>today&&r.estado!=="finalizada"),sellable=rooms.filter(r=>r.activa!==false&&!['mantenimiento','fuera_servicio'].includes(String(r.estado).toLowerCase())),occupied=new Set(inhouse.map(r=>String(r.habitacion_id))).size,occupancy=pct(occupied,sellable.length),paid=useMemo(()=>{const map=new Map();payments.forEach(p=>map.set(String(p.reserva_id),(map.get(String(p.reserva_id))||0)+Number(p.monto||0)));return map},[payments]),[clock,setClock]=useState(null)
+  const propertyId=settings?.property_id||"",storageKey=`hl-dashboard-${propertyId||settings?.hotel_name||"hotel"}`,[widgetOrder,setWidgetOrder]=useState(DEFAULT_WIDGET_ORDER),[hiddenWidgets,setHiddenWidgets]=useState([]),[editing,setEditing]=useState(false),[dragging,setDragging]=useState(""),[prefsReady,setPrefsReady]=useState(false)
   useEffect(()=>{const tick=()=>setClock(new Date()),id=setInterval(tick,30000);tick();return()=>clearInterval(id)},[])
+  useEffect(()=>{let cancelled=false;setPrefsReady(false);const apply=saved=>{if(saved?.order&&Array.isArray(saved.order)){const known=saved.order.filter(id=>DEFAULT_WIDGET_ORDER.includes(id)),missing=DEFAULT_WIDGET_ORDER.filter(id=>!known.includes(id));setWidgetOrder([...known,...missing])}if(Array.isArray(saved?.hidden))setHiddenWidgets(saved.hidden.filter(id=>DEFAULT_WIDGET_ORDER.includes(id)))};try{apply(JSON.parse(localStorage.getItem(storageKey)||"null"))}catch{};(async()=>{if(!propertyId||!userId){if(!cancelled)setPrefsReady(true);return}try{const value=await loadUserPreference({propertyId,userId,key:"dashboard_layout"});if(!cancelled&&value)apply(value)}catch{}finally{if(!cancelled)setPrefsReady(true)}})();return()=>{cancelled=true}},[storageKey,propertyId,userId])
+  useEffect(()=>{const payload={order:widgetOrder,hidden:hiddenWidgets};try{localStorage.setItem(storageKey,JSON.stringify(payload))}catch{}if(!prefsReady||!propertyId||!userId)return;const timer=setTimeout(()=>{saveUserPreference({propertyId,userId,key:"dashboard_layout",value:payload}).catch(()=>{})},450);return()=>clearTimeout(timer)},[storageKey,widgetOrder,hiddenWidgets,prefsReady,propertyId,userId])
   const clockDate=clock?new Intl.DateTimeFormat("es-AR",{weekday:"long",day:"2-digit",month:"long"}).format(clock):"",clockTime=clock?new Intl.DateTimeFormat("es-AR",{hour:"2-digit",minute:"2-digit"}).format(clock):""
-  return <div className={`${ui.content} ${polish.lobbyContent}`}>
-    <section className={`${ui.lobby} ${polish.lobbyHero}`}><div className={ui.marble}/><div className={ui.wood}/><div className={ui.glow}/><button className={polish.mobileMenu} onClick={onMenu}>☰</button><div className={polish.metaRow} style={{position:"absolute",zIndex:6,top:12,right:18,maxWidth:"none",width:"auto",pointerEvents:"none"}}><span style={{fontSize:16,fontWeight:500}}>{clockDate}</span>{clockDate&&clockTime&&<span style={{fontSize:11}}>{" · "}<b>{clockTime}</b></span>}</div><div><h2>Recepción serena.<br/><em>Operación impecable.</em></h2><p>“{settings?.motto||"La hospitalidad se siente en cada detalle."}”</p><div className={polish.heroButtons}><button onClick={()=>onView("calendar")}>Abrir Command Center →</button>{onNewReservation&&<button className={polish.newReservation} onClick={onNewReservation}>＋ Nueva reserva</button>}</div><form className={polish.heroSearch} onSubmit={e=>{e.preventDefault();onView("reservations")}}><span>⌕</span><input value={search||""} onChange={e=>onSearch?.(e.target.value)} placeholder="Buscar huésped, reserva o habitación…" autoComplete="off"/><button>Buscar</button></form></div><aside><small>OCUPACIÓN HOY</small><b>{occupancy}%</b><span>{arrivals.length} IN · {departures.length} OUT</span></aside></section>
-    <section className={polish.brief} aria-label="Resumen del turno">
-      <div className={polish.quickAccess}><header><small>ACCESOS RÁPIDOS</small><h3>Lo que recepción usa todo el día.</h3></header><div>{<button onClick={()=>onView("calendar")}><i>▦</i><span><b>Command Center</b><small>Calendario operativo</small></span></button>}{onNewReservation&&<button onClick={onNewReservation}><i>＋</i><span><b>Nueva reserva</b><small>Crear estadía</small></span></button>}<button onClick={()=>onView("housekeeping")}><i>◇</i><span><b>Housekeeping</b><small>Prioridades y estados</small></span></button><button onClick={()=>onView("reports")}><i>▥</i><span><b>Reportes</b><small>Recepción y operación</small></span></button></div></div>
-      <div className={polish.briefRail}>
-        <button onClick={()=>onView("calendar")}><span><small>LLEGADAS</small><b>Recepción prepara el próximo momento</b></span><strong>{arrivals.length}</strong><em>IN de hoy</em></button>
-        <button onClick={()=>onView("housekeeping")}><span><small>OPERACIÓN</small><b>Habitaciones que necesitan atención</b></span><strong>{attention}</strong><em>housekeeping / mantenimiento</em></button>
-        <button onClick={()=>onView("cash")}><span><small>SALDOS</small><b>Pendiente sobre estadías activas</b></span><strong>{money(balance)}</strong><em>caja y folios</em></button>
-      </div>
-    </section>
-    <div className={ui.twoCols}><section className={`${ui.panel} ${polish.panelPremium}`}><h3>Próximos momentos</h3>{[...arrivals,...departures].slice(0,8).map(r=><button className={ui.listRow} key={`${r.id}-${r.fecha_salida}`} onClick={()=>onOpen(r)}><span><b>{r.nombre_huesped}</b><small>{r.fecha_salida===today?"Salida":"Llegada"} · {r.numero_reserva||r.id}</small></span><em>{r.fecha_salida===today?"OUT":"IN"}</em></button>)}</section><section className={`${ui.panel} ${polish.panelPremium}`}><h3>En casa</h3>{inhouse.slice(0,8).map(r=><button className={ui.listRow} key={r.id} onClick={()=>onOpen(r)}><span><b>{r.nombre_huesped}</b><small>hasta {shortDate(r.fecha_salida)}</small></span><em>IN</em></button>)}</section></div>
+  const forecast=useMemo(()=>Array.from({length:12},(_,i)=>{const day=addDays(today,i-3),count=new Set(live.filter(r=>r.fecha_entrada<=day&&r.fecha_salida>day).map(r=>String(r.habitacion_id))).size;return pct(count,sellable.length)}),[today,live,sellable.length]),previous=useMemo(()=>Array.from({length:12},(_,i)=>{const day=addDays(today,i-10),count=new Set(live.filter(r=>r.fecha_entrada<=day&&r.fecha_salida>day).map(r=>String(r.habitacion_id))).size;return pct(count,sellable.length)}),[today,live,sellable.length])
+  const todayRevenue=live.filter(r=>r.fecha_entrada<=today&&r.fecha_salida>today).reduce((sum,r)=>sum+(reservationTotal(r)/Math.max(1,Math.round((new Date(`${r.fecha_salida}T12:00:00`)-new Date(`${r.fecha_entrada}T12:00:00`))/86400000))),0),monthKey=today.slice(0,7),monthReservations=live.filter(r=>String(r.fecha_entrada||"").startsWith(monthKey)),newToday=reservations.filter(r=>String(r.created_at||r.fecha_creacion||"").startsWith(today)).length,cancelled=reservations.filter(r=>r.estado==="cancelada"&&String(r.updated_at||r.fecha_entrada||"").startsWith(monthKey)).length
+  const roomClean={ready:rooms.filter(r=>["limpia","inspeccionada","disponible"].includes(String(r.estado||"").toLowerCase())).length,cleaning:rooms.filter(r=>["limpieza","inspeccion"].includes(String(r.estado||"").toLowerCase())).length,dirty:rooms.filter(r=>String(r.estado||"").toLowerCase()==="sucia").length}
+  const channelMap=new Map();monthReservations.forEach(r=>{const label=channelLabel(r.canal_reserva);channelMap.set(label,(channelMap.get(label)||0)+1)});const channelSegments=[...channelMap.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5).map(([label,value])=>({label,value,color:channelColor(label)})),otherCount=Math.max(0,monthReservations.length-channelSegments.reduce((s,x)=>s+x.value,0));if(otherCount)channelSegments.push({label:"Otros",value:otherCount,color:channelTone.otro})
+  function moveWidget(target){if(!dragging||dragging===target)return;setWidgetOrder(current=>{const next=current.filter(id=>id!==dragging),index=next.indexOf(target);next.splice(index<0?next.length:index,0,dragging);return next});setDragging("")}
+  function toggleWidget(id){setHiddenWidgets(current=>current.includes(id)?current.filter(x=>x!==id):[...current,id])}
+  function resetWidgets(){setWidgetOrder(DEFAULT_WIDGET_ORDER);setHiddenWidgets([])}
+  const widgetById=Object.fromEntries(DASHBOARD_WIDGETS.map(widget=>[widget.id,widget]))
+  function widgetContent(id){
+    if(id==="occupancy")return <section className={`${polish.card} ${polish.occupancyCard}`}><div className={polish.chartHeading}><div><small>OCUPACIÓN</small><strong>{occupancy}%</strong><p>{occupied} de {sellable.length} habitaciones ocupadas</p></div><div className={polish.chartLegend}><span><i className={polish.legendBlue}/>Actual / proyectada</span><span><i className={polish.legendDash}/>Período anterior</span></div></div><Sparkline values={forecast} comparison={previous}/><div className={polish.chartAxis}><span>{shortDate(addDays(today,-3))}</span><span>Hoy</span><span>{shortDate(addDays(today,8))}</span></div></section>
+    if(id==="priorities")return <PriorityPanel arrivals={arrivals} rooms={rooms} paid={paid}/>
+    if(id==="kpi-occupancy")return <KpiCard label="OCUPACIÓN HOY" value={`${occupancy}%`} detail={`${occupied}/${sellable.length} hab.`} ring={occupancy} onClick={()=>onView("calendar")}/>
+    if(id==="kpi-production")return <KpiCard label="PRODUCCIÓN ESTIMADA" value={money(todayRevenue)} detail="noche hotelera de hoy" icon="$" onClick={()=>onView("cash")}/>
+    if(id==="kpi-reservations")return <KpiCard label="RESERVAS" value={monthReservations.length} detail={`${newToday} nuevas hoy`} icon="▣" onClick={()=>onView("reservations")}/>
+    if(id==="kpi-housekeeping")return <KpiCard label="HOUSEKEEPING" value={roomClean.ready} detail={`${roomClean.dirty} sucias · ${roomClean.cleaning} en proceso`} icon="◇" onClick={()=>onView("housekeeping")}/>
+    if(id==="channels")return <section className={`${polish.card} ${polish.sourceCard}`}><header><div><small>ORIGEN DE RESERVAS</small><h3>Canales · mes actual</h3></div><Donut segments={channelSegments} total={monthReservations.length}/></header><div className={polish.sourceRows}>{channelSegments.map(item=><div key={item.label}><span><i style={{background:item.color}}/>{item.label}</span><b>{pct(item.value,monthReservations.length)}%</b><em><i style={{width:`${pct(item.value,monthReservations.length)}%`,background:item.color}}/></em></div>)}</div></section>
+    if(id==="reservation-metrics")return <section className={`${polish.card} ${polish.reservationMetrics}`}><small>RESERVAS · MES ACTUAL</small><div><span><b>{monthReservations.length}</b><small>Totales</small></span><span><b>{arrivals.length}</b><small>Llegadas hoy</small></span><span><b>{departures.length}</b><small>Salidas hoy</small></span><span><b>{cancelled}</b><small>Canceladas</small></span></div><button onClick={()=>onView("reports")}>Abrir reportes →</button></section>
+    if(id==="cleaning")return <section className={`${polish.card} ${polish.cleaningCard}`}><small>ESTADO DE HABITACIONES</small><h3>Housekeeping en vivo</h3><div><button onClick={()=>onView("housekeeping")}><b>{roomClean.ready}</b><span>Listas</span></button><button onClick={()=>onView("housekeeping")}><b>{roomClean.cleaning}</b><span>En proceso</span></button><button onClick={()=>onView("housekeeping")}><b>{roomClean.dirty}</b><span>Sucias</span></button></div></section>
+    if(id==="arrivals")return <OperationalColumn title="LLEGADAS" count={arrivals.length} items={arrivals} rooms={rooms} onOpen={onOpen} kind="arrivals"/>
+    if(id==="inhouse")return <OperationalColumn title="HUÉSPEDES EN CASA" count={inhouse.length} items={inhouse} rooms={rooms} onOpen={onOpen} kind="inhouse"/>
+    if(id==="departures")return <OperationalColumn title="SALIDAS" count={departures.length} items={departures} rooms={rooms} onOpen={onOpen} kind="departures"/>
+    return null
+  }
+  return <div className={`${ui.content} ${polish.dashboard}`}>
+    <header className={polish.dashboardTop}><div><button className={polish.mobileMenu} onClick={onMenu}>☰</button><small>HABITACIÓN LLENA · PMS</small><h1>Panel operativo</h1><p>{clockDate}{clockTime?` · ${clockTime}`:""} · {settings?.hotel_name||"Hotel"}</p></div><div className={polish.topActions}><div className={polish.searchBox} role="button" tabIndex={0} onClick={onCommand} onKeyDown={e=>(e.key==="Enter"||e.key===" ")&&onCommand?.()} aria-label="Abrir búsqueda global"><span>⌕</span><input readOnly value="" placeholder="Buscar en todo el PMS…" tabIndex={-1}/><kbd>⌘K</kbd></div><button className={`${polish.customizeButton} ${editing?polish.customizeButtonActive:""}`} onClick={()=>setEditing(v=>!v)}>⌘ Personalizar</button>{onNewReservation&&<button className={polish.primaryAction} onClick={onNewReservation}>＋ Nueva reserva</button>}</div></header>
+    {editing&&<DashboardCustomizer hidden={hiddenWidgets} onToggle={toggleWidget} onReset={resetWidgets} onDone={()=>setEditing(false)}/>} 
+    <section className={polish.widgetGrid}>{widgetOrder.filter(id=>!hiddenWidgets.includes(id)).map(id=>{const widget=widgetById[id];if(!widget)return null;return <WidgetSlot key={id} widget={widget} editing={editing} onDragStart={setDragging} onDrop={moveWidget}>{widgetContent(id)}</WidgetSlot>})}</section>
   </div>
 }
 

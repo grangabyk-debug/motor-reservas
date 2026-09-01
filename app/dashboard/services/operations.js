@@ -2,6 +2,7 @@ import{ supabase }from"../../../lib/supabase"
 import{ requirePropertyId }from"../data/tenant"
 
 const tenant=id=>requirePropertyId(id)
+async function currentUserId(){const{data,error}=await supabase.auth.getUser();if(error)throw error;const id=data?.user?.id;if(!id)throw new Error("La sesión venció. Volvé a ingresar.");return id}
 
 export async function saveFloor({propertyId,draft}){
   const row={property_id:tenant(propertyId),name:String(draft.name||"").trim(),sort_order:Number(draft.sort_order||0),active:draft.active!==false,updated_at:new Date().toISOString()}
@@ -36,6 +37,45 @@ export async function saveHousekeepingTask({propertyId,userId,draft}){
 export async function setHousekeepingStatus({propertyId,id,status}){
   const patch={status,updated_at:new Date().toISOString()};if(status==="in_progress")patch.started_at=new Date().toISOString();if(status==="done")patch.completed_at=new Date().toISOString()
   const{error}=await supabase.from("hotel_housekeeping_tasks").update(patch).eq("id",id).eq("property_id",tenant(propertyId));if(error)throw error
+}
+
+export async function assignHousekeepingTask({taskId,assigneeId=null}){
+  const{data,error}=await supabase.rpc("hl_housekeeping_assign_task",{p_task_id:taskId,p_assignee:assigneeId||null});if(error)throw error;return Array.isArray(data)?data[0]:data
+}
+
+export async function autoAssignHousekeeping({propertyId,date}){
+  const{data,error}=await supabase.rpc("hl_housekeeping_auto_assign",{p_property_id:tenant(propertyId),p_for_date:date});if(error)throw error;return data||{created:0,assigned:0}
+}
+
+export async function saveHousekeepingReport({propertyId,roomId,reservationId=null,kind,title,detail="",priority="normal"}){
+  const pid=tenant(propertyId),uid=await currentUserId(),cleanKind=String(kind||"").toLowerCase(),cleanTitle=String(title||"").trim()
+  if(!["lost_found","room_note"].includes(cleanKind))throw new Error("Tipo de reporte de Housekeeping no válido.")
+  if(!cleanTitle)throw new Error(cleanKind==="lost_found"?"Indicá qué objeto se encontró.":"Escribí un título para la nota.")
+  const{data,error}=await supabase.from("hotel_housekeeping_room_reports").insert({property_id:pid,room_id:Number(roomId),reservation_id:reservationId?Number(reservationId):null,kind:cleanKind,title:cleanTitle,detail:String(detail||"").trim()||null,priority,status:"open",created_by:uid}).select("*").single();if(error)throw error;return data
+}
+
+export async function resolveHousekeepingReport({propertyId,id}){
+  const uid=await currentUserId(),{data,error}=await supabase.from("hotel_housekeeping_room_reports").update({status:"resolved",resolved_by:uid,resolved_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",id).eq("property_id",tenant(propertyId)).select("*").single();if(error)throw error;return data
+}
+
+export async function saveHousekeepingAssignmentRule({propertyId,draft}){
+  const pid=tenant(propertyId),uid=await currentUserId(),scope=String(draft.scope_type||"all"),assignee=String(draft.assignee_id||"").trim()
+  if(!["all","floor","zone","room_type"].includes(scope))throw new Error("El criterio de autoasignación no es válido.")
+  if(!assignee)throw new Error("Elegí una persona para la regla.")
+  if(scope!=="all"&&!String(draft.scope_value||"").trim())throw new Error("Elegí el piso, zona o tipología que corresponde.")
+  const row={property_id:pid,scope_type:scope,scope_value:scope==="all"?null:String(draft.scope_value).trim(),assignee_id:assignee,label:String(draft.label||"").trim()||null,priority:Number(draft.priority||100),active:draft.active!==false,created_by:draft.created_by||uid,updated_at:new Date().toISOString()}
+  const query=draft.id?supabase.from("hotel_housekeeping_assignment_rules").update(row).eq("id",draft.id).eq("property_id",pid):supabase.from("hotel_housekeeping_assignment_rules").insert(row)
+  const{data,error}=await query.select("*").single();if(error)throw error;return data
+}
+
+export async function deleteHousekeepingAssignmentRule({propertyId,id}){
+  const{error}=await supabase.from("hotel_housekeeping_assignment_rules").delete().eq("id",id).eq("property_id",tenant(propertyId));if(error)throw error
+}
+
+export async function reportHousekeepingMaintenance({propertyId,roomId,title,description="",priority="normal"}){
+  const uid=await currentUserId(),row={property_id:tenant(propertyId),room_id:Number(roomId),resource_id:null,title:String(title||"").trim(),description:String(description||"").trim()||null,priority,status:"open",assigned_to:null,reported_by:uid,due_at:null,cost:0,photos:[],notes:"Reportado desde Housekeeping",updated_at:new Date().toISOString()}
+  if(!row.title)throw new Error("Describí la avería.")
+  const{data,error}=await supabase.from("hotel_maintenance_tickets").insert(row).select("*").single();if(error)throw error;return data
 }
 
 export async function saveMaintenanceTicket({propertyId,userId,draft}){

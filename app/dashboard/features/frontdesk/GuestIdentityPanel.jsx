@@ -1,0 +1,47 @@
+"use client"
+
+import{useEffect,useState}from"react"
+import{useHotelSession}from"../../hooks/useHotelSession"
+import{listGuestProfileDocuments,searchGuestProfiles}from"../../services/guests"
+import{openReservationDocument}from"../../services/reservationDocuments"
+import modal from"./reservation-modal.module.css"
+import s from"./guest-identity-panel.module.css"
+
+const DOC_TYPES=["DNI","Pasaporte","CUIL","Cédula","Otro"]
+const VIP={standard:"Estándar",frequent:"Frecuente",vip:"VIP",signature:"Signature"}
+const documentValue=p=>p?.documento??p?.dni??p?.document_number??""
+const documentType=p=>p?.tipo_documento??p?.document_type??""
+const birthDate=p=>p?.fecha_nacimiento??p?.birth_date??""
+const nationality=p=>p?.nacionalidad??p?.nationality??""
+const relationship=p=>p?.relacion??p?.relationship??""
+const docLabel=doc=>String(doc?.kind||"documento").replace(/_/g," ")
+
+export function holderOptions(draft){return[{value:"primary",label:draft?.guest?`Titular · ${draft.guest}`:"Huésped titular"},...(draft?.companions||[]).map((p,index)=>({value:`companion:${index}`,label:`Acompañante ${index+1}${p?.nombre?` · ${p.nombre}`:""}`})),{value:"reservation",label:"Documento general de la reserva"},{value:"company",label:"Empresa / agencia"}]}
+export function holderPatch(value,draft){if(value==="primary")return{holderRole:"primary",holderName:draft?.guest||null,passengerIndex:null};if(value==="company")return{holderRole:"company",holderName:null,passengerIndex:null};if(String(value).startsWith("companion:")){const passengerIndex=Number(String(value).split(":")[1]),person=(draft?.companions||[])[passengerIndex];return{holderRole:"companion",holderName:person?.nombre||null,passengerIndex}}return{holderRole:"reservation",holderName:null,passengerIndex:null}}
+export function holderValue(item){if(item?.holderRole==="companion"||item?.holder_role==="companion")return`companion:${Number(item?.passengerIndex??item?.passenger_index??0)}`;return item?.holderRole||item?.holder_role||"reservation"}
+
+export default function GuestIdentityPanel({draft,set,addCompanion,updateCompanion,removeCompanion}){
+  const session=useHotelSession(),propertyId=session.propertyId,[lookup,setLookup]=useState(""),[matches,setMatches]=useState([]),[looking,setLooking]=useState(false),[lookupMessage,setLookupMessage]=useState(""),[selectedProfile,setSelectedProfile]=useState(null),[priorDocs,setPriorDocs]=useState([])
+  useEffect(()=>{if(draft?.id){setLookup("");setMatches([]);return}const q=lookup.trim();if(!propertyId||q.length<2){setMatches([]);setLooking(false);return}let active=true;setLooking(true);setLookupMessage("");const timer=setTimeout(()=>searchGuestProfiles({propertyId,query:q}).then(rows=>{if(active)setMatches(rows)}).catch(error=>{if(active){setMatches([]);setLookupMessage(error.message||"No pudimos buscar huéspedes.")}}).finally(()=>active&&setLooking(false)),280);return()=>{active=false;clearTimeout(timer)}},[lookup,propertyId,draft?.id])
+  async function chooseProfile(profile){setSelectedProfile(profile);setLookup("");setMatches([]);setLookupMessage("");set("guest",profile.full_name||"");set("email",profile.email||"");set("phone",profile.phone||"");set("documentType",profile.document_type||"");set("document",profile.document_number||"");set("birthDate",profile.birth_date||"");set("nationality",profile.nationality||"");set("language",profile.language||"");set("address",profile.address||"");set("city",profile.city||"");set("province",profile.province||"");set("country",profile.country||"");try{setPriorDocs(await listGuestProfileDocuments({propertyId,guestProfileId:profile.id}))}catch(error){setPriorDocs([]);setLookupMessage(error.message||"La ficha se cargó, pero no pudimos traer sus documentos anteriores.")}}
+  return <section className={modal.panel}>
+    {!draft.id&&<div className={s.lookup}><div className={s.lookupHead}><div><b>Huésped recurrente</b><span>Buscá por nombre, email, documento o teléfono para no volver a cargar datos.</span></div>{selectedProfile&&<span className={s.selectedBadge}>Ficha reutilizada</span>}</div><div className={s.searchWrap}><input value={lookup} onChange={e=>{setLookup(e.target.value);setSelectedProfile(null);setPriorDocs([])}} placeholder="Buscar huésped existente…" autoComplete="off"/>{looking&&<span className={s.searchState}>Buscando…</span>}{matches.length>0&&<div className={s.results}>{matches.map(profile=><button type="button" className={s.result} key={profile.id} onClick={()=>chooseProfile(profile)}><span><b>{profile.full_name||"Huésped"}</b><small>{profile.document_number?`${profile.document_type||"Documento"} ${profile.document_number}`:profile.email||profile.phone||"Sin documento"}</small></span><em>{VIP[profile.vip_level||"standard"]||"Estándar"}{profile.last_stay_at?` · última ${profile.last_stay_at}`:""}</em></button>)}</div>}</div>{lookupMessage&&<div className={s.lookupMessage}>{lookupMessage}</div>}{selectedProfile&&<div className={s.selected}><span><b>{selectedProfile.full_name}</b><small>{selectedProfile.email||selectedProfile.phone||selectedProfile.document_number||"Ficha histórica"}</small></span><span>{(selectedProfile.tags||[]).slice(0,3).map(tag=><i key={tag}>{tag}</i>)}</span></div>}{priorDocs.length>0&&<div className={s.priorDocs}><span>Documentos personales ya guardados</span><div>{priorDocs.map(doc=><button type="button" key={doc.id} onClick={()=>openReservationDocument(doc)}>{docLabel(doc)} · {doc.file_name}</button>)}</div><small>No hace falta volver a subirlos para consultarlos.</small></div>}</div>}
+    <div className={modal.subhead}><div><h3>Huésped e identidad</h3><p className={s.hint}>La ficha queda reutilizable para futuras estadías y Web Check-in.</p></div></div>
+    <div className={modal.grid}>
+      <label className={modal.wide}><span>Nombre y apellido</span><input autoFocus={!!draft.id} value={draft.guest||""} onChange={e=>set("guest",e.target.value)}/></label>
+      <label className={modal.wide}><span>Email</span><input type="email" value={draft.email||""} onChange={e=>set("email",e.target.value)}/></label>
+      <label><span>Teléfono</span><input value={draft.phone||""} onChange={e=>set("phone",e.target.value)}/></label>
+      <label><span>Tipo documento</span><select value={draft.documentType||""} onChange={e=>set("documentType",e.target.value)}><option value="">Elegir…</option>{DOC_TYPES.map(type=><option key={type}>{type}</option>)}</select></label>
+      <label><span>Número documento</span><input value={draft.document||""} onChange={e=>set("document",e.target.value)}/></label>
+      <label><span>Fecha de nacimiento</span><input type="date" value={draft.birthDate||""} onChange={e=>set("birthDate",e.target.value)}/></label>
+      <label><span>Nacionalidad</span><input value={draft.nationality||""} onChange={e=>set("nationality",e.target.value)}/></label>
+      <label><span>Idioma</span><input value={draft.language||""} onChange={e=>set("language",e.target.value)}/></label>
+      <label><span>País</span><input value={draft.country||""} onChange={e=>set("country",e.target.value)}/></label>
+      <label><span>Provincia</span><input value={draft.province||""} onChange={e=>set("province",e.target.value)}/></label>
+      <label><span>Ciudad</span><input value={draft.city||""} onChange={e=>set("city",e.target.value)}/></label>
+      <label className={modal.full}><span>Dirección</span><input value={draft.address||""} onChange={e=>set("address",e.target.value)}/></label>
+    </div>
+    <div className={modal.subhead}><div><h4>Acompañantes</h4><p className={s.hint}>Cada pasajero puede tener documento, nacimiento, nacionalidad y relación con el titular.</p></div><button className={modal.miniButton} type="button" onClick={addCompanion}>＋ Agregar pasajero</button></div>
+    <div className={s.stack}>{(draft.companions||[]).map((p,index)=><article className={s.card} key={index}><div className={s.head}><b>Pasajero {index+1}</b><button type="button" onClick={()=>removeCompanion(index)}>Quitar</button></div><div className={modal.grid}><label className={modal.wide}><span>Nombre y apellido</span><input value={p.nombre||p.name||""} onChange={e=>updateCompanion(index,"nombre",e.target.value)}/></label><label><span>Tipo documento</span><select value={documentType(p)} onChange={e=>updateCompanion(index,"tipo_documento",e.target.value)}><option value="">Elegir…</option>{DOC_TYPES.map(type=><option key={type}>{type}</option>)}</select></label><label><span>Número documento</span><input value={documentValue(p)} onChange={e=>updateCompanion(index,"documento",e.target.value)}/></label><label><span>Fecha de nacimiento</span><input type="date" value={birthDate(p)} onChange={e=>updateCompanion(index,"fecha_nacimiento",e.target.value)}/></label><label><span>Nacionalidad</span><input value={nationality(p)} onChange={e=>updateCompanion(index,"nacionalidad",e.target.value)}/></label><label><span>Relación</span><input value={relationship(p)} onChange={e=>updateCompanion(index,"relacion",e.target.value)} placeholder="Pareja, hijo/a, colega…"/></label><label><span>Menor</span><select value={p.es_menor?"yes":"no"} onChange={e=>updateCompanion(index,"es_menor",e.target.value==="yes")}><option value="no">No</option><option value="yes">Sí</option></select></label></div></article>)}{!(draft.companions||[]).length&&<div className={modal.message}>Sin acompañantes cargados.</div>}</div>
+  </section>
+}

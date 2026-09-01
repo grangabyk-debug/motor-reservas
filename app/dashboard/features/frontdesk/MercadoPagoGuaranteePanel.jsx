@@ -1,8 +1,8 @@
 "use client"
 import{useEffect,useRef,useState}from"react"
 import{createPortal}from"react-dom"
-import{supabase}from"../../../../lib/supabase"
 import{money}from"../../core/formatters"
+import{mercadoPagoAuthFetch}from"../../services/mercadoPagoOAuth"
 import g from"./guarantee.module.css"
 
 let sdkPromise=null
@@ -13,7 +13,6 @@ async function mercadoPago(publicKey){
   if(!window.MercadoPago)throw new Error("Mercado Pago no está disponible.")
   return new window.MercadoPago(publicKey,{locale:"es-AR"})
 }
-async function authFetch(url,options={}){const{data:{session}}=await supabase.auth.getSession();if(!session?.access_token)throw new Error("Tu sesión venció. Volvé a iniciar sesión.");const response=await fetch(url,{...options,headers:{Authorization:`Bearer ${session.access_token}`,...(options.body?{"Content-Type":"application/json"}:{}),...(options.headers||{})}}),data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data?.error||"No se pudo completar la operación.");return data}
 function statusText(status){return({card_saved:"TARJETA GUARDADA",authorized:"GARANTÍA ACTIVA",captured:"GARANTÍA COBRADA",released:"GARANTÍA LIBERADA",expired:"RETENCIÓN VENCIDA",failed:"RETENCIÓN RECHAZADA",pending:"PENDIENTE",cancelled:"SIN TARJETA"})[status]||String(status||"SIN GARANTÍA").toUpperCase()}
 function statusTone(status){if(["card_saved","authorized"].includes(status))return g.good;if(["pending","expired"].includes(status))return g.warn;if(status==="failed")return g.bad;return""}
 function expiry(guarantee){return guarantee?.expiration_month&&guarantee?.expiration_year?`${String(guarantee.expiration_month).padStart(2,"0")}/${String(guarantee.expiration_year).slice(-2)}`:""}
@@ -35,10 +34,10 @@ export default function MercadoPagoGuaranteePanel({propertyId,reservationId,gues
   const[snapshot,setSnapshot]=useState(null),[busy,setBusy]=useState(false),[message,setMessage]=useState(""),[modal,setModal]=useState(null),[amount,setAmount]=useState(""),[captureAmount,setCaptureAmount]=useState(""),[concept,setConcept]=useState("Rotura / daño documentado")
   const defaultAmount=Math.max(1,Math.min(Number(stayTotal||150000)||150000,150000))
   useEffect(()=>{if(!amount)setAmount(String(defaultAmount))},[defaultAmount])
-  async function load(){if(!propertyId)return;try{const data=reservationId?await authFetch(`/api/hotel/mercadopago/guarantee?reservation_id=${encodeURIComponent(reservationId)}`):await authFetch(`/api/hotel/mercadopago/config?property_id=${encodeURIComponent(propertyId)}`);setSnapshot(reservationId?data:{platform_ready:data.platform_ready,connection:data.connection,events:[],guarantee:null});const auth=Number(data?.guarantee?.authorized_amount||0);if(auth>0)setCaptureAmount(String(auth))}catch(error){setMessage(error.message)}}
+  async function load(){if(!propertyId)return;try{const data=reservationId?await mercadoPagoAuthFetch(`/api/hotel/mercadopago/guarantee?reservation_id=${encodeURIComponent(reservationId)}`):await mercadoPagoAuthFetch(`/api/hotel/mercadopago/config?property_id=${encodeURIComponent(propertyId)}`);setSnapshot(reservationId?data:{platform_ready:data.platform_ready,connection:data.connection,events:[],guarantee:null});const auth=Number(data?.guarantee?.authorized_amount||0);if(auth>0)setCaptureAmount(String(auth))}catch(error){setMessage(error.message)}}
   useEffect(()=>{load();const handler=()=>load();window.addEventListener("hl:mercadopago-connected",handler);return()=>window.removeEventListener("hl:mercadopago-connected",handler)},[propertyId,reservationId])
-  async function connect(){setBusy(true);setMessage("");try{const data=await authFetch("/api/hotel/mercadopago/oauth/start",{method:"POST",body:JSON.stringify({property_id:propertyId})});window.location.href=data.url}catch(error){setMessage(error.message);setBusy(false)}}
-  async function action(name,payload={}){setBusy(true);setMessage("");try{const data=await authFetch("/api/hotel/mercadopago/guarantee",{method:"POST",body:JSON.stringify({reservation_id:reservationId,action:name,...payload})});setSnapshot(data);onGuaranteeChanged?.(data.guarantee);return data}catch(error){setMessage(error.message);throw error}finally{setBusy(false)}}
+  async function connect(){setBusy(true);setMessage("");try{const data=await mercadoPagoAuthFetch("/api/hotel/mercadopago/oauth/start",{method:"POST",body:JSON.stringify({property_id:propertyId})});window.location.href=data.url}catch(error){setMessage(error.message);setBusy(false)}}
+  async function action(name,payload={}){setBusy(true);setMessage("");try{const data=await mercadoPagoAuthFetch("/api/hotel/mercadopago/guarantee",{method:"POST",body:JSON.stringify({reservation_id:reservationId,action:name,...payload})});setSnapshot(data);onGuaranteeChanged?.(data.guarantee);return data}catch(error){setMessage(error.message);throw error}finally{setBusy(false)}}
   async function saveToken(payload){if(!reservationId){onStagedToken?.(payload);setMessage("Tarjeta protegida. Se vinculará a la reserva cuando la crees.");return}await action("save_card",payload)}
   async function authorizeToken(token){await action("authorize",{token,amount:Number(amount),idempotency_key:crypto.randomUUID?.()});await load()}
   async function capture(){const value=Number(captureAmount||0);if(!(value>0))return setMessage("Ingresá el importe a cobrar.");if(!window.confirm(`¿Registrar y cobrar ${money(value,currency)} por “${concept}”?`))return;await action("capture",{amount:value,concept,add_charge:true,idempotency_key:crypto.randomUUID?.()});await load()}

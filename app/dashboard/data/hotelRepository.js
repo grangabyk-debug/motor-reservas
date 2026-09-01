@@ -16,11 +16,12 @@ export function createHotelRepository(client,propertyId){
         scoped("hotel_charge_catalog").order("sort_order").order("name"),
         scoped("hotel_channel_connections"),
         scoped("hotel_key_issues").order("created_at",{ascending:false}).limit(100),
+        scoped("hotel_packages").eq("active",true).order("sort_order").order("name"),
       ])
       const error=results.find(result=>result.error)?.error
       if(error)throw error
-      const [rooms,floors,reservations,payments,blocks,charges,channels,keyIssues]=results.map(result=>result.data||[])
-      return {rooms,floors,reservations,payments,blocks,charges,channels,keyIssues}
+      const [rooms,floors,reservations,payments,blocks,charges,channels,keyIssues,packages]=results.map(result=>result.data||[])
+      return {rooms,floors,reservations,payments,blocks,charges,channels,keyIssues,packages}
     },
     async guestCRM(){const {data,error}=await scoped("hotel_guest_profiles").order("last_stay_at",{ascending:false}).limit(250);if(error)throw error;return data||[]},
     async partners(){const {data,error}=await scoped("hotel_partners").eq("active",true).order("name");if(error)throw error;return data||[]},
@@ -35,12 +36,13 @@ export function createHotelRepository(client,propertyId){
       return {housekeeping:housekeeping.data||[],maintenance:maintenance.data||[],resources:resources.data||[]}
     },
     async commercial(){
-      const [rates,upsells]=await Promise.all([
+      const [rates,upsells,packages]=await Promise.all([
         scoped("hotel_rate_calendar").order("stay_date").limit(1000),
         scoped("hotel_upsell_catalog").eq("active",true).order("sort_order").order("name"),
+        scoped("hotel_packages").order("sort_order").order("name"),
       ])
-      const error=[rates,upsells].find(result=>result.error)?.error;if(error)throw error
-      return {rates:rates.data||[],upsells:upsells.data||[]}
+      const error=[rates,upsells,packages].find(result=>result.error)?.error;if(error)throw error
+      return {rates:rates.data||[],upsells:upsells.data||[],packages:packages.data||[]}
     },
     async finance(){
       const [documents,sessions,movements]=await Promise.all([
