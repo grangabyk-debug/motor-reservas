@@ -1,6 +1,6 @@
 "use client"
 import{useEffect,useState}from"react"
-import{supabase}from"../../../lib/supabase"
+import{completeMercadoPagoOAuth}from"../services/mercadoPagoOAuth"
 
 export default function MercadoPagoOAuthBridge(){
   const[state,setState]=useState(null)
@@ -11,7 +11,7 @@ export default function MercadoPagoOAuthBridge(){
     if(oauthError){setState({kind:"error",text:`Mercado Pago: ${oauthError}`});clean();return}
     if(!oauthState){setState({kind:"error",text:"No pudimos validar el regreso de Mercado Pago."});clean();return}
     let active=true;setState({kind:"loading",text:"Terminando la conexión segura con Mercado Pago…"})
-    ;(async()=>{try{const{data:{session}}=await supabase.auth.getSession();if(!session?.access_token)throw new Error("Volvé a iniciar sesión para completar la conexión.");const response=await fetch("/api/hotel/mercadopago/oauth/complete",{method:"POST",headers:{Authorization:`Bearer ${session.access_token}`,"Content-Type":"application/json"},body:JSON.stringify({code,state:oauthState})}),data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data?.error||"No se pudo completar la conexión.");if(active)setState({kind:"ok",text:"Mercado Pago quedó conectado a este hotel."});window.dispatchEvent(new CustomEvent("hl:mercadopago-connected",{detail:data}))}catch(error){if(active)setState({kind:"error",text:error.message})}finally{clean();setTimeout(()=>active&&setState(null),5000)}})()
+    ;(async()=>{try{const data=await completeMercadoPagoOAuth({code,state:oauthState});if(active)setState({kind:"ok",text:"Mercado Pago quedó conectado a este hotel."});window.dispatchEvent(new CustomEvent("hl:mercadopago-connected",{detail:data}))}catch(error){if(active)setState({kind:"error",text:error.message})}finally{clean();setTimeout(()=>active&&setState(null),5000)}})()
     return()=>{active=false}
   },[])
   if(!state)return null
