@@ -8,7 +8,6 @@ const legacyBudgets=new Map([
   ["app/dashboard/features/frontdesk/ReservationDrawer.jsx",{bytes:38000,lines:820}],
   ["app/dashboard/features/operations/HousekeepingPremium.jsx",{bytes:36000,lines:780}],
   ["app/dashboard/features/commercial/GroupsPremium.jsx",{bytes:28000,lines:700}],
-  ["app/dashboard/features/hotel/AccessKeysPremium.jsx",{bytes:25000,lines:600}],
 ])
 const forbiddenLegacy=["app/dashboard/HotelOSClient.jsx","app/dashboard/AdvancedHotelModules.jsx","app/dashboard/advanced.module.css","scripts/harden-hotel-os-atomic.mjs"]
 const uiMustNotUseSupabase=[
@@ -66,6 +65,12 @@ if(!groupsHook.includes("loadGroupsWorkspace")||hasDirectSupabase(groupsHook))pr
 const groupMigration=read("supabase/migrations/20260901160500_group_desk_atomic_operations.sql")
 for(const rpc of ["hl_group_create_quote_atomic","hl_group_mark_quote_atomic"]){if(!groupMigration.includes(rpc))problems.push(`Group Desk migration missing ${rpc}`)}
 if(!/security invoker/i.test(groupMigration))problems.push("Group Desk atomic RPCs must remain security invoker so RLS stays authoritative")
+
+const accessUi=read("app/dashboard/features/hotel/AccessKeysPremium.jsx")
+const accessEditor=read("app/dashboard/features/hotel/components/AccessPointEditor.jsx")
+if(!accessUi.includes('from"./components/AccessPointEditor"'))problems.push("AccessKeysPremium must keep point editing outside the main workspace UI")
+if(!accessEditor.includes("export default function AccessPointEditor"))problems.push("AccessPointEditor is missing or not exported")
+if(hasDirectSupabase(accessEditor))problems.push("AccessPointEditor must stay presentation-only; no direct Supabase access")
 
 const accessService=read("app/dashboard/services/access.js")
 const accessHook=read("app/dashboard/hooks/useAccessWorkspace.js")
