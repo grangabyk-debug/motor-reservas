@@ -1,8 +1,8 @@
 "use client"
 
 import{useEffect,useMemo,useState}from"react"
-import{supabase}from"../../../../lib/supabase"
 import{money}from"../../core/formatters"
+import{currentUserId}from"../../services/session"
 import{applyDeposit,convertOtaPrepayment,createDeposit,createOtaPrepayment,createPaymentRequest,loadPaymentConnection,loadPaymentWorkspace,paidByReservation,refundDeposit,verifyPaymentRequest}from"../../services/payments"
 import s from"./payments-premium.module.css"
 
@@ -21,7 +21,7 @@ export default function PaymentsPremium({reservations=[],sessions=[],movements=[
   const selected=reservationMap.get(String(requestDraft.reservationId)),selectedBalance=selected?Math.max(0,Number(selected.precio_total||0)-(paidMap.get(String(selected.id))||0)):0
 
   async function reload(){if(!propertyId)return;const data=await loadPaymentWorkspace(propertyId);setWorkspace(data)}
-  useEffect(()=>{let active=true;supabase.auth.getUser().then(({data})=>active&&setUserId(data?.user?.id||null));return()=>{active=false}},[])
+  useEffect(()=>{let active=true;currentUserId().then(id=>active&&setUserId(id)).catch(()=>active&&setUserId(null));return()=>{active=false}},[])
   useEffect(()=>{let active=true;if(!propertyId)return;Promise.all([loadPaymentWorkspace(propertyId),loadPaymentConnection(propertyId)]).then(([data,config])=>{if(!active)return;setWorkspace(data);setConnection(config)}).catch(error=>active&&setMessage(error.message||"No se pudo cargar Pagos."));return()=>{active=false}},[propertyId])
   useEffect(()=>{if(requestDraft.reservationId||!activeReservations.length)return;const target=activeReservations.find(r=>Math.max(0,Number(r.precio_total||0)-(paidMap.get(String(r.id))||0))>.01)||activeReservations[0];if(target)setRequestDraft(x=>({...x,reservationId:String(target.id)}))},[activeReservations,paidMap,requestDraft.reservationId])
   useEffect(()=>{if(!selected)return;setRequestDraft(x=>({...x,amount:String(Math.max(0,Number(selected.precio_total||0)-(paidMap.get(String(selected.id))||0))) }))},[selected?.id,workspace.payments.length])
