@@ -24,8 +24,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - name: Install locked dependencies
-        run: npm ci
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
       - name: Product boundaries
         run: npm run check:product-boundaries
       - name: Hotel architecture
