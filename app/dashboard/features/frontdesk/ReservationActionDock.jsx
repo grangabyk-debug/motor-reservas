@@ -6,9 +6,9 @@ import{reservationTotal}from"./reservationModel"
 import{emailUrl,loadMessageTemplates,logReservationMessage,renderMessageTemplate,saveMessageTemplate,templateContext,whatsappUrl}from"../../services/communications"
 import s from"./reservation-action-dock.module.css"
 
-const readyStates=new Set(["inspeccionada","inspeccionado","disponible","libre"])
+const readyStates=new Set(["inspeccionada","inspeccionado","disponible"])
 const hardBlockedStates=new Set(["mantenimiento","fuera_servicio","fuera de servicio","fuera_de_servicio"])
-const roomStateLabel=value=>{const raw=String(value||"libre").toLowerCase();if(raw==="inspeccionada"||raw==="inspeccionado")return"Inspeccionada";if(raw==="limpia")return"Limpia";if(raw==="limpieza"||raw==="en_limpieza")return"En limpieza";if(raw==="sucia")return"Sucia";if(raw.includes("mantenimiento"))return"Mantenimiento";if(raw.includes("fuera"))return"Fuera de servicio";return raw?raw.replaceAll("_"," "):"Sin estado"}
+const roomStateLabel=value=>{const raw=String(value||"libre").toLowerCase();if(raw==="inspeccionada"||raw==="inspeccionado")return"Inspeccionada";if(raw==="limpia")return"Limpia";if(raw==="limpieza"||raw==="en_limpieza")return"En limpieza";if(raw==="sucia")return"Sucia";if(raw==="libre")return"Libre · sin inspección";if(raw.includes("mantenimiento"))return"Mantenimiento";if(raw.includes("fuera"))return"Fuera de servicio";return raw?raw.replaceAll("_"," "):"Sin estado"}
 const firstName=value=>String(value||"").trim().split(/\s+/)[0]||"Huésped"
 
 export default function ReservationActionDock({draft,original,rooms=[],payments=[],propertyId,userId,hotelName,onCheckin,onCheckout,onWebCheckin,onEmail,onKey,onPrint,onRoomStatus,onHousekeepingTask,onNotify}){
@@ -32,7 +32,10 @@ export default function ReservationActionDock({draft,original,rooms=[],payments=
     const popup=channel==="whatsapp"?window.open("about:blank","_blank"):null
     await run(`template-${channel}`,async()=>{
       let webCheckinUrl=""
-      if(selected.code==="pre_checkin")webCheckinUrl=await onWebCheckin?.({copy:false})||""
+      if(selected.code==="pre_checkin"){
+        webCheckinUrl=await onWebCheckin?.({copy:false})||""
+        if(!webCheckinUrl){popup?.close();throw new Error("No se pudo generar el enlace de pre check-in.")}
+      }
       const context=templateContext({draft,original,room,hotelName,balance,webCheckinUrl}),rendered=renderMessageTemplate(selected,context),recipient=channel==="whatsapp"?(draft.phone||original.telefono_huesped):(draft.email||original.email_huesped)
       if(!recipient){popup?.close();throw new Error(channel==="whatsapp"?"Falta el teléfono del huésped.":"Falta el email del huésped.")}
       await logReservationMessage({propertyId,userId,reservationId:original.id,templateId:selected.id,channel,status:"opened",recipient,subject:rendered.subject,body:rendered.body,metadata:{template_code:selected.code}})
