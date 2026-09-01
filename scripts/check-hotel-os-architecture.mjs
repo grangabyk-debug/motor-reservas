@@ -7,9 +7,8 @@ const defaultBudget={bytes:24000,lines:520}
 const legacyBudgets=new Map([
   ["app/dashboard/features/frontdesk/ReservationDrawer.jsx",{bytes:38000,lines:820}],
   ["app/dashboard/features/operations/HousekeepingPremium.jsx",{bytes:36000,lines:780}],
-  ["app/dashboard/features/commercial/GroupsPremium.jsx",{bytes:31000,lines:700}],
-  ["app/dashboard/features/finance/ReportsPremium.jsx",{bytes:32000,lines:700}],
-  ["app/dashboard/features/hotel/AccessKeysPremium.jsx",{bytes:30000,lines:650}],
+  ["app/dashboard/features/commercial/GroupsPremium.jsx",{bytes:28000,lines:700}],
+  ["app/dashboard/features/hotel/AccessKeysPremium.jsx",{bytes:25000,lines:600}],
   ["app/dashboard/HotelOSV2.jsx",{bytes:30000,lines:700}],
 ])
 const forbiddenLegacy=["app/dashboard/HotelOSClient.jsx","app/dashboard/AdvancedHotelModules.jsx","app/dashboard/advanced.module.css","scripts/harden-hotel-os-atomic.mjs"]
@@ -17,6 +16,7 @@ const uiMustNotUseSupabase=[
   "app/dashboard/features/frontdesk/ReservationDrawer.jsx",
   "app/dashboard/features/operations/HousekeepingPremium.jsx",
   "app/dashboard/features/commercial/GroupsPremium.jsx",
+  "app/dashboard/features/hotel/AccessKeysPremium.jsx",
 ]
 const problems=[],warnings=[]
 
@@ -61,6 +61,18 @@ const groupMigration=read("supabase/migrations/20260901160500_group_desk_atomic_
 for(const rpc of ["hl_group_create_quote_atomic","hl_group_mark_quote_atomic"]){if(!groupMigration.includes(rpc))problems.push(`Group Desk migration missing ${rpc}`)}
 if(!/security invoker/i.test(groupMigration))problems.push("Group Desk atomic RPCs must remain security invoker so RLS stays authoritative")
 
+const accessService=read("app/dashboard/services/access.js")
+const accessHook=read("app/dashboard/hooks/useAccessWorkspace.js")
+if(!accessService.includes("requirePropertyId")||!accessService.includes("subscribeAccessWorkspace"))problems.push("Access service must keep tenant validation and realtime orchestration")
+if(!accessService.includes("filter:`property_id=eq.${property}`"))problems.push("Access realtime subscription must stay filtered by property_id")
+if(!accessHook.includes("loadAccessWorkspace")||!accessHook.includes("subscribeAccessWorkspace")||hasDirectSupabase(accessHook))problems.push("useAccessWorkspace must orchestrate Access without direct Supabase access")
+
+const reportUi=read("app/dashboard/features/finance/ReportsPremium.jsx")
+const reportEngine=read("app/dashboard/features/finance/reportEngine.js")
+for(const fn of ["buildContext","reportData"]){if(!reportEngine.includes(`function ${fn}`)&&!reportEngine.includes(`function ${fn}(`)&&!reportEngine.includes(`export function ${fn}`))problems.push(`reportEngine missing ${fn}`)}
+if(!reportUi.includes('from"./reportEngine"'))problems.push("ReportsPremium must keep report calculations outside presentation UI")
+if(/from["']react["']/.test(reportEngine)||hasDirectSupabase(reportEngine))problems.push("reportEngine must stay pure: no React or Supabase dependency")
+
 const pagePath="app/dashboard/page.jsx",page=read(pagePath)
 if(!/HotelOSV2/.test(page))problems.push("app/dashboard/page.jsx: dashboard must use HotelOSV2 modular shell")
 
@@ -77,4 +89,4 @@ if(!hotelService.includes("Authorization:`Bearer ${token}`")&&!hotelService.incl
 
 if(warnings.length)console.warn("Architecture debt still tracked:\n- "+warnings.join("\n- "))
 if(problems.length){console.error("Habitación Llena architecture guard failed:\n- "+problems.join("\n- "));process.exit(1)}
-console.log("Habitación Llena architecture guard OK: product boundaries, tenant services, UI/Supabase separation, Group Desk atomicity, component budgets, atomic operations and server-secret rules verified")
+console.log("Habitación Llena architecture guard OK: product boundaries, tenant services, UI/Supabase separation, Group Desk atomicity, Access isolation, Reports engine separation, component budgets, atomic operations and server-secret rules verified")
