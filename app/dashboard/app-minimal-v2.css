@@ -1,0 +1,155 @@
+/* Habitación Llena — minimal interaction layer v2
+   Principle: the screen stays calm; depth appears when the user interacts. */
+
+.hlHotelgest{--hl-min-bg:#f6f7f9;--hl-min-surface:#fff;--hl-min-line:#e3e7ec;--hl-min-text:#263247;--hl-min-muted:#7f8b99;--hl-min-blue:#1769d2;--hl-min-shadow:0 8px 24px rgba(31,45,68,.045)}
+
+/* Remove marketing-like copy from operational screens. */
+.hlHotelgest main [class*="v2-module"][class*="editorial"] small,
+.hlHotelgest main [class*="v2-module"][class*="editorial"] p,
+.hlHotelgest main [class*="-module"][class*="hero"] p,
+.hlHotelgest main [class*="hotel-module"][class*="keyHero"] p,
+.hlHotelgest main [class*="hotel-module"][class*="settingsHero"] p,
+.hlHotelgest main [class*="hotel-module"][class*="intelligenceHero"] p{display:none!important}
+
+.hlHotelgest main [class*="v2-module"][class*="editorial"]{min-height:36px!important;margin:0!important}
+.hlHotelgest main [class*="v2-module"][class*="editorial"] h2{font-size:18px!important;line-height:1.1!important;margin:0!important}
+
+/* Keep common app surfaces flat and quiet. */
+.hlHotelgest main [class*="v2-module"][class*="panel"],
+.hlHotelgest main [class*="v2-module"][class*="tableWrap"],
+.hlHotelgest main [class*="v2-module"][class*="floorCard"],
+.hlHotelgest main [class*="-module"][class*="card"],
+.hlHotelgest main [class*="-module"][class*="panel"],
+.hlHotelgest main [class*="-module"][class*="metric"],
+.hlHotelgest main [class*="-module"] article{box-shadow:none!important}
+
+/* Revenue: calendar first. Metrics/recommendation remain available in reports/advanced tools, not in the primary rate workspace. */
+.hlHotelgest main [class*="v2-module"][class*="content"]:has([class*="business-module"][class*="rateCalendar"]) [class*="business-module"][class*="kpiGrid"],
+.hlHotelgest main [class*="v2-module"][class*="content"]:has([class*="business-module"][class*="rateCalendar"]) [class*="business-module"][class*="revenueSignal"]{display:none!important}
+.hlHotelgest main [class*="business-module"][class*="rateToolbar"]{gap:7px!important;padding:0 0 9px!important;border-bottom:1px solid var(--hl-min-line)!important}
+.hlHotelgest main [class*="business-module"][class*="rateToolbar"] form{gap:5px!important;overflow-x:auto!important;scrollbar-width:none!important}
+.hlHotelgest main [class*="business-module"][class*="rateToolbar"] form::-webkit-scrollbar{display:none}
+.hlHotelgest main [class*="business-module"][class*="rateCalendar"]{gap:5px!important;padding-top:8px!important}
+.hlHotelgest main [class*="business-module"][class*="rateCell"]{min-height:76px!important;border-radius:9px!important;box-shadow:none!important}
+
+/* Rooms: the room is the object; decorative door art and repeated labels get out of the way. */
+.hlHotelgest main [class*="v2-module"][class*="content"]:has([class*="v2-module"][class*="roomGrid"]) [class*="v2-module"][class*="door"]{display:none!important}
+.hlHotelgest main [class*="v2-module"][class*="roomCard"]{display:block!important;min-height:108px!important;padding:12px!important;background:#fff!important;border:1px solid var(--hl-min-line)!important;border-radius:11px!important}
+.hlHotelgest main [class*="v2-module"][class*="roomCard"] h4{margin:2px 0 4px!important;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;font-size:17px!important;font-weight:820!important;color:var(--hl-min-text)!important}
+.hlHotelgest main [class*="v2-module"][class*="roomCard"] p{margin:3px 0!important;font-size:10.5px!important;color:var(--hl-min-muted)!important}
+.hlHotelgest main [class*="v2-module"][class*="roomCard"] [class*="badge"]{margin-top:7px!important;padding:4px 7px!important;border-radius:7px!important;font-size:9px!important}
+.hlHotelgest main [class*="v2-module"][class*="floorCard"]>header{margin-bottom:9px!important}
+.hlHotelgest main [class*="v2-module"][class*="floorCard"]>header small{display:none!important}
+.hlHotelgest main [class*="v2-module"][class*="floorCard"]>header h3{font-size:14px!important;margin:0!important}
+.hlHotelgest main [class*="v2-module"][class*="floorCard"]>header span{font-size:9.5px!important;color:var(--hl-min-muted)!important}
+
+/* Maintenance/resources/partners: actions appear when the object is engaged on desktop. */
+@media(pointer:fine){
+  .hlHotelgest main [class*="v2-module"][class*="roomCard"] [class*="cardActions"],
+  .hlHotelgest main [class*="v2-module"][class*="ticket"] [class*="cardActions"],
+  .hlHotelgest main [class*="v2-module"][class*="resourceCard"] [class*="cardActions"],
+  .hlHotelgest main [class*="business-module"][class*="commercialCard"]>button{
+    opacity:0!important;transform:translateY(2px);transition:opacity .14s ease,transform .14s ease!important;
+  }
+  .hlHotelgest main [class*="v2-module"][class*="roomCard"]:hover [class*="cardActions"],
+  .hlHotelgest main [class*="v2-module"][class*="ticket"]:hover [class*="cardActions"],
+  .hlHotelgest main [class*="v2-module"][class*="resourceCard"]:hover [class*="cardActions"],
+  .hlHotelgest main [class*="business-module"][class*="commercialCard"]:hover>button{
+    opacity:1!important;transform:none;
+  }
+}
+
+/* Housekeeping: state rack first, controls contextual. */
+.hlHotelgest main [class*="housekeeping-premium-module"][class*="page"]{gap:8px!important;padding:14px 16px 28px!important;background:var(--hl-min-bg)!important}
+.hlHotelgest main [class*="housekeeping-premium-module"][class*="hero"]{min-height:0!important;padding:10px 12px!important;border:1px solid var(--hl-min-line)!important;border-radius:11px!important;background:#fff!important;box-shadow:none!important}
+.hlHotelgest main [class*="housekeeping-premium-module"][class*="hero"]>div:first-child small,
+.hlHotelgest main [class*="housekeeping-premium-module"][class*="hero"]>div:first-child p{display:none!important}
+.hlHotelgest main [class*="housekeeping-premium-module"][class*="hero"] h2{margin:0!important;font-size:16px!important;line-height:1.1!important;color:var(--hl-min-text)!important}
+.hlHotelgest main [class*="housekeeping-premium-module"][class*="summary"]{gap:5px!important}
+.hlHotelgest main [class*="housekeeping-premium-module"][class*="summary"] span{min-width:66px!important;padding:6px 8px!important;border-radius:8px!important}
+.hlHotelgest main [class*="housekeeping-premium-module"][class*="summary"] b{font-size:16px!important}.hlHotelgest main [class*="housekeeping-premium-module"][class*="summary"] small{font-size:8px!important}
+.hlHotelgest main [class*="housekeeping-premium-module"][class*="toolbar"]{gap:6px!important;padding:6px!important;border:1px solid var(--hl-min-line)!important;border-radius:10px!important;background:#fff!important;box-shadow:none!important}
+.hlHotelgest main [class*="housekeeping-premium-module"][class*="filterRow"]{gap:4px!important;overflow-x:auto!important;flex-wrap:nowrap!important;scrollbar-width:none!important}
+.hlHotelgest main [class*="housekeeping-premium-module"][class*="filterRow"]::-webkit-scrollbar{display:none}
+.hlHotelgest main [class*="housekeeping-premium-module"][class*="filterRow"] button,
+.hlHotelgest main [class*="housekeeping-premium-module"][class*="filterRow"] select,
+.hlHotelgest main [class*="housekeeping-premium-module"][class*="daySwitch"] button{height:32px!important;min-height:32px!important;padding:0 9px!important;border-radius:8px!important;font-size:9.5px!important;white-space:nowrap!important}
+.hlHotelgest main [class*="housekeeping-premium-module"][class*="workspace"]{gap:8px!important}
+.hlHotelgest main [class*="housekeeping-premium-module"][class*="turnList"],
+.hlHotelgest main [class*="housekeeping-premium-module"][class*="rack"]{border:1px solid var(--hl-min-line)!important;border-radius:11px!important;background:#fff!important;box-shadow:none!important}
+.hlHotelgest main [class*="housekeeping-premium-module"][class*="turnList"]>header small,
+.hlHotelgest main [class*="housekeeping-premium-module"][class*="rack"]>header small{display:none!important}
+.hlHotelgest main [class*="housekeeping-premium-module"][class*="turnList"] h3,
+.hlHotelgest main [class*="housekeeping-premium-module"][class*="rack"] h3{font-size:14px!important}
+.hlHotelgest main [class*="housekeeping-premium-module"][class*="dayMeta"]{display:none!important}
+.hlHotelgest main [class*="housekeeping-premium-module"][class*="dayCard"]{padding:9px!important;border-radius:9px!important;box-shadow:none!important}
+.hlHotelgest main [class*="housekeeping-premium-module"][class*="rackCard"]{min-height:82px!important;border-radius:9px!important;box-shadow:none!important}
+.hlHotelgest main [class*="housekeeping-premium-module"][class*="floorTitle"] small{display:none!important}
+.hlHotelgest main [class*="housekeeping-premium-module"][class*="quickTask"]{min-height:46px!important;padding:7px 9px!important;border:1px solid var(--hl-min-line)!important;border-radius:10px!important;background:#fff!important;box-shadow:none!important}
+.hlHotelgest main [class*="housekeeping-premium-module"][class*="quickTask"] small{display:none!important}.hlHotelgest main [class*="housekeeping-premium-module"][class*="quickTask"] b{font-size:10px!important;font-weight:700!important;color:var(--hl-min-muted)!important}
+@media(pointer:fine){
+  .hlHotelgest main [class*="housekeeping-premium-module"][class*="dayCard"] [class*="actionRow"]{max-height:0!important;opacity:0!important;overflow:hidden!important;margin:0!important;transition:max-height .15s ease,opacity .15s ease,margin .15s ease!important}
+  .hlHotelgest main [class*="housekeeping-premium-module"][class*="dayCard"]:hover [class*="actionRow"],
+  .hlHotelgest main [class*="housekeeping-premium-module"][class*="selectedDayCard"] [class*="actionRow"]{max-height:42px!important;opacity:1!important;margin-top:7px!important}
+}
+
+/* Lists and tables: the row itself is the interaction target. */
+.hlHotelgest main [class*="v2-module"][class*="tableWrap"] tr:hover td{background:#fafbfd!important}
+.hlHotelgest main [class*="v2-module"][class*="listRow"]{border-radius:0!important}
+
+/* Distribution/channel: hotel users see channels and state, not transport plumbing. */
+.hlHotelgest main [class*="channel-hub-premium-module"][class*="architecture"],
+.hlHotelgest main [class*="channel-hub-premium-module"][class*="helper"],
+.hlHotelgest main [class*="channel-hub-premium-module"][class*="guardrail"],
+.hlHotelgest main [class*="channel-hub-premium-module"][class*="syncActions"],
+.hlHotelgest main [class*="channel-hub-premium-module"][class*="inbound"]{display:none!important}
+.hlHotelgest main [class*="channel-hub-premium-module"][class*="hero"]{padding:10px 12px!important;border-radius:11px!important;box-shadow:none!important}
+.hlHotelgest main [class*="channel-hub-premium-module"][class*="hero"] p{display:none!important}
+
+/* Reports/config/support: no oversized marketing headers. */
+.hlHotelgest main [class*="reports-premium-module"][class*="hero"],
+.hlHotelgest main [class*="support-module"][class*="hero"],
+.hlHotelgest main [class*="settings-workspace-module"][class*="hero"]{min-height:0!important;padding:11px 13px!important;border-radius:11px!important;box-shadow:none!important}
+.hlHotelgest main [class*="reports-premium-module"][class*="hero"] p,
+.hlHotelgest main [class*="support-module"][class*="hero"] p,
+.hlHotelgest main [class*="settings-workspace-module"][class*="hero"] p{display:none!important}
+
+/* Dialogs/drawers: focused interaction, not another dashboard. */
+.hlHotelgest [class*="v2-module"][class*="modal"],
+.hlHotelgest [class*="reservation-modal-module"][class*="dialog"],
+.hlHotelgest [class*="housekeeping-premium-module"][class*="drawer"]{box-shadow:0 24px 70px rgba(22,34,52,.22)!important}
+
+@media(max-width:900px){
+  .hlHotelgest main [class*="v2-module"][class*="content"]:not([class*="command-center-module"]){padding:10px 10px calc(24px + env(safe-area-inset-bottom))!important;gap:8px!important}
+  .hlHotelgest main [class*="v2-module"][class*="editorial"]{min-height:34px!important}
+  .hlHotelgest main [class*="v2-module"][class*="editorial"] h2{font-size:16px!important}
+  .hlHotelgest main [class*="v2-module"][class*="cardGrid"],
+  .hlHotelgest main [class*="v2-module"][class*="resourceGrid"],
+  .hlHotelgest main [class*="v2-module"][class*="ticketGrid"],
+  .hlHotelgest main [class*="v2-module"][class*="hkGrid"],
+  .hlHotelgest main [class*="v2-module"][class*="roomGrid"]{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:7px!important}
+  .hlHotelgest main [class*="v2-module"][class*="roomCard"]{min-height:94px!important;padding:10px!important}
+  .hlHotelgest main [class*="housekeeping-premium-module"][class*="page"]{padding:9px 9px calc(24px + env(safe-area-inset-bottom))!important}
+  .hlHotelgest main [class*="housekeeping-premium-module"][class*="hero"]{display:flex!important;align-items:center!important;gap:8px!important;overflow-x:auto!important}
+  .hlHotelgest main [class*="housekeeping-premium-module"][class*="hero"] h2{font-size:14px!important;white-space:nowrap!important}
+  .hlHotelgest main [class*="housekeeping-premium-module"][class*="summary"]{margin-left:auto!important;flex:0 0 auto!important}
+  .hlHotelgest main [class*="housekeeping-premium-module"][class*="workspace"]{grid-template-columns:1fr!important}
+  .hlHotelgest main [class*="housekeeping-premium-module"][class*="turnList"]{display:none!important}
+  .hlHotelgest main [class*="housekeeping-premium-module"][class*="rackGrid"]{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:6px!important}
+  .hlHotelgest main [class*="housekeeping-premium-module"][class*="rackCard"]{min-height:76px!important;padding:8px!important}
+  .hlHotelgest main [class*="housekeeping-premium-module"][class*="quickTask"]{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;gap:6px!important}
+  .hlHotelgest main [class*="housekeeping-premium-module"][class*="quickTask"]>div{display:none!important}
+  .hlHotelgest main [class*="business-module"][class*="rateCalendar"]{overflow-x:auto!important;grid-auto-flow:column!important;grid-auto-columns:minmax(92px,1fr)!important;grid-template-columns:none!important;scroll-snap-type:x proximity!important;padding-bottom:3px!important}
+  .hlHotelgest main [class*="business-module"][class*="rateCell"]{scroll-snap-align:start!important}
+  .hlHotelgest [class*="v2-module"][class*="shade"]{padding:0!important;align-items:end!important}
+  .hlHotelgest [class*="v2-module"][class*="modal"]{width:100%!important;max-width:none!important;max-height:92dvh!important;margin:0!important;border-radius:18px 18px 0 0!important;padding:16px 14px calc(16px + env(safe-area-inset-bottom))!important}
+}
+
+@media(max-width:560px){
+  .hlHotelgest main [class*="v2-module"][class*="cardGrid"],
+  .hlHotelgest main [class*="v2-module"][class*="resourceGrid"],
+  .hlHotelgest main [class*="v2-module"][class*="ticketGrid"],
+  .hlHotelgest main [class*="v2-module"][class*="hkGrid"],
+  .hlHotelgest main [class*="v2-module"][class*="roomGrid"]{grid-template-columns:1fr!important}
+  .hlHotelgest main [class*="housekeeping-premium-module"][class*="rackGrid"]{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
