@@ -19,53 +19,6 @@
   transform:translate(-50%,0) scale(1)!important;
 }
 
-/* Hover card readability: larger, stronger typography without making the preview bulky. */
-.hlHotelgest main [class*="planning-parity-module"][class*="stayPreview"]{
-  width:300px!important;
-  min-width:300px!important;
-  gap:8px!important;
-  padding:13px 14px!important;
-  line-height:1.35!important;
-}
-.hlHotelgest main [class*="planning-parity-module"][class*="stayPreview"]>strong{
-  font-size:8px!important;
-  line-height:1.25!important;
-  font-weight:900!important;
-  letter-spacing:.105em!important;
-}
-.hlHotelgest main [class*="planning-parity-module"][class*="stayPreview"]>b{
-  font-size:14px!important;
-  line-height:1.15!important;
-  font-weight:900!important;
-  letter-spacing:-.01em!important;
-}
-.hlHotelgest main [class*="planning-parity-module"][class*="stayPreview"]>small{
-  font-size:9px!important;
-  line-height:1.45!important;
-  font-weight:650!important;
-  opacity:.94!important;
-}
-.hlHotelgest main [class*="planning-parity-module"][class*="stayPreview"]>span{
-  gap:9px!important;
-}
-.hlHotelgest main [class*="planning-parity-module"][class*="stayPreview"]>span>em{
-  font-size:8px!important;
-  line-height:1.25!important;
-  font-weight:800!important;
-  letter-spacing:.035em!important;
-}
-.hlHotelgest main [class*="planning-parity-module"][class*="stayPreview"]>span>em>b{
-  margin-top:3px!important;
-  font-size:10.5px!important;
-  line-height:1.25!important;
-  font-weight:900!important;
-}
-.hlHotelgest.hlThemeDark main [class*="planning-parity-module"][class*="stayPreview"]>strong,
-.hlHotelgest.hlThemeDark main [class*="planning-parity-module"][class*="stayPreview"]>b,
-.hlHotelgest.hlThemeDark main [class*="planning-parity-module"][class*="stayPreview"]>span>em>b{
-  text-shadow:0 1px 10px rgba(0,0,0,.22)!important;
-}
-
 /* Resize handle: larger hit target, clear black grip on hover.
    The actual draggable <i> already carries application/x-hl-resize; this only improves affordance. */
 .hlHotelgest main [class*="command-center-module"][class*="stay"][class*="planning-parity-module"]{
@@ -119,6 +72,120 @@
 .hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="stay"]:hover>i[draggable="true"]::before{
   background:#000;
   box-shadow:0 0 0 1px rgba(255,255,255,.92),0 0 13px rgba(0,0,0,.7);
+}
+
+/* Hover preview typography: readable at a glance without making the card bulky. */
+.hlHotelgest main [class*="planning-parity-module"][class*="stayPreview"]{
+  width:296px!important;
+  min-width:296px!important;
+  gap:8px!important;
+  padding:13px 14px!important;
+}
+.hlHotelgest main [class*="planning-parity-module"][class*="stayPreview"]>strong{
+  font-size:9px!important;
+  line-height:1.2!important;
+  font-weight:900!important;
+  letter-spacing:.09em!important;
+  color:#38526f!important;
+}
+.hlHotelgest main [class*="planning-parity-module"][class*="stayPreview"]>b{
+  font-size:14px!important;
+  line-height:1.15!important;
+  font-weight:900!important;
+  color:#13233a!important;
+}
+.hlHotelgest main [class*="planning-parity-module"][class*="stayPreview"]>small{
+  font-size:10px!important;
+  line-height:1.4!important;
+  font-weight:650!important;
+  color:#53657c!important;
+}
+.hlHotelgest main [class*="planning-parity-module"][class*="stayPreview"]>span>em{
+  font-size:8.5px!important;
+  line-height:1.25!important;
+  font-weight:800!important;
+  color:#697a90!important;
+}
+.hlHotelgest main [class*="planning-parity-module"][class*="stayPreview"]>span>em>b{
+  margin-top:3px!important;
+  font-size:11px!important;
+  line-height:1.25!important;
+  font-weight:900!important;
+  color:#15263e!important;
+}
+.hlHotelgest.hlThemeDark main [class*="planning-parity-module"][class*="stayPreview"]>strong{color:#9fc7ff!important}
+.hlHotelgest.hlThemeDark main [class*="planning-parity-module"][class*="stayPreview"]>b,
+.hlHotelgest.hlThemeDark main [class*="planning-parity-module"][class*="stayPreview"]>span>em>b{color:#f3f7ff!important}
+.hlHotelgest.hlThemeDark main [class*="planning-parity-module"][class*="stayPreview"]>small{color:#b9c7d9!important}
+.hlHotelgest.hlThemeDark main [class*="planning-parity-module"][class*="stayPreview"]>span>em{color:#91a5bf!important}
+
+/* Planning left rail: show the actual room names/numbers clearly.
+   Room.nombre contains values like 300, 301, 302, 303, 400 and 402. */
+.hlHotelgest main [class*="planning-lenses-module"][class*="roomButton"]{
+  color:#111c2f!important;
+  opacity:1!important;
+}
+.hlHotelgest main [class*="planning-lenses-module"][class*="roomCopy"]{
+  display:grid!important;
+  align-content:center!important;
+  justify-items:start!important;
+  min-width:0!important;
+  visibility:visible!important;
+  opacity:1!important;
+  position:relative!important;
+  z-index:9!important;
+  text-align:left!important;
+}
+.hlHotelgest main [class*="planning-lenses-module"][class*="roomCopy"]>b{
+  display:block!important;
+  visibility:visible!important;
+  opacity:1!important;
+  font-size:14px!important;
+  line-height:1.1!important;
+  font-weight:900!important;
+  letter-spacing:.01em!important;
+  color:#111c2f!important;
+}
+.hlHotelgest main [class*="planning-lenses-module"][class*="roomCopy"]>small{
+  display:block!important;
+  margin-top:4px!important;
+  font-size:10px!important;
+  line-height:1.15!important;
+  font-weight:750!important;
+  color:#56667c!important;
+}
+
+/* Group/type labels are intentionally a little larger and darker for scanning. */
+.hlHotelgest main [class*="command-center-module"][class*="groupHeader"] b{
+  font-size:12.5px!important;
+  font-weight:900!important;
+  color:#172238!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="groupHeader"] small{
+  font-size:10px!important;
+  font-weight:700!important;
+  color:#627189!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="typeOccupancy"]>div:first-child b{
+  font-size:12.5px!important;
+  font-weight:900!important;
+  color:#172238!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="typeOccupancy"]>div:first-child small{
+  font-size:9.5px!important;
+  font-weight:700!important;
+  color:#627189!important;
+}
+.hlHotelgest.hlThemeDark main [class*="planning-lenses-module"][class*="roomButton"],
+.hlHotelgest.hlThemeDark main [class*="planning-lenses-module"][class*="roomCopy"]>b,
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="groupHeader"] b,
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="typeOccupancy"]>div:first-child b{
+  color:#f3f7ff!important;
+}
+.hlHotelgest.hlThemeDark main [class*="planning-lenses-module"][class*="roomCopy"]>small,
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="groupHeader"] small,
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="typeOccupancy"]>div:first-child small{
+  color:#9fb0c6!important;
 }
 
 @media(max-width:900px){
