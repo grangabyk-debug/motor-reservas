@@ -17,6 +17,12 @@ export default function DashboardChrome({children}){
 
   useEffect(()=>{
     try{localStorage.setItem(THEME_KEY,theme)}catch{}
+    const root=document.querySelector(".hlHotelgest")
+    if(!root)return
+    root.classList.toggle("hlThemeDark",theme==="dark")
+    root.classList.toggle("hlThemeLight",theme!=="dark")
+    root.dataset.hlTheme=theme
+    return()=>{root.classList.remove("hlThemeDark","hlThemeLight");delete root.dataset.hlTheme}
   },[theme])
 
   useEffect(()=>{
@@ -30,7 +36,7 @@ export default function DashboardChrome({children}){
   const timeLabel=useMemo(()=>clock?new Intl.DateTimeFormat("es-AR",{hour:"2-digit",minute:"2-digit"}).format(clock):"",[clock])
   const dark=theme==="dark"
 
-  return <div className={`hlDashboardChrome ${dark?"hlThemeDark":"hlThemeLight"}`} data-hl-theme={theme}>
+  return <>
     <div className="hlUtilityBar" role="banner">
       <div className="hlUtilityRegion"><span className="hlUtilityFlag" aria-hidden="true">▰</span><span>Hecho en Argentina · pensado para la región</span></div>
       <div className="hlUtilityRight">
@@ -39,5 +45,5 @@ export default function DashboardChrome({children}){
       </div>
     </div>
     {children}
-  </div>
+  </>
 }
