@@ -7,6 +7,8 @@ import"./planning-stage-now.css"
 import"./dashboard-stage-now.css"
 import"./module-stage-now.css"
 import"./hotelgest-theme.css"
+import"./dashboard-hotelgest-v2.css"
+import"./planning-hotelgest-v2.css"
 
 export default function DashboardPage(){
   return <><StaticCaretGuard/><MercadoPagoOAuthBridge/><div className={`hlStageNow hlHotelgest ${readability.readable} ${design.system}`}><HotelOSV2/></div></>
