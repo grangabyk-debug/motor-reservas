@@ -5,6 +5,7 @@ import{addDays,money,shortDate,isoDate}from"../../core/formatters"
 import{loadUserPreference,saveUserPreference}from"../../services/preferences"
 import{DASHBOARD_WIDGETS,DEFAULT_WIDGET_ORDER,DEFAULT_WIDGET_SIZES,normalizeWidgetOrder,normalizeWidgetSizes,presetLayout}from"./DashboardWidgetLayout"
 import{DashboardCustomizer,WidgetSlot}from"./DashboardWidgetLibrary"
+import DashboardTodayRail from"./DashboardTodayRail"
 import ui from"../../v2.module.css"
 import polish from"./frontdesk-polish.module.css"
 import GuestCRMWorkspace from"./GuestCRM"
@@ -57,6 +58,7 @@ export function Lobby({settings,rooms,reservations,payments,onView,onOpen,search
   const channelMap=new Map();monthReservations.forEach(r=>{const label=channelLabel(r.canal_reserva);channelMap.set(label,(channelMap.get(label)||0)+1)});const channelSegments=[...channelMap.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5).map(([label,value])=>({label,value,color:channelColor(label)})),otherCount=Math.max(0,monthReservations.length-channelSegments.reduce((s,x)=>s+x.value,0));if(otherCount)channelSegments.push({label:"Otros",value:otherCount,color:channelTone.otro})
   function markCustom(){setActivePreset("custom")}
   function moveWidget(target){if(!dragging||dragging===target)return;setWidgetOrder(current=>{const next=current.filter(id=>id!==dragging),index=next.indexOf(target);next.splice(index<0?next.length:index,0,dragging);return next});setDragging("");markCustom()}
+  function nudgeWidget(id,direction){setWidgetOrder(current=>{const index=current.indexOf(id),target=index+direction;if(index<0||target<0||target>=current.length)return current;const next=[...current],[item]=next.splice(index,1);next.splice(target,0,item);return next});markCustom()}
   function toggleWidget(id){setHiddenWidgets(current=>current.includes(id)?current.filter(x=>x!==id):[...current,id]);markCustom()}
   function resizeWidget(id,size){const widget=DASHBOARD_WIDGETS.find(item=>item.id===id);if(!widget?.sizes.includes(size))return;setWidgetSizes(current=>({...current,[id]:size}));markCustom()}
   function resetWidgets(){setWidgetOrder(DEFAULT_WIDGET_ORDER);setHiddenWidgets([]);setWidgetSizes(DEFAULT_WIDGET_SIZES);setActivePreset("custom")}
@@ -81,8 +83,9 @@ export function Lobby({settings,rooms,reservations,payments,onView,onOpen,search
   }
   return <div className={`${ui.content} ${polish.dashboard}`}>
     <header className={polish.dashboardTop}><div><button className={polish.mobileMenu} onClick={onMenu}>☰</button><small>HABITACIÓN LLENA · PMS</small><h1>Panel operativo</h1><p>{clockDate}{clockTime?` · ${clockTime}`:""} · {settings?.hotel_name||"Hotel"}</p></div><div className={polish.topActions}><div className={polish.searchBox} role="button" tabIndex={0} onClick={onCommand} onKeyDown={e=>(e.key==="Enter"||e.key===" ")&&onCommand?.()} aria-label="Abrir búsqueda global"><span>⌕</span><input readOnly value="" placeholder="Buscar en todo el PMS…" tabIndex={-1}/><kbd>⌘K</kbd></div><button className={`${polish.customizeButton} ${editing?polish.customizeButtonActive:""}`} onClick={()=>setEditing(v=>!v)}>⌘ Personalizar</button>{onNewReservation&&<button className={polish.primaryAction} onClick={onNewReservation}>＋ Nueva reserva</button>}</div></header>
+    <DashboardTodayRail arrivals={arrivals} departures={departures} inhouse={inhouse} rooms={rooms} paid={paid} occupancy={occupancy} onView={onView} onOpen={onOpen} onNewReservation={onNewReservation}/>
     {editing&&<DashboardCustomizer hidden={hiddenWidgets} activePreset={activePreset} onPreset={applyPreset} onToggle={toggleWidget} onReset={resetWidgets} onDone={()=>setEditing(false)} customizerClass={polish.customizer} introClass={polish.customizerIntro} togglesClass={polish.widgetToggles} onClass={polish.widgetOn} offClass={polish.widgetOff} actionsClass={polish.customizerActions} doneClass={polish.doneButton}/>} 
-    <section className={polish.widgetGrid}>{widgetOrder.filter(id=>!hiddenWidgets.includes(id)).map(id=>{const widget=widgetById[id];if(!widget)return null;return <WidgetSlot key={id} widget={widget} size={widgetSizes[id]} editing={editing} onDragStart={setDragging} onDrop={moveWidget} onSize={resizeWidget} slotClass={polish.widgetSlot} editingClass={polish.widgetEditing} handleClass={polish.widgetHandle}>{widgetContent(id)}</WidgetSlot>})}</section>
+    <section className={polish.widgetGrid}>{widgetOrder.filter(id=>!hiddenWidgets.includes(id)).map(id=>{const widget=widgetById[id];if(!widget)return null;return <WidgetSlot key={id} widget={widget} size={widgetSizes[id]} editing={editing} onDragStart={setDragging} onDrop={moveWidget} onSize={resizeWidget} onNudge={nudgeWidget} slotClass={polish.widgetSlot} editingClass={polish.widgetEditing} handleClass={polish.widgetHandle}>{widgetContent(id)}</WidgetSlot>})}</section>
   </div>
 }
 
