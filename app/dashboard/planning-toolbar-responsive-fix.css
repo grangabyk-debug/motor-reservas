@@ -1,0 +1,289 @@
+/* Final responsive alignment pass for Planning operator controls and Assignment Rack.
+   Keep this file loaded last. It intentionally overrides previous compact-bar experiments. */
+
+/* ---------- PLANNING TOP CONTROL BAR ---------- */
+.hlHotelgest main [class*="command-center-module"][class*="toolbar"]{
+  box-sizing:border-box!important;
+  min-height:60px!important;
+  height:auto!important;
+  padding:9px 10px!important;
+  gap:12px!important;
+}
+
+/* Every visible operator control uses the same 40px rhythm. */
+.hlHotelgest main [class*="command-center-module"][class*="rangeBlock"]{
+  flex:0 0 310px!important;
+  min-width:0!important;
+  height:40px!important;
+  gap:5px!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="rangeBlock"] button,
+.hlHotelgest main [class*="command-center-module"][class*="rangeBlock"] [class*="todayButton"]{
+  box-sizing:border-box!important;
+  height:40px!important;
+  min-height:40px!important;
+  border-radius:10px!important;
+  font-size:12px!important;
+  line-height:1!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="rangeBlock"] strong{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  height:40px!important;
+  min-width:116px!important;
+  font-size:12px!important;
+  line-height:1!important;
+}
+
+.hlHotelgest main [class*="command-center-module"][class*="viewSwitch"]{
+  box-sizing:border-box!important;
+  top:9px!important;
+  height:40px!important;
+  min-height:40px!important;
+  padding:0!important;
+  gap:4px!important;
+  border-radius:11px!important;
+  overflow:visible!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="viewSwitch"] button{
+  box-sizing:border-box!important;
+  height:40px!important;
+  min-height:40px!important;
+  padding:0 14px!important;
+  border-radius:10px!important;
+  font-size:12px!important;
+  line-height:40px!important;
+  font-weight:850!important;
+  white-space:nowrap!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="viewSwitch"] button:last-child{
+  min-width:142px!important;
+}
+
+.hlHotelgest main [class*="command-center-module"][class*="filters"]{
+  flex:0 1 520px!important;
+  min-width:300px!important;
+  max-width:520px!important;
+  height:40px!important;
+  align-items:center!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="searchInput"]{
+  box-sizing:border-box!important;
+  height:40px!important;
+  min-height:40px!important;
+  width:100%!important;
+  border-radius:10px!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="searchInput"] input{
+  height:38px!important;
+  font-size:12px!important;
+  line-height:38px!important;
+}
+
+/* Wide desktop: one true visual row. Give the center switch a bounded lane so it
+   can never collide with the range on the left or search on the right. */
+@media(min-width:1421px){
+  .hlHotelgest main [class*="command-center-module"][class*="toolbar"]{
+    display:flex!important;
+    align-items:center!important;
+    justify-content:space-between!important;
+    min-height:60px!important;
+    padding:9px 10px!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="viewSwitch"]{
+    left:50%!important;
+    right:auto!important;
+    width:auto!important;
+    max-width:430px!important;
+    transform:translateX(-50%)!important;
+  }
+}
+
+/* Notebook / compact desktop: two clean rows INSIDE the same rounded surface.
+   Row 1 = view mode. Row 2 = date range + search. Nothing is absolutely allowed
+   to sit on top of another control. */
+@media(max-width:1420px) and (min-width:901px){
+  .hlHotelgest main [class*="command-center-module"][class*="toolbar"]{
+    display:grid!important;
+    grid-template-columns:minmax(270px,auto) minmax(280px,1fr)!important;
+    grid-template-areas:"switch switch" "range search"!important;
+    align-items:center!important;
+    min-height:112px!important;
+    padding:58px 10px 10px!important;
+    column-gap:12px!important;
+    row-gap:9px!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="viewSwitch"]{
+    top:9px!important;
+    left:10px!important;
+    right:10px!important;
+    width:auto!important;
+    max-width:none!important;
+    transform:none!important;
+    justify-content:center!important;
+    overflow-x:auto!important;
+    scrollbar-width:none!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="rangeBlock"]{
+    grid-area:range!important;
+    width:100%!important;
+    flex:none!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="filters"]{
+    grid-area:search!important;
+    width:100%!important;
+    min-width:0!important;
+    max-width:none!important;
+    flex:none!important;
+    margin:0!important;
+  }
+}
+
+/* Tablet and phone: deterministic three lanes. No overlap and no horizontal
+   page overflow; only the mode buttons themselves may scroll if absolutely needed. */
+@media(max-width:900px){
+  .hlHotelgest main [class*="command-center-module"][class*="toolbar"]{
+    display:flex!important;
+    flex-direction:column!important;
+    align-items:stretch!important;
+    min-height:164px!important;
+    padding:58px 9px 9px!important;
+    gap:9px!important;
+    overflow:hidden!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="viewSwitch"]{
+    top:9px!important;
+    left:9px!important;
+    right:9px!important;
+    width:auto!important;
+    max-width:none!important;
+    transform:none!important;
+    justify-content:flex-start!important;
+    overflow-x:auto!important;
+    overflow-y:hidden!important;
+    scrollbar-width:none!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="viewSwitch"] button{
+    min-width:max-content!important;
+    padding:0 13px!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="rangeBlock"]{
+    width:100%!important;
+    flex:0 0 40px!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="rangeBlock"] strong{
+    flex:1 1 auto!important;
+    min-width:0!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="filters"]{
+    width:100%!important;
+    min-width:0!important;
+    max-width:none!important;
+    flex:0 0 40px!important;
+    margin:0!important;
+  }
+}
+
+@media(max-width:520px){
+  .hlHotelgest main [class*="command-center-module"][class*="viewSwitch"] button{
+    font-size:11px!important;
+    padding:0 11px!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="rangeBlock"] button{
+    min-width:36px!important;
+    padding:0 8px!important;
+  }
+}
+
+/* ---------- ASSIGNMENT RACK HEADER ACTIONS ---------- */
+.hlHotelgest main [class*="assignment-rack-module"][class*="wrap"]>header{
+  align-items:center!important;
+}
+.hlHotelgest main [class*="assignment-rack-module"][class*="headerActions"]{
+  display:grid!important;
+  grid-template-columns:142px 178px 42px!important;
+  align-items:center!important;
+  gap:8px!important;
+  min-height:42px!important;
+}
+.hlHotelgest main [class*="assignment-rack-module"][class*="headerActions"] label{
+  position:relative!important;
+  display:block!important;
+  height:42px!important;
+  min-height:42px!important;
+}
+.hlHotelgest main [class*="assignment-rack-module"][class*="headerActions"] label>span{
+  position:absolute!important;
+  left:2px!important;
+  top:-14px!important;
+  font-size:9px!important;
+  line-height:10px!important;
+  font-weight:900!important;
+}
+.hlHotelgest main [class*="assignment-rack-module"][class*="headerActions"] input,
+.hlHotelgest main [class*="assignment-rack-module"][class*="headerActions"] button{
+  box-sizing:border-box!important;
+  width:100%!important;
+  height:42px!important;
+  min-height:42px!important;
+  margin:0!important;
+  border-radius:11px!important;
+  font-size:12px!important;
+  line-height:1!important;
+  font-weight:850!important;
+}
+.hlHotelgest main [class*="assignment-rack-module"][class*="headerActions"] [class*="close"]{
+  width:42px!important;
+  min-width:42px!important;
+  padding:0!important;
+  font-size:17px!important;
+}
+
+/* Slightly stronger rack hierarchy. */
+.hlHotelgest main [class*="assignment-rack-module"] [class*="sectionTitle"] b,
+.hlHotelgest main [class*="assignment-rack-module"] [class*="mapHead"] b{
+  font-size:13px!important;
+  font-weight:900!important;
+}
+.hlHotelgest main [class*="assignment-rack-module"] [class*="arrivals"]>button b{
+  font-size:13px!important;
+  font-weight:900!important;
+}
+.hlHotelgest main [class*="assignment-rack-module"] [class*="arrivals"]>button small,
+.hlHotelgest main [class*="assignment-rack-module"] [class*="arrivals"]>button em{
+  font-size:10.5px!important;
+  line-height:1.35!important;
+}
+.hlHotelgest main [class*="assignment-rack-module"] [class*="floors"] button b{
+  font-size:15px!important;
+  font-weight:900!important;
+}
+.hlHotelgest main [class*="assignment-rack-module"] [class*="floors"] button small,
+.hlHotelgest main [class*="assignment-rack-module"] [class*="floors"] button em{
+  font-size:10px!important;
+  line-height:1.25!important;
+}
+
+/* Rack header responsive behavior. */
+@media(max-width:1100px){
+  .hlHotelgest main [class*="assignment-rack-module"][class*="wrap"]>header{
+    display:grid!important;
+    grid-template-columns:1fr!important;
+    gap:18px!important;
+  }
+  .hlHotelgest main [class*="assignment-rack-module"][class*="headerActions"]{
+    width:100%!important;
+    grid-template-columns:minmax(130px,1fr) minmax(155px,1fr) 42px!important;
+  }
+}
+@media(max-width:620px){
+  .hlHotelgest main [class*="assignment-rack-module"][class*="headerActions"]{
+    grid-template-columns:minmax(0,1fr) 42px!important;
+    grid-template-areas:"date close" "toggle toggle"!important;
+    gap:8px!important;
+  }
+  .hlHotelgest main [class*="assignment-rack-module"][class*="headerActions"] label{grid-area:date!important}
+  .hlHotelgest main [class*="assignment-rack-module"][class*="headerActions"] button:not([class*="close"]){grid-area:toggle!important}
+  .hlHotelgest main [class*="assignment-rack-module"][class*="headerActions"] [class*="close"]{grid-area:close!important}
+}
