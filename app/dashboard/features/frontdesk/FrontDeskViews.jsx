@@ -8,6 +8,7 @@ import{DashboardCustomizer,WidgetSlot}from"./DashboardWidgetLibrary"
 import ui from"../../v2.module.css"
 import polish from"./frontdesk-polish.module.css"
 import GuestCRMWorkspace from"./GuestCRM"
+import RevenueLab from"./RevenueLab"
 
 const channelTone={booking:"#4c82ee",directa:"#16a98a",motor:"#16a98a",expedia:"#f5a524",airbnb:"#ef5f6c",agencia:"#8b6dd7",otro:"#9ba7ba"}
 const channelLabel=value=>{const raw=String(value||"Directa").trim(),v=raw.toLowerCase();if(v.includes("booking"))return"Booking.com";if(v.includes("expedia"))return"Expedia";if(v.includes("airbnb"))return"Airbnb";if(v.includes("motor"))return"Motor directo";if(v.includes("agencia"))return"Agencias";if(v==="directa"||v.includes("whatsapp")||v.includes("tel")||v.includes("walk"))return"Directa";return raw||"Otros"}
@@ -64,6 +65,7 @@ export function Lobby({settings,rooms,reservations,payments,onView,onOpen,search
   function widgetContent(id){
     if(id==="turn-pulse")return <section className={`${polish.card} ${polish.reservationMetrics}`}><small>OPERACIÓN · HOY</small><div><span><b>{arrivals.length}</b><small>Llegadas</small></span><span><b>{inhouse.length}</b><small>En casa</small></span><span><b>{departures.length}</b><small>Salidas</small></span><span><b>{noShows}</b><small>No-show</small></span></div><button onClick={()=>onView("reservations")}>Ver movimiento del día →</button></section>
     if(id==="occupancy")return <section className={`${polish.card} ${polish.occupancyCard}`}><div className={polish.chartHeading}><div><small>OCUPACIÓN</small><strong>{occupancy}%</strong><p>{occupied} de {sellable.length} habitaciones ocupadas</p></div><div className={polish.chartLegend}><span><i className={polish.legendBlue}/>Actual / proyectada</span><span><i className={polish.legendDash}/>Período anterior</span></div></div><Sparkline values={forecast} comparison={previous}/><div className={polish.chartAxis}><span>{shortDate(addDays(today,-3))}</span><span>Hoy</span><span>{shortDate(addDays(today,8))}</span></div></section>
+    if(id==="revenue-lab")return <RevenueLab occupancy={occupancy} occupied={occupied} roomCount={sellable.length} todayRevenue={todayRevenue} currency={settings?.currency||settings?.moneda||live.find(r=>r.moneda)?.moneda||"ARS"}/>
     if(id==="priorities")return <PriorityPanel arrivals={arrivals} rooms={rooms} paid={paid}/>
     if(id==="kpi-occupancy")return <KpiCard label="OCUPACIÓN HOY" value={`${occupancy}%`} detail={`${occupied}/${sellable.length} hab.`} ring={occupancy} onClick={()=>onView("calendar")}/>
     if(id==="kpi-production")return <KpiCard label="PRODUCCIÓN ESTIMADA" value={money(todayRevenue)} detail="noche hotelera de hoy" icon="$" onClick={()=>onView("cash")}/>
