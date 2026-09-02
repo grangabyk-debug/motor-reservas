@@ -1,0 +1,76 @@
+/* Dashboard action row: search + quote + reservation, customization lives in Settings. */
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="customizeButton"]{display:none!important}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="topActions"]{
+  display:flex!important;
+  flex-direction:row!important;
+  align-items:center!important;
+  justify-content:flex-end!important;
+  gap:10px!important;
+  width:min(760px,58vw)!important;
+  min-width:0!important;
+}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="searchBox"]{
+  flex:1 1 420px!important;
+  min-width:280px!important;
+  height:44px!important;
+  border-radius:12px!important;
+}
+.hlHotelgest .hlPrimaryStack{
+  display:flex!important;
+  flex-direction:row!important;
+  align-items:center!important;
+  gap:10px!important;
+  min-width:0!important;
+}
+.hlHotelgest .hlPrimaryStack [class*="frontdesk-polish-module"][class*="primaryAction"],
+.hlHotelgest .hlQuoteAction{
+  width:154px!important;
+  min-width:154px!important;
+  height:44px!important;
+  min-height:44px!important;
+  padding:0 16px!important;
+  border-radius:12px!important;
+  font-size:12px!important;
+  font-weight:800!important;
+  letter-spacing:-.01em!important;
+  white-space:nowrap!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  box-sizing:border-box!important;
+  transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease,filter .16s ease!important;
+}
+.hlHotelgest .hlPrimaryStack [class*="frontdesk-polish-module"][class*="primaryAction"]{
+  background:linear-gradient(135deg,#2f76ef 0%,#6861ee 100%)!important;
+  border:1px solid rgba(91,112,235,.62)!important;
+  color:#fff!important;
+  box-shadow:0 10px 24px rgba(62,99,220,.22),inset 0 1px 0 rgba(255,255,255,.22)!important;
+}
+.hlHotelgest .hlQuoteAction{
+  background:linear-gradient(135deg,#118d98 0%,#277fae 100%)!important;
+  border:1px solid rgba(38,141,168,.62)!important;
+  color:#fff!important;
+  box-shadow:0 10px 24px rgba(23,126,157,.18),inset 0 1px 0 rgba(255,255,255,.2)!important;
+}
+.hlHotelgest .hlPrimaryStack [class*="frontdesk-polish-module"][class*="primaryAction"]:hover,
+.hlHotelgest .hlQuoteAction:hover{transform:translateY(-1px)!important;filter:brightness(1.04)!important}
+.hlHotelgest .hlQuoteAction:hover{box-shadow:0 13px 28px rgba(23,126,157,.24),0 0 18px rgba(52,181,200,.12)!important}
+.hlHotelgest.hlThemeDark .hlQuoteAction{
+  background:linear-gradient(135deg,#0d7580 0%,#245f91 100%)!important;
+  border-color:#2f7897!important;
+  box-shadow:0 0 20px rgba(41,157,184,.12),0 10px 25px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.09)!important;
+}
+.hlHotelgest.hlThemeDark .hlPrimaryStack [class*="frontdesk-polish-module"][class*="primaryAction"]{
+  box-shadow:0 0 22px rgba(67,115,239,.12),0 10px 25px rgba(0,0,0,.22),inset 0 1px 0 rgba(255,255,255,.1)!important;
+}
+@media(max-width:1180px){
+  .hlHotelgest main [class*="frontdesk-polish-module"][class*="topActions"]{width:min(670px,62vw)!important}
+  .hlHotelgest .hlPrimaryStack [class*="frontdesk-polish-module"][class*="primaryAction"],.hlHotelgest .hlQuoteAction{width:138px!important;min-width:138px!important}
+}
+@media(max-width:900px){
+  .hlHotelgest main [class*="frontdesk-polish-module"][class*="topActions"]{width:100%!important;display:grid!important;grid-template-columns:1fr!important}
+  .hlHotelgest main [class*="frontdesk-polish-module"][class*="searchBox"]{width:100%!important;min-width:0!important}
+  .hlHotelgest .hlPrimaryStack{display:grid!important;grid-template-columns:1fr 1fr!important;width:100%!important}
+  .hlHotelgest .hlPrimaryStack [class*="frontdesk-polish-module"][class*="primaryAction"],.hlHotelgest .hlQuoteAction{width:100%!important;min-width:0!important}
+}
+@media(max-width:520px){.hlHotelgest .hlPrimaryStack{grid-template-columns:1fr!important}}
