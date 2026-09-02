@@ -6,12 +6,12 @@ import polish from "./shell-polish.module.css"
 
 export default function HotelTopbar({view,title,onNewReservation,onMenu,onCommand}){
   const meta=VIEW_META[view],display=view==="integrations"?"Channel":title||meta?.label||"Hotel"
-  return <header className={`${ui.topbar} ${polish.topbarPremium} ${polish.appTopbar}`}>
+  return <header className={`${ui.topbar} ${polish.topbarPremium} hlAppTopbar`}>
     <button className={ui.menu} onClick={onMenu} aria-label="Abrir menú">☰</button>
-    <div className={polish.appTitle} title={display}>{display}</div>
+    <div className="hlAppTitle" title={display}>{display}</div>
     <div className={ui.actions}>
-      <button type="button" onClick={onCommand} aria-label="Buscar en Habitación Llena" title="Buscar" className={polish.appSearch}>⌕</button>
-      {onNewReservation&&<button className={`${ui.primary} ${polish.appReservation}`} onClick={onNewReservation}>＋ Reserva</button>}
+      <button type="button" onClick={onCommand} aria-label="Buscar en Habitación Llena" title="Buscar" className="hlAppSearch">⌕</button>
+      {onNewReservation&&<button className={`${ui.primary} hlAppReservation`} onClick={onNewReservation}>＋ Reserva</button>}
     </div>
   </header>
 }
