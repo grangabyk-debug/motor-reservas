@@ -73,6 +73,25 @@
   z-index:15!important;
 }
 
+/* Planning controls must reflow instead of falling outside the viewport. */
+@media(max-width:1250px){
+  .hlHotelgest [class*="filters"]{
+    flex-wrap:wrap!important;
+    overflow:visible!important;
+    row-gap:6px!important;
+  }
+  .hlHotelgest [class*="searchInput"]{
+    flex:1 1 100%!important;
+    min-width:min(100%,260px)!important;
+  }
+  .hlHotelgest [class*="filters"] select,
+  .hlHotelgest [class*="filters"] > input,
+  .hlHotelgest [class*="filters"] > button{
+    flex:0 1 auto!important;
+    max-width:100%!important;
+  }
+}
+
 @media(max-width:900px){
   .hlHotelgest [class*="toolbar"] > [class*="legend"]{
     flex-wrap:nowrap!important;
@@ -81,4 +100,21 @@
     scrollbar-width:none!important;
   }
   .hlHotelgest [class*="toolbar"] > [class*="legend"]::-webkit-scrollbar{display:none!important}
+  .hlHotelgest [class*="filters"]{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+    overflow:visible!important;
+  }
+  .hlHotelgest [class*="searchInput"]{grid-column:1/-1!important;width:100%!important}
+  .hlHotelgest [class*="filters"] select,
+  .hlHotelgest [class*="filters"] > input,
+  .hlHotelgest [class*="filters"] > button{
+    width:100%!important;
+    min-width:0!important;
+  }
+}
+
+@media(max-width:560px){
+  .hlHotelgest [class*="filters"]{grid-template-columns:1fr!important}
+  .hlHotelgest [class*="toolbar"] > [class*="legend"]{font-size:10px!important;gap:6px 10px!important}
 }
