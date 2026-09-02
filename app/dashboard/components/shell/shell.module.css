@@ -56,10 +56,13 @@
 
 .moduleList{display:flex;flex:1 1 auto;min-height:0;flex-direction:column;gap:6px;margin-top:12px;width:46px;overflow:visible}
 .moduleItem{position:relative;width:46px;flex:0 0 auto}
-.moduleButton{display:grid;place-items:center;width:46px;height:46px;padding:0;border:0;border-radius:13px;background:transparent;color:#718096;cursor:pointer;transition:background-color .15s ease,color .15s ease,transform .15s ease}
-.moduleButton:hover{background:#f1f4f8;color:#284e7a;transform:translateY(-1px)}
-.moduleButtonActive{background:#eaf1fb;color:#245fc8}
+.moduleButton{display:grid;place-items:center;width:46px;height:46px;padding:0;border:0;border-radius:13px;background:transparent;color:#718096;cursor:pointer;transition:background-color .15s ease,color .15s ease,transform .15s ease,box-shadow .15s ease}
+.moduleButton:hover{background:linear-gradient(145deg,#f2f7ff,#eef4fb);color:#285c95;transform:translateY(-1px);box-shadow:inset 0 0 0 1px rgba(69,121,190,.08),0 7px 16px rgba(44,87,145,.06)}
+.moduleButtonActive{background:linear-gradient(145deg,#e9f3ff,#edf3ff);color:#2469d8;box-shadow:inset 0 0 0 1px rgba(57,119,221,.16),0 0 18px rgba(54,124,245,.12)}
 .moduleButton i{font-style:normal;font-size:18px;line-height:1}
+.moduleGlyph{display:grid!important;place-items:center;width:28px;height:28px;color:currentColor;filter:drop-shadow(0 3px 5px rgba(38,86,151,.08))}
+.moduleGlyph svg{display:block;width:23px;height:23px;overflow:visible}
+.moduleButtonActive .moduleGlyph{filter:drop-shadow(0 0 7px rgba(54,124,245,.22))}
 .mobileModuleText,.mobileChevron{display:none}
 
 .rail [data-tip]{position:relative}
@@ -73,10 +76,13 @@
 .moduleFlyout header b{display:block;margin-top:3px;font-size:15px;color:#25364c}
 .moduleFlyout header span{display:block;margin-top:3px;font-size:10px;line-height:1.35;color:#8a96a6}
 .moduleFlyout>div{display:grid;gap:2px;padding-top:7px}
-.moduleFlyout>div button{display:grid;grid-template-columns:25px minmax(0,1fr) 12px;align-items:center;gap:7px;min-height:40px;padding:6px 8px;border:0;border-radius:9px;background:transparent;color:#617087;text-align:left;cursor:pointer}
-.moduleFlyout>div button:hover{background:#f3f6f9;color:#2d4665}
-.moduleFlyout>div button.flyoutActive{background:#eaf1fb;color:#245fc8}
+.moduleFlyout>div button{display:grid;grid-template-columns:29px minmax(0,1fr) 12px;align-items:center;gap:7px;min-height:42px;padding:6px 8px;border:0;border-radius:10px;background:transparent;color:#617087;text-align:left;cursor:pointer;transition:background .15s ease,color .15s ease,transform .15s ease}
+.moduleFlyout>div button:hover{background:#f3f7fb;color:#2d5f98;transform:translateX(1px)}
+.moduleFlyout>div button.flyoutActive{background:#eaf2fd;color:#245fc8}
 .moduleFlyout>div button i{font-style:normal;color:#54769b}
+.flyoutGlyph{display:grid!important;place-items:center;width:27px;height:27px;border-radius:8px;background:rgba(83,126,178,.07);color:currentColor!important}
+.flyoutGlyph svg{width:18px;height:18px}
+.moduleFlyout>div button.flyoutActive .flyoutGlyph{background:rgba(45,107,215,.11);color:#2469d8!important}
 .moduleFlyout>div button span{font-size:11px;font-weight:700}
 .moduleFlyout>div button em{font-style:normal;font-size:8px;color:#3975b6}
 @keyframes flyoutIn{from{opacity:0;transform:translateX(-4px)}to{opacity:1;transform:none}}
@@ -86,6 +92,7 @@
 .railUtility{cursor:pointer}
 .railUtility:hover,.railUtilityActive{background:#f1f4f8!important;color:#294e79}
 .railUtility>span,.sessionMark>span{display:grid;place-items:center;width:30px;height:30px;border-radius:10px;background:#edf2f7;color:#42658c;font-size:11px;font-weight:900;line-height:1}
+.utilityGlyph svg{width:18px;height:18px}
 .railUtility:nth-of-type(2)>span{font-size:17px;color:#7d6870}
 .railUtility>b,.sessionMark>b,.countryMark>b{display:none}
 .sessionMark{cursor:default}
@@ -120,8 +127,8 @@
   .hotelSwitch select{opacity:1;padding:0 12px 0 34px;border:0;background:transparent;color:#45556b;font-size:11px}
   .moduleList{flex:0 0 auto;gap:4px;margin-top:8px}
   .moduleItem{width:100%}
-  .moduleButton{width:100%;height:46px;grid-template-columns:28px minmax(0,1fr) 14px;justify-items:start;padding:0 10px;text-align:left}
-  .moduleButton i{font-size:16px}
+  .moduleButton{width:100%;height:48px;grid-template-columns:34px minmax(0,1fr) 14px;justify-items:start;padding:0 10px;text-align:left}
+  .moduleGlyph{width:30px;height:30px}.moduleGlyph svg{width:22px;height:22px}
   .mobileModuleText{display:grid;gap:2px}
   .mobileModuleText b{font-size:11px}.mobileModuleText small{font-size:9px;color:#94a0b0}
   .mobileChevron{display:block;justify-self:end}
