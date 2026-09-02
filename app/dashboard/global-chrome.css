@@ -1,0 +1,27 @@
+.hlDashboardChrome{min-height:100%;background:#f6f7f9;color:#202938;transition:background .18s ease,color .18s ease}
+.hlUtilityBar{position:sticky;top:0;z-index:120;min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:6px 18px;border-bottom:1px solid #e3e7ec;background:rgba(255,255,255,.96);backdrop-filter:blur(16px);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#647186}
+.hlUtilityRegion,.hlUtilityRight,.hlUtilityClock,.hlThemeToggle{display:flex;align-items:center}
+.hlUtilityRegion{gap:8px;min-width:0;font-size:10px;font-weight:700;letter-spacing:.01em;white-space:nowrap}
+.hlUtilityFlag{width:22px;height:12px;display:grid;place-items:center;border-radius:3px;background:linear-gradient(#75b9e8 0 33%,#fff 33% 66%,#75b9e8 66%);color:#e0b62f;font-size:6px;overflow:hidden}
+.hlUtilityRight{gap:10px;margin-left:auto}
+.hlUtilityClock{gap:8px;padding-right:10px;border-right:1px solid #e3e7ec;font-size:10px;white-space:nowrap}
+.hlUtilityClock span{text-transform:capitalize;color:#7f8a99}.hlUtilityClock strong{font-size:12px;color:#27344a;font-variant-numeric:tabular-nums}
+.hlThemeToggle{gap:6px;min-height:32px;padding:0 10px;border:1px solid #dfe5ec;border-radius:9px;background:#fff;color:#4d5c72;cursor:pointer;font:700 10px/1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.hlThemeToggle span{font-size:15px}.hlThemeToggle em{font-style:normal}.hlThemeToggle:hover{background:#f5f7fa}
+
+.hlDashboardChrome.hlThemeDark{background:#11151c;color:#e7ebf1;--hl-app-bg:#11151c;--hl-app-surface:#171c24;--hl-app-line:#2b3340;--hl-app-text:#e7ebf1;--hl-app-muted:#96a2b3;--hl-min-bg:#11151c;--hl-min-surface:#171c24;--hl-min-line:#2b3340;--hl-min-text:#e7ebf1;--hl-min-muted:#96a2b3}
+.hlThemeDark .hlUtilityBar{background:rgba(19,24,32,.96);border-color:#2b3340;color:#9aa6b6}
+.hlThemeDark .hlUtilityClock{border-color:#2b3340}.hlThemeDark .hlUtilityClock span{color:#8f9bad}.hlThemeDark .hlUtilityClock strong{color:#f1f4f8}
+.hlThemeDark .hlThemeToggle{background:#1b222c;border-color:#333c49;color:#eef2f6}.hlThemeDark .hlThemeToggle:hover{background:#242c37}
+.hlThemeDark [class*="v2-module"][class*="shell"],.hlThemeDark [class*="v2-module"][class*="work"],.hlThemeDark main{background:#11151c!important;color:#e7ebf1!important}
+.hlThemeDark aside[class*="shell-module"],.hlThemeDark [class*="shell-module"][class*="sidebar"]{background:#151a22!important;border-color:#2b3340!important;color:#dce3ec!important}
+.hlThemeDark .hlAppTopbar{background:rgba(21,26,34,.96)!important;border-color:#2b3340!important;color:#e7ebf1!important}
+.hlThemeDark .hlAppTitle{color:#eef2f6!important}.hlThemeDark .hlAppSearch{background:#1b222c!important;border-color:#333c49!important;color:#c7d0dc!important}
+.hlThemeDark main [class*="frontdesk-polish-module"][class*="dashboard"],.hlThemeDark main [class*="housekeeping-premium-module"][class*="page"]{background:#11151c!important}
+.hlThemeDark main [class*="frontdesk-polish-module"][class*="card"],.hlThemeDark main [class*="frontdesk-polish-module"][class*="kpiCard"],.hlThemeDark main [class*="v2-module"][class*="panel"],.hlThemeDark main [class*="v2-module"][class*="floorCard"],.hlThemeDark main [class*="v2-module"][class*="tableWrap"],.hlThemeDark main [class*="v2-module"][class*="paymentBox"],.hlThemeDark main [class*="v2-module"][class*="roomCard"],.hlThemeDark main [class*="v2-module"][class*="guestCard"],.hlThemeDark main [class*="v2-module"][class*="resourceCard"],.hlThemeDark main [class*="v2-module"][class*="ticket"],.hlThemeDark main [class*="v2-module"][class*="hkCard"],.hlThemeDark main [class*="-module"][class*="card"],.hlThemeDark main [class*="-module"][class*="panel"],.hlThemeDark main [class*="-module"] article{background:#171c24!important;border-color:#2b3340!important;color:#e7ebf1!important}
+.hlThemeDark main h1,.hlThemeDark main h2,.hlThemeDark main h3,.hlThemeDark main h4,.hlThemeDark main strong,.hlThemeDark main b{color:#eef2f6!important}.hlThemeDark main p,.hlThemeDark main small,.hlThemeDark main span,.hlThemeDark main em{border-color:#2b3340}
+.hlThemeDark main input,.hlThemeDark main select,.hlThemeDark main textarea{background:#131820!important;border-color:#303947!important;color:#e8edf4!important}.hlThemeDark main input::placeholder,.hlThemeDark main textarea::placeholder{color:#7e8a9b!important}
+.hlThemeDark main table th{background:#151a22!important;color:#929eae!important;border-color:#2b3340!important}.hlThemeDark main table td{background:#171c24!important;color:#dbe2eb!important;border-color:#2b3340!important}.hlThemeDark main table tr:hover td{background:#1e2530!important}
+.hlThemeDark main button:not(.hlAppReservation){border-color:#333c49}.hlThemeDark [class*="frontdesk-polish-module"][class*="searchBox"],.hlThemeDark [class*="frontdesk-polish-module"][class*="customizer"]{background:#171c24!important;border-color:#2b3340!important;color:#dce3ec!important}
+
+@media(max-width:760px){.hlUtilityBar{padding:6px 10px}.hlUtilityRegion span:last-child{display:none}.hlUtilityClock span{display:none}.hlThemeToggle em{display:none}.hlThemeToggle{width:34px;padding:0;justify-content:center}.hlUtilityRight{gap:7px}}
