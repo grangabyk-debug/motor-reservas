@@ -51,7 +51,7 @@ function SimpleDashboard({settings,rooms=[],reservations=[],payments=[],onView,o
   const today=isoDate(),live=reservations.filter(activeReservation),arrivals=live.filter(r=>r.fecha_entrada===today&&r.estado!=="alojado"),departures=live.filter(r=>r.fecha_salida===today&&r.estado!=="finalizada"),inhouse=live.filter(r=>r.fecha_entrada<=today&&r.fecha_salida>today&&r.estado!=="finalizada"),sellable=rooms.filter(r=>r.activa!==false&&!['mantenimiento','fuera_servicio'].includes(String(r.estado||"").toLowerCase())),occupied=new Set(inhouse.map(r=>String(r.habitacion_id))).size,occupancy=pct(occupied,sellable.length),dirty=rooms.filter(r=>String(r.estado||"").toLowerCase()==="sucia").length,cleaning=rooms.filter(r=>["limpieza","en_limpieza","inspeccion"].includes(String(r.estado||"").toLowerCase())).length,ready=rooms.filter(r=>["limpia","inspeccionada","disponible"].includes(String(r.estado||"").toLowerCase())).length
   const paid=useMemo(()=>{const map=new Map();payments.forEach(p=>map.set(String(p.reserva_id),(map.get(String(p.reserva_id))||0)+Number(p.monto||0)));return map},[payments]),due=arrivals.filter(r=>Math.max(0,Number(r.precio_total||0)-(paid.get(String(r.id))||0))>.01),dueAmount=due.reduce((sum,r)=>sum+Math.max(0,Number(r.precio_total||0)-(paid.get(String(r.id))||0)),0)
   const forecast=useMemo(()=>Array.from({length:14},(_,i)=>{const day=addDays(today,i),count=new Set(live.filter(r=>r.fecha_entrada<=day&&r.fecha_salida>day).map(r=>String(r.habitacion_id))).size;return pct(count,sellable.length)}),[today,live,sellable.length]),todayRevenue=live.filter(r=>r.fecha_entrada<=today&&r.fecha_salida>today).reduce((sum,r)=>sum+Number(r.precio_total||0)/nights(r),0)
-  const roomName=id=>rooms.find(room=>String(room.id)===String(id))?.nombre||"Sin asignar",nextArrivals=[...arrivals].sort((a,b)=>String(a.hora_llegada_estimada||"99:99").localeCompare(String(b.hora_llegada_estimada||"99:99"))).slice(0,4),attention=[...due.slice(0,2).map(r=>({label:"Cobro pendiente",detail:`${r.nombre_huesped} · ${money(Math.max(0,Number(r.precio_total||0)-(paid.get(String(r.id))||0)),r.moneda||"ARS")}`,view:"cash"})),...(dirty?[{label:"Housekeeping",detail:`${dirty} sucias · ${cleaning} en proceso`,view:"housekeeping"}]:[]),...(departures.length&&arrivals.some(a=>departures.some(d=>String(d.habitacion_id)===String(a.habitacion_id)))?[{label:"Recambio hoy",detail:"Hay habitaciones con salida y nueva llegada el mismo día.",view:"calendar"}]:[])].slice(0,4)
+  const roomName=id=>rooms.find(room=>String(room.id)===String(id))?.nombre||"Sin asignar",nextArrivals=[...arrivals].sort((a,b)=>String(a.hora_llegada_estimada||"99:99").localeCompare(String(b.hora_llegada_estimada||"99:99"))).slice(0,4),attention=[...due.slice(0,2).map(r=>({label:"Cobro pendiente",detail:`${r.nombre_huesped} · revisar cuenta antes del ingreso`,view:"cash"})),...(dirty?[{label:"Housekeeping",detail:"Hay habitaciones que requieren preparación operativa.",view:"housekeeping"}]:[]),...(departures.length&&arrivals.some(a=>departures.some(d=>String(d.habitacion_id)===String(a.habitacion_id)))?[{label:"Recambio hoy",detail:"Hay una salida y una nueva llegada en la misma habitación.",view:"calendar"}]:[])].slice(0,4)
   const dateLabel=clock?new Intl.DateTimeFormat("es-AR",{weekday:"long",day:"numeric",month:"long"}).format(clock):"",timeLabel=clock?new Intl.DateTimeFormat("es-AR",{hour:"2-digit",minute:"2-digit"}).format(clock):""
 
   return <main className={s.simple}>
@@ -62,29 +62,29 @@ function SimpleDashboard({settings,rooms=[],reservations=[],payments=[],onView,o
 
     <div className={s.nationalLine}><ArgentinaMark/><span>ARS · Mercado Pago · ARCA</span></div>
 
-    <section className={s.metrics} aria-label="Indicadores de hoy">
-      <button type="button" onClick={()=>onView?.("calendar")}><small>OCUPACIÓN</small><strong>{occupancy}%</strong><span>{occupied} de {sellable.length} habitaciones</span></button>
-      <button type="button" onClick={()=>onView?.("reservations")}><small>LLEGADAS</small><strong>{arrivals.length}</strong><span>{nextArrivals[0]?`${nextArrivals[0].hora_llegada_estimada||"Sin hora"} · ${nextArrivals[0].nombre_huesped}`:"Sin pendientes"}</span></button>
-      <button type="button" onClick={()=>onView?.("reservations")}><small>SALIDAS</small><strong>{departures.length}</strong><span>{departures.length?"Movimiento del día":"Sin pendientes"}</span></button>
-      <button type="button" onClick={()=>onView?.("housekeeping")}><small>HOUSEKEEPING</small><strong>{dirty||ready}</strong><span>{dirty?`${dirty} sucias · ${cleaning} en proceso`:`${ready} listas`}</span></button>
-      <button type="button" onClick={()=>onView?.("cash")}><small>COBROS HOY</small><strong>{due.length}</strong><span>{due.length?money(dueAmount,due[0]?.moneda||"ARS"):"Sin deuda inmediata"}</span></button>
+    <section className={s.metrics} aria-label="Widgets de hoy">
+      <button type="button" className={s.metricWidget} onClick={()=>onView?.("calendar")}><small>OCUPACIÓN</small><strong>{occupancy}%</strong><span>{occupied} de {sellable.length} habitaciones</span></button>
+      <button type="button" className={s.metricWidget} onClick={()=>onView?.("reservations")}><small>LLEGADAS</small><strong>{arrivals.length}</strong><span>{nextArrivals[0]?`${nextArrivals[0].hora_llegada_estimada||"Sin hora"} · ${nextArrivals[0].nombre_huesped}`:"Sin pendientes"}</span></button>
+      <button type="button" className={s.metricWidget} onClick={()=>onView?.("reservations")}><small>SALIDAS</small><strong>{departures.length}</strong><span>{departures.length?"Movimiento del día":"Sin pendientes"}</span></button>
+      <button type="button" className={s.metricWidget} onClick={()=>onView?.("housekeeping")}><small>HOUSEKEEPING</small><strong>{dirty||ready}</strong><span>{dirty?`${dirty} sucias · ${cleaning} en proceso`:`${ready} listas`}</span></button>
+      <button type="button" className={s.metricWidget} onClick={()=>onView?.("cash")}><small>COBROS HOY</small><strong>{due.length}</strong><span>{due.length?money(dueAmount,due[0]?.moneda||"ARS"):"Sin deuda inmediata"}</span></button>
     </section>
 
     <section className={s.mainStage}>
-      <div className={s.occupancyStage}>
-        <div className={s.stageHead}><div><small>PRÓXIMOS 14 DÍAS</small><h2>Ocupación</h2></div><div><b>{occupancy}%</b><span>hoy</span></div></div>
+      <article className={`${s.widget} ${s.occupancyStage}`} data-widget="forecast">
+        <div className={s.stageHead}><div><small>PRÓXIMOS 14 DÍAS</small><h2>Tendencia de ocupación</h2></div></div>
         <Trend values={forecast}/>
         <div className={s.axis}><span>Hoy</span><span>{shortDate(addDays(today,6))}</span><span>{shortDate(addDays(today,13))}</span></div>
         <div className={s.revenueLine}><span><small>Producción estimada · noche actual</small><b>{money(Math.round(todayRevenue),settings?.currency||settings?.moneda||"ARS")}</b></span><button type="button" onClick={()=>onView?.("rates")}>Abrir Revenue →</button></div>
-      </div>
-      <aside className={s.now}>
+      </article>
+      <aside className={`${s.widget} ${s.now}`} data-widget="attention">
         <header><small>AHORA</small><h2>Lo que merece atención</h2></header>
         <div className={s.attention}>{attention.length?attention.map((item,index)=><button type="button" key={`${item.label}-${index}`} onClick={()=>onView?.(item.view)}><i/><span><b>{item.label}</b><small>{item.detail}</small></span><em>→</em></button>):<div className={s.calm}><i>✓</i><div><b>Sin alertas críticas</b><span>La operación no muestra pendientes urgentes.</span></div></div>}</div>
         <button type="button" className={s.planningLink} onClick={()=>onView?.("calendar")}>Abrir Planning <span>→</span></button>
       </aside>
     </section>
 
-    <section className={s.arrivals}>
+    <section className={`${s.widget} ${s.arrivals}`} data-widget="arrivals">
       <header><div><small>PRÓXIMAS LLEGADAS</small><h2>Recepción</h2></div><button type="button" onClick={()=>onView?.("reservations")}>Ver todas →</button></header>
       <div>{nextArrivals.length?nextArrivals.map(r=><button type="button" key={r.id} onClick={()=>onOpen?.(r)}><time>{r.hora_llegada_estimada||"--:--"}</time><span><b>{r.nombre_huesped||"Huésped"}</b><small>{roomName(r.habitacion_id)} · {r.numero_reserva||r.id}</small></span><em>Check-in</em></button>):<p>No hay llegadas pendientes para hoy.</p>}</div>
     </section>
