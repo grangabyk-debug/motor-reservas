@@ -15,7 +15,101 @@
   opacity:1!important;
 }
 .hlHotelgest:not(.hlThemeDark) main [class*="command-center-module"][class*="staySelected"]:hover{
-  background:linear-gradient(135deg,color-mix(in srgb,var(--channel) 27%,white),color-mix(in srgb,var(--channel) 15%,white))!important;
+  background:linear-gradient(135deg,color-mix(in srgb,var(--channel) 22%,white),color-mix(in srgb,var(--channel) 12%,white))!important;
+}
+
+/* Planning reservation interaction: keep the channel colour on hover and add premium game-like motion. */
+.hlHotelgest main [class*="command-center-module"][class*="stay"]{
+  will-change:transform,filter,box-shadow;
+  transform-origin:center;
+  transition:transform .22s cubic-bezier(.2,.82,.25,1),box-shadow .22s ease,filter .22s ease!important;
+}
+.hlHotelgest:not(.hlThemeDark) main [class*="command-center-module"][class*="stay"]:hover{
+  background:linear-gradient(135deg,color-mix(in srgb,var(--channel) 18%,white),color-mix(in srgb,var(--channel) 10%,white))!important;
+  color:color-mix(in srgb,var(--channel) 78%,#172033)!important;
+  transform:translateY(-2px) scale(1.018)!important;
+  filter:saturate(1.08) brightness(1.015)!important;
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--channel) 43%,#d9e1eb),0 0 0 1px color-mix(in srgb,var(--channel) 12%,transparent),0 10px 24px color-mix(in srgb,var(--channel) 18%,rgba(49,70,107,.10)),0 0 24px color-mix(in srgb,var(--channel) 12%,transparent)!important;
+}
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="stay"]:hover{
+  background:linear-gradient(135deg,color-mix(in srgb,var(--channel) 30%,#102033),color-mix(in srgb,var(--channel) 17%,#0d1b2a))!important;
+  color:color-mix(in srgb,var(--channel) 35%,#f3f8ff)!important;
+  transform:translateY(-2px) scale(1.018)!important;
+  filter:saturate(1.10) brightness(1.05)!important;
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--channel) 55%,#2b4159),0 0 28px color-mix(in srgb,var(--channel) 26%,transparent),0 10px 24px rgba(0,0,0,.30)!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="stay"]:active{
+  transform:translateY(0) scale(.985)!important;
+  transition-duration:.08s!important;
+}
+
+/* The custom reservation hover card follows the reservation/channel colour; never a white floating card. */
+.hlHotelgest main [class*="planning-parity-module"][class*="stayPreview"]{
+  isolation:isolate!important;
+  overflow:hidden!important;
+  border-color:color-mix(in srgb,var(--channel) 40%,#d5dfeb)!important;
+  background:linear-gradient(145deg,color-mix(in srgb,var(--channel) 30%,#f8fbff),color-mix(in srgb,var(--channel) 16%,#edf4fc))!important;
+  color:color-mix(in srgb,var(--channel) 72%,#162238)!important;
+  box-shadow:0 20px 46px rgba(30,46,75,.17),0 0 30px color-mix(in srgb,var(--channel) 15%,transparent),inset 0 1px 0 rgba(255,255,255,.70)!important;
+  transform:translate(-50%,9px) scale(.965)!important;
+  transition:opacity .18s ease,transform .24s cubic-bezier(.16,.9,.28,1),box-shadow .22s ease!important;
+}
+.hlHotelgest main [class*="planning-parity-module"][class*="stayPreview"]::before{
+  content:"";
+  position:absolute;
+  z-index:-1;
+  inset:-35% -60%;
+  pointer-events:none;
+  background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.48) 49%,rgba(255,255,255,.12) 56%,transparent 66%);
+  transform:translateX(-48%) rotate(3deg);
+  opacity:0;
+}
+.hlHotelgest main [class*="planning-parity-module"][class*="stayOverflow"]:hover [class*="stayPreview"]{
+  transform:translate(-50%,0) scale(1)!important;
+  box-shadow:0 24px 54px rgba(30,46,75,.20),0 0 34px color-mix(in srgb,var(--channel) 20%,transparent),inset 0 1px 0 rgba(255,255,255,.76)!important;
+}
+.hlHotelgest main [class*="planning-parity-module"][class*="stayOverflow"]:hover [class*="stayPreview"]::before{
+  animation:hlReservationSheen .72s .06s cubic-bezier(.18,.72,.25,1) both;
+}
+.hlHotelgest main [class*="planning-parity-module"][class*="stayPreview"]>strong{
+  color:color-mix(in srgb,var(--channel) 74%,#38506d)!important;
+}
+.hlHotelgest main [class*="planning-parity-module"][class*="stayPreview"]>b,
+.hlHotelgest main [class*="planning-parity-module"][class*="stayPreview"]>span>em>b{
+  color:color-mix(in srgb,var(--channel) 56%,#152137)!important;
+}
+.hlHotelgest main [class*="planning-parity-module"][class*="stayPreview"]>small,
+.hlHotelgest main [class*="planning-parity-module"][class*="stayPreview"]>span>em{
+  color:color-mix(in srgb,var(--channel) 30%,#61748d)!important;
+}
+.hlHotelgest.hlThemeDark main [class*="planning-parity-module"][class*="stayPreview"]{
+  border-color:color-mix(in srgb,var(--channel) 48%,#31465e)!important;
+  background:linear-gradient(145deg,color-mix(in srgb,var(--channel) 25%,#102033),color-mix(in srgb,var(--channel) 13%,#091522))!important;
+  color:#eef6ff!important;
+  box-shadow:0 24px 56px rgba(0,0,0,.42),0 0 34px color-mix(in srgb,var(--channel) 24%,transparent),inset 0 1px 0 rgba(255,255,255,.07)!important;
+}
+.hlHotelgest.hlThemeDark main [class*="planning-parity-module"][class*="stayPreview"]::before{
+  background:linear-gradient(105deg,transparent 38%,rgba(160,205,255,.18) 49%,rgba(255,255,255,.07) 56%,transparent 66%);
+}
+.hlHotelgest.hlThemeDark main [class*="planning-parity-module"][class*="stayOverflow"]:hover [class*="stayPreview"]{
+  box-shadow:0 26px 62px rgba(0,0,0,.48),0 0 38px color-mix(in srgb,var(--channel) 30%,transparent),inset 0 1px 0 rgba(255,255,255,.09)!important;
+}
+.hlHotelgest.hlThemeDark main [class*="planning-parity-module"][class*="stayPreview"]>strong{
+  color:color-mix(in srgb,var(--channel) 58%,#c9ddf5)!important;
+}
+.hlHotelgest.hlThemeDark main [class*="planning-parity-module"][class*="stayPreview"]>b,
+.hlHotelgest.hlThemeDark main [class*="planning-parity-module"][class*="stayPreview"]>span>em>b{
+  color:#f1f7ff!important;
+}
+.hlHotelgest.hlThemeDark main [class*="planning-parity-module"][class*="stayPreview"]>small,
+.hlHotelgest.hlThemeDark main [class*="planning-parity-module"][class*="stayPreview"]>span>em{
+  color:#9bb0c8!important;
+}
+
+@keyframes hlReservationSheen{
+  0%{opacity:0;transform:translateX(-48%) rotate(3deg)}
+  18%{opacity:.9}
+  100%{opacity:0;transform:translateX(48%) rotate(3deg)}
 }
 
 /* Planning dark date navigator: no white segmented pill. */
@@ -115,4 +209,18 @@
 @media(max-width:900px){
   .hlPrimaryStack{width:100%;min-width:0}
   .hlQuoteAction{width:100%;height:36px}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .hlHotelgest main [class*="command-center-module"][class*="stay"],
+  .hlHotelgest main [class*="planning-parity-module"][class*="stayPreview"]{
+    transition:none!important;
+    animation:none!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="stay"]:hover{
+    transform:none!important;
+  }
+  .hlHotelgest main [class*="planning-parity-module"][class*="stayPreview"]::before{
+    animation:none!important;
+  }
 }
