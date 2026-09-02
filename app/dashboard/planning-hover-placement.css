@@ -253,6 +253,92 @@
   box-shadow:inset -3px 0 #5b8dff!important;
 }
 
+/* Simplify each type block: the group header names the type once.
+   The occupancy summary underneath keeps only the percentages. */
+.hlHotelgest main [class*="command-center-module"][class*="typeOccupancy"]>div:first-child>*{
+  display:none!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="typeOccupancy"]>div:first-child{
+  min-height:30px!important;
+  background:linear-gradient(90deg,#f7f9fc,#fbfcfe)!important;
+  border-right:1px solid #e5ebf2!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="typeOccupancy"],
+.hlHotelgest main [class*="command-center-module"][class*="typeOccupancy"]>div:last-child>div{
+  min-height:30px!important;
+}
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="typeOccupancy"]>div:first-child{
+  background:linear-gradient(90deg,#101b29,#121f2f)!important;
+  border-right-color:#27384d!important;
+}
+
+/* Put Semana / 3 semanas / Mes / Rack inside the same compact control bar.
+   The top row collapses, so the Planning calendar moves upward. */
+@media(min-width:901px){
+  .hlHotelgest main [class*="command-center-module"][class*="commandPage"]{
+    grid-template-rows:0 auto minmax(0,1fr)!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="topline"]{
+    position:relative!important;
+    z-index:45!important;
+    min-height:0!important;
+    height:0!important;
+    padding:0!important;
+    border:0!important;
+    background:transparent!important;
+    box-shadow:none!important;
+    overflow:visible!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="topline"]>div:first-child{
+    display:none!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="viewSwitch"]{
+    position:absolute!important;
+    top:7px!important;
+    left:50%!important;
+    right:auto!important;
+    transform:translateX(-50%)!important;
+    z-index:48!important;
+    height:32px!important;
+    max-width:42vw!important;
+    padding:1px!important;
+    border:1px solid #dce4ee!important;
+    border-radius:8px!important;
+    background:#f7f9fc!important;
+    box-shadow:0 4px 12px rgba(47,67,103,.06)!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="viewSwitch"] button{
+    height:30px!important;
+    padding:0 12px!important;
+    border-radius:7px!important;
+    font-size:10.5px!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="toolbar"]{
+    position:relative!important;
+    z-index:30!important;
+    min-height:46px!important;
+    padding:7px 8px!important;
+    border:1px solid #dfe7f0!important;
+    border-radius:12px!important;
+    box-shadow:0 5px 16px rgba(47,67,103,.04)!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="rangeBlock"] button,
+  .hlHotelgest main [class*="command-center-module"][class*="searchInput"]{
+    height:32px!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="searchInput"]{
+    max-width:520px!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="calendar"]{
+    margin-top:5px!important;
+  }
+  .hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="viewSwitch"]{
+    background:#111d2b!important;
+    border-color:#2a3a4e!important;
+    box-shadow:0 7px 20px rgba(0,0,0,.22)!important;
+  }
+}
+
 @media(max-width:900px){
   /* Touch keeps a larger target even though hover preview is disabled there. */
   .hlHotelgest main [class*="command-center-module"][class*="stay"]>i[draggable="true"]{
