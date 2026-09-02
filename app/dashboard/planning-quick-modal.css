@@ -1,0 +1,298 @@
+/* Planning reservation quick-view modal — loaded last on purpose. */
+
+.hlHotelgest main [class*="command-center-module"][class*="withInspector"]{
+  grid-template-rows:auto auto minmax(0,1fr)!important;
+}
+
+.hlHotelgest main [class*="command-center-module"][class*="commandPage"]:has([class*="inspector"])::after{
+  content:"";
+  position:fixed;
+  inset:0;
+  z-index:70;
+  background:rgba(20,32,51,.34);
+  backdrop-filter:blur(7px) saturate(.92);
+  -webkit-backdrop-filter:blur(7px) saturate(.92);
+  animation:hlReservationModalBackdrop .18s ease both;
+}
+
+.hlHotelgest main [class*="command-center-module"][class*="inspector"]{
+  position:fixed!important;
+  left:50%!important;
+  top:50%!important;
+  z-index:80!important;
+  width:min(540px,calc(100vw - 28px))!important;
+  max-width:540px!important;
+  max-height:min(680px,calc(100dvh - 28px))!important;
+  margin:0!important;
+  transform:translate(-50%,-50%)!important;
+  display:flex!important;
+  flex-direction:column!important;
+  overflow:hidden!important;
+  border:1px solid rgba(113,137,170,.28)!important;
+  border-radius:24px!important;
+  background:linear-gradient(145deg,rgba(255,255,255,.98),rgba(246,249,253,.98))!important;
+  box-shadow:0 36px 100px rgba(23,39,66,.30),0 10px 30px rgba(48,75,117,.14),inset 0 1px 0 rgba(255,255,255,.96)!important;
+  animation:hlReservationModalIn .24s cubic-bezier(.18,.88,.26,1) both;
+}
+
+.hlHotelgest main [class*="command-center-module"][class*="inspector"]::before{
+  content:"";
+  position:absolute;
+  inset:0 0 auto;
+  height:92px;
+  pointer-events:none;
+  background:radial-gradient(circle at 12% 0,rgba(62,132,242,.13),transparent 52%),linear-gradient(90deg,rgba(53,116,225,.05),rgba(114,86,218,.04));
+}
+
+.hlHotelgest main [class*="command-center-module"][class*="inspector"]>header{
+  position:relative!important;
+  z-index:1!important;
+  min-height:0!important;
+  display:grid!important;
+  grid-template-columns:1fr!important;
+  gap:15px!important;
+  padding:20px 20px 17px!important;
+  border-bottom:1px solid rgba(129,149,177,.18)!important;
+  background:transparent!important;
+}
+
+.hlHotelgest main [class*="command-center-module"][class*="guestIdentity"]{
+  gap:12px!important;
+  padding-right:42px!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="guestIdentity"]>span{
+  width:46px!important;
+  height:46px!important;
+  flex:0 0 46px!important;
+  border-radius:15px!important;
+  background:linear-gradient(145deg,#eaf2ff,#eef0ff)!important;
+  color:#356bd2!important;
+  box-shadow:inset 0 0 0 1px rgba(70,111,190,.12),0 8px 20px rgba(58,91,151,.10)!important;
+  font-size:12px!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="guestIdentity"] small{
+  font-size:9px!important;
+  letter-spacing:.11em!important;
+  color:#71819a!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="guestIdentity"] h3{
+  margin:3px 0 2px!important;
+  font-size:21px!important;
+  line-height:1.05!important;
+  color:#17243a!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="guestIdentity"] p{
+  font-size:11px!important;
+  color:#728199!important;
+}
+
+.hlHotelgest main [class*="command-center-module"][class*="inspectorActions"]{
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  align-items:stretch!important;
+  gap:8px!important;
+  overflow:visible!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="inspectorActions"]>button,
+.hlHotelgest main [class*="command-center-module"][class*="inspectorActions"]>[class*="room-operations"] button,
+.hlHotelgest main [class*="command-center-module"][class*="inspectorActions"] button{
+  min-width:0!important;
+  width:100%!important;
+  min-height:38px!important;
+  height:38px!important;
+  padding:0 11px!important;
+  border:1px solid #dce5f0!important;
+  border-radius:11px!important;
+  background:linear-gradient(180deg,#fff,#f7f9fc)!important;
+  color:#44556f!important;
+  box-shadow:0 4px 12px rgba(36,57,91,.045)!important;
+  font-size:10px!important;
+  font-weight:800!important;
+  transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease,background .15s ease!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="inspectorActions"] button:hover{
+  transform:translateY(-1px)!important;
+  border-color:#b9cceb!important;
+  background:#f2f7ff!important;
+  color:#285ebc!important;
+  box-shadow:0 8px 18px rgba(52,91,157,.10)!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="inspectorActions"]>button:last-of-type:not([class*="closeInspector"]){
+  background:linear-gradient(135deg,#3476e8,#625bdd)!important;
+  border-color:transparent!important;
+  color:#fff!important;
+  box-shadow:0 9px 22px rgba(67,91,210,.20)!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="inspectorActions"] [class*="closeInspector"]{
+  position:absolute!important;
+  top:16px!important;
+  right:16px!important;
+  z-index:3!important;
+  width:34px!important;
+  min-width:34px!important;
+  height:34px!important;
+  min-height:34px!important;
+  padding:0!important;
+  border-radius:11px!important;
+  background:rgba(255,255,255,.76)!important;
+  color:#5f6f86!important;
+  border:1px solid rgba(133,153,182,.22)!important;
+  box-shadow:0 7px 18px rgba(38,57,87,.08)!important;
+  font-size:19px!important;
+}
+
+.hlHotelgest main [class*="command-center-module"][class*="inspectorBody"]{
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:10px!important;
+  padding:14px 16px 16px!important;
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+  background:rgba(247,249,252,.78)!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="inspectorBody"]>section{
+  min-width:0!important;
+  min-height:74px!important;
+  padding:12px 13px!important;
+  border:1px solid #e2e8f1!important;
+  border-radius:14px!important;
+  background:#fff!important;
+  box-shadow:0 4px 14px rgba(34,55,88,.045)!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="inspectorBody"] small{
+  font-size:8.5px!important;
+  line-height:1.15!important;
+  letter-spacing:.10em!important;
+  color:#7c8ba1!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="inspectorBody"] b{
+  margin-top:6px!important;
+  font-size:12px!important;
+  line-height:1.25!important;
+  color:#213149!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="account"]{
+  grid-column:1/-1!important;
+  min-height:88px!important;
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:8px!important;
+  background:linear-gradient(135deg,#f8fbff,#f6f5ff)!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="account"]>div{
+  padding:6px 8px!important;
+  border-radius:10px!important;
+  background:rgba(255,255,255,.68)!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="note"]{
+  grid-column:1/-1!important;
+  min-height:72px!important;
+  background:linear-gradient(135deg,#fffdf8,#fbfcff)!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="note"] p{
+  margin-top:6px!important;
+  font-size:11px!important;
+  line-height:1.4!important;
+  color:#607087!important;
+}
+
+/* Dark mode */
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="commandPage"]:has([class*="inspector"])::after{
+  background:rgba(2,8,15,.64)!important;
+  backdrop-filter:blur(8px) saturate(.86)!important;
+}
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="inspector"]{
+  border-color:rgba(91,126,169,.32)!important;
+  background:linear-gradient(145deg,#101d2c,#0b1724)!important;
+  box-shadow:0 40px 110px rgba(0,0,0,.58),0 0 44px rgba(62,124,226,.11),inset 0 1px 0 rgba(255,255,255,.04)!important;
+}
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="inspector"]::before{
+  background:radial-gradient(circle at 12% 0,rgba(61,138,250,.18),transparent 54%),linear-gradient(90deg,rgba(63,129,233,.07),rgba(113,85,218,.06))!important;
+}
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="inspector"]>header{
+  border-color:#26384b!important;
+}
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="guestIdentity"]>span{
+  background:linear-gradient(145deg,#17304d,#182747)!important;
+  color:#a7c9ff!important;
+  box-shadow:inset 0 0 0 1px rgba(91,142,216,.22),0 0 22px rgba(67,131,230,.11)!important;
+}
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="guestIdentity"] h3{color:#f1f6fd!important}
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="guestIdentity"] p,
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="guestIdentity"] small{color:#8ea4bd!important}
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="inspectorActions"] button{
+  border-color:#2d4259!important;
+  background:linear-gradient(180deg,#142437,#101d2c)!important;
+  color:#cbd9e9!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.025),0 6px 15px rgba(0,0,0,.10)!important;
+}
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="inspectorActions"] button:hover{
+  border-color:#446a94!important;
+  background:#18304a!important;
+  color:#fff!important;
+  box-shadow:0 0 18px rgba(68,133,230,.10)!important;
+}
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="inspectorActions"] [class*="closeInspector"]{
+  background:#132235!important;
+  color:#b9cbe0!important;
+  border-color:#30475f!important;
+}
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="inspectorBody"]{
+  background:#091522!important;
+}
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="inspectorBody"]>section{
+  border-color:#26394d!important;
+  background:linear-gradient(145deg,#102033,#0d1b2a)!important;
+  box-shadow:0 8px 20px rgba(0,0,0,.13),inset 0 1px 0 rgba(255,255,255,.02)!important;
+}
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="inspectorBody"] small{color:#8198b2!important}
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="inspectorBody"] b{color:#edf5ff!important}
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="account"]{
+  background:linear-gradient(135deg,#10243b,#171d39)!important;
+}
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="account"]>div{
+  background:rgba(7,17,29,.34)!important;
+}
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="note"]{
+  background:linear-gradient(135deg,#161d25,#111c2a)!important;
+}
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="note"] p{color:#a9b9cb!important}
+
+@keyframes hlReservationModalIn{
+  from{opacity:0;transform:translate(-50%,-47%) scale(.94)}
+  to{opacity:1;transform:translate(-50%,-50%) scale(1)}
+}
+@keyframes hlReservationModalBackdrop{from{opacity:0}to{opacity:1}}
+
+@media(max-width:620px){
+  .hlHotelgest main [class*="command-center-module"][class*="inspector"]{
+    width:calc(100vw - 16px)!important;
+    max-height:calc(100dvh - 16px)!important;
+    border-radius:19px!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="inspector"]>header{
+    padding:16px 14px 14px!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="guestIdentity"]{padding-right:38px!important}
+  .hlHotelgest main [class*="command-center-module"][class*="inspectorActions"]{
+    grid-template-columns:1fr!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="inspectorBody"]{
+    grid-template-columns:1fr!important;
+    padding:11px!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="account"],
+  .hlHotelgest main [class*="command-center-module"][class*="note"]{
+    grid-column:1!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="account"]{
+    grid-template-columns:1fr!important;
+  }
+}
+
+@media(prefers-reduced-motion:reduce){
+  .hlHotelgest main [class*="command-center-module"][class*="inspector"],
+  .hlHotelgest main [class*="command-center-module"][class*="commandPage"]:has([class*="inspector"])::after{
+    animation:none!important;
+  }
+}
