@@ -1,0 +1,110 @@
+.screen{
+  min-height:100dvh;
+  display:grid;
+  place-items:center;
+  padding:28px;
+  box-sizing:border-box;
+  overflow:hidden;
+  background:
+    radial-gradient(circle at 50% 38%,rgba(45,107,215,.10),transparent 28%),
+    linear-gradient(180deg,#fbfcff 0%,#f3f6fb 100%);
+  color:#17233d;
+  font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+.inner{
+  width:min(420px,100%);
+  display:grid;
+  justify-items:center;
+  text-align:center;
+}
+.visual{
+  position:relative;
+  width:92px;
+  height:92px;
+  display:grid;
+  place-items:center;
+  margin-bottom:24px;
+}
+.mark{
+  position:relative;
+  z-index:2;
+  display:grid;
+  place-items:center;
+  width:54px;
+  height:54px;
+  border-radius:17px;
+  background:linear-gradient(145deg,#2f6fda,#2057b5);
+  color:#fff;
+  font-size:14px;
+  font-weight:850;
+  letter-spacing:.08em;
+  box-shadow:0 14px 34px rgba(37,94,190,.22);
+}
+.orbit{
+  position:absolute;
+  inset:0;
+  border:1px solid rgba(42,101,198,.16);
+  border-radius:50%;
+  animation:spin 2.8s linear infinite;
+}
+.orbit::after{
+  content:"";
+  position:absolute;
+  left:50%;
+  top:-4px;
+  width:8px;
+  height:8px;
+  margin-left:-4px;
+  border-radius:50%;
+  background:#63b8ff;
+  box-shadow:0 0 0 5px rgba(99,184,255,.12);
+}
+.eyebrow{
+  margin:0 0 8px;
+  color:#5c6f8e;
+  font-size:10px;
+  font-weight:850;
+  letter-spacing:.18em;
+}
+.title{
+  margin:0;
+  color:#17233d;
+  font-size:clamp(22px,3vw,28px);
+  font-weight:780;
+  letter-spacing:-.035em;
+}
+.message{
+  max-width:350px;
+  margin:10px 0 0;
+  color:#71809a;
+  font-size:13px;
+  line-height:1.55;
+}
+.progress{
+  display:grid;
+  grid-template-columns:repeat(3,36px);
+  gap:7px;
+  margin-top:24px;
+}
+.progress i{
+  display:block;
+  height:3px;
+  border-radius:999px;
+  background:#dce4f0;
+  overflow:hidden;
+}
+.progress i::after{
+  content:"";
+  display:block;
+  width:100%;
+  height:100%;
+  border-radius:inherit;
+  background:#2d6bd7;
+  transform:translateX(-105%);
+  animation:progress 1.45s ease-in-out infinite;
+}
+.progress i:nth-child(2)::after{animation-delay:.16s}.progress i:nth-child(3)::after{animation-delay:.32s}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes progress{0%{transform:translateX(-105%)}45%,65%{transform:translateX(0)}100%{transform:translateX(105%)}}
+@media(max-width:560px){.screen{padding:20px}.visual{width:82px;height:82px}.mark{width:50px;height:50px;border-radius:16px}.message{font-size:12px}}
+@media(prefers-reduced-motion:reduce){.orbit,.progress i::after{animation:none}.progress i::after{transform:none}}
