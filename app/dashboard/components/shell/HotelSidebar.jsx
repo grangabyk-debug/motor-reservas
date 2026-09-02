@@ -1,6 +1,6 @@
 "use client"
 
-import{useEffect,useMemo,useState}from"react"
+import{useEffect,useMemo,useRef,useState}from"react"
 import{HOTEL_NAVIGATION,groupForView}from"../../core/navigation"
 import{ROLE_LABELS}from"../../core/permissions"
 import ui from"./shell.module.css"
@@ -42,10 +42,19 @@ function HotelIcon({name}){
 export default function HotelSidebar({view,onView,hotelName="Hotel",hotelLogo="",role="reception",properties=[],propertyId,onPropertyChange,onLogout,mobileOpen=false}){
   const activeGroup=useMemo(()=>view==="support"?"":groupForView(view).id,[view])
   const[expanded,setExpanded]=useState("")
+  const railRef=useRef(null)
   useEffect(()=>setExpanded(""),[view])
+  useEffect(()=>{
+    if(!expanded)return
+    const closeOutside=event=>{if(railRef.current&&!railRef.current.contains(event.target))setExpanded("")}
+    const closeEscape=event=>{if(event.key==="Escape")setExpanded("")}
+    document.addEventListener("pointerdown",closeOutside,true)
+    document.addEventListener("keydown",closeEscape)
+    return()=>{document.removeEventListener("pointerdown",closeOutside,true);document.removeEventListener("keydown",closeEscape)}
+  },[expanded])
   function openView(id){setExpanded("");onView(id)}
 
-  return <aside className={`${ui.rail} ${mobileOpen?ui.railOpen:""}`} data-hl-rail="true" aria-label="Navegación de Habitación Llena">
+  return <aside ref={railRef} className={`${ui.rail} ${mobileOpen?ui.railOpen:""}`} data-hl-rail="true" aria-label="Navegación de Habitación Llena">
     <div className={ui.railTop}>
       <button type="button" className={ui.railHome} onClick={()=>openView("lobby")} data-tip={hotelName} aria-label={`Ir al inicio de ${hotelName}`}>
         {hotelLogo?<span className={ui.hotelMark}><img src={hotelLogo} alt=""/></span>:<span className={ui.hotelMark}>{initials(hotelName)}</span>}
