@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192" role="img" aria-label="Habitación Llena">
+  <rect width="192" height="192" rx="42" fill="#1f2d40"/>
+  <path d="M55 39h82c8.284 0 15 6.716 15 15v99h-24V65H72v88H48V54c0-8.284 6.716-15 15-15h-8Z" fill="#fff" opacity=".98"/>
+  <path d="M76 67h48v86H76z" fill="#f6f7f9"/>
+  <rect x="83" y="77" width="34" height="66" rx="5" fill="#1f2d40"/>
+  <circle cx="108" cy="112" r="4.5" fill="#caa96b"/>
+  <path d="M48 153h104v10H48z" fill="#caa96b"/>
+</svg>
