@@ -26,5 +26,5 @@ export const metadata={
 export const viewport={themeColor:"#ffffff"}
 
 export default function DashboardPage(){
-  return <><StaticCaretGuard/><MercadoPagoOAuthBridge/><PWAInstaller/><div className="hlHotelgest"><DashboardChrome><HotelOSV2/></DashboardChrome></div></>
+  return <><StaticCaretGuard/><MercadoPagoOAuthBridge/><div className="hlHotelgest"><DashboardChrome><HotelOSV2/></DashboardChrome></div><PWAInstaller/></>
 }
