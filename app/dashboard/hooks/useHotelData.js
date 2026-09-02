@@ -8,7 +8,7 @@ import{expireTentativeReservations}from"../services/tentatives"
 const empty={rooms:[],floors:[],reservations:[],payments:[],blocks:[],charges:[],channels:[],keyIssues:[],packages:[]}
 
 export function useHotelData(propertyId,view){
-  const[core,setCore]=useState(empty),[settings,setSettings]=useState(null),[guests,setGuests]=useState([]),[operations,setOperations]=useState({housekeeping:[],maintenance:[],resources:[]}),[commercial,setCommercial]=useState({rates:[],upsells:[],packages:[],partners:[],groups:[]}),[finance,setFinance]=useState({documents:[],sessions:[],movements:[]}),[hotel,setHotel]=useState({members:[],automations:[],events:[],permissions:[]}),[loading,setLoading]=useState(false),[error,setError]=useState(""),seq=useRef(0),group=groupForView(view).id
+  const[core,setCore]=useState(empty),[settings,setSettings]=useState(null),[guests,setGuests]=useState([]),[operations,setOperations]=useState({housekeeping:[],maintenance:[],resources:[]}),[commercial,setCommercial]=useState({rates:[],upsells:[],packages:[],partners:[],groups:[]}),[finance,setFinance]=useState({documents:[],sessions:[],movements:[]}),[hotel,setHotel]=useState({members:[],automations:[],events:[],permissions:[]}),[loading,setLoading]=useState(false),[error,setError]=useState(""),seq=useRef(0),group=groupForView(view).id,quoteMode=view==="quote"
   const reload=useCallback(async()=>{
     if(!propertyId)return
     const run=++seq.current;setLoading(true);setError("")
@@ -20,6 +20,7 @@ export function useHotelData(propertyId,view){
       if(group==="frontdesk"){
         const[g,p,groups]=await Promise.all([repo.guestCRM(),repo.partners(),repo.groups()]);if(run===seq.current){setGuests(g);setCommercial(x=>({...x,packages:base.packages||[],partners:p,groups}))}
       }
+      if(quoteMode){const o=await repo.operations();if(run===seq.current)setOperations(o)}
       if(group==="operations"){const o=await repo.operations();if(run===seq.current)setOperations(o)}
       if(group==="commercial"){
         const[c,p,groups]=await Promise.all([repo.commercial(),repo.partners(),repo.groups()]);if(run===seq.current)setCommercial({...c,partners:p,groups})
@@ -34,7 +35,7 @@ export function useHotelData(propertyId,view){
       }
     }catch(e){if(run===seq.current)setError(e.message||"No pudimos cargar el hotel.")}
     finally{if(run===seq.current)setLoading(false)}
-  },[propertyId,group])
+  },[propertyId,group,quoteMode])
   useEffect(()=>{reload()},[reload])
   useEffect(()=>{if(!propertyId)return;const timer=setInterval(()=>{expireTentativeReservations({propertyId}).catch(()=>{})},60000);return()=>clearInterval(timer)},[propertyId])
   useEffect(()=>{if(!propertyId)return;const channel=supabase.channel(`hl-v2-${propertyId}`).on("postgres_changes",{event:"*",schema:"public",table:"reservas",filter:`property_id=eq.${propertyId}`},reload).on("postgres_changes",{event:"*",schema:"public",table:"habitaciones",filter:`property_id=eq.${propertyId}`},reload).on("postgres_changes",{event:"*",schema:"public",table:"pagos",filter:`property_id=eq.${propertyId}`},reload).on("postgres_changes",{event:"*",schema:"public",table:"hotel_packages",filter:`property_id=eq.${propertyId}`},reload).subscribe();return()=>{supabase.removeChannel(channel)}},[propertyId,reload])
