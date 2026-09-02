@@ -6,10 +6,13 @@ import editor from"./dashboard-widget-editor.module.css"
 export function WidgetSlot({widget,size,editing,onDragStart,onDrop,onSize,onNudge,children,slotClass,editingClass,handleClass,nudgeClass}){
   const layout=layoutForWidget(widget,size)
   return <div className={`${slotClass} ${editing?editingClass:""}`} data-widget-id={widget.id} data-widget-size={layout.size} style={{"--widget-span":layout.span,"--widget-rows":layout.rows}} draggable aria-grabbed="false" onDragStart={e=>{e.currentTarget.setAttribute("aria-grabbed","true");e.currentTarget.classList.add("hlWidgetDragging");e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",widget.id);onDragStart(widget.id)}} onDragEnd={e=>{e.currentTarget.setAttribute("aria-grabbed","false");e.currentTarget.classList.remove("hlWidgetDragging")}} onDragOver={e=>{e.preventDefault();e.dataTransfer.dropEffect="move";e.currentTarget.classList.add("hlWidgetDropTarget")}} onDragLeave={e=>e.currentTarget.classList.remove("hlWidgetDropTarget")} onDrop={e=>{e.preventDefault();e.currentTarget.classList.remove("hlWidgetDropTarget");onDrop(widget.id)}}>
-    <div className={`${handleClass} ${editing?"hlWidgetHandleEditing":"hlWidgetHandleIdle"}`} title="Arrastrá para mover este widget">
+    {editing&&<div className={`${handleClass} hlWidgetHandleEditing`} title="Arrastrá para mover este widget">
       <span aria-hidden="true">⠿</span>
-      {editing&&<><b>{widget.label}</b><div className="hlWidgetSizeControls" onPointerDown={e=>e.stopPropagation()} onDragStart={e=>{e.preventDefault();e.stopPropagation()}}>{widget.sizes.map(option=><button type="button" draggable={false} key={option} className={layout.size===option?"hlWidgetSizeActive":""} onClick={e=>{e.preventDefault();e.stopPropagation();onSize(widget.id,option)}}>{option.replace("x","×")}</button>)}</div><div className={nudgeClass||editor.nudge} onPointerDown={e=>e.stopPropagation()} onDragStart={e=>{e.preventDefault();e.stopPropagation()}}><button type="button" draggable={false} aria-label={`Subir ${widget.label}`} onClick={e=>{e.preventDefault();e.stopPropagation();onNudge?.(widget.id,-1)}}>↑</button><button type="button" draggable={false} aria-label={`Bajar ${widget.label}`} onClick={e=>{e.preventDefault();e.stopPropagation();onNudge?.(widget.id,1)}}>↓</button></div><small>Mover</small></>}
-    </div>
+      <b>{widget.label}</b>
+      <div className="hlWidgetSizeControls" onPointerDown={e=>e.stopPropagation()} onDragStart={e=>{e.preventDefault();e.stopPropagation()}}>{widget.sizes.map(option=><button type="button" draggable={false} key={option} className={layout.size===option?"hlWidgetSizeActive":""} onClick={e=>{e.preventDefault();e.stopPropagation();onSize(widget.id,option)}}>{option.replace("x","×")}</button>)}</div>
+      <div className={nudgeClass||editor.nudge} onPointerDown={e=>e.stopPropagation()} onDragStart={e=>{e.preventDefault();e.stopPropagation()}}><button type="button" draggable={false} aria-label={`Subir ${widget.label}`} onClick={e=>{e.preventDefault();e.stopPropagation();onNudge?.(widget.id,-1)}}>↑</button><button type="button" draggable={false} aria-label={`Bajar ${widget.label}`} onClick={e=>{e.preventDefault();e.stopPropagation();onNudge?.(widget.id,1)}}>↓</button></div>
+      <small>Mover</small>
+    </div>}
     {children}
   </div>
 }
