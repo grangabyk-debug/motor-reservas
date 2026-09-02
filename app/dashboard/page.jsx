@@ -2,6 +2,7 @@ import HotelOSV2 from"./HotelOSV2"
 import StaticCaretGuard from"../components/StaticCaretGuard"
 import MercadoPagoOAuthBridge from"./components/MercadoPagoOAuthBridge"
 import PWAInstaller from"./components/PWAInstaller"
+import DashboardChrome from"./components/DashboardChrome"
 import"./pms-unified.css"
 import"./pms-unified-modules.css"
 import"./simple-interaction-v2.css"
@@ -10,6 +11,7 @@ import"./app-simple-mode.css"
 import"./app-minimal-v2.css"
 import"./app-interaction-polish.css"
 import"./mobile-reservation-flow.css"
+import"./global-chrome.css"
 
 export const metadata={
   title:"Habitación Llena",
@@ -22,5 +24,5 @@ export const metadata={
 export const viewport={themeColor:"#ffffff"}
 
 export default function DashboardPage(){
-  return <><StaticCaretGuard/><MercadoPagoOAuthBridge/><PWAInstaller/><div className="hlHotelgest"><HotelOSV2/></div></>
+  return <><StaticCaretGuard/><MercadoPagoOAuthBridge/><PWAInstaller/><div className="hlHotelgest"><DashboardChrome><HotelOSV2/></DashboardChrome></div></>
 }
