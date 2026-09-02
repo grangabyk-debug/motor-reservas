@@ -12,6 +12,7 @@ import"./app-minimal-v2.css"
 import"./app-interaction-polish.css"
 import"./mobile-reservation-flow.css"
 import"./global-chrome.css"
+import"./pms-dark-theme-safe.css"
 
 export const metadata={
   title:"Habitación Llena",
