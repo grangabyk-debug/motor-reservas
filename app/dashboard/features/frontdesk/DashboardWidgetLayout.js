@@ -7,7 +7,7 @@ export const WIDGET_LAYOUTS={
 export const DASHBOARD_WIDGETS=[
   {id:"turn-pulse",label:"Resumen del turno",defaultSize:"2x1",sizes:["2x1","2x2"]},
   {id:"occupancy",label:"Ocupación y tendencia",defaultSize:"2x1",sizes:["2x1","2x2"]},
-  {id:"revenue-lab",label:"HL Revenue Lab",defaultSize:"2x1",sizes:["2x1","2x2"]},
+  {id:"revenue-lab",label:"Simulador de ingresos",defaultSize:"2x1",sizes:["2x1"]},
   {id:"priorities",label:"Tareas prioritarias",defaultSize:"2x1",sizes:["2x1","2x2"]},
   {id:"kpi-occupancy",label:"Ocupación hoy",defaultSize:"1x1",sizes:["1x1","2x1"]},
   {id:"kpi-production",label:"Producción",defaultSize:"1x1",sizes:["1x1","2x1"]},
@@ -37,7 +37,7 @@ export const DASHBOARD_PRESETS={
     description:"Ocupación, producción y canales sin ruido operativo.",
     order:["occupancy","revenue-lab","kpi-occupancy","kpi-production","kpi-reservations","channels","reservation-metrics","turn-pulse","cleaning","kpi-housekeeping","priorities","arrivals","inhouse","departures"],
     hidden:["priorities","arrivals","inhouse","departures"],
-    sizes:{occupancy:"2x2","revenue-lab":"2x2",channels:"2x1","reservation-metrics":"2x1","turn-pulse":"2x1"},
+    sizes:{occupancy:"2x2","revenue-lab":"2x1",channels:"2x1","reservation-metrics":"2x1","turn-pulse":"2x1"},
   },
   housekeeping:{
     label:"Housekeeping",
