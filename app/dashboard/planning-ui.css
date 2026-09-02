@@ -118,3 +118,239 @@
   .hlHotelgest [class*="filters"]{grid-template-columns:1fr!important}
   .hlHotelgest [class*="toolbar"] > [class*="legend"]{font-size:10px!important;gap:6px 10px!important}
 }
+
+/* --------------------------------------------------------------------------
+   SIMPLE APP MODE
+   The Planning primary surface should feel like a focused hotel app: search,
+   date navigation and the room calendar. Advanced intelligence stays out of
+   the way instead of competing with the grid for attention.
+   -------------------------------------------------------------------------- */
+.hlHotelgest [class*="commandPage"]{
+  gap:8px!important;
+  padding:10px 12px 14px!important;
+  background:#f7f9fc!important;
+}
+
+/* Keep the useful range presets, remove the duplicate title and long help copy. */
+.hlHotelgest [class*="commandPage"] > [class*="topline"]{
+  min-height:32px!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+  justify-content:flex-end!important;
+}
+.hlHotelgest [class*="commandPage"] > [class*="topline"] > div:first-child{
+  display:none!important;
+}
+.hlHotelgest [class*="commandPage"] [class*="viewSwitch"]{
+  gap:4px!important;
+  padding:3px!important;
+  border:1px solid #e2e7ef!important;
+  border-radius:10px!important;
+  background:#fff!important;
+  box-shadow:0 1px 2px rgba(16,24,40,.03)!important;
+}
+.hlHotelgest [class*="commandPage"] [class*="viewSwitch"] button{
+  min-height:28px!important;
+  padding:0 10px!important;
+  border:0!important;
+  border-radius:7px!important;
+  font-size:11px!important;
+  font-weight:750!important;
+  white-space:nowrap!important;
+}
+
+/* One compact command row: dates + guest/room search. */
+.hlHotelgest [class*="commandPage"] > [class*="toolbar"]{
+  display:flex!important;
+  align-items:center!important;
+  gap:8px!important;
+  min-height:40px!important;
+  padding:0!important;
+  margin:0!important;
+  border:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+.hlHotelgest [class*="commandPage"] [class*="planning-lenses-module"]{
+  display:none!important;
+}
+.hlHotelgest [class*="commandPage"] [class*="rangeBlock"]{
+  flex:0 0 auto!important;
+  height:36px!important;
+  min-height:36px!important;
+  gap:2px!important;
+  padding:3px!important;
+  border:1px solid #dfe5ee!important;
+  border-radius:9px!important;
+  background:#fff!important;
+  box-shadow:none!important;
+}
+.hlHotelgest [class*="commandPage"] [class*="rangeBlock"] button{
+  min-width:29px!important;
+  height:28px!important;
+  border:0!important;
+  border-radius:6px!important;
+  background:transparent!important;
+  font-size:13px!important;
+}
+.hlHotelgest [class*="commandPage"] [class*="rangeBlock"] strong{
+  padding:0 6px!important;
+  font-size:11px!important;
+  white-space:nowrap!important;
+}
+.hlHotelgest [class*="commandPage"] [class*="todayButton"]{
+  background:#eef4ff!important;
+  color:#235fba!important;
+}
+.hlHotelgest [class*="commandPage"] [class*="filters"]{
+  display:block!important;
+  flex:1 1 360px!important;
+  min-width:180px!important;
+  max-width:520px!important;
+  margin-left:auto!important;
+  overflow:visible!important;
+}
+.hlHotelgest [class*="commandPage"] [class*="filters"] > :not([class*="searchInput"]){
+  display:none!important;
+}
+.hlHotelgest [class*="commandPage"] [class*="searchInput"]{
+  width:100%!important;
+  min-width:0!important;
+  height:36px!important;
+  min-height:36px!important;
+  border-radius:9px!important;
+  border-color:#dfe5ee!important;
+  box-shadow:none!important;
+}
+.hlHotelgest [class*="commandPage"] [class*="searchInput"] span{
+  opacity:.5!important;
+}
+.hlHotelgest [class*="commandPage"] [class*="searchInput"] input{
+  font-size:12px!important;
+}
+.hlHotelgest [class*="commandPage"] > [class*="toolbar"] > [class*="legend"]{
+  display:none!important;
+}
+
+/* Advanced Planning layers are intentionally quiet on the default screen. */
+.hlHotelgest [class*="commandPage"] [class*="availability-rack-module"],
+.hlHotelgest [class*="commandPage"] [class*="planning-context-module"],
+.hlHotelgest [class*="commandPage"] [class*="restrictionStrip"],
+.hlHotelgest [class*="commandPage"] [class*="occupancyRow"]{
+  display:none!important;
+}
+
+/* The calendar is the product: one clean white surface, low chrome. */
+.hlHotelgest [class*="commandPage"] [class*="calendar"]{
+  border:1px solid #e0e6ef!important;
+  border-radius:14px!important;
+  background:#fff!important;
+  box-shadow:0 5px 20px rgba(22,34,55,.055)!important;
+  overflow:auto!important;
+}
+.hlHotelgest [class*="commandPage"] [class*="calHead"]{
+  border-bottom:1px solid #e6ebf2!important;
+  background:#fbfcfe!important;
+}
+.hlHotelgest [class*="commandPage"] [class*="roomHead"]{
+  background:#fbfcfe!important;
+}
+.hlHotelgest [class*="commandPage"] [class*="roomHead"] small{
+  display:none!important;
+}
+.hlHotelgest [class*="commandPage"] [class*="days"] > div{
+  min-height:46px!important;
+  background:#fbfcfe!important;
+}
+.hlHotelgest [class*="commandPage"] [class*="days"] small,
+.hlHotelgest [class*="commandPage"] [class*="days"] em{
+  font-size:9px!important;
+  opacity:.68!important;
+}
+.hlHotelgest [class*="commandPage"] [class*="days"] b{
+  font-size:13px!important;
+}
+.hlHotelgest [class*="commandPage"] [class*="groupHeader"]{
+  min-height:32px!important;
+  padding-top:4px!important;
+  padding-bottom:4px!important;
+  background:#f3f6fa!important;
+  border-color:#e4e9f0!important;
+}
+.hlHotelgest [class*="commandPage"] [class*="groupHeader"] b{
+  font-size:11px!important;
+}
+.hlHotelgest [class*="commandPage"] [class*="groupHeader"] small,
+.hlHotelgest [class*="commandPage"] [class*="groupHeader"] em{
+  font-size:9px!important;
+  opacity:.7!important;
+}
+.hlHotelgest [class*="commandPage"] [class*="typeOccupancy"]{
+  min-height:31px!important;
+  background:#f9fbfd!important;
+  border-color:#e7ecf2!important;
+}
+.hlHotelgest [class*="commandPage"] [class*="typeOccupancy"] small{
+  display:none!important;
+}
+
+/* Reservation bars: softer, denser and easier to scan like a native app. */
+.hlHotelgest [class*="commandPage"] [class*="stay"]{
+  min-height:27px!important;
+  border-radius:7px!important;
+  box-shadow:0 1px 2px rgba(15,23,42,.08)!important;
+}
+
+@media(max-width:900px){
+  .hlHotelgest [class*="commandPage"]{
+    padding:8px!important;
+    gap:7px!important;
+  }
+  .hlHotelgest [class*="commandPage"] > [class*="topline"]{
+    min-height:30px!important;
+    overflow-x:auto!important;
+    justify-content:flex-start!important;
+    scrollbar-width:none!important;
+  }
+  .hlHotelgest [class*="commandPage"] > [class*="topline"]::-webkit-scrollbar{display:none!important}
+  .hlHotelgest [class*="commandPage"] [class*="viewSwitch"]{
+    flex-wrap:nowrap!important;
+    width:max-content!important;
+  }
+  .hlHotelgest [class*="commandPage"] > [class*="toolbar"]{
+    display:grid!important;
+    grid-template-columns:1fr!important;
+    gap:6px!important;
+  }
+  .hlHotelgest [class*="commandPage"] [class*="rangeBlock"]{
+    width:max-content!important;
+    max-width:100%!important;
+  }
+  .hlHotelgest [class*="commandPage"] [class*="filters"]{
+    display:block!important;
+    width:100%!important;
+    max-width:none!important;
+    margin:0!important;
+  }
+  .hlHotelgest [class*="commandPage"] [class*="searchInput"]{
+    width:100%!important;
+  }
+  .hlHotelgest [class*="commandPage"] [class*="calendar"]{
+    border-radius:11px!important;
+  }
+}
+
+@media(max-width:560px){
+  .hlHotelgest [class*="commandPage"] [class*="viewSwitch"] button{
+    min-height:27px!important;
+    padding:0 8px!important;
+    font-size:10px!important;
+  }
+  .hlHotelgest [class*="commandPage"] [class*="rangeBlock"] strong{
+    max-width:150px!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+  }
+}
