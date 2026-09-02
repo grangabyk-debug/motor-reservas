@@ -21,6 +21,7 @@ import"./pms-dark-complete.css"
 import"./pms-final-fixes.css"
 import"./pms-top-actions.css"
 import"./planning-quick-modal.css"
+import"./planning-quick-modal-v2.css"
 
 export const metadata={
   title:"Habitación Llena",
