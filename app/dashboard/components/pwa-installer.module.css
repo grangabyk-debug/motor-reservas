@@ -1,33 +1,38 @@
 .install{
   position:fixed;
-  right:18px;
+  left:82px;
+  right:auto;
   bottom:18px;
-  z-index:1200;
+  z-index:1180;
   display:flex;
   align-items:center;
   gap:7px;
-  height:40px;
-  padding:0 13px;
-  border:1px solid #dbe2e9;
+  height:38px;
+  padding:0 12px;
+  border:1px solid rgba(120,145,178,.28);
   border-radius:12px;
-  background:rgba(255,255,255,.97);
+  background:rgba(248,251,255,.82);
   color:#263247;
-  box-shadow:0 10px 30px rgba(31,45,68,.12);
-  backdrop-filter:blur(12px);
+  box-shadow:0 12px 30px rgba(31,45,68,.11),inset 0 1px 0 rgba(255,255,255,.82);
+  backdrop-filter:blur(16px) saturate(130%);
   font:inherit;
   cursor:pointer;
+  transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease;
 }
-.install span{font-size:17px;line-height:1;color:#1769d2}
-.install b{font-size:11px;font-weight:800}
-.install:hover{background:#f7f9fb;border-color:#cfd9e4}
+.install span{font-size:16px;line-height:1;color:#357cf0}
+.install b{font-size:10px;font-weight:800}
+.install:hover{transform:translateY(-1px);border-color:rgba(69,125,210,.38);box-shadow:0 14px 34px rgba(31,45,68,.15),0 0 18px rgba(53,124,240,.10),inset 0 1px 0 rgba(255,255,255,.9)}
 .install:focus-visible{outline:3px solid rgba(23,105,210,.18);outline-offset:2px}
 
-@media(max-width:760px){
+:global(.hlThemeDark)~.install,.install:global(.dark){background:rgba(16,30,45,.86);color:#eaf2ff;border-color:rgba(123,159,202,.22)}
+
+@media(max-width:900px){
   .install{
-    right:12px;
-    bottom:calc(12px + env(safe-area-inset-bottom));
-    height:42px;
-    padding:0 12px;
+    left:12px;
+    right:auto;
+    bottom:calc(14px + env(safe-area-inset-bottom));
+    height:40px;
+    padding:0 11px;
   }
 }
 
