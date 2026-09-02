@@ -62,6 +62,83 @@ body:has(.hlHotelgest){
 .hlHotelgest main select,
 .hlHotelgest main textarea{max-width:100%}
 
+/* Dashboard readability — larger operational typography on desktop and notebook. */
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="dashboardTop"]>div:first-child>small{
+  font-size:12px!important;
+  letter-spacing:.16em!important;
+}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="dashboardTop"] h1{
+  font-size:clamp(31px,2.25vw,44px)!important;
+}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="searchBox"] input{font-size:13px!important}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="searchBox"] button,
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="customizeButton"]{font-size:11px!important}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="primaryAction"]{font-size:13px!important}
+
+/* Today rail */
+.hlHotelgest main [class*="dashboard-today-rail-module"][class*="identity"] small{font-size:9px!important}
+.hlHotelgest main [class*="dashboard-today-rail-module"][class*="identity"] b{font-size:12px!important}
+.hlHotelgest main [class*="dashboard-today-rail-module"][class*="metric"]>span{font-size:10px!important}
+.hlHotelgest main [class*="dashboard-today-rail-module"][class*="metric"]>b{font-size:16px!important}
+.hlHotelgest main [class*="dashboard-today-rail-module"][class*="metric"]>small{font-size:9px!important}
+.hlHotelgest main [class*="dashboard-today-rail-module"][class*="actions"] button{font-size:10px!important}
+
+/* Main dashboard cards */
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="chartHeading"] small,
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="tasksCard"] header small,
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="sourceCard"]>small,
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="reservationMetrics"]>small,
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="cleaningCard"]>small{
+  font-size:11px!important;
+}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="chartHeading"] strong{font-size:42px!important}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="chartHeading"] p{font-size:12px!important}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="chartLegend"]{font-size:10px!important}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="chartAxis"]{font-size:10px!important}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="tasksCard"] h3{font-size:18px!important}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="taskRow"] b{font-size:12px!important}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="taskRow"] small{font-size:10px!important}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="statusPill"]{font-size:9px!important}
+
+/* Operation summary numbers and labels */
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="reservationMetrics"] span b{font-size:24px!important}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="reservationMetrics"] span small{font-size:10px!important}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="reservationMetrics"]>button{font-size:11px!important}
+
+/* KPI row */
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="kpiCard"]>small{font-size:10px!important}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="kpiCard"]>b{font-size:27px!important}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="kpiCard"]>span{font-size:10px!important}
+
+/* Bottom cards: origin, arrivals, departures, housekeeping. */
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="sourceCard"] h3,
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="cleaningCard"] h3{font-size:17px!important}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="sourceRows"] span,
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="sourceRows"] b{font-size:10px!important}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="operationColumn"]>header small{font-size:11px!important}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="operationColumn"]>header button{font-size:10px!important}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="guestRow"] b{font-size:11px!important}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="guestRow"] small,
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="guestRow"] em{font-size:9px!important}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="cleaningCard"] button b{font-size:21px!important}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="cleaningCard"] button span{font-size:10px!important}
+
+/* Revenue simulator summary card. */
+.hlHotelgest main [class*="revenue-lab-module"][class*="summaryHead"] small,
+.hlHotelgest main [class*="revenue-lab-module"][class*="summaryMetrics"] small{font-size:10px!important}
+.hlHotelgest main [class*="revenue-lab-module"][class*="summaryHead"] h3{font-size:17px!important}
+.hlHotelgest main [class*="revenue-lab-module"][class*="summaryHead"] p{font-size:10px!important}
+.hlHotelgest main [class*="revenue-lab-module"][class*="summaryMetrics"] b{font-size:18px!important}
+.hlHotelgest main [class*="revenue-lab-module"][class*="summaryMetrics"] span{font-size:9px!important}
+.hlHotelgest main [class*="revenue-lab-module"][class*="openButton"]{font-size:10px!important}
+
+/* Utility bar remains discreet, but not microscopic. */
+.hlHotelgest .hlUtilityRegion,
+.hlHotelgest .hlUtilityClock,
+.hlHotelgest .hlThemeToggle{font-size:11px!important}
+.hlHotelgest .hlUtilityClock strong{font-size:12px!important}
+.hlHotelgest .hlThemeToggle em{font-size:10px!important}
+
 /* Large desktop / normal notebook: still two large widgets per row, but no capped one-sided canvas. */
 @media(max-width:1400px){
   .hlHotelgest main [class*="frontdesk-polish-module"][class*="dashboard"]{
