@@ -119,8 +119,7 @@
 .hlHotelgest.hlThemeDark main [class*="planning-parity-module"][class*="stayPreview"]>small{color:#b9c7d9!important}
 .hlHotelgest.hlThemeDark main [class*="planning-parity-module"][class*="stayPreview"]>span>em{color:#91a5bf!important}
 
-/* Planning left rail: show the actual room names/numbers clearly.
-   Room.nombre contains values like 300, 301, 302, 303, 400 and 402. */
+/* Planning left rail: show the actual room names/numbers clearly. */
 .hlHotelgest main [class*="planning-lenses-module"][class*="roomButton"]{
   color:#111c2f!important;
   opacity:1!important;
@@ -155,6 +154,61 @@
   color:#56667c!important;
 }
 
+/* Hard fallback: target the actual first cell of every physical room row.
+   This does not depend on the roomCopy/roomButton module class names. */
+.hlHotelgest main [class*="command-center-module"][class*="calRow"]>button:first-child{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  width:100%!important;
+  min-width:0!important;
+  min-height:54px!important;
+  padding:8px 10px!important;
+  overflow:visible!important;
+  visibility:visible!important;
+  opacity:1!important;
+  color:#0d1b30!important;
+  background:#f8fbff!important;
+  text-align:left!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="calRow"]>button:first-child>span{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:flex-start!important;
+  justify-content:center!important;
+  visibility:visible!important;
+  opacity:1!important;
+  width:100%!important;
+  min-width:0!important;
+  color:#0d1b30!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="calRow"]>button:first-child b{
+  display:block!important;
+  visibility:visible!important;
+  opacity:1!important;
+  color:#0a1830!important;
+  font-size:15px!important;
+  line-height:1.05!important;
+  font-weight:950!important;
+  letter-spacing:.015em!important;
+  white-space:nowrap!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="calRow"]>button:first-child small{
+  display:block!important;
+  visibility:visible!important;
+  opacity:1!important;
+  margin-top:4px!important;
+  color:#5d6f88!important;
+  font-size:10px!important;
+  line-height:1.15!important;
+  font-weight:750!important;
+  white-space:nowrap!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="calRow"]>button:first-child:hover{
+  background:#eef5ff!important;
+  box-shadow:inset -3px 0 #5d8ff1!important;
+}
+
 /* Group/type labels are intentionally a little larger and darker for scanning. */
 .hlHotelgest main [class*="command-center-module"][class*="groupHeader"] b{
   font-size:12.5px!important;
@@ -186,6 +240,17 @@
 .hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="groupHeader"] small,
 .hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="typeOccupancy"]>div:first-child small{
   color:#9fb0c6!important;
+}
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="calRow"]>button:first-child{
+  background:#111d2c!important;
+  color:#f5f8ff!important;
+  border-right-color:#2a3b50!important;
+}
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="calRow"]>button:first-child b{color:#fff!important}
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="calRow"]>button:first-child small{color:#9fb1c9!important}
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="calRow"]>button:first-child:hover{
+  background:#17263a!important;
+  box-shadow:inset -3px 0 #5b8dff!important;
 }
 
 @media(max-width:900px){
