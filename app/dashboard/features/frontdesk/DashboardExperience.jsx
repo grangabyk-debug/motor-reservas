@@ -17,12 +17,36 @@ function Trend({values=[]}){
 function ArgentinaMark(){return <span className={s.argentina}><i aria-hidden="true"><b/></i><span>Hecho en Argentina · pensado para la región</span></span>}
 
 export default function DashboardExperience(props){
-  const{settings,rooms=[],reservations=[],payments=[],onView,onOpen,onNewReservation,onMenu,onCommand}=props
-  const propertyKey=settings?.property_id||settings?.hotel_name||"hotel",[mode,setMode]=useState("simple"),[clock,setClock]=useState(null)
-  useEffect(()=>{try{const saved=localStorage.getItem(`hl-dashboard-mode:${propertyKey}`);if(saved==="advanced"||saved==="simple")setMode(saved)}catch{}},[propertyKey])
-  useEffect(()=>{try{localStorage.setItem(`hl-dashboard-mode:${propertyKey}`,mode)}catch{}},[mode,propertyKey])
+  const propertyKey=props.settings?.property_id||props.settings?.hotel_name||"hotel"
+  const[mode,setMode]=useState("simple")
+
+  useEffect(()=>{
+    try{
+      const saved=localStorage.getItem(`hl-dashboard-mode:${propertyKey}`)
+      if(saved==="advanced"||saved==="simple")setMode(saved)
+    }catch{}
+  },[propertyKey])
+
+  useEffect(()=>{
+    try{localStorage.setItem(`hl-dashboard-mode:${propertyKey}`,mode)}catch{}
+  },[mode,propertyKey])
+
+  return mode==="advanced"
+    ?<AdvancedDashboard {...props} onMode={()=>setMode("simple")}/>
+    :<SimpleDashboard {...props} onMode={()=>setMode("advanced")}/>
+}
+
+function AdvancedDashboard(props){
+  const{onMode,...lobbyProps}=props
+  return <div className={s.advanced}>
+    <div className={s.modeBar}><ArgentinaMark/><div><button type="button" onClick={onMode}>Simple</button><button type="button" className={s.modeActive}>Avanzada</button></div></div>
+    <Lobby {...lobbyProps}/>
+  </div>
+}
+
+function SimpleDashboard({settings,rooms=[],reservations=[],payments=[],onView,onOpen,onNewReservation,onMenu,onCommand,onMode}){
+  const[clock,setClock]=useState(null)
   useEffect(()=>{const tick=()=>setClock(new Date()),id=setInterval(tick,30000);tick();return()=>clearInterval(id)},[])
-  if(mode==="advanced")return <div className={s.advanced}><div className={s.modeBar}><ArgentinaMark/><div><button onClick={()=>setMode("simple")}>Simple</button><button className={s.modeActive}>Avanzada</button></div></div><Lobby {...props}/></div>
 
   const today=isoDate(),live=reservations.filter(activeReservation),arrivals=live.filter(r=>r.fecha_entrada===today&&r.estado!=="alojado"),departures=live.filter(r=>r.fecha_salida===today&&r.estado!=="finalizada"),inhouse=live.filter(r=>r.fecha_entrada<=today&&r.fecha_salida>today&&r.estado!=="finalizada"),sellable=rooms.filter(r=>r.activa!==false&&!['mantenimiento','fuera_servicio'].includes(String(r.estado||"").toLowerCase())),occupied=new Set(inhouse.map(r=>String(r.habitacion_id))).size,occupancy=pct(occupied,sellable.length),dirty=rooms.filter(r=>String(r.estado||"").toLowerCase()==="sucia").length,cleaning=rooms.filter(r=>["limpieza","en_limpieza","inspeccion"].includes(String(r.estado||"").toLowerCase())).length,ready=rooms.filter(r=>["limpia","inspeccionada","disponible"].includes(String(r.estado||"").toLowerCase())).length
   const paid=useMemo(()=>{const map=new Map();payments.forEach(p=>map.set(String(p.reserva_id),(map.get(String(p.reserva_id))||0)+Number(p.monto||0)));return map},[payments]),due=arrivals.filter(r=>Math.max(0,Number(r.precio_total||0)-(paid.get(String(r.id))||0))>.01),dueAmount=due.reduce((sum,r)=>sum+Math.max(0,Number(r.precio_total||0)-(paid.get(String(r.id))||0)),0)
@@ -32,18 +56,18 @@ export default function DashboardExperience(props){
 
   return <main className={s.simple}>
     <header className={s.header}>
-      <div className={s.title}><button className={s.mobileMenu} onClick={onMenu} aria-label="Abrir menú">☰</button><div><small>HABITACIÓN LLENA</small><h1>Panel operativo</h1><p>{settings?.hotel_name||"Hotel"} · {dateLabel}{timeLabel?` · ${timeLabel}`:""}</p></div></div>
-      <div className={s.headerActions}><button className={s.search} onClick={onCommand}>⌕ <span>Buscar</span></button><div className={s.modeSwitch} aria-label="Modo del dashboard"><button className={s.modeActive}>Simple</button><button onClick={()=>setMode("advanced")}>Avanzada</button></div>{onNewReservation&&<button className={s.newReservation} onClick={onNewReservation}>＋ Nueva reserva</button>}</div>
+      <div className={s.title}><button type="button" className={s.mobileMenu} onClick={onMenu} aria-label="Abrir menú">☰</button><div><small>HABITACIÓN LLENA</small><h1>Panel operativo</h1><p>{settings?.hotel_name||"Hotel"} · {dateLabel}{timeLabel?` · ${timeLabel}`:""}</p></div></div>
+      <div className={s.headerActions}><button type="button" className={s.search} onClick={onCommand}>⌕ <span>Buscar</span></button><div className={s.modeSwitch} aria-label="Modo del dashboard"><button type="button" className={s.modeActive}>Simple</button><button type="button" onClick={onMode}>Avanzada</button></div>{onNewReservation&&<button type="button" className={s.newReservation} onClick={onNewReservation}>＋ Nueva reserva</button>}</div>
     </header>
 
     <div className={s.nationalLine}><ArgentinaMark/><span>ARS · Mercado Pago · ARCA</span></div>
 
     <section className={s.metrics} aria-label="Indicadores de hoy">
-      <button onClick={()=>onView?.("calendar")}><small>OCUPACIÓN</small><strong>{occupancy}%</strong><span>{occupied} de {sellable.length} habitaciones</span></button>
-      <button onClick={()=>onView?.("reservations")}><small>LLEGADAS</small><strong>{arrivals.length}</strong><span>{nextArrivals[0]?`${nextArrivals[0].hora_llegada_estimada||"Sin hora"} · ${nextArrivals[0].nombre_huesped}`:"Sin pendientes"}</span></button>
-      <button onClick={()=>onView?.("reservations")}><small>SALIDAS</small><strong>{departures.length}</strong><span>{departures.length?"Movimiento del día":"Sin pendientes"}</span></button>
-      <button onClick={()=>onView?.("housekeeping")}><small>HOUSEKEEPING</small><strong>{dirty||ready}</strong><span>{dirty?`${dirty} sucias · ${cleaning} en proceso`:`${ready} listas`}</span></button>
-      <button onClick={()=>onView?.("cash")}><small>COBROS HOY</small><strong>{due.length}</strong><span>{due.length?money(dueAmount,due[0]?.moneda||"ARS"):"Sin deuda inmediata"}</span></button>
+      <button type="button" onClick={()=>onView?.("calendar")}><small>OCUPACIÓN</small><strong>{occupancy}%</strong><span>{occupied} de {sellable.length} habitaciones</span></button>
+      <button type="button" onClick={()=>onView?.("reservations")}><small>LLEGADAS</small><strong>{arrivals.length}</strong><span>{nextArrivals[0]?`${nextArrivals[0].hora_llegada_estimada||"Sin hora"} · ${nextArrivals[0].nombre_huesped}`:"Sin pendientes"}</span></button>
+      <button type="button" onClick={()=>onView?.("reservations")}><small>SALIDAS</small><strong>{departures.length}</strong><span>{departures.length?"Movimiento del día":"Sin pendientes"}</span></button>
+      <button type="button" onClick={()=>onView?.("housekeeping")}><small>HOUSEKEEPING</small><strong>{dirty||ready}</strong><span>{dirty?`${dirty} sucias · ${cleaning} en proceso`:`${ready} listas`}</span></button>
+      <button type="button" onClick={()=>onView?.("cash")}><small>COBROS HOY</small><strong>{due.length}</strong><span>{due.length?money(dueAmount,due[0]?.moneda||"ARS"):"Sin deuda inmediata"}</span></button>
     </section>
 
     <section className={s.mainStage}>
@@ -51,18 +75,18 @@ export default function DashboardExperience(props){
         <div className={s.stageHead}><div><small>PRÓXIMOS 14 DÍAS</small><h2>Ocupación</h2></div><div><b>{occupancy}%</b><span>hoy</span></div></div>
         <Trend values={forecast}/>
         <div className={s.axis}><span>Hoy</span><span>{shortDate(addDays(today,6))}</span><span>{shortDate(addDays(today,13))}</span></div>
-        <div className={s.revenueLine}><span><small>Producción estimada · noche actual</small><b>{money(Math.round(todayRevenue),settings?.currency||settings?.moneda||"ARS")}</b></span><button onClick={()=>onView?.("rates")}>Abrir Revenue →</button></div>
+        <div className={s.revenueLine}><span><small>Producción estimada · noche actual</small><b>{money(Math.round(todayRevenue),settings?.currency||settings?.moneda||"ARS")}</b></span><button type="button" onClick={()=>onView?.("rates")}>Abrir Revenue →</button></div>
       </div>
       <aside className={s.now}>
         <header><small>AHORA</small><h2>Lo que merece atención</h2></header>
-        <div className={s.attention}>{attention.length?attention.map((item,index)=><button key={`${item.label}-${index}`} onClick={()=>onView?.(item.view)}><i/><span><b>{item.label}</b><small>{item.detail}</small></span><em>→</em></button>):<div className={s.calm}><i>✓</i><div><b>Sin alertas críticas</b><span>La operación no muestra pendientes urgentes.</span></div></div>}</div>
-        <button className={s.planningLink} onClick={()=>onView?.("calendar")}>Abrir Planning <span>→</span></button>
+        <div className={s.attention}>{attention.length?attention.map((item,index)=><button type="button" key={`${item.label}-${index}`} onClick={()=>onView?.(item.view)}><i/><span><b>{item.label}</b><small>{item.detail}</small></span><em>→</em></button>):<div className={s.calm}><i>✓</i><div><b>Sin alertas críticas</b><span>La operación no muestra pendientes urgentes.</span></div></div>}</div>
+        <button type="button" className={s.planningLink} onClick={()=>onView?.("calendar")}>Abrir Planning <span>→</span></button>
       </aside>
     </section>
 
     <section className={s.arrivals}>
-      <header><div><small>PRÓXIMAS LLEGADAS</small><h2>Recepción</h2></div><button onClick={()=>onView?.("reservations")}>Ver todas →</button></header>
-      <div>{nextArrivals.length?nextArrivals.map(r=><button key={r.id} onClick={()=>onOpen?.(r)}><time>{r.hora_llegada_estimada||"--:--"}</time><span><b>{r.nombre_huesped||"Huésped"}</b><small>{roomName(r.habitacion_id)} · {r.numero_reserva||r.id}</small></span><em>Check-in</em></button>):<p>No hay llegadas pendientes para hoy.</p>}</div>
+      <header><div><small>PRÓXIMAS LLEGADAS</small><h2>Recepción</h2></div><button type="button" onClick={()=>onView?.("reservations")}>Ver todas →</button></header>
+      <div>{nextArrivals.length?nextArrivals.map(r=><button type="button" key={r.id} onClick={()=>onOpen?.(r)}><time>{r.hora_llegada_estimada||"--:--"}</time><span><b>{r.nombre_huesped||"Huésped"}</b><small>{roomName(r.habitacion_id)} · {r.numero_reserva||r.id}</small></span><em>Check-in</em></button>):<p>No hay llegadas pendientes para hoy.</p>}</div>
     </section>
   </main>
 }
