@@ -1,32 +1,36 @@
-/* Keep Planning content visibly below the rebuilt operator bar. Loaded last. */
+/* Planning / Rack vertical flow. Loaded last.
+   The Assignment Rack now exposes a stable data hook so its position no longer
+   depends on generated CSS-module class names. */
+
 .hlHotelgest main [class*="command-center-module"][class*="calendar"]{
   margin-top:14px!important;
 }
 
-/* Assignment Rack is the first child inside the scrollable Planning canvas. Legacy
-   positioning made its header start behind the rebuilt operator bar. Offset the
-   rack itself so its title/actions always begin below the bar instead of trying
-   to move the whole calendar container. */
-.hlHotelgest main [class*="command-center-module"][class*="calendar"] > [class*="assignment-rack-module"][class*="wrap"]{
+/* Wide desktop: the operator bar is one 60px row. The rack starts clearly below
+   it, with a small visual breathing space instead of sitting behind the bar. */
+.hlHotelgest main [class*="command-center-module"][class*="calendar"] > [data-assignment-rack="true"]{
   position:relative!important;
   z-index:1!important;
-  margin-top:70px!important;
+  box-sizing:border-box!important;
+  margin-top:68px!important;
 }
 
+/* Notebook: the responsive operator surface becomes two rows. */
 @media(max-width:1279px) and (min-width:860px){
   .hlHotelgest main [class*="command-center-module"][class*="calendar"]{
     margin-top:12px!important;
   }
-  .hlHotelgest main [class*="command-center-module"][class*="calendar"] > [class*="assignment-rack-module"][class*="wrap"]{
-    margin-top:118px!important;
+  .hlHotelgest main [class*="command-center-module"][class*="calendar"] > [data-assignment-rack="true"]{
+    margin-top:116px!important;
   }
 }
 
+/* Tablet / phone: range, view switch and search use three stacked rows. */
 @media(max-width:859px){
   .hlHotelgest main [class*="command-center-module"][class*="calendar"]{
     margin-top:10px!important;
   }
-  .hlHotelgest main [class*="command-center-module"][class*="calendar"] > [class*="assignment-rack-module"][class*="wrap"]{
-    margin-top:170px!important;
+  .hlHotelgest main [class*="command-center-module"][class*="calendar"] > [data-assignment-rack="true"]{
+    margin-top:166px!important;
   }
 }
