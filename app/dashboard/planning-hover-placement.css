@@ -1,0 +1,20 @@
+/* Adaptive reservation hover preview placement.
+   The client bridge chooses above/below using the actual visible Planning space. */
+.hlHotelgest main [class*="planning-parity-module"][class*="stayOverflow"][data-hl-preview-side="below"] [class*="planning-parity-module"][class*="stayPreview"]{
+  top:calc(100% + 8px)!important;
+  bottom:auto!important;
+  transform:translate(-50%,6px) scale(.965)!important;
+  transform-origin:center top!important;
+}
+.hlHotelgest main [class*="planning-parity-module"][class*="stayOverflow"][data-hl-preview-side="below"]:hover [class*="planning-parity-module"][class*="stayPreview"]{
+  transform:translate(-50%,0) scale(1)!important;
+}
+.hlHotelgest main [class*="planning-parity-module"][class*="stayOverflow"][data-hl-preview-side="above"] [class*="planning-parity-module"][class*="stayPreview"]{
+  top:auto!important;
+  bottom:calc(100% + 8px)!important;
+  transform:translate(-50%,-6px) scale(.965)!important;
+  transform-origin:center bottom!important;
+}
+.hlHotelgest main [class*="planning-parity-module"][class*="stayOverflow"][data-hl-preview-side="above"]:hover [class*="planning-parity-module"][class*="stayPreview"]{
+  transform:translate(-50%,0) scale(1)!important;
+}
