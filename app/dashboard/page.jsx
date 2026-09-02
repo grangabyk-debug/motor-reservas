@@ -3,12 +3,11 @@ import StaticCaretGuard from"../components/StaticCaretGuard"
 import MercadoPagoOAuthBridge from"./components/MercadoPagoOAuthBridge"
 import readability from"./readability.module.css"
 import design from"./dashboard-design.module.css"
-import"./planning-stage-now.css"
-import"./dashboard-stage-now.css"
 import"./module-stage-now.css"
 import"./hotelgest-theme.css"
 import"./dashboard-hotelgest-v2.css"
 import"./planning-hotelgest-v2.css"
+import"./hotelgest-final.css"
 
 export default function DashboardPage(){
   return <><StaticCaretGuard/><MercadoPagoOAuthBridge/><div className={`hlStageNow hlHotelgest ${readability.readable} ${design.system}`}><HotelOSV2/></div></>
