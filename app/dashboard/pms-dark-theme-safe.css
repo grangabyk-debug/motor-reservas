@@ -1,0 +1,330 @@
+/* Habitación Llena — full dark theme, visual-only layer.
+   IMPORTANT: this file intentionally does NOT change layout geometry.
+   No position/top/left/right/inset/width/height/padding/margin/display/grid/overflow/transform rules here. */
+
+.hlHotelgest.hlThemeDark{
+  --hl-night-0:#0a0f16;
+  --hl-night-1:#0f1620;
+  --hl-night-2:#141d28;
+  --hl-night-3:#192432;
+  --hl-night-4:#202d3c;
+  --hl-night-line:#273648;
+  --hl-night-line-strong:#34465d;
+  --hl-night-text:#edf4ff;
+  --hl-night-text-2:#cbd7e6;
+  --hl-night-muted:#8fa0b4;
+  --hl-night-faint:#65758a;
+  --hl-night-blue:#4b8cff;
+  --hl-night-cyan:#31c3dc;
+  --hl-night-green:#32c493;
+  --hl-night-amber:#f4b657;
+  --hl-night-red:#f1737e;
+  --hl-night-violet:#9d84f2;
+  --hl-night-shadow:0 14px 36px rgba(0,0,0,.26);
+  --hl-night-shadow-soft:0 8px 24px rgba(0,0,0,.18);
+  color-scheme:dark;
+  background:#0a0f16!important;
+  color:#edf4ff!important;
+}
+
+/* Utility bar */
+.hlThemeDark .hlUtilityBar{
+  background:rgba(12,18,26,.96)!important;
+  border-color:var(--hl-night-line)!important;
+  color:var(--hl-night-muted)!important;
+  box-shadow:0 1px 0 rgba(255,255,255,.025)!important;
+}
+.hlThemeDark .hlUtilityClock{border-color:var(--hl-night-line)!important}
+.hlThemeDark .hlUtilityClock span{color:var(--hl-night-muted)!important}
+.hlThemeDark .hlUtilityClock strong{color:var(--hl-night-text)!important}
+.hlThemeDark .hlThemeToggle{
+  background:#17212d!important;
+  border-color:#2c3b4f!important;
+  color:#e7eef8!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035)!important;
+}
+.hlThemeDark .hlThemeToggle:hover{background:#1d2a38!important;border-color:#3a4e66!important}
+
+/* App shell: colors only. Canonical shell.module.css keeps ALL sizing/positioning. */
+.hlThemeDark>div[class*="v2-module"][class*="shell"],
+.hlThemeDark [class*="v2-module"][class*="work"],
+.hlThemeDark main{
+  background-color:var(--hl-night-0)!important;
+  color:var(--hl-night-text)!important;
+}
+
+/* Sidebar — theme only; never override rail geometry. */
+.hlThemeDark [class*="shell-module"][class*="rail"]{
+  background:#0d141d!important;
+  color:var(--hl-night-text-2)!important;
+  border-color:#202d3c!important;
+  box-shadow:5px 0 24px rgba(0,0,0,.16)!important;
+}
+.hlThemeDark [class*="shell-module"][class*="railBottom"]{
+  background:#0d141d!important;
+  border-color:#202d3c!important;
+}
+.hlThemeDark [class*="shell-module"][class*="hotelSwitch"]{border-color:#253244!important;color:var(--hl-night-muted)!important}
+.hlThemeDark [class*="shell-module"][class*="hotelSwitch"] select{background:transparent!important;color:var(--hl-night-text-2)!important}
+.hlThemeDark [class*="shell-module"][class*="moduleButton"]{background:transparent!important;color:#71839a!important;box-shadow:none!important}
+.hlThemeDark [class*="shell-module"][class*="moduleButton"]:hover{background:#172230!important;color:#c9dcf5!important}
+.hlThemeDark [class*="shell-module"][class*="moduleButtonActive"]{
+  background:linear-gradient(135deg,rgba(75,140,255,.22),rgba(75,140,255,.09))!important;
+  color:#72a5ff!important;
+  box-shadow:inset 0 0 0 1px rgba(92,153,255,.22),0 6px 18px rgba(29,83,171,.12)!important;
+}
+.hlThemeDark [class*="shell-module"][class*="railUtility"]{background:transparent!important;color:#75879d!important}
+.hlThemeDark [class*="shell-module"][class*="railUtility"]:hover,
+.hlThemeDark [class*="shell-module"][class*="railUtilityActive"]{background:#172230!important;color:#8eb6ff!important}
+.hlThemeDark [class*="shell-module"][class*="railUtility"]>span,
+.hlThemeDark [class*="shell-module"][class*="sessionMark"]>span{
+  background:#172230!important;
+  color:#9ab2ce!important;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.025)!important;
+}
+.hlThemeDark [class*="shell-module"][class*="railUtility"]>b,
+.hlThemeDark [class*="shell-module"][class*="sessionMark"]>b,
+.hlThemeDark [class*="shell-module"][class*="countryMark"]>b{color:#9aabc0!important}
+.hlThemeDark [class*="shell-module"][data-tip]::after{
+  background:#17212d!important;
+  color:#d9e5f4!important;
+  border-color:#2d3d51!important;
+  box-shadow:0 14px 34px rgba(0,0,0,.28)!important;
+}
+.hlThemeDark [class*="shell-module"][class*="moduleFlyout"]{
+  background:#121b26!important;
+  color:var(--hl-night-text)!important;
+  border-color:#2b394c!important;
+  box-shadow:0 22px 60px rgba(0,0,0,.34)!important;
+}
+.hlThemeDark [class*="shell-module"][class*="moduleFlyout"]::before{background:#121b26!important;border-color:#2b394c!important}
+.hlThemeDark [class*="shell-module"][class*="moduleFlyout"] header{border-color:#253244!important}
+.hlThemeDark [class*="shell-module"][class*="moduleFlyout"] header small,
+.hlThemeDark [class*="shell-module"][class*="moduleFlyout"] header span{color:#7f91a8!important}
+.hlThemeDark [class*="shell-module"][class*="moduleFlyout"] header b{color:#edf4ff!important}
+.hlThemeDark [class*="shell-module"][class*="moduleFlyout"]>div button{background:transparent!important;color:#a5b5c8!important}
+.hlThemeDark [class*="shell-module"][class*="moduleFlyout"]>div button:hover{background:#1a2634!important;color:#edf4ff!important}
+.hlThemeDark [class*="shell-module"][class*="moduleFlyout"]>div button[class*="flyoutActive"]{background:rgba(75,140,255,.15)!important;color:#78a9ff!important}
+
+/* Topbar */
+.hlThemeDark .hlAppTopbar{
+  background:rgba(12,18,26,.94)!important;
+  color:var(--hl-night-text)!important;
+  border-color:var(--hl-night-line)!important;
+  box-shadow:0 1px 0 rgba(255,255,255,.02)!important;
+}
+.hlThemeDark .hlAppTitle{color:#f1f6fd!important}
+.hlThemeDark .hlAppSearch{
+  background:#151f2b!important;
+  color:#a7bad0!important;
+  border-color:#2b3a4e!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.025)!important;
+}
+.hlThemeDark .hlAppSearch:hover{background:#1b2836!important;color:#d8e6f7!important;border-color:#39506a!important}
+
+/* Page backgrounds and typography */
+.hlThemeDark main [class*="dashboard"],
+.hlThemeDark main [class*="workspace"],
+.hlThemeDark main [class*="Workspace"],
+.hlThemeDark main [class*="page"],
+.hlThemeDark main [class*="Page"],
+.hlThemeDark main [class*="root"]{color:var(--hl-night-text)!important}
+
+.hlThemeDark main h1,.hlThemeDark main h2,.hlThemeDark main h3,.hlThemeDark main h4,.hlThemeDark main h5,
+.hlThemeDark main b,.hlThemeDark main strong{color:var(--hl-night-text)!important}
+.hlThemeDark main p,.hlThemeDark main label,.hlThemeDark main li{color:var(--hl-night-text-2)!important}
+.hlThemeDark main small,.hlThemeDark main time{color:var(--hl-night-muted)!important}
+
+/* Primary surface families used across Front Desk, Revenue, HK, Groups, Finance, Hotel and integrations. */
+.hlThemeDark main [class*="frontdesk-polish-module"][class*="card"],
+.hlThemeDark main [class*="frontdesk-polish-module"][class*="kpiCard"],
+.hlThemeDark main [class*="revenue-lab-module"][class*="summaryCard"],
+.hlThemeDark main [class*="v2-module"][class*="panel"],
+.hlThemeDark main [class*="v2-module"][class*="floorCard"],
+.hlThemeDark main [class*="v2-module"][class*="tableWrap"],
+.hlThemeDark main [class*="v2-module"][class*="paymentBox"],
+.hlThemeDark main [class*="v2-module"][class*="roomCard"],
+.hlThemeDark main [class*="v2-module"][class*="guestCard"],
+.hlThemeDark main [class*="v2-module"][class*="resourceCard"],
+.hlThemeDark main [class*="v2-module"][class*="ticket"],
+.hlThemeDark main [class*="v2-module"][class*="hkCard"],
+.hlThemeDark main [class*="v2-module"][class*="twinRoom"],
+.hlThemeDark main [class*="business-module"][class*="commercialCard"],
+.hlThemeDark main [class*="business-module"][class*="providerGrid"] article,
+.hlThemeDark main [class*="business-module"][class*="kpiGrid"] article,
+.hlThemeDark main [class*="accounting-premium-module"][class*="accountList"],
+.hlThemeDark main [class*="accounting-premium-module"][class*="accountPlan"],
+.hlThemeDark main [class*="accounting-premium-module"][class*="trend"],
+.hlThemeDark main [class*="accounting-premium-module"][class*="suppliers"],
+.hlThemeDark main [class*="accounting-premium-module"][class*="guestCard"],
+.hlThemeDark main [class*="accounting-premium-module"][class*="tableWrap"],
+.hlThemeDark main [class*="accounting-premium-module"][class*="metricGrid"] article,
+.hlThemeDark main [class*="accounting-premium-module"][class*="exportGrid"] article,
+.hlThemeDark main [class*="accounting-premium-module"][class*="exportHistory"],
+.hlThemeDark main [class*="accounting-premium-module"][class*="journal"] article,
+.hlThemeDark main article[class],
+.hlThemeDark main [class*="panel"],
+.hlThemeDark main [class*="Panel"],
+.hlThemeDark main [class*="summary"],
+.hlThemeDark main [class*="Summary"],
+.hlThemeDark main [class*="tableWrap"],
+.hlThemeDark main [class*="TableWrap"]{
+  background:#141d28!important;
+  border-color:#273648!important;
+  color:var(--hl-night-text)!important;
+  box-shadow:var(--hl-night-shadow-soft)!important;
+}
+
+/* Keep large analytics/hero areas richer than plain cards. */
+.hlThemeDark main [class*="frontdesk-polish-module"][class*="occupancyCard"]{
+  background:radial-gradient(circle at 82% 10%,rgba(75,140,255,.16),transparent 34%),linear-gradient(180deg,#151f2b,#121a24)!important;
+  border-color:#2a394d!important;
+}
+.hlThemeDark main [class*="accounting-premium-module"][class*="hero"],
+.hlThemeDark main [class*="accounting-premium-module"][class*="taxHero"]{
+  background:radial-gradient(circle at 90% 5%,rgba(49,195,220,.12),transparent 34%),linear-gradient(135deg,#151f2b,#111923)!important;
+  border-color:#2b3b50!important;
+  box-shadow:var(--hl-night-shadow)!important;
+}
+.hlThemeDark main [class*="business-module"][class*="revenueSignal"],
+.hlThemeDark main [class*="business-module"][class*="cashHero"],
+.hlThemeDark main [class*="accounting-premium-module"][class*="sideCard"]{
+  background:linear-gradient(135deg,#102b45,#153d5a)!important;
+  border-color:#24455f!important;
+  color:#f2f7fc!important;
+  box-shadow:0 18px 42px rgba(0,0,0,.23)!important;
+}
+
+/* Front desk today rail, widget editor and quick surfaces. */
+.hlThemeDark main [class*="dashboard-today-rail-module"][class*="shell"],
+.hlThemeDark main [class*="dashboard-widget-editor-module"],
+.hlThemeDark main [class*="frontdesk-polish-module"][class*="customizer"],
+.hlThemeDark main [class*="frontdesk-polish-module"][class*="searchBox"]{
+  background:#141d28!important;
+  border-color:#29384b!important;
+  color:var(--hl-night-text)!important;
+  box-shadow:var(--hl-night-shadow-soft)!important;
+}
+.hlThemeDark main [class*="dashboard-today-rail-module"][class*="identity"]{border-color:#2a394b!important}
+.hlThemeDark main [class*="dashboard-today-rail-module"][class*="metric"]{background:transparent!important;color:var(--hl-night-text-2)!important;border-color:transparent!important}
+.hlThemeDark main [class*="dashboard-today-rail-module"][class*="metric"]:hover{background:#1a2634!important;border-color:#314259!important}
+.hlThemeDark main [class*="dashboard-today-rail-module"][class*="metric"]>span,
+.hlThemeDark main [class*="dashboard-today-rail-module"][class*="metric"]>small{color:var(--hl-night-muted)!important}
+
+/* Planning/calendar surfaces — keep reservation status colors untouched. */
+.hlThemeDark main [class*="v2-module"][class*="calendar"],
+.hlThemeDark main [class*="planning-"][class*="calendar"],
+.hlThemeDark main [class*="planning-"][class*="grid"],
+.hlThemeDark main [class*="planning-"][class*="surface"],
+.hlThemeDark main [class*="planning-"][class*="toolbar"],
+.hlThemeDark main [class*="planning-"][class*="context"]{
+  background-color:#111923!important;
+  border-color:#263547!important;
+  color:var(--hl-night-text)!important;
+}
+.hlThemeDark main [class*="v2-module"][class*="calHead"],
+.hlThemeDark main [class*="v2-module"][class*="roomHead"],
+.hlThemeDark main [class*="v2-module"][class*="roomName"]{
+  background:#151f2b!important;
+  color:var(--hl-night-text-2)!important;
+  border-color:#29384a!important;
+}
+.hlThemeDark main [class*="v2-module"][class*="calRow"],
+.hlThemeDark main [class*="v2-module"][class*="dayCell"]{border-color:#233143!important}
+.hlThemeDark main [class*="v2-module"][class*="today"]{background:rgba(75,140,255,.11)!important}
+.hlThemeDark main [class*="v2-module"][class*="blocked"]{background:repeating-linear-gradient(135deg,rgba(143,160,180,.10) 0 5px,transparent 5px 10px)!important}
+
+/* Business/rates */
+.hlThemeDark main [class*="business-module"][class*="rateCalendar"]{border-color:#29384b!important;background:#111923!important}
+.hlThemeDark main [class*="business-module"][class*="rateCell"]{background:#151f2b!important;color:var(--hl-night-text-2)!important;border-color:#273648!important}
+.hlThemeDark main [class*="business-module"][class*="rateCell"]:hover{background:#1c2938!important}
+.hlThemeDark main [class*="business-module"][class*="rateClosed"]{background:#2b2023!important;color:#ef9ca4!important}
+.hlThemeDark main [class*="business-module"][class*="reportTabs"]{background:#111923!important;border-color:#29384b!important}
+
+/* Finance/accounting detailed surfaces. */
+.hlThemeDark main [class*="accounting-premium-module"][class*="tabs"]{background:#111923!important;border-color:#273648!important}
+.hlThemeDark main [class*="accounting-premium-module"][class*="tabs"] button{color:#95a7bd!important}
+.hlThemeDark main [class*="accounting-premium-module"][class*="tabs"] button[class*="active"]{background:#1b2938!important;color:#76a9ff!important;box-shadow:inset 0 0 0 1px rgba(75,140,255,.17)!important}
+.hlThemeDark main [class*="accounting-premium-module"][class*="articleList"],
+.hlThemeDark main [class*="accounting-premium-module"][class*="payList"],
+.hlThemeDark main [class*="accounting-premium-module"][class*="note"],
+.hlThemeDark main [class*="accounting-premium-module"][class*="fiscalIntro"]{background:#111923!important;border-color:#273648!important;color:var(--hl-night-text-2)!important}
+.hlThemeDark main [class*="accounting-premium-module"][class*="payList"] h4,
+.hlThemeDark main [class*="accounting-premium-module"][class*="journal"] article>header,
+.hlThemeDark main [class*="accounting-premium-module"][class*="journal"] article>footer{background:#182330!important;border-color:#2a394c!important;color:var(--hl-night-text-2)!important}
+.hlThemeDark main [class*="accounting-premium-module"][class*="barPair"]{border-color:#2a394b!important}
+
+/* Tables everywhere */
+.hlThemeDark main table{color:var(--hl-night-text-2)!important;border-color:#273648!important}
+.hlThemeDark main table th{
+  background:#111923!important;
+  color:#8fa0b4!important;
+  border-color:#273648!important;
+}
+.hlThemeDark main table td{
+  background:#141d28!important;
+  color:#d6e1ee!important;
+  border-color:#273648!important;
+}
+.hlThemeDark main table tr:hover td{background:#192432!important}
+.hlThemeDark main table td b{color:#edf4ff!important}
+.hlThemeDark main table td small{color:#8496aa!important}
+
+/* Inputs and neutral controls */
+.hlThemeDark main input,
+.hlThemeDark main select,
+.hlThemeDark main textarea{
+  background:#101821!important;
+  color:#e8eff8!important;
+  border-color:#2b3a4d!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.018)!important;
+}
+.hlThemeDark main input::placeholder,.hlThemeDark main textarea::placeholder{color:#66788e!important}
+.hlThemeDark main input:focus,.hlThemeDark main select:focus,.hlThemeDark main textarea:focus{border-color:#4b7fc2!important;box-shadow:0 0 0 3px rgba(75,140,255,.10)!important}
+
+.hlThemeDark main button:not(.hlAppReservation):not([class*="primary"]):not([class*="Primary"]):not([class*="danger"]):not([class*="Danger"]):not([class*="success"]):not([class*="Success"]):not([class*="stay"]):not([class*="Stay"]):not([class*="status"]):not([class*="Status"]):not([class*="connected"]):not([class*="activeTab"]){
+  border-color:#2d3c50!important;
+  color:#cad7e6!important;
+}
+.hlThemeDark main [class*="actions"] button:not([class*="primary"]):not([class*="Primary"]),
+.hlThemeDark main [class*="toolbar"] button:not([class*="primary"]):not([class*="Primary"]),
+.hlThemeDark main [class*="tabs"] button:not([class*="active"]):not([class*="Active"]),
+.hlThemeDark main [class*="filter"] button:not([class*="active"]):not([class*="Active"]){background:#17212d!important;color:#aebed1!important;border-color:#2c3b4f!important}
+.hlThemeDark main [class*="actions"] button:not([class*="primary"]):not([class*="Primary"]):hover,
+.hlThemeDark main [class*="toolbar"] button:not([class*="primary"]):not([class*="Primary"]):hover{background:#1e2b3a!important;color:#edf4ff!important;border-color:#3a5069!important}
+
+/* Modals/drawers/popovers, without touching their geometry. */
+.hlThemeDark main [class*="modal"],
+.hlThemeDark main [class*="Modal"],
+.hlThemeDark main [class*="drawer"],
+.hlThemeDark main [class*="Drawer"],
+.hlThemeDark main [class*="popover"],
+.hlThemeDark main [class*="Popover"]{
+  background-color:#121b26!important;
+  color:var(--hl-night-text)!important;
+  border-color:#2b394c!important;
+  box-shadow:0 28px 80px rgba(0,0,0,.38)!important;
+}
+.hlThemeDark main [class*="drawerHead"],
+.hlThemeDark main [class*="drawerTabs"],
+.hlThemeDark main [class*="modal"] header,
+.hlThemeDark main [class*="Modal"] header{background-color:#151f2b!important;border-color:#2a394b!important}
+.hlThemeDark main [class*="overlay"],
+.hlThemeDark main [class*="Overlay"],
+.hlThemeDark main [class*="shade"],
+.hlThemeDark main [class*="Shade"]{background-color:rgba(2,7,12,.66)!important}
+
+/* Small secondary surfaces; semantic green/amber/red status chips are intentionally left alone. */
+.hlThemeDark main [class*="empty"]{color:#8496aa!important}
+.hlThemeDark main [class*="empty"] b{color:#c8d5e5!important}
+.hlThemeDark main [class*="note"]:not([class*="status"]),
+.hlThemeDark main [class*="helper"],
+.hlThemeDark main [class*="hint"]{background-color:#111923!important;border-color:#273648!important;color:#9fb0c4!important}
+
+/* Scrollbars */
+.hlThemeDark main *{scrollbar-color:#34465d #101720}
+
+/* SVG/chart legibility. Preserve series colors, improve axes/labels/grid. */
+.hlThemeDark main svg text{fill:#8fa0b4!important}
+.hlThemeDark main svg line{stroke-opacity:.65}
+.hlThemeDark main [class*="legend"]{color:#9eb0c4!important}
