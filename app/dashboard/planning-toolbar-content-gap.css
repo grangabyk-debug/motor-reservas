@@ -1,0 +1,14 @@
+/* Keep Planning content visibly below the rebuilt operator bar. Loaded last. */
+.hlHotelgest main [class*="command-center-module"][class*="calendar"]{
+  margin-top:14px!important;
+}
+@media(max-width:1279px){
+  .hlHotelgest main [class*="command-center-module"][class*="calendar"]{
+    margin-top:12px!important;
+  }
+}
+@media(max-width:859px){
+  .hlHotelgest main [class*="command-center-module"][class*="calendar"]{
+    margin-top:10px!important;
+  }
+}
