@@ -20,6 +20,7 @@ import"./pms-flyout-clarity.css"
 import"./pms-dark-complete.css"
 import"./pms-final-fixes.css"
 import"./pms-top-actions.css"
+import"./planning-quick-modal.css"
 
 export const metadata={
   title:"Habitación Llena",
