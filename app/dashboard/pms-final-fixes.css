@@ -1,0 +1,105 @@
+/* Final visual fixes kept isolated and loaded last. */
+
+/* Planning: selected reservation in light mode must keep its channel tint instead of washing out. */
+.hlHotelgest:not(.hlThemeDark) main [class*="command-center-module"][class*="staySelected"]{
+  background:linear-gradient(135deg,color-mix(in srgb,var(--channel) 22%,white),color-mix(in srgb,var(--channel) 12%,white))!important;
+  color:color-mix(in srgb,var(--channel) 80%,#172033)!important;
+  border-left-color:var(--channel)!important;
+  outline:2px solid color-mix(in srgb,var(--channel) 72%,#4569d9)!important;
+  outline-offset:2px!important;
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--channel) 28%,#d9e1eb),0 8px 20px color-mix(in srgb,var(--channel) 15%,transparent)!important;
+}
+.hlHotelgest:not(.hlThemeDark) main [class*="command-center-module"][class*="staySelected"] b,
+.hlHotelgest:not(.hlThemeDark) main [class*="command-center-module"][class*="staySelected"] small{
+  color:inherit!important;
+  opacity:1!important;
+}
+.hlHotelgest:not(.hlThemeDark) main [class*="command-center-module"][class*="staySelected"]:hover{
+  background:linear-gradient(135deg,color-mix(in srgb,var(--channel) 27%,white),color-mix(in srgb,var(--channel) 15%,white))!important;
+}
+
+/* Planning dark date navigator: no white segmented pill. */
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="rangeBlock"]{
+  padding:3px!important;
+  border:1px solid #2c4056!important;
+  border-radius:12px!important;
+  background:linear-gradient(180deg,#0e1d2c,#0a1623)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 8px 22px rgba(0,0,0,.16)!important;
+}
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="rangeBlock"] strong{
+  min-width:108px!important;
+  padding:0 8px!important;
+  color:#d9e7f7!important;
+  background:transparent!important;
+  text-shadow:0 0 12px rgba(109,166,255,.08)!important;
+}
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="rangeBlock"] button{
+  border-color:#30465f!important;
+  background:#112238!important;
+  color:#dbe8f7!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035)!important;
+}
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="rangeBlock"] button:hover{
+  background:#17304d!important;
+  border-color:#42678f!important;
+  color:#fff!important;
+}
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="rangeBlock"] [class*="todayButton"]{
+  background:linear-gradient(135deg,#24568d,#354f9a)!important;
+  color:#fff!important;
+  border-color:#4f75ac!important;
+  box-shadow:0 0 16px rgba(67,126,226,.14)!important;
+}
+
+/* Dashboard top actions: quotation sits neatly below New reservation. */
+.hlPrimaryStack{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:6px;
+  min-width:max-content;
+}
+.hlPrimaryStack [class*="primaryAction"]{width:100%!important}
+.hlQuoteAction{
+  height:31px;
+  padding:0 13px;
+  border:1px solid #cfdaf0;
+  border-radius:9px;
+  background:linear-gradient(135deg,#f2f6ff,#f2efff);
+  color:#5367a4;
+  box-shadow:0 6px 16px rgba(59,88,160,.08);
+  font-size:9px;
+  font-weight:850;
+  cursor:pointer;
+  transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease;
+}
+.hlQuoteAction:hover{transform:translateY(-1px);border-color:#aebfe4;box-shadow:0 9px 20px rgba(65,91,167,.12)}
+.hlHotelgest.hlThemeDark .hlQuoteAction{
+  border-color:#385376;
+  background:linear-gradient(135deg,#132a47,#262248);
+  color:#9fc3ff;
+  box-shadow:0 0 20px rgba(67,126,229,.09),inset 0 1px 0 rgba(255,255,255,.04);
+}
+.hlHotelgest.hlThemeDark .hlQuoteAction:hover{border-color:#4c73a2;box-shadow:0 0 24px rgba(73,137,241,.14)}
+
+/* Occupancy ring becomes a traffic-light signal and never has a white center in dark mode. */
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="kpiRing"]{
+  background:conic-gradient(var(--ring-color,#2f71ef) var(--value),#e4eaf2 0)!important;
+  box-shadow:0 0 14px color-mix(in srgb,var(--ring-color,#2f71ef) 25%,transparent)!important;
+}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="kpiRing"]:after{
+  background:#fff!important;
+  box-shadow:inset 0 0 0 1px rgba(78,96,124,.06)!important;
+}
+.hlHotelgest.hlThemeDark main [class*="frontdesk-polish-module"][class*="kpiRing"]{
+  background:conic-gradient(var(--ring-color,#2f71ef) var(--value),#263649 0)!important;
+  box-shadow:0 0 18px color-mix(in srgb,var(--ring-color,#2f71ef) 34%,transparent)!important;
+}
+.hlHotelgest.hlThemeDark main [class*="frontdesk-polish-module"][class*="kpiRing"]:after{
+  background:#112033!important;
+  box-shadow:inset 0 0 0 1px rgba(130,164,205,.18)!important;
+}
+
+@media(max-width:900px){
+  .hlPrimaryStack{width:100%;min-width:0}
+  .hlQuoteAction{width:100%;height:36px}
+}
