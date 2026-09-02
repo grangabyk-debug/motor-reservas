@@ -14,7 +14,7 @@ const dayLabel=day=>new Date(`${day}T12:00:00`).toLocaleDateString("es-AR",{week
 
 export default function AvailabilityRack({rooms=[],reservations=[],blocks=[]}){
   const propertyId=rooms.find(r=>r.property_id)?.property_id||reservations.find(r=>r.property_id)?.property_id||null
-  const[groupBlocks,setGroupBlocks]=useState([]),[open,setOpen]=useState(true),today=isoDate()
+  const[groupBlocks,setGroupBlocks]=useState([]),[open,setOpen]=useState(false),today=isoDate()
   const days=useMemo(()=>Array.from({length:7},(_,i)=>addDays(today,i)),[today])
   const types=useMemo(()=>[...new Set(rooms.map(roomType))].sort((a,b)=>a.localeCompare(b,"es")),[rooms])
 
@@ -35,7 +35,7 @@ export default function AvailabilityRack({rooms=[],reservations=[],blocks=[]}){
   const totalToday=types.reduce((acc,type)=>{const s=statFor(type,today);acc.total+=s.total;acc.free+=s.free;acc.groupHold+=s.groupHold;return acc},{total:0,free:0,groupHold:0})
   if(!rooms.length)return null
   return <section className={rack.wrap}>
-    <header className={rack.head}><div><small>RACK DE DISPONIBILIDAD REAL</small><b>{totalToday.free} libres de {totalToday.total} hoy{totalToday.groupHold?` · ${totalToday.groupHold} retenidas por grupos`:""}</b><span>Descuenta reservas, bloqueos operativos y cupos grupales todavía no asignados.</span></div><button onClick={()=>setOpen(v=>!v)}>{open?"Ocultar rack":"Mostrar rack"}</button></header>
-    {open&&<div className={rack.table}><div className={rack.corner}><b>Tipología</b><small>7 días</small></div>{days.map(day=><div className={rack.dayHead} key={day}><b>{dayLabel(day)}</b><small>{day===today?"HOY":""}</small></div>)}{types.map(type=><div className={rack.row} key={type}><div className={rack.typeCell}><b>{type}</b><small>{rooms.filter(r=>roomType(r)===type).length} habitaciones</small></div>{days.map(day=>{const s=statFor(type,day),tone=s.free===0?"sold":s.free<=Math.max(1,Math.ceil(s.total*.25))?"low":s.groupHold?"group":"ok";return <div className={rack.cell} data-tone={tone} key={`${type}-${day}`} title={`${s.free} libres · ${s.physical} ocupadas/bloqueadas · ${s.groupHold} retenidas por grupos`}><strong>{s.free}</strong><span>libres</span>{s.groupHold>0&&<em>{s.groupHold} grupo</em>}</div>})}</div>)}</div>}
+    <header className={rack.head}><div><small>DISPONIBILIDAD</small><b>{totalToday.free} de {totalToday.total} habitaciones libres hoy{totalToday.groupHold?` · ${totalToday.groupHold} retenidas por grupos`:""}</b><span>Reservas, bloqueos y cupos grupales en los próximos 7 días.</span></div><button type="button" onClick={()=>setOpen(v=>!v)}>{open?"Ocultar disponibilidad":"Ver disponibilidad"}</button></header>
+    {open&&<div className={rack.table}><div className={rack.corner}><b>Tipología</b><small>Próximos 7 días</small></div>{days.map(day=><div className={rack.dayHead} key={day}><b>{dayLabel(day)}</b><small>{day===today?"HOY":""}</small></div>)}{types.map(type=><div className={rack.row} key={type}><div className={rack.typeCell}><b>{type}</b><small>{rooms.filter(r=>roomType(r)===type).length} habitaciones</small></div>{days.map(day=>{const s=statFor(type,day),tone=s.free===0?"sold":s.free<=Math.max(1,Math.ceil(s.total*.25))?"low":s.groupHold?"group":"ok";return <div className={rack.cell} data-tone={tone} key={`${type}-${day}`} title={`${s.free} libres · ${s.physical} ocupadas/bloqueadas · ${s.groupHold} retenidas por grupos`}><strong>{s.free}</strong><span>libres</span>{s.groupHold>0&&<em>{s.groupHold} grupo</em>}</div>})}</div>)}</div>}
   </section>
 }

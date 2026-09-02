@@ -3,6 +3,7 @@ import StaticCaretGuard from"../components/StaticCaretGuard"
 import MercadoPagoOAuthBridge from"./components/MercadoPagoOAuthBridge"
 import"./pms-unified.css"
 import"./pms-unified-modules.css"
+import"./simple-interaction-v2.css"
 
 export default function DashboardPage(){
   return <><StaticCaretGuard/><MercadoPagoOAuthBridge/><div className="hlHotelgest"><HotelOSV2/></div></>
