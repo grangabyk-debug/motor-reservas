@@ -38,7 +38,7 @@ export default function DashboardChrome({children}){
 
   return <>
     <div className="hlUtilityBar" role="banner">
-      <div className="hlUtilityRegion"><span className="hlUtilityFlag" aria-hidden="true">▰</span><span>Hecho en Argentina · pensado para la región</span></div>
+      <div className="hlUtilityRegion"><span className="hlUtilityFlag" aria-hidden="true">▰</span><span>Hecho en Argentina</span></div>
       <div className="hlUtilityRight">
         <time className="hlUtilityClock" dateTime={clock?.toISOString?.()||undefined}><span>{dateLabel}</span><strong>{timeLabel}</strong></time>
         <button type="button" className="hlThemeToggle" onClick={()=>setTheme(dark?"light":"dark")} aria-label={dark?"Activar modo claro":"Activar modo oscuro"} title={dark?"Modo claro":"Modo oscuro"}><span aria-hidden="true">{dark?"☀":"☾"}</span><em>{dark?"Claro":"Oscuro"}</em></button>
