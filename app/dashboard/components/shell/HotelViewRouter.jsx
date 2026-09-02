@@ -3,7 +3,8 @@
 import{VIEW_META}from"../../core/navigation"
 import{addDays,isoDate,money}from"../../core/formatters"
 import CommandCenter from"../../features/frontdesk/CommandCenter"
-import{Lobby,Reservations,GuestCRM}from"../../features/frontdesk/FrontDeskViews"
+import{Reservations,GuestCRM}from"../../features/frontdesk/FrontDeskViews"
+import DashboardExperience from"../../features/frontdesk/DashboardExperience"
 import LobbyTentativeStrip from"../../features/frontdesk/LobbyTentativeStrip"
 import{RoomsView,MaintenanceView,ResourcesView,DigitalTwinView}from"../../features/operations/OperationsViews"
 import HousekeepingPremium from"../../features/operations/HousekeepingPremium"
@@ -25,7 +26,7 @@ import ui from"../../v2.module.css"
 
 export default function HotelViewRouter({view,data,session,settings,permissions,role,live,committed,activeRooms,packages,search,setSearch,allowed,action,changeView,openReservation,openReservationTab,newReservation,newReservationAction,move,resize,setBlockDraft,onMenu,onCommand,hotelName}){
   const today=isoDate()
-  if(view==="lobby")return <><LobbyTentativeStrip reservations={live} rooms={data.rooms} onOpen={openReservation}/><Lobby settings={settings} rooms={data.rooms} reservations={committed} payments={data.payments} onView={changeView} onOpen={openReservation} search={search} onSearch={setSearch} onNewReservation={newReservationAction} onMenu={onMenu} onCommand={onCommand} userId={session.user?.id}/></>
+  if(view==="lobby")return <><LobbyTentativeStrip reservations={live} rooms={data.rooms} onOpen={openReservation}/><DashboardExperience settings={settings} rooms={data.rooms} reservations={committed} payments={data.payments} onView={changeView} onOpen={openReservation} search={search} onSearch={setSearch} onNewReservation={newReservationAction} onMenu={onMenu} onCommand={onCommand} userId={session.user?.id}/></>
   if(view==="calendar")return <CommandCenter rooms={activeRooms} reservations={live} payments={data.payments} blocks={data.blocks} floors={data.floors} onMove={move} onResize={resize} onOpen={openReservation} onOpenExternal={openReservationTab} onNew={(room,day)=>newReservation(room.id,day)} onBlock={(room,day)=>setBlockDraft({roomId:String(room.id),start:day,end:addDays(day,1),reason:"Bloqueo operativo",detail:""})}/>
   if(view==="reservations")return <Reservations reservations={data.reservations} rooms={data.rooms} search={search} onOpen={openReservation}/>
   if(view==="guests")return <GuestCRM guests={data.guests} search={search}/>
