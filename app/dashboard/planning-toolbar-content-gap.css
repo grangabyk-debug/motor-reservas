@@ -2,13 +2,31 @@
 .hlHotelgest main [class*="command-center-module"][class*="calendar"]{
   margin-top:14px!important;
 }
-@media(max-width:1279px){
+
+/* Assignment Rack is the first child inside the scrollable Planning canvas. Legacy
+   positioning made its header start behind the rebuilt operator bar. Offset the
+   rack itself so its title/actions always begin below the bar instead of trying
+   to move the whole calendar container. */
+.hlHotelgest main [class*="command-center-module"][class*="calendar"] > [class*="assignment-rack-module"][class*="wrap"]{
+  position:relative!important;
+  z-index:1!important;
+  margin-top:70px!important;
+}
+
+@media(max-width:1279px) and (min-width:860px){
   .hlHotelgest main [class*="command-center-module"][class*="calendar"]{
     margin-top:12px!important;
   }
+  .hlHotelgest main [class*="command-center-module"][class*="calendar"] > [class*="assignment-rack-module"][class*="wrap"]{
+    margin-top:118px!important;
+  }
 }
+
 @media(max-width:859px){
   .hlHotelgest main [class*="command-center-module"][class*="calendar"]{
     margin-top:10px!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="calendar"] > [class*="assignment-rack-module"][class*="wrap"]{
+    margin-top:170px!important;
   }
 }
