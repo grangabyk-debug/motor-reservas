@@ -99,6 +99,19 @@
   box-shadow:inset 0 0 0 1px rgba(130,164,205,.18)!important;
 }
 
+/* Quote workspace: prevent CSS Grid auto tracks from stretching the compact header to fill viewport height. */
+.hlHotelgest [class*="quote-builder-module"][class*="page"]{
+  align-content:start!important;
+  grid-auto-rows:max-content!important;
+  grid-template-rows:max-content max-content!important;
+}
+.hlHotelgest [class*="quote-builder-module"][class*="hero"]{
+  align-self:start!important;
+  min-height:0!important;
+  height:auto!important;
+  max-height:64px!important;
+}
+
 @media(max-width:900px){
   .hlPrimaryStack{width:100%;min-width:0}
   .hlQuoteAction{width:100%;height:36px}
