@@ -1,0 +1,342 @@
+/* Planning operator bar rebuilt from scratch.
+   Important: this file is loaded LAST. It stops visually positioning the view switch
+   over another component and instead makes the existing React children participate
+   in one real CSS grid. No absolute positioning is used for the operator controls. */
+
+.hlHotelgest main [class*="command-center-module"][class*="commandPage"]{
+  position:relative!important;
+  display:grid!important;
+  grid-template-columns:minmax(270px,.78fr) minmax(390px,auto) minmax(320px,1.22fr)!important;
+  grid-template-rows:60px minmax(0,1fr)!important;
+  column-gap:12px!important;
+  row-gap:8px!important;
+  align-items:center!important;
+}
+
+/* Turn the old two React wrappers into transparent structural wrappers. Their
+   useful children now become grid items of commandPage, which is the key change. */
+.hlHotelgest main [class*="command-center-module"][class*="topline"],
+.hlHotelgest main [class*="command-center-module"][class*="toolbar"]{
+  display:contents!important;
+  position:static!important;
+  width:auto!important;
+  height:auto!important;
+  min-height:0!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  background:none!important;
+  box-shadow:none!important;
+  overflow:visible!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="topline"]>div:first-child,
+.hlHotelgest main [class*="command-center-module"][class*="toolbar"]>:first-child,
+.hlHotelgest main [class*="command-center-module"][class*="legend"]{
+  display:none!important;
+}
+
+/* One single visual surface behind range, view presets and search. */
+.hlHotelgest main [class*="command-center-module"][class*="commandPage"]::before{
+  content:"";
+  grid-column:1 / -1!important;
+  grid-row:1!important;
+  align-self:stretch!important;
+  justify-self:stretch!important;
+  z-index:0!important;
+  border:1px solid #dce5f0!important;
+  border-radius:14px!important;
+  background:rgba(255,255,255,.96)!important;
+  box-shadow:0 8px 24px rgba(41,65,101,.07)!important;
+  backdrop-filter:blur(14px)!important;
+  -webkit-backdrop-filter:blur(14px)!important;
+}
+
+/* Shared 44px control rhythm. */
+.hlHotelgest main [class*="command-center-module"][class*="rangeBlock"],
+.hlHotelgest main [class*="command-center-module"][class*="viewSwitch"],
+.hlHotelgest main [class*="command-center-module"][class*="filters"]{
+  position:static!important;
+  inset:auto!important;
+  transform:none!important;
+  z-index:2!important;
+  box-sizing:border-box!important;
+  width:100%!important;
+  min-width:0!important;
+  max-width:none!important;
+  height:44px!important;
+  min-height:44px!important;
+  margin:0!important;
+  align-self:center!important;
+}
+
+/* Date/range group — left lane. */
+.hlHotelgest main [class*="command-center-module"][class*="rangeBlock"]{
+  grid-column:1!important;
+  grid-row:1!important;
+  display:grid!important;
+  grid-template-columns:42px minmax(110px,1fr) 42px 54px!important;
+  align-items:center!important;
+  gap:0!important;
+  margin-left:10px!important;
+  width:calc(100% - 10px)!important;
+  padding:2px!important;
+  border:1px solid #dbe4ef!important;
+  border-radius:11px!important;
+  background:#f8fafd!important;
+  overflow:hidden!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="rangeBlock"] button,
+.hlHotelgest main [class*="command-center-module"][class*="rangeBlock"] strong{
+  box-sizing:border-box!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  height:40px!important;
+  min-height:40px!important;
+  margin:0!important;
+  border:0!important;
+  border-radius:8px!important;
+  background:transparent!important;
+  color:#24344d!important;
+  font-size:12px!important;
+  line-height:1!important;
+  font-weight:900!important;
+  white-space:nowrap!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="rangeBlock"] strong{
+  min-width:0!important;
+  padding:0 8px!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="rangeBlock"] button:hover{
+  background:#edf4ff!important;
+  color:#2f68d4!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="rangeBlock"] [class*="todayButton"]{
+  background:#eef4ff!important;
+  color:#2d66cf!important;
+}
+
+/* View presets — true center lane, never floating over search. */
+.hlHotelgest main [class*="command-center-module"][class*="viewSwitch"]{
+  grid-column:2!important;
+  grid-row:1!important;
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(82px,1fr)) minmax(142px,1.45fr)!important;
+  align-items:center!important;
+  gap:3px!important;
+  padding:2px!important;
+  border:1px solid #dbe4ef!important;
+  border-radius:11px!important;
+  background:#f6f9fd!important;
+  overflow:hidden!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="viewSwitch"] button{
+  box-sizing:border-box!important;
+  width:100%!important;
+  min-width:0!important;
+  height:40px!important;
+  min-height:40px!important;
+  margin:0!important;
+  padding:0 11px!important;
+  border:0!important;
+  border-radius:9px!important;
+  background:transparent!important;
+  color:#5c6b82!important;
+  font-size:12px!important;
+  line-height:1!important;
+  font-weight:850!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  transition:background .16s ease,color .16s ease,transform .16s ease,box-shadow .16s ease!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="viewSwitch"] button:hover{
+  background:#fff!important;
+  color:#2d4262!important;
+  transform:translateY(-1px)!important;
+  box-shadow:0 5px 12px rgba(46,81,143,.09)!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="viewSwitch"] button[class*="activeView"],
+.hlHotelgest main [class*="command-center-module"][class*="viewSwitch"] button[class*="rackViewActive"]{
+  background:linear-gradient(135deg,#2f72e8,#3265d8)!important;
+  color:#fff!important;
+  box-shadow:0 6px 14px rgba(47,104,212,.20)!important;
+}
+
+/* Search — right lane. Hide the legacy advanced controls from this compact bar. */
+.hlHotelgest main [class*="command-center-module"][class*="filters"]{
+  grid-column:3!important;
+  grid-row:1!important;
+  display:flex!important;
+  align-items:center!important;
+  padding-right:10px!important;
+  overflow:visible!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="filters"]>select,
+.hlHotelgest main [class*="command-center-module"][class*="filters"]>[class*="dateInput"],
+.hlHotelgest main [class*="command-center-module"][class*="filters"]>button{
+  display:none!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="searchInput"]{
+  box-sizing:border-box!important;
+  display:flex!important;
+  align-items:center!important;
+  gap:7px!important;
+  width:100%!important;
+  min-width:0!important;
+  max-width:none!important;
+  height:44px!important;
+  min-height:44px!important;
+  margin:0!important;
+  padding:0 13px!important;
+  border:1px solid #dbe4ef!important;
+  border-radius:11px!important;
+  background:#fff!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9)!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="searchInput"] input{
+  width:100%!important;
+  min-width:0!important;
+  height:42px!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  color:#24344d!important;
+  font-size:12px!important;
+  line-height:42px!important;
+  font-weight:700!important;
+}
+.hlHotelgest main [class*="command-center-module"][class*="searchInput"] input:focus{outline:none!important}
+
+.hlHotelgest main [class*="command-center-module"][class*="calendar"]{
+  grid-column:1 / -1!important;
+  grid-row:2!important;
+  margin-top:0!important;
+  min-width:0!important;
+}
+
+/* Medium notebooks: one unified surface, two rows. */
+@media(max-width:1279px) and (min-width:860px){
+  .hlHotelgest main [class*="command-center-module"][class*="commandPage"]{
+    grid-template-columns:minmax(265px,.9fr) minmax(420px,1.45fr)!important;
+    grid-template-rows:52px 52px minmax(0,1fr)!important;
+    column-gap:10px!important;
+    row-gap:0!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="commandPage"]::before{
+    grid-column:1 / -1!important;
+    grid-row:1 / 3!important;
+    margin:0!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="rangeBlock"]{
+    grid-column:1!important;
+    grid-row:1!important;
+    margin-left:10px!important;
+    width:calc(100% - 10px)!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="viewSwitch"]{
+    grid-column:2!important;
+    grid-row:1!important;
+    margin-right:10px!important;
+    width:calc(100% - 10px)!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="filters"]{
+    grid-column:1 / -1!important;
+    grid-row:2!important;
+    padding:0 10px 8px!important;
+    height:52px!important;
+    min-height:52px!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="calendar"]{
+    grid-row:3!important;
+    margin-top:8px!important;
+  }
+}
+
+/* Tablet / phone: three deterministic rows inside the SAME surface. */
+@media(max-width:859px){
+  .hlHotelgest main [class*="command-center-module"][class*="commandPage"]{
+    grid-template-columns:minmax(0,1fr)!important;
+    grid-template-rows:52px 52px 52px minmax(0,1fr)!important;
+    row-gap:0!important;
+    column-gap:0!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="commandPage"]::before{
+    grid-column:1!important;
+    grid-row:1 / 4!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="rangeBlock"]{
+    grid-column:1!important;
+    grid-row:1!important;
+    margin:8px 9px 0!important;
+    width:calc(100% - 18px)!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="viewSwitch"]{
+    grid-column:1!important;
+    grid-row:2!important;
+    margin:4px 9px!important;
+    width:calc(100% - 18px)!important;
+    grid-template-columns:repeat(3,minmax(78px,1fr)) minmax(134px,1.35fr)!important;
+    overflow-x:auto!important;
+    overflow-y:hidden!important;
+    scrollbar-width:none!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="viewSwitch"]::-webkit-scrollbar{display:none!important}
+  .hlHotelgest main [class*="command-center-module"][class*="filters"]{
+    grid-column:1!important;
+    grid-row:3!important;
+    padding:0 9px 8px!important;
+    height:52px!important;
+    min-height:52px!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="calendar"]{
+    grid-row:4!important;
+    margin-top:8px!important;
+  }
+}
+
+@media(max-width:520px){
+  .hlHotelgest main [class*="command-center-module"][class*="rangeBlock"]{
+    grid-template-columns:38px minmax(94px,1fr) 38px 48px!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="rangeBlock"] button,
+  .hlHotelgest main [class*="command-center-module"][class*="rangeBlock"] strong,
+  .hlHotelgest main [class*="command-center-module"][class*="viewSwitch"] button,
+  .hlHotelgest main [class*="command-center-module"][class*="searchInput"] input{
+    font-size:11px!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="viewSwitch"]{
+    justify-content:flex-start!important;
+  }
+  .hlHotelgest main [class*="command-center-module"][class*="viewSwitch"] button{
+    min-width:max-content!important;
+    padding:0 12px!important;
+  }
+}
+
+/* Dark mode keeps the same geometry; only the materials change. */
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="commandPage"]::before{
+  background:rgba(13,24,37,.97)!important;
+  border-color:#293b50!important;
+  box-shadow:0 10px 28px rgba(0,0,0,.28)!important;
+}
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="rangeBlock"],
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="viewSwitch"]{
+  background:#101d2c!important;
+  border-color:#2a3d53!important;
+}
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="rangeBlock"] button,
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="rangeBlock"] strong,
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="viewSwitch"] button{
+  color:#c8d6e8!important;
+}
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="searchInput"]{
+  background:#0f1b2a!important;
+  border-color:#2b3e53!important;
+  box-shadow:none!important;
+}
+.hlHotelgest.hlThemeDark main [class*="command-center-module"][class*="searchInput"] input{
+  color:#eef5ff!important;
+}
