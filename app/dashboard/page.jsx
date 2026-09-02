@@ -15,6 +15,7 @@ import"./global-chrome.css"
 import"./pms-dark-theme-safe.css"
 import"./pms-premium-restyle.css"
 import"./pms-responsive.css"
+import"./pms-flyout-clarity.css"
 
 export const metadata={
   title:"Habitación Llena",
