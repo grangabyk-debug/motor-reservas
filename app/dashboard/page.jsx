@@ -9,6 +9,7 @@ import"./planning-ui.css"
 import"./app-simple-mode.css"
 import"./app-minimal-v2.css"
 import"./app-interaction-polish.css"
+import"./mobile-reservation-flow.css"
 
 export const metadata={
   title:"Habitación Llena",
