@@ -4,6 +4,7 @@ import MercadoPagoOAuthBridge from"./components/MercadoPagoOAuthBridge"
 import PWAInstaller from"./components/PWAInstaller"
 import DashboardChrome from"./components/DashboardChrome"
 import DashboardWidgetEditBridge from"./components/DashboardWidgetEditBridge"
+import PlanningHoverPlacementBridge from"./components/PlanningHoverPlacementBridge"
 import"./pms-unified.css"
 import"./pms-unified-modules.css"
 import"./simple-interaction-v2.css"
@@ -22,6 +23,7 @@ import"./pms-final-fixes.css"
 import"./pms-top-actions.css"
 import"./planning-quick-modal.css"
 import"./planning-quick-modal-v2.css"
+import"./planning-hover-placement.css"
 
 export const metadata={
   title:"Habitación Llena",
@@ -34,5 +36,5 @@ export const metadata={
 export const viewport={themeColor:"#ffffff"}
 
 export default function DashboardPage(){
-  return <><StaticCaretGuard/><MercadoPagoOAuthBridge/><DashboardWidgetEditBridge/><div className="hlHotelgest"><DashboardChrome><HotelOSV2/></DashboardChrome></div><PWAInstaller/></>
+  return <><StaticCaretGuard/><MercadoPagoOAuthBridge/><DashboardWidgetEditBridge/><PlanningHoverPlacementBridge/><div className="hlHotelgest"><DashboardChrome><HotelOSV2/></DashboardChrome></div><PWAInstaller/></>
 }
