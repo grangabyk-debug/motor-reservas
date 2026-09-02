@@ -1,0 +1,120 @@
+/* Planning UI surface rules.
+   This file owns browser/global normalization for the Planning workspace only. */
+
+/* Search: one visual control, never an input inside another visible input. */
+.hlHotelgest [class*="searchInput"]{
+  overflow:hidden;
+  border:1px solid #dce4ee!important;
+  border-radius:8px!important;
+  background:#fff!important;
+  box-shadow:none!important;
+  outline:0!important;
+}
+.hlHotelgest [class*="searchInput"]:has(input:focus){
+  border-color:#8fb0e8!important;
+  box-shadow:0 0 0 3px rgba(47,104,212,.10)!important;
+}
+.hlHotelgest input[aria-label="Filtrar habitación"]{
+  width:100%!important;
+  height:100%!important;
+  min-height:0!important;
+  border:0!important;
+  border-radius:0!important;
+  outline:0!important;
+  box-shadow:none!important;
+  background:transparent!important;
+  padding:0!important;
+  appearance:none!important;
+}
+.hlHotelgest input[aria-label="Filtrar habitación"]:focus,
+.hlHotelgest input[aria-label="Filtrar habitación"]:focus-visible{
+  border:0!important;
+  outline:0!important;
+  box-shadow:none!important;
+}
+
+/* Channel legend: restore semantic colors and readable labels. */
+.hlHotelgest [class*="toolbar"] > [class*="legend"]{
+  display:flex!important;
+  align-items:center!important;
+  flex-wrap:wrap!important;
+  gap:7px 14px!important;
+  min-height:20px!important;
+  padding:1px 2px 0!important;
+  color:#65738a!important;
+  font-size:11px!important;
+  line-height:1!important;
+}
+.hlHotelgest [class*="toolbar"] > [class*="legend"] > span{
+  display:inline-flex!important;
+  align-items:center!important;
+  gap:6px!important;
+  white-space:nowrap!important;
+}
+.hlHotelgest [class*="toolbar"] > [class*="legend"] i{
+  display:inline-block!important;
+  width:8px!important;
+  height:8px!important;
+  flex:0 0 8px!important;
+  border-radius:999px!important;
+}
+.hlHotelgest [class*="directDot"]{background:#16a77a!important}
+.hlHotelgest [class*="bookingDot"]{background:#2f6fdf!important}
+.hlHotelgest [class*="airbnbDot"]{background:#ef6471!important}
+.hlHotelgest [class*="agencyDot"]{background:#8067d9!important}
+.hlHotelgest [class*="tentativeDot"]{background:#d79a28!important}
+.hlHotelgest [class*="blockDot"]{background:#aab5c5!important}
+
+/* Selected stay: preserve the channel color but make selection unmistakable. */
+.hlHotelgest [class*="staySelected"]{
+  outline:2px solid #111827!important;
+  outline-offset:1px!important;
+  box-shadow:0 0 0 2px rgba(255,255,255,.96),0 8px 18px rgba(17,24,39,.18)!important;
+  z-index:15!important;
+}
+
+/* Planning controls must reflow instead of falling outside the viewport. */
+@media(max-width:1250px){
+  .hlHotelgest [class*="filters"]{
+    flex-wrap:wrap!important;
+    overflow:visible!important;
+    row-gap:6px!important;
+  }
+  .hlHotelgest [class*="searchInput"]{
+    flex:1 1 100%!important;
+    min-width:min(100%,260px)!important;
+  }
+  .hlHotelgest [class*="filters"] select,
+  .hlHotelgest [class*="filters"] > input,
+  .hlHotelgest [class*="filters"] > button{
+    flex:0 1 auto!important;
+    max-width:100%!important;
+  }
+}
+
+@media(max-width:900px){
+  .hlHotelgest [class*="toolbar"] > [class*="legend"]{
+    flex-wrap:nowrap!important;
+    overflow-x:auto!important;
+    padding-bottom:2px!important;
+    scrollbar-width:none!important;
+  }
+  .hlHotelgest [class*="toolbar"] > [class*="legend"]::-webkit-scrollbar{display:none!important}
+  .hlHotelgest [class*="filters"]{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+    overflow:visible!important;
+  }
+  .hlHotelgest [class*="searchInput"]{grid-column:1/-1!important;width:100%!important}
+  .hlHotelgest [class*="filters"] select,
+  .hlHotelgest [class*="filters"] > input,
+  .hlHotelgest [class*="filters"] > button{
+    width:100%!important;
+    min-width:0!important;
+  }
+}
+
+@media(max-width:560px){
+  .hlHotelgest [class*="filters"]{grid-template-columns:1fr!important}
+  .hlHotelgest [class*="toolbar"] > [class*="legend"]{font-size:10px!important;gap:6px 10px!important}
+}
