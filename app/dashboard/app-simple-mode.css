@@ -1,0 +1,326 @@
+/* Habitación Llena — app simple mode
+   Visual rule: simple by default, powerful on interaction. No functionality is removed here. */
+
+.hlHotelgest{
+  --hl-app-bg:#f6f7f9;
+  --hl-app-surface:#ffffff;
+  --hl-app-line:#e3e7ec;
+  --hl-app-text:#202938;
+  --hl-app-muted:#7a8595;
+  --hl-app-blue:#1769d2;
+  --hl-app-radius:12px;
+}
+
+/* One calm, app-like top bar on every module. */
+.hlHotelgest .hlAppTopbar{
+  min-height:50px!important;
+  height:50px!important;
+  padding:6px 12px!important;
+  gap:10px!important;
+  background:rgba(255,255,255,.96)!important;
+  border-bottom:1px solid var(--hl-app-line)!important;
+  box-shadow:none!important;
+  backdrop-filter:blur(14px)!important;
+}
+.hlHotelgest .hlAppTitle{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:#263247;
+  font-size:14px;
+  line-height:1;
+  font-weight:850;
+  letter-spacing:-.015em;
+}
+.hlHotelgest .hlAppSearch{
+  display:grid;
+  place-items:center;
+  width:32px;
+  height:32px;
+  padding:0;
+  border:1px solid #dfe5ec;
+  border-radius:9px;
+  background:#fff;
+  color:#5b687a;
+  font-size:16px;
+  cursor:pointer;
+}
+.hlHotelgest .hlAppSearch:hover{background:#f5f7fa;border-color:#d5dce5}
+.hlHotelgest .hlAppReservation{
+  height:32px!important;
+  min-height:32px!important;
+  padding:0 11px!important;
+  border-radius:9px!important;
+  background:var(--hl-app-blue)!important;
+  font-size:10.5px!important;
+  font-weight:800!important;
+}
+
+/* Main canvas: less framing, more usable space. */
+.hlHotelgest main[class*="v2-module"][class*="work"]{background:var(--hl-app-bg)!important}
+.hlHotelgest main [class*="v2-module"][class*="content"]:not([class*="command-center-module"]){
+  width:100%!important;
+  max-width:1500px!important;
+  gap:12px!important;
+  padding:14px 16px 26px!important;
+}
+
+/* Shared page heading becomes a compact app header, not a marketing hero. */
+.hlHotelgest main [class*="v2-module"][class*="editorial"]{
+  min-height:40px!important;
+  align-items:center!important;
+  gap:10px!important;
+  padding:0 2px!important;
+}
+.hlHotelgest main [class*="v2-module"][class*="editorial"] small{display:none!important}
+.hlHotelgest main [class*="v2-module"][class*="editorial"] h2{
+  margin:0!important;
+  font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;
+  font-size:19px!important;
+  line-height:1.1!important;
+  font-weight:780!important;
+  letter-spacing:-.025em!important;
+}
+.hlHotelgest main [class*="v2-module"][class*="editorial"] p{display:none!important}
+.hlHotelgest main [class*="v2-module"][class*="editorial"] button{height:34px!important;padding:0 11px!important;border-radius:9px!important;font-size:10.5px!important}
+
+/* Shared surfaces: flatter and quieter. */
+.hlHotelgest main [class*="v2-module"][class*="panel"],
+.hlHotelgest main [class*="v2-module"][class*="floorCard"],
+.hlHotelgest main [class*="v2-module"][class*="tableWrap"],
+.hlHotelgest main [class*="v2-module"][class*="paymentBox"]{
+  border:1px solid var(--hl-app-line)!important;
+  border-radius:var(--hl-app-radius)!important;
+  background:#fff!important;
+  box-shadow:none!important;
+}
+.hlHotelgest main [class*="v2-module"][class*="panel"],
+.hlHotelgest main [class*="v2-module"][class*="floorCard"]{padding:13px!important}
+.hlHotelgest main [class*="v2-module"][class*="panel"] h3,
+.hlHotelgest main [class*="v2-module"][class*="floorCard"] h3{
+  margin:0 0 9px!important;
+  font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;
+  font-size:15px!important;
+  font-weight:780!important;
+  letter-spacing:-.015em!important;
+}
+.hlHotelgest main [class*="v2-module"][class*="twoCols"]{gap:9px!important}
+.hlHotelgest main [class*="v2-module"][class*="cardGrid"],
+.hlHotelgest main [class*="v2-module"][class*="resourceGrid"],
+.hlHotelgest main [class*="v2-module"][class*="ticketGrid"],
+.hlHotelgest main [class*="v2-module"][class*="hkGrid"],
+.hlHotelgest main [class*="v2-module"][class*="roomGrid"]{gap:8px!important}
+
+/* Lists feel like tappable app rows. */
+.hlHotelgest main [class*="v2-module"][class*="listRow"]{
+  min-height:46px!important;
+  padding:8px 3px!important;
+  border-bottom:1px solid #edf0f3!important;
+}
+.hlHotelgest main [class*="v2-module"][class*="listRow"] b{font-size:12px!important}
+.hlHotelgest main [class*="v2-module"][class*="listRow"] small,
+.hlHotelgest main [class*="v2-module"][class*="listRow"] em{font-size:9.5px!important}
+
+/* Tables: compact, readable and touch-friendly. */
+.hlHotelgest main [class*="v2-module"][class*="tableWrap"]{overflow:auto!important}
+.hlHotelgest main [class*="v2-module"][class*="tableWrap"] th{
+  height:34px!important;
+  padding:7px 11px!important;
+  background:#fafbfc!important;
+  color:#8390a0!important;
+  font-size:8.5px!important;
+  letter-spacing:.06em!important;
+}
+.hlHotelgest main [class*="v2-module"][class*="tableWrap"] td{
+  min-height:44px!important;
+  padding:9px 11px!important;
+  font-size:11px!important;
+}
+
+/* Operational cards: no decorative furniture around the action. */
+.hlHotelgest main [class*="v2-module"][class*="guestCard"],
+.hlHotelgest main [class*="v2-module"][class*="resourceCard"],
+.hlHotelgest main [class*="v2-module"][class*="ticket"],
+.hlHotelgest main [class*="v2-module"][class*="hkCard"],
+.hlHotelgest main [class*="v2-module"][class*="twinRoom"],
+.hlHotelgest main [class*="v2-module"][class*="roomCard"]{
+  border:1px solid var(--hl-app-line)!important;
+  border-radius:11px!important;
+  padding:11px!important;
+  background:#fff!important;
+  box-shadow:none!important;
+  transform:none!important;
+}
+.hlHotelgest main [class*="v2-module"][class*="guestCard"] h3,
+.hlHotelgest main [class*="v2-module"][class*="resourceCard"] h3,
+.hlHotelgest main [class*="v2-module"][class*="ticket"] h3,
+.hlHotelgest main [class*="v2-module"][class*="hkCard"] h3,
+.hlHotelgest main [class*="v2-module"][class*="twinRoom"] h3{
+  font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;
+  font-size:14px!important;
+  font-weight:760!important;
+}
+.hlHotelgest main [class*="v2-module"][class*="guestCard"] p,
+.hlHotelgest main [class*="v2-module"][class*="resourceCard"] p,
+.hlHotelgest main [class*="v2-module"][class*="ticket"] p,
+.hlHotelgest main [class*="v2-module"][class*="hkCard"] p,
+.hlHotelgest main [class*="v2-module"][class*="twinRoom"] p{font-size:10.5px!important}
+
+/* Keep actions available, but visually secondary until needed. */
+.hlHotelgest main [class*="v2-module"][class*="cardActions"],
+.hlHotelgest main [class*="v2-module"][class*="rowActions"]{gap:5px!important;margin-top:7px!important}
+.hlHotelgest main [class*="v2-module"][class*="cardActions"] button,
+.hlHotelgest main [class*="v2-module"][class*="rowActions"] button,
+.hlHotelgest main [class*="v2-module"][class*="panel"] button{
+  min-height:32px!important;
+  padding:0 9px!important;
+  border-radius:8px!important;
+  font-size:10px!important;
+  box-shadow:none!important;
+}
+
+/* Custom module heroes become compact headers. */
+.hlHotelgest main [class*="-module"][class*="hero"],
+.hlHotelgest main [class*="hotel-module"][class*="keyHero"],
+.hlHotelgest main [class*="hotel-module"][class*="intelligenceHero"],
+.hlHotelgest main [class*="hotel-module"][class*="settingsHero"],
+.hlHotelgest main [class*="business-module"][class*="revenueSignal"],
+.hlHotelgest main [class*="business-module"][class*="cashHero"]{
+  min-height:0!important;
+  padding:13px 14px!important;
+  border:1px solid var(--hl-app-line)!important;
+  border-radius:var(--hl-app-radius)!important;
+  background:#fff!important;
+  color:var(--hl-app-text)!important;
+  box-shadow:none!important;
+}
+.hlHotelgest main [class*="-module"][class*="hero"] h1,
+.hlHotelgest main [class*="-module"][class*="hero"] h2,
+.hlHotelgest main [class*="hotel-module"][class*="keyHero"] h2,
+.hlHotelgest main [class*="hotel-module"][class*="intelligenceHero"] h2,
+.hlHotelgest main [class*="hotel-module"][class*="settingsHero"] h2,
+.hlHotelgest main [class*="business-module"][class*="revenueSignal"] h2,
+.hlHotelgest main [class*="business-module"][class*="cashHero"] h2{
+  margin:0!important;
+  color:#263247!important;
+  font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;
+  font-size:18px!important;
+  line-height:1.12!important;
+  font-weight:800!important;
+  letter-spacing:-.025em!important;
+}
+.hlHotelgest main [class*="-module"][class*="hero"] p,
+.hlHotelgest main [class*="hotel-module"][class*="keyHero"] p,
+.hlHotelgest main [class*="hotel-module"][class*="intelligenceHero"] p,
+.hlHotelgest main [class*="hotel-module"][class*="settingsHero"] p,
+.hlHotelgest main [class*="business-module"][class*="revenueSignal"] p,
+.hlHotelgest main [class*="business-module"][class*="cashHero"] p{display:none!important}
+
+/* Generic premium cards/panels: same lightweight surface language. */
+.hlHotelgest main [class*="-module"][class*="card"],
+.hlHotelgest main [class*="-module"][class*="panel"],
+.hlHotelgest main [class*="-module"][class*="metric"],
+.hlHotelgest main [class*="-module"] article{
+  border-radius:11px!important;
+  box-shadow:none!important;
+}
+
+/* Tabs and filters act like compact app controls, not banners. */
+.hlHotelgest main [class*="-module"][class*="tabs"]{
+  gap:4px!important;
+  min-height:38px!important;
+  padding:3px!important;
+  overflow-x:auto!important;
+  scrollbar-width:none!important;
+}
+.hlHotelgest main [class*="-module"][class*="tabs"]::-webkit-scrollbar{display:none}
+.hlHotelgest main [class*="-module"][class*="tabs"] button{
+  min-height:32px!important;
+  padding:0 10px!important;
+  border-radius:8px!important;
+  font-size:10px!important;
+  white-space:nowrap!important;
+  box-shadow:none!important;
+}
+.hlHotelgest main [class*="-module"][class*="toolbar"],
+.hlHotelgest main [class*="-module"][class*="filters"]{
+  gap:6px!important;
+  padding:6px!important;
+  border-radius:10px!important;
+  box-shadow:none!important;
+}
+.hlHotelgest main [class*="-module"][class*="toolbar"] button,
+.hlHotelgest main [class*="-module"][class*="filters"] button,
+.hlHotelgest main [class*="-module"][class*="toolbar"] input,
+.hlHotelgest main [class*="-module"][class*="filters"] input,
+.hlHotelgest main [class*="-module"][class*="toolbar"] select,
+.hlHotelgest main [class*="-module"][class*="filters"] select{
+  min-height:34px!important;
+  border-radius:8px!important;
+  font-size:10.5px!important;
+}
+
+/* Dashboard: compact control room rather than a wall of widgets. */
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="dashboard"]{
+  padding:14px 16px 26px!important;
+  gap:9px!important;
+  background:var(--hl-app-bg)!important;
+}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="dashboardTop"]{margin:0 0 2px!important;min-height:40px!important}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="dashboardTop"] h1{font-size:21px!important;line-height:1.05!important}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="dashboardTop"] p{display:none!important}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="card"],
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="kpiCard"]{
+  border-radius:11px!important;
+  border:1px solid var(--hl-app-line)!important;
+  box-shadow:none!important;
+}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="kpiCard"]{min-height:76px!important;padding:11px!important}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="kpiCard"] b{font-size:21px!important}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="guestRow"]{min-height:48px!important}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="taskRow"]{min-height:44px!important}
+
+/* Inputs everywhere in the working canvas stay quiet and familiar. */
+.hlHotelgest main input,
+.hlHotelgest main select,
+.hlHotelgest main textarea{
+  border-color:#dfe4ea!important;
+  box-shadow:none!important;
+}
+.hlHotelgest main input:focus,
+.hlHotelgest main select:focus,
+.hlHotelgest main textarea:focus{
+  border-color:#9db8dc!important;
+  box-shadow:0 0 0 3px rgba(23,105,210,.08)!important;
+}
+
+/* Planning keeps its dedicated high-density interaction rules. */
+.hlHotelgest main [class*="command-center-module"][class*="commandPage"]{padding-top:12px!important}
+
+@media(max-width:900px){
+  .hlHotelgest .hlAppTopbar{height:48px!important;min-height:48px!important;padding:5px 10px!important}
+  .hlHotelgest .hlAppTitle{font-size:13px}
+  .hlHotelgest .hlAppReservation{height:32px!important;padding:0 9px!important}
+  .hlHotelgest main [class*="v2-module"][class*="content"]:not([class*="command-center-module"]),
+  .hlHotelgest main [class*="frontdesk-polish-module"][class*="dashboard"]{padding:10px 10px 22px!important}
+  .hlHotelgest main [class*="v2-module"][class*="twoCols"]{grid-template-columns:1fr!important}
+  .hlHotelgest main [class*="v2-module"][class*="cardGrid"],
+  .hlHotelgest main [class*="v2-module"][class*="resourceGrid"],
+  .hlHotelgest main [class*="v2-module"][class*="ticketGrid"],
+  .hlHotelgest main [class*="v2-module"][class*="hkGrid"],
+  .hlHotelgest main [class*="v2-module"][class*="roomGrid"]{grid-template-columns:1fr!important}
+  .hlHotelgest main [class*="v2-module"][class*="editorial"]{min-height:34px!important}
+  .hlHotelgest main [class*="v2-module"][class*="editorial"] h2{font-size:17px!important}
+}
+
+@media(max-width:560px){
+  .hlHotelgest .hlAppSearch{width:31px;height:31px}
+  .hlHotelgest .hlAppReservation{font-size:10px!important}
+  .hlHotelgest main [class*="-module"][class*="hero"],
+  .hlHotelgest main [class*="hotel-module"][class*="keyHero"],
+  .hlHotelgest main [class*="hotel-module"][class*="intelligenceHero"],
+  .hlHotelgest main [class*="hotel-module"][class*="settingsHero"],
+  .hlHotelgest main [class*="business-module"][class*="revenueSignal"],
+  .hlHotelgest main [class*="business-module"][class*="cashHero"]{padding:11px!important}
+}
