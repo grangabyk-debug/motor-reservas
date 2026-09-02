@@ -1,0 +1,207 @@
+/* Habitación Llena — interaction polish
+   Modern, tactile and rewarding without turning the PMS into visual noise.
+   No functionality is hidden or removed by this layer. */
+
+.hlHotelgest{
+  --hl-play-blue:#1769d2;
+  --hl-play-ink:#243247;
+  --hl-play-line:#dde5ee;
+  --hl-play-soft:#f4f7fb;
+  --hl-play-glow:0 10px 28px rgba(24,67,118,.10);
+  --hl-play-hover:0 8px 22px rgba(31,45,68,.09);
+  --hl-play-focus:0 0 0 3px rgba(23,105,210,.13);
+  --hl-play-spring:cubic-bezier(.2,.8,.2,1);
+}
+
+/* Controls should feel immediate and physical. */
+.hlHotelgest button,
+.hlHotelgest [role="button"],
+.hlHotelgest input,
+.hlHotelgest select,
+.hlHotelgest textarea{
+  transition:border-color .16s ease,background-color .16s ease,color .16s ease,box-shadow .18s ease,transform .18s var(--hl-play-spring),opacity .16s ease!important;
+}
+.hlHotelgest button:not(:disabled),.hlHotelgest [role="button"]{touch-action:manipulation}
+.hlHotelgest button:not(:disabled):active,.hlHotelgest [role="button"]:active{transform:scale(.975)}
+.hlHotelgest button:focus-visible,.hlHotelgest [role="button"]:focus-visible{
+  outline:none!important;
+  box-shadow:var(--hl-play-focus)!important;
+}
+
+/* Top bar: quiet glass, crisp action feedback. */
+.hlHotelgest .hlAppTopbar{
+  background:rgba(255,255,255,.94)!important;
+  border-bottom-color:rgba(218,226,236,.9)!important;
+  box-shadow:0 1px 0 rgba(31,45,68,.02)!important;
+}
+.hlHotelgest .hlAppSearch:hover{
+  background:#f3f7fc!important;
+  border-color:#cfdbea!important;
+  color:var(--hl-play-blue)!important;
+  transform:translateY(-1px);
+  box-shadow:0 5px 14px rgba(23,105,210,.08)!important;
+}
+.hlHotelgest .hlAppReservation:hover{
+  transform:translateY(-1px);
+  box-shadow:0 7px 18px rgba(23,105,210,.22)!important;
+}
+
+/* Navigation feels like an app launcher rather than a static menu. */
+@media(pointer:fine){
+  .hlHotelgest [data-hl-rail="true"] button:hover{transform:translateY(-1px)}
+  .hlHotelgest [data-hl-rail="true"] [class*="moduleButton"]:hover{
+    background:rgba(255,255,255,.075)!important;
+  }
+}
+.hlHotelgest [data-hl-rail="true"] [class*="moduleButtonActive"]{
+  box-shadow:inset 3px 0 0 rgba(255,255,255,.88),0 6px 18px rgba(0,0,0,.08)!important;
+}
+.hlHotelgest [data-hl-rail="true"] [class*="moduleFlyout"]{
+  transform-origin:left center;
+  animation:hlFlyoutIn .18s var(--hl-play-spring) both;
+  box-shadow:0 22px 54px rgba(20,31,48,.18)!important;
+}
+.hlHotelgest [data-hl-rail="true"] [class*="flyoutActive"]{
+  background:#edf4ff!important;
+  color:#185aa9!important;
+}
+
+/* Primary operational surfaces gain depth only when the pointer engages them. */
+@media(pointer:fine){
+  .hlHotelgest main [class*="v2-module"][class*="roomCard"],
+  .hlHotelgest main [class*="v2-module"][class*="guestCard"],
+  .hlHotelgest main [class*="v2-module"][class*="resourceCard"],
+  .hlHotelgest main [class*="v2-module"][class*="ticket"],
+  .hlHotelgest main [class*="v2-module"][class*="hkCard"],
+  .hlHotelgest main [class*="v2-module"][class*="twinRoom"],
+  .hlHotelgest main [class*="housekeeping-premium-module"][class*="rackCard"],
+  .hlHotelgest main [class*="housekeeping-premium-module"][class*="dayCard"],
+  .hlHotelgest main [class*="business-module"][class*="commercialCard"],
+  .hlHotelgest main [class*="business-module"][class*="rateCell"]{
+    transition:border-color .18s ease,box-shadow .2s ease,transform .2s var(--hl-play-spring),background-color .18s ease!important;
+  }
+  .hlHotelgest main [class*="v2-module"][class*="roomCard"]:hover,
+  .hlHotelgest main [class*="v2-module"][class*="guestCard"]:hover,
+  .hlHotelgest main [class*="v2-module"][class*="resourceCard"]:hover,
+  .hlHotelgest main [class*="v2-module"][class*="ticket"]:hover,
+  .hlHotelgest main [class*="v2-module"][class*="hkCard"]:hover,
+  .hlHotelgest main [class*="v2-module"][class*="twinRoom"]:hover,
+  .hlHotelgest main [class*="housekeeping-premium-module"][class*="rackCard"]:hover,
+  .hlHotelgest main [class*="housekeeping-premium-module"][class*="dayCard"]:hover,
+  .hlHotelgest main [class*="business-module"][class*="commercialCard"]:hover,
+  .hlHotelgest main [class*="business-module"][class*="rateCell"]:hover{
+    transform:translateY(-2px);
+    border-color:#cfdbe8!important;
+    box-shadow:var(--hl-play-hover)!important;
+  }
+}
+
+/* Lists behave like selectable objects. */
+.hlHotelgest main [class*="v2-module"][class*="listRow"],
+.hlHotelgest main [class*="v2-module"][class*="tableWrap"] tbody tr{
+  transition:background-color .15s ease,box-shadow .15s ease,transform .15s ease!important;
+}
+@media(pointer:fine){
+  .hlHotelgest main [class*="v2-module"][class*="listRow"]:hover{
+    background:#f7f9fc!important;
+    box-shadow:inset 3px 0 0 #b8cbe3!important;
+  }
+  .hlHotelgest main [class*="v2-module"][class*="tableWrap"] tbody tr:hover{
+    box-shadow:inset 3px 0 0 #c6d6e9!important;
+  }
+}
+
+/* Status chips: small pieces of game-like state, still professional. */
+.hlHotelgest main [class*="badge"],
+.hlHotelgest main [class*="chip"],
+.hlHotelgest main [class*="statusPill"]{
+  transition:transform .16s var(--hl-play-spring),box-shadow .16s ease,filter .16s ease!important;
+}
+@media(pointer:fine){
+  .hlHotelgest main [class*="badge"]:hover,
+  .hlHotelgest main [class*="chip"]:hover,
+  .hlHotelgest main [class*="statusPill"]:hover{transform:translateY(-1px);filter:saturate(1.05)}
+}
+
+/* Planning: reservations should feel draggable, alive and satisfying. */
+.hlHotelgest [class*="commandPage"] [class*="calendar"]{
+  box-shadow:0 10px 30px rgba(24,48,78,.065)!important;
+}
+.hlHotelgest [class*="commandPage"] [class*="stay"]{
+  cursor:grab!important;
+  transition:transform .16s var(--hl-play-spring),box-shadow .18s ease,filter .16s ease,outline-color .16s ease!important;
+  will-change:transform;
+}
+.hlHotelgest [class*="commandPage"] [class*="stay"]:active{cursor:grabbing!important;transform:scale(.985)}
+@media(pointer:fine){
+  .hlHotelgest [class*="commandPage"] [class*="stay"]:hover{
+    transform:translateY(-1px) scale(1.006);
+    filter:saturate(1.06) brightness(1.015);
+    box-shadow:0 7px 18px rgba(20,35,55,.16)!important;
+    z-index:12!important;
+  }
+}
+.hlHotelgest [class*="commandPage"] [class*="staySelected"]{
+  animation:hlSelectPop .22s var(--hl-play-spring) both;
+}
+.hlHotelgest [class*="commandPage"] [class*="todayButton"]{
+  box-shadow:inset 0 0 0 1px rgba(23,105,210,.07)!important;
+}
+.hlHotelgest [class*="commandPage"] [class*="viewSwitch"] button:hover,
+.hlHotelgest [class*="commandPage"] [class*="rangeBlock"] button:hover{
+  background:#f0f5fb!important;
+  color:#245da7!important;
+}
+
+/* Revenue calendar feels editable rather than report-like. */
+.hlHotelgest main [class*="business-module"][class*="rateCell"]{cursor:pointer}
+.hlHotelgest main [class*="business-module"][class*="rateCell"]:active{transform:scale(.985)}
+
+/* Drawers and dialogs enter like native app layers. */
+.hlHotelgest [class*="reservation-modal-module"][class*="dialog"],
+.hlHotelgest [class*="housekeeping-premium-module"][class*="drawer"],
+.hlHotelgest [class*="v2-module"][class*="modal"]{
+  animation:hlLayerIn .2s var(--hl-play-spring) both;
+}
+
+/* Inputs reward focus without adding permanent chrome. */
+.hlHotelgest main input:focus,
+.hlHotelgest main select:focus,
+.hlHotelgest main textarea:focus{
+  border-color:#9bb7d7!important;
+  box-shadow:var(--hl-play-focus)!important;
+}
+
+/* Touch: no hover dependency, stronger press feedback and comfortable targets. */
+@media(pointer:coarse){
+  .hlHotelgest button:not(:disabled):active,.hlHotelgest [role="button"]:active{transform:scale(.965)}
+  .hlHotelgest [class*="commandPage"] [class*="stay"]:active{transform:scale(.975)!important;filter:saturate(1.07)}
+  .hlHotelgest main [class*="v2-module"][class*="roomCard"]:active,
+  .hlHotelgest main [class*="v2-module"][class*="guestCard"]:active,
+  .hlHotelgest main [class*="housekeeping-premium-module"][class*="rackCard"]:active{
+    transform:scale(.985);
+    background:#f8fafc!important;
+  }
+}
+
+@media(max-width:900px){
+  .hlHotelgest .hlAppTopbar{box-shadow:0 1px 0 rgba(31,45,68,.04)!important}
+  .hlHotelgest [class*="commandPage"] [class*="calendar"]{box-shadow:0 7px 22px rgba(24,48,78,.055)!important}
+  .hlHotelgest [class*="reservation-modal-module"][class*="dialog"],
+  .hlHotelgest [class*="housekeeping-premium-module"][class*="drawer"]{
+    border-radius:18px 18px 0 0!important;
+  }
+}
+
+@keyframes hlFlyoutIn{from{opacity:0;transform:translateX(-6px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes hlLayerIn{from{opacity:0;transform:translateY(8px) scale(.992)}to{opacity:1;transform:none}}
+@keyframes hlSelectPop{0%{transform:scale(.985)}65%{transform:scale(1.012)}100%{transform:none}}
+
+@media(prefers-reduced-motion:reduce){
+  .hlHotelgest *, .hlHotelgest *::before, .hlHotelgest *::after{
+    animation-duration:.001ms!important;
+    animation-iteration-count:1!important;
+    transition-duration:.001ms!important;
+    scroll-behavior:auto!important;
+  }
+}
