@@ -1,0 +1,145 @@
+/* Habitación Llena — responsive geometry layer.
+   Loaded last. It adjusts sizing and flow only; theme and rail behavior stay owned by their existing styles. */
+
+html:has(.hlHotelgest),
+body:has(.hlHotelgest){
+  width:100%!important;
+  max-width:100%!important;
+  overflow-x:hidden!important;
+}
+
+.hlHotelgest,
+.hlHotelgest>div[class*="v2-module"][class*="shell"],
+.hlHotelgest>div[class*="v2-module"][class*="shell"]>main[class*="v2-module"][class*="work"]{
+  width:100%!important;
+  max-width:none!important;
+  min-width:0!important;
+}
+
+/* Ordinary modules may use the whole workspace. Planning keeps its own high-density horizontal canvas. */
+.hlHotelgest main [class*="v2-module"][class*="content"]:not([class*="command-center-module"]){
+  width:min(100%,2600px)!important;
+  max-width:2600px!important;
+  min-width:0!important;
+  margin-inline:auto!important;
+  box-sizing:border-box!important;
+  padding-inline:clamp(12px,1.35vw,28px)!important;
+}
+
+/* Dashboard: fluid on desktop, centered only on genuinely ultra-wide displays. */
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="dashboard"]{
+  width:min(100%,2600px)!important;
+  max-width:2600px!important;
+  min-width:0!important;
+  margin-inline:auto!important;
+  box-sizing:border-box!important;
+  padding:clamp(14px,1.15vw,22px) clamp(14px,1.35vw,28px) 30px!important;
+}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="dashboardTop"],
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="widgetGrid"]{
+  width:100%!important;
+  max-width:none!important;
+  min-width:0!important;
+}
+
+/* Stable widget geometry by device class. */
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="widgetGrid"]{
+  grid-template-columns:repeat(12,minmax(0,1fr))!important;
+  gap:clamp(9px,.7vw,14px)!important;
+}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="widgetSlot"]{
+  min-width:0!important;
+  max-width:100%!important;
+}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="widgetSlot"][data-widget-size="1x1"]{grid-column:span 3!important}
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="widgetSlot"][data-widget-size="2x1"],
+.hlHotelgest main [class*="frontdesk-polish-module"][class*="widgetSlot"][data-widget-size="2x2"]{grid-column:span 6!important}
+
+/* Keep visual media and controls from forcing the canvas wider than the viewport. */
+.hlHotelgest main img,
+.hlHotelgest main svg{max-width:100%}
+.hlHotelgest main input,
+.hlHotelgest main select,
+.hlHotelgest main textarea{max-width:100%}
+
+/* Large desktop / normal notebook: still two large widgets per row, but no capped one-sided canvas. */
+@media(max-width:1400px){
+  .hlHotelgest main [class*="frontdesk-polish-module"][class*="dashboard"]{
+    padding-inline:16px!important;
+  }
+}
+
+/* Compact notebook / landscape tablet. */
+@media(max-width:1100px){
+  .hlHotelgest main [class*="frontdesk-polish-module"][class*="widgetGrid"]{
+    grid-template-columns:repeat(6,minmax(0,1fr))!important;
+  }
+  .hlHotelgest main [class*="frontdesk-polish-module"][class*="widgetSlot"][data-widget-size="1x1"]{grid-column:span 3!important}
+  .hlHotelgest main [class*="frontdesk-polish-module"][class*="widgetSlot"][data-widget-size="2x1"],
+  .hlHotelgest main [class*="frontdesk-polish-module"][class*="widgetSlot"][data-widget-size="2x2"]{grid-column:1/-1!important}
+  .hlHotelgest main [class*="frontdesk-polish-module"][class*="topActions"]{min-width:0!important}
+  .hlHotelgest main [class*="frontdesk-polish-module"][class*="searchBox"]{
+    min-width:210px!important;
+    width:min(350px,34vw)!important;
+  }
+}
+
+/* At 900px the existing shell changes the rail into its mobile drawer. These rules only reflow page content. */
+@media(max-width:900px){
+  .hlHotelgest main [class*="v2-module"][class*="content"]:not([class*="command-center-module"]){
+    width:100%!important;
+    max-width:none!important;
+    margin:0!important;
+    padding-inline:12px!important;
+  }
+  .hlHotelgest main [class*="frontdesk-polish-module"][class*="dashboard"]{
+    width:100%!important;
+    max-width:none!important;
+    margin:0!important;
+    padding:12px!important;
+  }
+  .hlHotelgest main [class*="frontdesk-polish-module"][class*="dashboardTop"]{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr)!important;
+    align-items:stretch!important;
+    gap:12px!important;
+  }
+  .hlHotelgest main [class*="frontdesk-polish-module"][class*="topActions"]{
+    width:100%!important;
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) auto auto!important;
+    align-items:center!important;
+    gap:8px!important;
+  }
+  .hlHotelgest main [class*="frontdesk-polish-module"][class*="searchBox"]{
+    width:100%!important;
+    min-width:0!important;
+  }
+}
+
+/* Phones and small tablets: every widget becomes a clean full-width block. */
+@media(max-width:720px){
+  .hlHotelgest main [class*="frontdesk-polish-module"][class*="widgetGrid"]{
+    grid-template-columns:minmax(0,1fr)!important;
+    gap:10px!important;
+  }
+  .hlHotelgest main [class*="frontdesk-polish-module"][class*="widgetSlot"][data-widget-size]{grid-column:1/-1!important}
+  .hlHotelgest main [class*="frontdesk-polish-module"][class*="topActions"]{
+    grid-template-columns:1fr 1fr!important;
+  }
+  .hlHotelgest main [class*="frontdesk-polish-module"][class*="searchBox"]{grid-column:1/-1!important}
+  .hlHotelgest main [class*="frontdesk-polish-module"][class*="primaryAction"],
+  .hlHotelgest main [class*="frontdesk-polish-module"][class*="customizeButton"]{width:100%!important}
+  .hlHotelgest main [class*="frontdesk-polish-module"][class*="chartHeading"]{flex-direction:column!important}
+  .hlHotelgest main [class*="frontdesk-polish-module"][class*="chartLegend"]{flex-wrap:wrap!important}
+}
+
+@media(max-width:480px){
+  .hlHotelgest main [class*="v2-module"][class*="content"]:not([class*="command-center-module"]),
+  .hlHotelgest main [class*="frontdesk-polish-module"][class*="dashboard"]{padding-inline:9px!important}
+  .hlHotelgest main [class*="frontdesk-polish-module"][class*="topActions"]{grid-template-columns:1fr!important}
+  .hlHotelgest main [class*="frontdesk-polish-module"][class*="searchBox"],
+  .hlHotelgest main [class*="frontdesk-polish-module"][class*="primaryAction"],
+  .hlHotelgest main [class*="frontdesk-polish-module"][class*="customizeButton"]{grid-column:1!important;width:100%!important}
+  .hlHotelgest main [class*="frontdesk-polish-module"][class*="reservationMetrics"]>div{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
