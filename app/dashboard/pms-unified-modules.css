@@ -1,0 +1,95 @@
+/* Habitación Llena — final normalization for legacy module CSS.
+   Same tokens, same font, same surfaces. Semantic colors only for state. */
+
+/* Hotel: settings, keys, team, automations, intelligence page */
+.hlHotelgest [class*="hotel-module"][class*="keyHero"],
+.hlHotelgest [class*="hotel-module"][class*="intelligenceHero"],
+.hlHotelgest [class*="hotel-module"][class*="settingsHero"]{
+  color:var(--hl-text)!important;background:#fff!important;border:1px solid var(--hl-line)!important;border-radius:20px!important;box-shadow:var(--hl-shadow)!important;padding:24px!important;
+}
+.hlHotelgest [class*="hotel-module"][class*="keyHero"] h2,
+.hlHotelgest [class*="hotel-module"][class*="intelligenceHero"] h2,
+.hlHotelgest [class*="hotel-module"][class*="settingsHero"] h2{font-size:34px!important;font-weight:780!important;color:var(--hl-navy)!important}
+.hlHotelgest [class*="hotel-module"][class*="keyHero"] p,
+.hlHotelgest [class*="hotel-module"][class*="intelligenceHero"] p,
+.hlHotelgest [class*="hotel-module"][class*="settingsHero"] p{color:var(--hl-muted)!important;font-size:13px!important}
+.hlHotelgest [class*="hotel-module"][class*="eyebrow"],
+.hlHotelgest [class*="hotel-module"] small{color:var(--hl-subtle)!important}
+.hlHotelgest [class*="hotel-module"][class*="keyCard"],
+.hlHotelgest [class*="hotel-module"][class*="integrationCard"],
+.hlHotelgest [class*="hotel-module"][class*="automationCard"],
+.hlHotelgest [class*="hotel-module"][class*="teamCard"],
+.hlHotelgest [class*="hotel-module"][class*="permissionPanel"],
+.hlHotelgest [class*="hotel-module"][class*="settingsCard"],
+.hlHotelgest [class*="hotel-module"][class*="chatShell"]{background:#fff!important;border:1px solid var(--hl-line)!important;border-radius:18px!important;box-shadow:0 8px 24px rgba(31,49,77,.045)!important}
+.hlHotelgest [class*="hotel-module"] h3{color:var(--hl-navy)!important;font-size:19px!important;font-weight:730!important}
+.hlHotelgest [class*="hotel-module"] button{border-radius:10px!important;background:#f6f8fb!important;color:#4c6079!important;border:1px solid var(--hl-line)!important}
+.hlHotelgest [class*="hotel-module"] button:hover{background:var(--hl-blue-soft)!important;color:var(--hl-blue-strong)!important}
+.hlHotelgest [class*="hotel-module"][class*="settingsActions"] button,
+.hlHotelgest [class*="hotel-module"][class*="chatForm"] button{background:var(--hl-blue)!important;color:#fff!important;border-color:var(--hl-blue)!important}
+.hlHotelgest [class*="hotel-module"] input,.hlHotelgest [class*="hotel-module"] select,.hlHotelgest [class*="hotel-module"] textarea{background:#fff!important;color:var(--hl-text)!important;border:1px solid #d6dfeb!important;border-radius:10px!important;font-size:12.5px!important}
+.hlHotelgest [class*="hotel-module"][class*="avatar"],.hlHotelgest [class*="hotel-module"][class*="logoPreview"] span{background:linear-gradient(145deg,#edf3fc,#dce8fa)!important;color:#45668f!important}
+.hlHotelgest [class*="hotel-module"][class*="eventInbox"]{background:var(--hl-navy)!important;color:#fff!important;border-radius:18px!important}
+.hlHotelgest [class*="hotel-module"][class*="chatForm"]{background:#f7f9fc!important;border-color:var(--hl-line)!important}
+.hlHotelgest [class*="hotel-module"][class*="assistant"]{background:#eef3f9!important;color:#425670!important}
+.hlHotelgest [class*="hotel-module"][class*="user"]{background:var(--hl-blue)!important;color:#fff!important}
+
+/* Commercial / Revenue / partners */
+.hlHotelgest [class*="business-module"][class*="revenueSignal"],
+.hlHotelgest [class*="business-module"][class*="cashHero"]{background:#fff!important;color:var(--hl-text)!important;border:1px solid var(--hl-line)!important;border-radius:20px!important;box-shadow:var(--hl-shadow)!important}
+.hlHotelgest [class*="business-module"][class*="revenueSignal"] h2,
+.hlHotelgest [class*="business-module"][class*="cashHero"] h2{color:var(--hl-navy)!important;font-weight:780!important}
+.hlHotelgest [class*="business-module"][class*="revenueSignal"] p,
+.hlHotelgest [class*="business-module"][class*="cashHero"] p{color:var(--hl-muted)!important}
+.hlHotelgest [class*="business-module"] article,
+.hlHotelgest [class*="business-module"] [class*="signalCard"],
+.hlHotelgest [class*="business-module"] [class*="partnerCard"],
+.hlHotelgest [class*="business-module"] [class*="upsellCard"]{background:#fff!important;border-color:var(--hl-line)!important;color:var(--hl-text)!important;box-shadow:0 8px 24px rgba(31,49,77,.04)!important}
+.hlHotelgest [class*="business-module"] button{border-radius:10px!important}
+.hlHotelgest [class*="business-module"] [class*="primary"],.hlHotelgest [class*="business-module"] button[class*="active"]{background:var(--hl-blue)!important;color:#fff!important;border-color:var(--hl-blue)!important}
+
+/* Settings regional commerce */
+.hlHotelgest [class*="regional-commerce-module"][class*="card"]{background:#fff!important;border:1px solid var(--hl-line)!important;border-radius:18px!important;box-shadow:var(--hl-shadow)!important}
+.hlHotelgest [class*="regional-commerce-module"][class*="card"] h3{color:var(--hl-navy)!important;font-size:24px!important;font-weight:750!important}
+.hlHotelgest [class*="regional-commerce-module"][class*="card"] header small{color:var(--hl-blue)!important;font-size:10px!important}
+.hlHotelgest [class*="regional-commerce-module"][class*="card"] header>span{background:var(--hl-blue-soft)!important;color:var(--hl-blue-strong)!important}
+.hlHotelgest [class*="regional-commerce-module"] select{background:#fff!important;color:var(--hl-text)!important;border-color:#d6dfeb!important;font-size:12px!important}
+.hlHotelgest [class*="regional-commerce-module"][class*="provider"]{background:#f9fbfd!important;border-color:var(--hl-line)!important}
+.hlHotelgest [class*="regional-commerce-module"][class*="provider"]>span{background:var(--hl-blue-soft)!important;color:var(--hl-blue-strong)!important}
+.hlHotelgest [class*="settings-workspace-module"][class*="actions"] button{background:var(--hl-blue)!important;border-color:var(--hl-blue)!important;color:#fff!important}
+
+/* Reports already use blue; normalize title/surfaces only. */
+.hlHotelgest [class*="reports-premium-module"][class*="hero"],.hlHotelgest [class*="reports-premium-module"][class*="metric"],.hlHotelgest [class*="reports-premium-module"][class*="panel"],.hlHotelgest [class*="reports-premium-module"][class*="reportCard"]{border-color:var(--hl-line)!important;box-shadow:var(--hl-shadow)!important}
+.hlHotelgest [class*="reports-premium-module"] h1,.hlHotelgest [class*="reports-premium-module"] h2,.hlHotelgest [class*="reports-premium-module"] h3{color:var(--hl-navy)!important}
+
+/* Support */
+.hlHotelgest [class*="support-module"][class*="hero"]{background:#fff!important;color:var(--hl-text)!important;border:1px solid var(--hl-line)!important;border-radius:20px!important;box-shadow:var(--hl-shadow)!important}
+.hlHotelgest [class*="support-module"][class*="hero"] small{color:var(--hl-blue)!important}.hlHotelgest [class*="support-module"][class*="hero"] h2{color:var(--hl-navy)!important}.hlHotelgest [class*="support-module"][class*="hero"] p{color:var(--hl-muted)!important}
+.hlHotelgest [class*="support-module"][class*="tabs"] button{background:#f5f7fa!important;color:#607087!important;border-color:var(--hl-line)!important;border-radius:10px!important}.hlHotelgest [class*="support-module"][class*="tabs"] [class*="active"]{background:var(--hl-blue)!important;color:#fff!important;border-color:var(--hl-blue)!important}
+.hlHotelgest [class*="support-module"][class*="faq"] article,.hlHotelgest [class*="support-module"][class*="supportShell"]{background:#fff!important;border-color:var(--hl-line)!important;box-shadow:var(--hl-shadow)!important}
+.hlHotelgest [class*="support-module"][class*="faq"] article>button{color:var(--hl-navy)!important;font-size:15px!important}.hlHotelgest [class*="support-module"][class*="faq"] article>button b{color:var(--hl-blue)!important}
+.hlHotelgest [class*="support-module"][class*="agent"]{background:#eef3f8!important;color:#425670!important}.hlHotelgest [class*="support-module"][class*="customer"]{background:var(--hl-blue)!important;color:#fff!important}.hlHotelgest [class*="support-module"][class*="composer"]{background:#f7f9fc!important;border-color:var(--hl-line)!important}.hlHotelgest [class*="support-module"][class*="composer"] textarea{border-color:#d6dfeb!important;color:var(--hl-text)!important}.hlHotelgest [class*="support-module"][class*="composer"] button{background:var(--hl-blue)!important;color:#fff!important}
+
+/* Llena Intelligence floating assistant */
+.hlHotelgest [class*="intelligence-concierge-module"][class*="orb"]{background:linear-gradient(145deg,#3c78e2,#1f4fa8)!important;color:#fff!important;border-color:#8eb3ee!important;box-shadow:0 14px 38px rgba(34,84,169,.28)!important}
+.hlHotelgest [class*="intelligence-concierge-module"][class*="orb"] i{border-color:#8eb3ee!important}
+.hlHotelgest [class*="intelligence-concierge-module"][class*="signal"],.hlHotelgest [class*="intelligence-concierge-module"][class*="panel"]{background:linear-gradient(160deg,#172849,#101c34)!important;color:#fff!important;border-color:#365786!important;box-shadow:0 28px 80px rgba(12,28,54,.36)!important}
+.hlHotelgest [class*="intelligence-concierge-module"] small{color:#a9c8f5!important}.hlHotelgest [class*="intelligence-concierge-module"] h4,.hlHotelgest [class*="intelligence-concierge-module"] b{color:#fff!important}.hlHotelgest [class*="intelligence-concierge-module"] p{color:#c2cede!important}
+.hlHotelgest [class*="intelligence-concierge-module"][class*="identity"]>span{background:#dbe8fb!important;color:#2e5f9d!important}.hlHotelgest [class*="intelligence-concierge-module"][class*="user"]{background:var(--hl-blue)!important;color:#fff!important}.hlHotelgest [class*="intelligence-concierge-module"][class*="assistant"]{background:rgba(255,255,255,.1)!important;color:#fff!important}.hlHotelgest [class*="intelligence-concierge-module"][class*="composer"] button{background:#dbe8fb!important;color:#214f91!important}
+
+/* Reservation finance widgets / guarantee */
+.hlHotelgest [class*="reservation-payment-summary-module"] [class*="metrics"] article,.hlHotelgest [class*="reservation-payment-summary-module"][class*="breakdown"]{background:#fff!important;border-color:var(--hl-line)!important;box-shadow:0 8px 24px rgba(31,49,77,.04)!important}.hlHotelgest [class*="reservation-payment-summary-module"] [class*="metrics"] [class*="total"]{background:var(--hl-navy)!important;border-color:var(--hl-navy)!important}.hlHotelgest [class*="reservation-payment-summary-module"] [class*="metrics"] [class*="pending"]{background:#fff7e8!important}.hlHotelgest [class*="reservation-payment-summary-module"] [class*="metrics"] [class*="clear"]{background:#eef8f3!important}.hlHotelgest [class*="reservation-payment-summary-module"] h4,.hlHotelgest [class*="reservation-payment-summary-module"] strong{color:var(--hl-navy)!important}
+.hlHotelgest [class*="guarantee-module"][class*="card"]{background:#fff!important;border-color:var(--hl-line)!important}.hlHotelgest [class*="guarantee-module"][class*="cardLine"]{background:var(--hl-navy)!important;color:#fff!important}.hlHotelgest [class*="guarantee-module"][class*="actions"] button,.hlHotelgest [class*="guarantee-module"][class*="primary"]{border-radius:10px!important;background:#f5f7fa!important;color:#50647d!important;border-color:var(--hl-line)!important}.hlHotelgest [class*="guarantee-module"][class*="actions"] [class*="primary"],.hlHotelgest [class*="guarantee-module"] button[class*="primary"]{background:var(--hl-blue)!important;color:#fff!important;border-color:var(--hl-blue)!important}.hlHotelgest [class*="guarantee-module"][class*="capture"]{background:#f6f8fb!important}.hlHotelgest [class*="guarantee-module"][class*="overlay"]{background:rgba(18,29,50,.48)!important}.hlHotelgest [class*="guarantee-module"][class*="modal"]{background:#f8fafc!important;color:var(--hl-text)!important}.hlHotelgest [class*="guarantee-module"][class*="modal"] header{background:#fff!important;border-color:var(--hl-line)!important}.hlHotelgest [class*="guarantee-module"] input,.hlHotelgest [class*="guarantee-module"] select{border-color:#d6dfeb!important;color:var(--hl-text)!important}
+
+/* Old Channel Manager stays operational, but technical plumbing is hidden from hotel users. */
+.hlHotelgest [class*="channel-hub-premium-module"][class*="architecture"]{display:none!important}
+.hlHotelgest [class*="channel-hub-premium-module"][class*="hero"]{background:#fff!important;color:var(--hl-text)!important;border:1px solid var(--hl-line)!important;border-radius:20px!important;box-shadow:var(--hl-shadow)!important}
+.hlHotelgest [class*="channel-hub-premium-module"][class*="hero"] small{color:var(--hl-blue)!important}.hlHotelgest [class*="channel-hub-premium-module"][class*="hero"] h2{color:var(--hl-navy)!important}.hlHotelgest [class*="channel-hub-premium-module"][class*="hero"] p{color:var(--hl-muted)!important}
+.hlHotelgest [class*="channel-hub-premium-module"][class*="heroActions"]{display:none!important}
+.hlHotelgest [class*="channel-hub-premium-module"][class*="tabs"] button:nth-child(2),.hlHotelgest [class*="channel-hub-premium-module"][class*="tabs"] button:nth-child(4){display:none!important}
+.hlHotelgest [class*="channel-hub-premium-module"][class*="guardrail"],.hlHotelgest [class*="channel-hub-premium-module"][class*="helper"],.hlHotelgest [class*="channel-hub-premium-module"][class*="syncActions"],.hlHotelgest [class*="channel-hub-premium-module"][class*="inbound"]{display:none!important}
+.hlHotelgest [class*="channel-hub-premium-module"][class*="metric"],.hlHotelgest [class*="channel-hub-premium-module"][class*="panel"],.hlHotelgest [class*="channel-hub-premium-module"] article{background:#fff!important;border-color:var(--hl-line)!important;color:var(--hl-text)!important}.hlHotelgest [class*="channel-hub-premium-module"] h3,.hlHotelgest [class*="channel-hub-premium-module"] h4{color:var(--hl-navy)!important}.hlHotelgest [class*="channel-hub-premium-module"] button[class*="active"],.hlHotelgest [class*="channel-hub-premium-module"] [class*="primary"]{background:var(--hl-blue)!important;color:#fff!important;border-color:var(--hl-blue)!important}
+
+/* Generic controls in pages not yet individually refactored. */
+.hlHotelgest [class*="operations-module"] button,.hlHotelgest [class*="finance-module"] button,.hlHotelgest [class*="commercial-module"] button{border-radius:10px!important}
+.hlHotelgest [class*="operations-module"] input,.hlHotelgest [class*="operations-module"] select,.hlHotelgest [class*="finance-module"] input,.hlHotelgest [class*="finance-module"] select,.hlHotelgest [class*="commercial-module"] input,.hlHotelgest [class*="commercial-module"] select{border-color:#d6dfeb!important;background:#fff!important;color:var(--hl-text)!important}
