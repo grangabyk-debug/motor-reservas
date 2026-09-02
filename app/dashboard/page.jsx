@@ -26,6 +26,7 @@ import"./planning-quick-modal-v2.css"
 import"./planning-hover-placement.css"
 import"./planning-toolbar-rack-final.css"
 import"./planning-toolbar-responsive-fix.css"
+import"./planning-toolbar-rebuild.css"
 
 export const metadata={
   title:"Habitación Llena",
