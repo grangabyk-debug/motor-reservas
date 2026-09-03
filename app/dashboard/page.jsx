@@ -5,6 +5,7 @@ import PWAInstaller from"./components/PWAInstaller"
 import DashboardChrome from"./components/DashboardChrome"
 import DashboardWidgetEditBridge from"./components/DashboardWidgetEditBridge"
 import PlanningHoverPlacementBridge from"./components/PlanningHoverPlacementBridge"
+import ReservationCreateFlowBridge from"./components/ReservationCreateFlowBridge"
 import"./pms-unified.css"
 import"./pms-unified-modules.css"
 import"./simple-interaction-v2.css"
@@ -30,6 +31,7 @@ import"./reservation-panel-spacing.css"
 import"./reservation-color-rhythm.css"
 import"./reservation-flow-final.css"
 import"./reservation-create-cta-final.css"
+import"./reservation-create-flow.css"
 
 export const metadata={
   title:"Habitación Llena",
@@ -42,5 +44,5 @@ export const metadata={
 export const viewport={themeColor:"#ffffff"}
 
 export default function DashboardPage(){
-  return <><StaticCaretGuard/><MercadoPagoOAuthBridge/><DashboardWidgetEditBridge/><PlanningHoverPlacementBridge/><div className="hlHotelgest"><DashboardChrome><HotelOSV2/></DashboardChrome></div><PWAInstaller/></>
+  return <><StaticCaretGuard/><MercadoPagoOAuthBridge/><DashboardWidgetEditBridge/><PlanningHoverPlacementBridge/><ReservationCreateFlowBridge/><div className="hlHotelgest"><DashboardChrome><HotelOSV2/></DashboardChrome></div><PWAInstaller/></>
 }
