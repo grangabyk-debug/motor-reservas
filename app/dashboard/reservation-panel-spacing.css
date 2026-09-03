@@ -1,0 +1,18 @@
+/* Reserva 360: breathing room for every tab without changing component structure. */
+.hlHotelgest section[role="dialog"] > form > main > section{
+  box-sizing:border-box;
+  padding-inline:14px;
+}
+
+/* Keep the visual rhythm consistent when the modal gets narrower. */
+@media(max-width:820px){
+  .hlHotelgest section[role="dialog"] > form > main > section{padding-inline:12px}
+}
+
+@media(max-width:560px){
+  .hlHotelgest section[role="dialog"] > form > main > section{padding-inline:10px}
+}
+
+@media(max-width:390px){
+  .hlHotelgest section[role="dialog"] > form > main > section{padding-inline:8px}
+}
