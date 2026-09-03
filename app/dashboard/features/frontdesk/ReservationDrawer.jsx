@@ -8,6 +8,7 @@ import{compressReservationDocument,deleteReservationDocument,listReservationDocu
 import{useReservationWorkspace}from"../../hooks/useReservationWorkspace"
 import useReservationRoomAvailability from"./useReservationRoomAvailability"
 import useReservationDraftSafety from"./useReservationDraftSafety"
+import{statusLabel,channelLabel}from"./reservationLabels"
 import ReservationOverview from"./components/ReservationOverview"
 import ReservationStayArticles from"./components/ReservationStayArticles"
 import ReservationMoneyDocuments from"./components/ReservationMoneyDocuments"
@@ -15,15 +16,12 @@ import modal from"./reservation-modal.module.css"
 
 const TABS=[["overview","Resumen"],["guest","Huésped"],["stay","Estadía"],["articles","Extras y cierre"],["money","Pagos"],["documents","Documentos"],["notes","Notas"]]
 const isParkingExtra=item=>item?.resource_category==="parking"||item?.kind==="parking"
-const localNowKey=()=>{const d=new Date(),y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),day=String(d.getDate()).padStart(2,"0"),h=String(d.getHours()).padStart(2,"0"),min=String(d.getMinutes()).padStart(2,"0");return`${y}-${m}-${day}T${h}:${min}:00`}
 const paymentMethod=item=>String(item?.metodo||item?.method||"Pago")
 const paymentAmount=item=>Number(item?.monto??item?.amount??0)
 const paymentNote=item=>String(item?.nota||item?.note||"")
 const isDeposit=item=>/seña|deposit/i.test(`${paymentMethod(item)} ${paymentNote(item)}`)
 function resourceQuantity(resource,draft){const mode=resource?.charge_mode,units=stayBillingUnits(draft);if(resource?.category==="parking")return Math.max(1,units||1);if(mode==="per_night"||mode==="per_day")return Math.max(1,units||1);if(mode==="per_person")return Math.max(1,Number(draft?.pax||1));return 1}
 function resourceLine(resource,draft,category=resource?.category){const quantity=resourceQuantity(resource,draft),unit=Number(resource?.price||0);return{name:resource?.name||"Recurso",resource_id:resource?.id||null,resource_category:category||"service",charge_mode:resource?.charge_mode||"per_use",quantity,unit_price:unit,total:unit*quantity}}
-function statusLabel(original,occupancy){if(original?.no_show)return"NO SHOW";const status=String(original?.estado||"").toLowerCase();if(status==="cancelada")return"CANCELADA";if(status==="finalizada")return"OUT";if(status==="alojado")return"IN";if(occupancy?.valid){const now=localNowKey();if(now>=occupancy.endAt)return"OUT";if(now>=occupancy.startAt&&now<occupancy.endAt)return"IN"}return"FUTURA"}
-function channelLabel(value){const raw=String(value||"").trim(),channel=raw.toLowerCase();if(!raw)return"CANAL PENDIENTE";if(channel.includes("booking"))return"OTA · BOOKING.COM";if(channel.includes("expedia"))return"OTA · EXPEDIA";if(channel.includes("airbnb"))return"OTA · AIRBNB";if(channel.includes("motor"))return"MOTOR";if(channel.includes("agencia"))return"AGENCIA";if(channel==="directa")return"DIRECTA";if(channel.includes("teléfono")||channel.includes("telefono")||channel.includes("whatsapp")||channel.includes("walk-in"))return`DIRECTA · ${raw.toUpperCase()}`;return raw.toUpperCase()}
 
 export default function ReservationDrawer({initial,original,rooms,partners=[],groups=[],charges=[],payments=[],busy=false,onClose,onSave,onCheckin,onCheckout,onPayment,onPrint,onEmail,onKey,onWebCheckin}){
   const[draft,setDraft]=useState(initial),[tab,setTab]=useState("overview"),[payment,setPayment]=useState({amount:"",method:"",currency:"ARS",note:""}),[paymentMessage,setPaymentMessage]=useState(""),[documents,setDocuments]=useState([]),[docBusy,setDocBusy]=useState(false),[docMessage,setDocMessage]=useState(""),[parkingDaysManual,setParkingDaysManual]=useState(false)
