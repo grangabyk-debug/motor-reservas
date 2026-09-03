@@ -1,0 +1,41 @@
+/* Final clarity pass for the 3-step reservation creation path. */
+.hlHotelgest section[role="dialog"] nav button:nth-of-type(4){
+  border-color:rgba(53,111,218,.42)!important;
+  background:linear-gradient(90deg,rgba(58,111,225,.14),rgba(96,93,221,.10),rgba(58,184,153,.11))!important;
+  box-shadow:inset 3px 0 #3f74df,0 5px 16px rgba(48,86,154,.08)!important;
+}
+.hlHotelgest section[role="dialog"] nav button:nth-of-type(4)::before{
+  border-color:rgba(58,111,221,.38)!important;
+  background:#e4edff!important;
+  color:#2f66c8!important;
+  box-shadow:0 2px 7px rgba(47,99,195,.10)!important;
+}
+.hlHotelgest section[role="dialog"] nav button:nth-of-type(4)::after{
+  color:#2f5ea9!important;
+  font-weight:950!important;
+  text-shadow:none!important;
+}
+.hlHotelgest section[role="dialog"] nav button:nth-of-type(4):hover{
+  border-color:rgba(53,111,218,.62)!important;
+  background:linear-gradient(90deg,rgba(58,111,225,.20),rgba(96,93,221,.14),rgba(58,184,153,.15))!important;
+}
+.hlHotelgest section[role="dialog"] nav button:nth-of-type(4)[class*="active"]{
+  border-color:rgba(96,224,195,.42)!important;
+  background:linear-gradient(100deg,#3471dc,#655bd7 64%,#328f82)!important;
+  box-shadow:inset 3px 0 #82f1d5,0 8px 20px rgba(48,72,160,.22)!important;
+}
+.hlHotelgest section[role="dialog"] nav button:nth-of-type(4)[class*="active"]::before{
+  border-color:rgba(255,255,255,.35)!important;
+  background:rgba(255,255,255,.15)!important;
+  color:#fff!important;
+}
+.hlHotelgest section[role="dialog"] nav button:nth-of-type(4)[class*="active"]::after{color:#fff!important}
+
+.hlHotelgest.hlThemeDark section[role="dialog"] nav button:nth-of-type(4){
+  border-color:rgba(103,149,239,.44)!important;
+  background:linear-gradient(90deg,rgba(53,105,208,.24),rgba(102,85,206,.18),rgba(48,159,134,.16))!important;
+  box-shadow:inset 3px 0 #6591ef,0 6px 18px rgba(0,0,0,.18)!important;
+}
+.hlHotelgest.hlThemeDark section[role="dialog"] nav button:nth-of-type(4)::before{background:rgba(75,125,225,.20)!important;color:#b7d1ff!important}
+.hlHotelgest.hlThemeDark section[role="dialog"] nav button:nth-of-type(4)::after{color:#d9e7ff!important}
+.hlHotelgest.hlThemeDark section[role="dialog"] nav button:nth-of-type(4)[class*="active"]::after{color:#fff!important}
