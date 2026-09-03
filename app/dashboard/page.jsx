@@ -29,6 +29,7 @@ import"./planning-assignment-rack-dark.css"
 import"./reservation-panel-spacing.css"
 import"./reservation-color-rhythm.css"
 import"./reservation-flow-final.css"
+import"./reservation-create-cta-final.css"
 
 export const metadata={
   title:"Habitación Llena",
