@@ -5,11 +5,26 @@
     linear-gradient(180deg,#fafcff,#f6f9fd);
 }
 
-/* Field labels: use the product blue instead of another shade of black. */
-.hlHotelgest section[role="dialog"] > form > main label > span{
-  color:#456fb3;
-  font-weight:850;
+/* Field labels are deliberately distinct from both the control and its value.
+   The small blue-glass tag gives the form an easy scanning rhythm without adding noise. */
+.hlHotelgest section[role="dialog"] > form > main .grid label > span,
+.hlHotelgest section[role="dialog"] > form > main .wideField > span{
+  display:inline-flex;
+  align-items:center;
+  width:max-content;
+  max-width:100%;
+  min-height:20px;
+  box-sizing:border-box;
+  margin-bottom:1px;
+  padding:2px 7px 2px 8px;
+  border-left:3px solid #3f78e6;
+  border-radius:6px;
+  background:linear-gradient(90deg,rgba(52,118,232,.13),rgba(121,102,232,.055));
+  color:#2964ca!important;
+  font-weight:900!important;
   letter-spacing:.025em;
+  line-height:1.15;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.7);
 }
 
 /* Main form controls get a very light blue glass tint. */
@@ -70,8 +85,12 @@
     linear-gradient(180deg,#0d1826,#0a1521);
 }
 
-.hlHotelgest.hlThemeDark section[role="dialog"] > form > main label > span{
-  color:#8fbaff;
+.hlHotelgest.hlThemeDark section[role="dialog"] > form > main .grid label > span,
+.hlHotelgest.hlThemeDark section[role="dialog"] > form > main .wideField > span{
+  border-left-color:#71a6ff;
+  background:linear-gradient(90deg,rgba(79,139,238,.18),rgba(124,103,235,.09));
+  color:#9bc3ff!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035);
 }
 
 .hlHotelgest.hlThemeDark section[role="dialog"] > form > main input:not([type="checkbox"]):not([type="radio"]),
@@ -109,4 +128,6 @@
 
 @media(max-width:560px){
   .hlHotelgest section[role="dialog"] > form > main h3::after{width:16px;margin-left:6px}
+  .hlHotelgest section[role="dialog"] > form > main .grid label > span,
+  .hlHotelgest section[role="dialog"] > form > main .wideField > span{padding-inline:6px;min-height:19px}
 }
