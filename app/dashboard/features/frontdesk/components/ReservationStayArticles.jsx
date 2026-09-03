@@ -4,6 +4,7 @@ import{useEffect,useMemo,useState}from"react"
 import{money}from"../../../core/formatters"
 import MercadoPagoGuaranteePanel from"../MercadoPagoGuaranteePanel"
 import ReservationVehicleParking from"./ReservationVehicleParking"
+import ReservationExtrasServices from"./ReservationExtrasServices"
 import modal from"../reservation-modal.module.css"
 import ws from"../reservation-workspace.module.css"
 import mr from"../reservation-multiroom.module.css"
@@ -61,13 +62,10 @@ export default function ReservationStayArticles({tab,draft,set,room,totals,rooms
     </section>}
 
     {tab==="articles"&&<section className={modal.panel}>
-      <div className={modal.subhead}><div><h3>Artículos y extras</h3><p className={mr.flowHint}>Cochera, vehículo, mascotas y consumos adicionales quedan fuera de la estadía principal.</p></div><button className={modal.miniButton} type="button" onClick={addPet}>＋ Mascota</button></div>
+      <div className={modal.subhead}><div><h3>Artículos y extras</h3><p className={mr.flowHint}>Vehículos, mascotas y servicios del hotel se cargan por separado y se suman automáticamente a la reserva.</p></div></div>
       <div className={ws.articleSummary}><div><small>Alojamiento</small><b>{money(totals.stay,draft.currency)}</b></div><div><small>Extras</small><b>{money(totals.extras,draft.currency)}</b></div><div><small>Cochera</small><b>{money(totals.parking,draft.currency)}</b></div><div><small>Mascotas</small><b>{money(totals.pets,draft.currency)}</b></div></div>
       <ReservationVehicleParking draft={draft} set={set} parkingResources={parkingResources} occupancy={occupancy} currency={draft.currency}/>
-      <div className={modal.rows}>{(draft.pets||[]).map((pet,i)=><div className={modal.row} key={`pet-${i}`}><input placeholder="Nombre mascota" value={pet.name||""} onChange={e=>set("pets",(draft.pets||[]).map((p,j)=>j===i?{...p,name:e.target.value}:p))}/><select value={pet.resource_id||""} onChange={e=>updatePetResource(i,e.target.value)}><option value="">Tarifa manual</option>{petResources.map(r=><option key={r.id} value={r.id}>{r.name} · {money(r.price)}</option>)}</select><NumberInput min="0" placeholder="Valor" value={pet.amount??""} onChange={v=>set("pets",(draft.pets||[]).map((p,j)=>j===i?{...p,amount:v}:p))}/><button className={modal.remove} type="button" onClick={()=>set("pets",(draft.pets||[]).filter((_,j)=>j!==i))}>×</button></div>)}</div>
-      {otherResources.length>0&&<div className={modal.chips}>{otherResources.map(r=><button type="button" key={`resource-${r.id}`} onClick={()=>addResource(r)}>＋ {r.name} · {money(r.price)}</button>)}</div>}
-      <div className={modal.chips}>{charges.filter(c=>c.active!==false).map(c=><button type="button" key={c.id} onClick={()=>addCharge(c)}>＋ {c.name} · {money(c.amount)}</button>)}</div>
-      <div className={modal.rows}>{(draft.extras||[]).map((extra,i)=>isParkingExtra(extra)?null:<div className={`${modal.row} ${modal.three}`} key={`extra-${i}`}><input value={extra.name||""} onChange={e=>set("extras",(draft.extras||[]).map((p,j)=>j===i?{...p,name:e.target.value}:p))}/><NumberInput min="0" value={extra.total??""} onChange={v=>set("extras",(draft.extras||[]).map((p,j)=>j===i?{...p,total:v}:p))}/><button className={modal.remove} type="button" onClick={()=>set("extras",(draft.extras||[]).filter((_,j)=>j!==i))}>×</button></div>)}</div>
+      <ReservationExtrasServices draft={draft} set={set} totals={totals} petResources={petResources} addPet={addPet} updatePetResource={updatePetResource} otherResources={otherResources} addResource={addResource} charges={charges} addCharge={addCharge} isParkingExtra={isParkingExtra}/>
       {workspaceError&&<div className={modal.message}>{workspaceError}</div>}
     </section>}
   </>
