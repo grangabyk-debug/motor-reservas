@@ -80,15 +80,10 @@
 .hlHotelgest section[role="dialog"] > form > main p{color:#6f809a}
 
 /* Recovery-safe change: typography only in the room assignment summary. */
-.hlHotelgest section[role="dialog"] > form > main [class*="reservation-multiroom_summary"] > span{
+.hlHotelgest section[role="dialog"] > form > main [class*="reservation-multiroom"][class*="summary"] > span{
   font-size:12px!important;
   font-weight:800!important;
   letter-spacing:.01em!important;
-}
-.hlHotelgest section[role="dialog"] > form > main [class*="reservation-multiroom_summary"] > b{
-  font-size:16px!important;
-  font-weight:900!important;
-  letter-spacing:0!important;
 }
 
 /* Dark mode: bright labels, quieter values, same hierarchy. */
@@ -125,6 +120,5 @@
 @media(max-width:560px){
   .hlHotelgest section[role="dialog"] > form > main h3::after{width:16px;margin-left:6px}
   .hlHotelgest section[role="dialog"] > form > main label > span:first-child{font-size:10.5px!important}
-  .hlHotelgest section[role="dialog"] > form > main [class*="reservation-multiroom_summary"] > span{font-size:11px!important}
-  .hlHotelgest section[role="dialog"] > form > main [class*="reservation-multiroom_summary"] > b{font-size:15px!important}
+  .hlHotelgest section[role="dialog"] > form > main [class*="reservation-multiroom"][class*="summary"] > span{font-size:11px!important}
 }
