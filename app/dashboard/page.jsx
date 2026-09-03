@@ -5,6 +5,7 @@ import PWAInstaller from"./components/PWAInstaller"
 import DashboardChrome from"./components/DashboardChrome"
 import DashboardWidgetEditBridge from"./components/DashboardWidgetEditBridge"
 import PlanningHoverPlacementBridge from"./components/PlanningHoverPlacementBridge"
+import ReservationAssignmentSummaryBridge from"./components/ReservationAssignmentSummaryBridge"
 import"./pms-unified.css"
 import"./pms-unified-modules.css"
 import"./simple-interaction-v2.css"
@@ -40,5 +41,5 @@ export const metadata={
 export const viewport={themeColor:"#ffffff"}
 
 export default function DashboardPage(){
-  return <><StaticCaretGuard/><MercadoPagoOAuthBridge/><DashboardWidgetEditBridge/><PlanningHoverPlacementBridge/><div className="hlHotelgest"><DashboardChrome><HotelOSV2/></DashboardChrome></div><PWAInstaller/></>
+  return <><StaticCaretGuard/><MercadoPagoOAuthBridge/><DashboardWidgetEditBridge/><PlanningHoverPlacementBridge/><ReservationAssignmentSummaryBridge/><div className="hlHotelgest"><DashboardChrome><HotelOSV2/></DashboardChrome></div><PWAInstaller/></>
 }
