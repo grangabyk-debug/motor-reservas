@@ -128,7 +128,7 @@ function sync(){
   const root=dialog()
   if(root){
     const tab=normalize(text(activeTab(root)))
-    if(tab.includes("estadía")||tab.includes("extras"))readMeta(root)
+    if(tab.includes("huésped")||tab.includes("estadía")||tab.includes("extras"))readMeta(root)
     if(tab.includes("extras"))ensureDock(root);else root.querySelector(dockSelector)?.remove()
     return
   }
@@ -145,7 +145,9 @@ export default function ReservationCreateFlowBridge(){
     sync()
     const observer=new MutationObserver(schedule)
     observer.observe(document.body,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:["class","value","aria-selected"]})
-    return()=>observer.disconnect()
+    document.addEventListener("input",schedule,true)
+    document.addEventListener("change",schedule,true)
+    return()=>{observer.disconnect();document.removeEventListener("input",schedule,true);document.removeEventListener("change",schedule,true)}
   },[])
   return null
 }
