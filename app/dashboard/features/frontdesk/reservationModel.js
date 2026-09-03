@@ -32,7 +32,7 @@ export function stayOccupancy(draft={}){
 export function stayBillingUnits(draft){return stayOccupancy(draft).billingUnits||0}
 
 export function reservationTotal(draft,room){
-  const occupancy=stayOccupancy(draft),rate=draft.rate!==""&&draft.rate!=null?Number(draft.rate||0):Number(room?.precio||0),additional=(draft.additionalRooms||[]).filter(item=>item?.roomId&&String(item.roomId)!==String(draft.roomId)),allExtras=draft.extras||[],parkingLines=allExtras.filter(isParkingLine)
+  const occupancy=stayOccupancy(draft),configuredRate=Number(room?.precio||0),storedRate=draft.rate!==""&&draft.rate!=null?Number(draft.rate||0):configuredRate,rate=!draft?.id&&room?.id?configuredRate:storedRate,additional=(draft.additionalRooms||[]).filter(item=>item?.roomId&&String(item.roomId)!==String(draft.roomId)),allExtras=draft.extras||[],parkingLines=allExtras.filter(isParkingLine)
   const extras=allExtras.filter(x=>!isParkingLine(x)).reduce((a,x)=>a+Number(x.total||x.amount||0),0)
   const pets=(draft.pets||[]).reduce((a,x)=>a+Number(x.amount||0),0)
   const parking=parkingLines.length?parkingLines.reduce((a,x)=>a+Number(x.total||x.amount||0),0):Number(draft.parking||0)
