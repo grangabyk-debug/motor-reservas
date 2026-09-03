@@ -27,6 +27,7 @@ import"./planning-hover-placement.css"
 import"./planning-toolbar-clean.css"
 import"./planning-assignment-rack-dark.css"
 import"./reservation-panel-spacing.css"
+import"./reservation-color-rhythm.css"
 
 export const metadata={
   title:"Habitación Llena",
