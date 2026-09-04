@@ -3,19 +3,19 @@
 import{useCallback,useEffect,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 
-export default function usePlanningData(propertyId){
+export default function usePlanningData(propertyId,windowStart,windowEndExclusive){
   const[rooms,setRooms]=useState([])
   const[reservations,setReservations]=useState([])
   const[loading,setLoading]=useState(true)
   const[error,setError]=useState("")
 
   const load=useCallback(async()=>{
-    if(!propertyId)return
+    if(!propertyId||!windowStart||!windowEndExclusive)return
     setLoading(true);setError("")
     try{
       const[roomRes,resRes]=await Promise.all([
         supabase.from("habitaciones").select("id,nombre,tipo,capacidad,precio,estado,activa,sort_order,housekeeping_zone").eq("property_id",propertyId).eq("activa",true).order("sort_order").order("nombre"),
-        supabase.from("reservas").select("id,numero_reserva,nombre_huesped,email_huesped,telefono_huesped,habitacion_id,habitaciones_ids,fecha_entrada,fecha_salida,estado,tarifa_noche,precio_total,moneda,canal_reserva,cantidad_huespedes,no_show,tipo_estadia,notas").eq("property_id",propertyId).neq("estado","cancelada").order("fecha_entrada"),
+        supabase.from("reservas").select("id,numero_reserva,nombre_huesped,email_huesped,telefono_huesped,habitacion_id,habitaciones_ids,fecha_entrada,fecha_salida,estado,tarifa_noche,precio_total,moneda,canal_reserva,cantidad_huespedes,no_show,tipo_estadia,notas").eq("property_id",propertyId).neq("estado","cancelada").lt("fecha_entrada",windowEndExclusive).gte("fecha_salida",windowStart).order("fecha_entrada"),
       ])
       if(roomRes.error)throw roomRes.error
       if(resRes.error)throw resRes.error
@@ -23,16 +23,16 @@ export default function usePlanningData(propertyId){
       setReservations(resRes.data||[])
     }catch(err){setError(err?.message||"No se pudo cargar el Planning.")}
     finally{setLoading(false)}
-  },[propertyId])
+  },[propertyId,windowStart,windowEndExclusive])
 
   useEffect(()=>{load()},[load])
 
   const moveReservation=useCallback(async({reservationId,roomId,start,end})=>{
     const{data,error:rpcError}=await supabase.rpc("hl_planning_move_reservation_atomic",{p_reserva_id:Number(reservationId),p_habitacion_id:Number(roomId),p_fecha_entrada:start,p_fecha_salida:end})
     if(rpcError)throw rpcError
-    setReservations(list=>list.map(item=>item.id===data.id?data:item))
+    setReservations(list=>list.map(item=>item.id===data.id?data:item).filter(item=>item.fecha_entrada<windowEndExclusive&&item.fecha_salida>=windowStart))
     return data
-  },[])
+  },[windowStart,windowEndExclusive])
 
   const createReservation=useCallback(async draft=>{
     const{data:userData,error:userError}=await supabase.auth.getUser();if(userError)throw userError
@@ -47,9 +47,9 @@ export default function usePlanningData(propertyId){
     }
     const{data,error:rpcError}=await supabase.rpc("hl_create_reservation_atomic",{p_reservation:payload,p_payments:[]})
     if(rpcError)throw rpcError
-    setReservations(list=>[...list,data])
+    if(data.fecha_entrada<windowEndExclusive&&data.fecha_salida>=windowStart)setReservations(list=>[...list,data])
     return data
-  },[propertyId,rooms])
+  },[propertyId,rooms,windowStart,windowEndExclusive])
 
   return{rooms,reservations,loading,error,setError,load,moveReservation,createReservation}
 }
