@@ -30,6 +30,6 @@ export default function PmsSidebar({view,onView,property,properties=[],onPropert
       <NavGroup title="Operación" items={operations} view={view} onView={onView}/>
       <NavGroup title="Gestión" items={MANAGEMENT_NAV} view={view} onView={onView}/>
     </nav>
-    <div className={s.sidebarFooter}><span><b>{user?.email||"Usuario autenticado"}</b><small>Acceso por propiedad · v{version}</small></span><button type="button" title={`Versión ${version}`}>•••</button></div>
+    <div className={s.sidebarFooter}><span><b>{user?.email||"Usuario autenticado"}</b><small>Acceso por propiedad · v{version}</small></span><button type="button" title={`Configuración · versión ${version}`} onClick={()=>onView("settings")}>•••</button></div>
   </aside>
 }
