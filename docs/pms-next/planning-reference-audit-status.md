@@ -1,1 +1,0 @@
-Status snapshot 2026-09-04: persistent planning behavior audit created on `pms-rebuild-zero`. Live Heroes PMS interaction capture is pending only because the Opera Browser Connector session is disconnected. Public Heroes PMS planning documentation has already been reviewed for baseline behaviors.
