@@ -1,86 +1,64 @@
 "use client"
 
 import{useMemo,useState}from"react"
+import useReservationsData from"./useReservationsData"
 import s from"./reservations.module.css"
 
-const INITIAL=[
-  {id:"7463960",guest:"Ananya Rao",room:"155",arrival:"2026-09-16",departure:"2026-09-17",payment:"paid",channel:"Directa",email:"ananya@example.com",phone:"+54 11 5555 1201",status:"reserved"},
-  {id:"7463899",guest:"Lucas Müller",room:"242",arrival:"2026-09-16",departure:"2026-09-19",payment:"paid",channel:"Directa",email:"lucas@example.com",phone:"+54 11 5555 1202",status:"reserved"},
-  {id:"7463685",guest:"Noah Brown",room:"312",arrival:"2026-09-16",departure:"2026-09-19",payment:"paid",channel:"Booking",email:"noah@example.com",phone:"+54 11 5555 1203",status:"reserved"},
-  {id:"7463633",guest:"Omar Haddad",room:"101",arrival:"2026-09-16",departure:"2026-09-18",payment:"pending",channel:"Directa",email:"omar@example.com",phone:"+54 11 5555 1204",status:"reserved"},
-  {id:"7463842",guest:"Sofia Rossi",room:"117",arrival:"2026-09-15",departure:"2026-09-17",payment:"paid",channel:"Motor",email:"sofia@example.com",phone:"+54 11 5555 1205",status:"checked-in"},
-  {id:"7463868",guest:"Clara Fontaine",room:"171",arrival:"2026-09-14",departure:"2026-09-18",payment:"due",channel:"Agencia",email:"clara@example.com",phone:"+54 11 5555 1206",status:"reserved"},
-  {id:"7463849",guest:"Omar Haddad",room:"235",arrival:"2026-09-13",departure:"2026-09-14",payment:"paid",channel:"Directa",email:"omar2@example.com",phone:"+54 11 5555 1207",status:"no-show"},
-  {id:"7463796",guest:"Clara Fontaine",room:"320",arrival:"2026-09-13",departure:"2026-09-16",payment:"paid",channel:"Booking",email:"clara2@example.com",phone:"+54 11 5555 1208",status:"reserved"},
-  {id:"7463776",guest:"Elena Petrova",room:"119",arrival:"2026-09-13",departure:"2026-09-16",payment:"paid",channel:"Directa",email:"elena@example.com",phone:"+54 11 5555 1209",status:"reserved"},
-]
+const fmtDate=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"2-digit",year:"numeric"}).format(new Date(`${value}T12:00:00`)):"—"
+const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency,maximumFractionDigits:0}).format(Number(value)||0)
 
-const date=value=>new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"2-digit",year:"numeric"}).format(new Date(`${value}T12:00:00`))
+function paymentState(item,paid){
+  const total=Number(item.precio_total)||0
+  if(total<=0)return"paid"
+  if(paid<=0)return"due"
+  if(paid>=total)return"paid"
+  return"pending"
+}
 const paymentLabel=value=>value==="paid"?"Pagado":value==="pending"?"Parcial":"Pendiente"
+const statusLabel=item=>item.no_show?"No-show":item.estado==="alojado"?"En hotel":item.estado==="finalizada"?"Finalizada":item.estado==="cancelada"?"Cancelada":item.estado==="tentativa"?"Tentativa":item.estado==="pendiente"?"Pendiente":"Confirmada"
 
-export default function ReservationsWorkspace({onNavigate}){
-  const[items,setItems]=useState(INITIAL)
+export default function ReservationsWorkspace({propertyId,onNavigate}){
+  const data=useReservationsData(propertyId)
   const[query,setQuery]=useState("")
   const[mode,setMode]=useState("active")
   const[filterOpen,setFilterOpen]=useState(false)
   const[paymentFilter,setPaymentFilter]=useState("all")
   const[selected,setSelected]=useState(null)
+  const[saving,setSaving]=useState("")
+  const roomById=useMemo(()=>new Map(data.rooms.map(room=>[Number(room.id),room])),[data.rooms])
+
+  const items=useMemo(()=>data.reservations.map(item=>{
+    const paid=data.paymentByReservation.get(Number(item.id))||0
+    return{...item,paid,payment:paymentState(item,paid),room:roomById.get(Number(item.habitacion_id))}
+  }),[data.reservations,data.paymentByReservation,roomById])
 
   const visible=useMemo(()=>items.filter(item=>{
-    if(mode==="trash"&&item.status!=="trash")return false
-    if(mode==="noshow"&&item.status!=="no-show")return false
-    if(mode==="active"&&["trash","no-show"].includes(item.status))return false
+    if(mode==="trash"&&item.estado!=="cancelada")return false
+    if(mode==="noshow"&&!item.no_show)return false
+    if(mode==="active"&&(item.estado==="cancelada"||item.no_show))return false
     if(paymentFilter!=="all"&&item.payment!==paymentFilter)return false
     const term=query.trim().toLowerCase()
-    return !term||`${item.id} ${item.guest} ${item.room} ${item.channel}`.toLowerCase().includes(term)
+    return !term||`${item.numero_reserva||item.id} ${item.nombre_huesped} ${item.room?.nombre||""} ${item.canal_reserva||""}`.toLowerCase().includes(term)
   }),[items,mode,paymentFilter,query])
 
-  function checkIn(id){
-    setItems(list=>list.map(item=>item.id===id?{...item,status:item.status==="checked-in"?"reserved":"checked-in"}:item))
-    setSelected(current=>current?.id===id?{...current,status:current.status==="checked-in"?"reserved":"checked-in"}:current)
+  async function patch(item,changes,label){
+    setSaving(String(item.id));data.setError("")
+    try{const updated=await data.updateReservation(item.id,changes);if(selected?.id===item.id)setSelected({...selected,...updated});return true}
+    catch(err){data.setError(err?.message||`No se pudo ${label}.`);return false}
+    finally{setSaving("")}
   }
-  function remove(id){
-    setItems(list=>list.map(item=>item.id===id?{...item,status:"trash"}:item))
-    if(selected?.id===id)setSelected(null)
-  }
-  function restore(id){setItems(list=>list.map(item=>item.id===id?{...item,status:"reserved"}:item))}
+  async function checkIn(item){await patch(item,{estado:item.estado==="alojado"?"confirmada":"alojado"},item.estado==="alojado"?"deshacer el check-in":"hacer el check-in")}
+  async function checkout(item){setSaving(String(item.id));data.setError("");try{const updated=await data.checkout(item.id);if(selected?.id===item.id)setSelected({...selected,...updated})}catch(err){data.setError(err?.message||"No se pudo realizar el check-out.")}finally{setSaving("")}}
+  async function cancel(item){if(!window.confirm(`Cancelar la reserva ${item.numero_reserva||item.id} de ${item.nombre_huesped}?`))return;const ok=await patch(item,{estado:"cancelada"},"cancelar la reserva");if(ok&&selected?.id===item.id)setSelected(null)}
+  async function restore(item){await patch(item,{estado:"confirmada",no_show:false},"restaurar la reserva")}
+  async function toggleNoShow(item){await patch(item,{no_show:!item.no_show},item.no_show?"quitar el no-show":"marcar no-show")}
 
   return <section className={s.page}>
-    <header className={s.heading}>
-      <div><small>RESERVAS</small><h1>Reservas</h1><p>{items.filter(item=>item.status!=="trash").length} reservas visibles en este entorno de prueba.</p></div>
-      <div className={s.tools}>
-        <label className={s.search}>⌕<input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Buscar reservas"/></label>
-        <button type="button" className={`${s.tool} ${mode==="noshow"?s.toolActive:""}`} onClick={()=>setMode(current=>current==="noshow"?"active":"noshow")}>⊘ No-show</button>
-        <button type="button" className={`${s.tool} ${mode==="trash"?s.toolActive:""}`} onClick={()=>setMode(current=>current==="trash"?"active":"trash")}>♲ Papelera</button>
-        <button type="button" className={`${s.tool} ${filterOpen?s.toolActive:""}`} onClick={()=>setFilterOpen(value=>!value)}>≡ Filtrar</button>
-        <button type="button" className={s.primary} onClick={()=>onNavigate?.("planning")}>＋ Nueva reserva</button>
-      </div>
-    </header>
-
+    <header className={s.heading}><div><small>RESERVAS</small><h1>Reservas</h1><p>{items.filter(item=>item.estado!=="cancelada").length} reservas reales en la propiedad activa.</p></div><div className={s.tools}><label className={s.search}>⌕<input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar reserva, huésped o habitación"/></label><button type="button" className={`${s.tool} ${mode==="noshow"?s.toolActive:""}`} onClick={()=>setMode(v=>v==="noshow"?"active":"noshow")}>⊘ No-show</button><button type="button" className={`${s.tool} ${mode==="trash"?s.toolActive:""}`} onClick={()=>setMode(v=>v==="trash"?"active":"trash")}>♲ Canceladas</button><button type="button" className={`${s.tool} ${filterOpen?s.toolActive:""}`} onClick={()=>setFilterOpen(v=>!v)}>≡ Filtrar</button><button type="button" className={s.primary} onClick={()=>onNavigate?.("planning")}>＋ Nueva reserva</button></div></header>
+    {data.error&&<div className={s.empty}>{data.error}</div>}
     {filterOpen&&<div className={s.filterPanel}><span>Pago</span>{[["all","Todos"],["paid","Pagado"],["pending","Parcial"],["due","Pendiente"]].map(([value,label])=><button type="button" key={value} className={paymentFilter===value?s.selectedFilter:""} onClick={()=>setPaymentFilter(value)}>{label}</button>)}</div>}
-
-    <div className={s.tableWrap}>
-      <table className={s.table}>
-        <thead><tr><th>ID</th><th>Cliente</th><th>Habitación</th><th>Llegada</th><th>Salida</th><th>Pago</th><th>Acciones</th></tr></thead>
-        <tbody>{visible.map(item=><tr key={item.id}>
-          <td className={s.id}>{item.id}</td>
-          <td className={s.client}><b>{item.guest}</b><small>{item.channel}</small></td>
-          <td><span className={s.room}><span className={s.roomBadge}>{item.room}</span><i className={s.roomDot}/></span></td>
-          <td>{date(item.arrival)}</td><td>{date(item.departure)}</td>
-          <td><span className={`${s.payment} ${item.payment==="pending"?s.paymentPending:item.payment==="due"?s.paymentDue:""}`}>{paymentLabel(item.payment)}</span></td>
-          <td><div className={s.actions}>{mode==="trash"?<button type="button" className={s.actionButton} onClick={()=>restore(item.id)} title="Restaurar">↺</button>:<><button type="button" className={`${s.actionButton} ${s.checkin} ${item.status==="checked-in"?s.checked:""}`} onClick={()=>checkIn(item.id)}>{item.status==="checked-in"?"✓ En hotel":"→ Check-in"}</button><button type="button" className={s.actionButton} onClick={()=>setSelected(item)} title="Ver detalle">◉</button><button type="button" className={s.actionButton} onClick={()=>remove(item.id)} title="Mover a papelera">⌫</button></>}</div></td>
-        </tr>)}</tbody>
-      </table>
-      {!visible.length&&<div className={s.empty}>No hay reservas que coincidan con esta vista.</div>}
-    </div>
-    <div className={s.footer}><span>Mostrando {visible.length} de {items.length}</span><span>Las acciones de esta pantalla son locales hasta conectar el servicio multi-tenant.</span></div>
-
-    {selected&&<div className={s.drawerShade} onMouseDown={event=>event.target===event.currentTarget&&setSelected(null)}><aside className={s.drawer}>
-      <header><div><small>RESERVA {selected.id}</small><h2>{selected.guest}</h2><p>{selected.channel} · Habitación {selected.room}</p></div><button className={s.close} onClick={()=>setSelected(null)}>×</button></header>
-      <div className={s.summary}><div><small>Llegada</small><b>{date(selected.arrival)}</b></div><div><small>Salida</small><b>{date(selected.departure)}</b></div><div><small>Pago</small><b>{paymentLabel(selected.payment)}</b></div><div><small>Estado</small><b>{selected.status==="checked-in"?"En hotel":"Reservada"}</b></div></div>
-      <section className={s.drawerSection}><small>HUÉSPED</small><h3>Contacto</h3><div className={s.metaList}><div><span>Email</span><b>{selected.email}</b></div><div><span>Teléfono</span><b>{selected.phone}</b></div><div><span>Canal</span><b>{selected.channel}</b></div></div></section>
-      <section className={s.drawerSection}><small>ESTADÍA</small><h3>Asignación</h3><div className={s.metaList}><div><span>Habitación</span><b>{selected.room}</b></div><div><span>Entrada</span><b>{date(selected.arrival)}</b></div><div><span>Salida</span><b>{date(selected.departure)}</b></div></div></section>
-      <div className={s.drawerActions}><button type="button" onClick={()=>setSelected(null)}>Cerrar</button><button type="button" className={s.mainAction} onClick={()=>checkIn(selected.id)}>{selected.status==="checked-in"?"Deshacer check-in":"Hacer check-in"}</button></div>
-    </aside></div>}
+    <div className={s.tableWrap}><table className={s.table}><thead><tr><th>ID</th><th>Cliente</th><th>Habitación</th><th>Llegada</th><th>Salida</th><th>Pago</th><th>Acciones</th></tr></thead><tbody>{visible.map(item=><tr key={item.id}><td className={s.id}>{item.numero_reserva||item.id}</td><td className={s.client}><b>{item.nombre_huesped}</b><small>{item.canal_reserva||"Directa"}</small></td><td><span className={s.room}><span className={s.roomBadge}>{item.room?.nombre||"—"}</span><i className={s.roomDot}/></span></td><td>{fmtDate(item.fecha_entrada)}</td><td>{fmtDate(item.fecha_salida)}</td><td><span className={`${s.payment} ${item.payment==="pending"?s.paymentPending:item.payment==="due"?s.paymentDue:""}`}>{paymentLabel(item.payment)}</span></td><td><div className={s.actions}>{mode==="trash"?<button type="button" className={s.actionButton} disabled={saving===String(item.id)} onClick={()=>restore(item)}>↺ Restaurar</button>:<><button type="button" className={`${s.actionButton} ${s.checkin} ${item.estado==="alojado"?s.checked:""}`} disabled={saving===String(item.id)||item.estado==="finalizada"} onClick={()=>item.estado==="alojado"?checkout(item):checkIn(item)}>{item.estado==="alojado"?"← Check-out":"→ Check-in"}</button><button type="button" className={s.actionButton} onClick={()=>setSelected(item)} title="Ver detalle">◉</button><button type="button" className={s.actionButton} disabled={saving===String(item.id)} onClick={()=>toggleNoShow(item)} title="No-show">⊘</button><button type="button" className={s.actionButton} disabled={saving===String(item.id)} onClick={()=>cancel(item)} title="Cancelar">⌫</button></>}</div></td></tr>)}</tbody></table>{data.loading?<div className={s.empty}>Cargando reservas…</div>:!visible.length&&<div className={s.empty}>No hay reservas que coincidan con esta vista.</div>}</div>
+    <div className={s.footer}><span>Mostrando {visible.length} de {items.length}</span><span>Pagos y estados se calculan desde la base real de la propiedad.</span></div>
+    {selected&&<div className={s.drawerShade} onMouseDown={e=>e.target===e.currentTarget&&setSelected(null)}><aside className={s.drawer}><header><div><small>RESERVA {selected.numero_reserva||selected.id}</small><h2>{selected.nombre_huesped}</h2><p>{selected.canal_reserva||"Directa"} · Habitación {selected.room?.nombre||"—"}</p></div><button className={s.close} onClick={()=>setSelected(null)}>×</button></header><div className={s.summary}><div><small>Llegada</small><b>{fmtDate(selected.fecha_entrada)}</b></div><div><small>Salida</small><b>{fmtDate(selected.fecha_salida)}</b></div><div><small>Pago</small><b>{paymentLabel(selected.payment)}</b></div><div><small>Estado</small><b>{statusLabel(selected)}</b></div></div><section className={s.drawerSection}><small>HUÉSPED</small><h3>Contacto</h3><div className={s.metaList}><div><span>Email</span><b>{selected.email_huesped||"—"}</b></div><div><span>Teléfono</span><b>{selected.telefono_huesped||"—"}</b></div><div><span>Canal</span><b>{selected.canal_reserva||"Directa"}</b></div></div></section><section className={s.drawerSection}><small>CUENTA</small><h3>Estadía</h3><div className={s.metaList}><div><span>Total</span><b>{money(selected.precio_total,selected.moneda)}</b></div><div><span>Cobrado</span><b>{money(selected.paid,selected.moneda)}</b></div><div><span>Saldo</span><b>{money(Math.max(0,Number(selected.precio_total||0)-selected.paid),selected.moneda)}</b></div></div></section><div className={s.drawerActions}><button onClick={()=>setSelected(null)}>Cerrar</button><button className={s.mainAction} disabled={saving===String(selected.id)||selected.estado==="finalizada"} onClick={()=>selected.estado==="alojado"?checkout(selected):checkIn(selected)}>{selected.estado==="alojado"?"Hacer check-out":"Hacer check-in"}</button></div></aside></div>}
   </section>
 }
