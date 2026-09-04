@@ -7,6 +7,7 @@ export const PRIMARY_NAV=[
 ]
 
 export const OPERATIONS_NAV=[
+  {id:"tasks",label:"Tareas & check-lists",icon:"tasks"},
   {id:"housekeeping",label:"Housekeeping",icon:"clean"},
   {id:"maintenance",label:"Mantenimiento",icon:"wrench"},
   {id:"rates",label:"Tarifas y disponibilidad",icon:"rates"},
