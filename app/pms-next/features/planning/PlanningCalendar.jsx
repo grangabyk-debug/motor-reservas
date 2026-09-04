@@ -17,22 +17,19 @@ function monthSegments(days){
   days.forEach((day,index)=>{
     const date=fromKey(day),key=`${date.getFullYear()}-${date.getMonth()}`,previous=result.at(-1)
     if(previous?.key===key)previous.span++
-    else result.push({key,start:index,span:1,label:new Intl.DateTimeFormat("es-AR",{month:"long",year:"numeric"}).format(date)})
+    else result.push({key,start:index,span:1,date})
   })
-  return result
+  return result.map(segment=>({...segment,label:segment.span<4?new Intl.DateTimeFormat("es-AR",{month:"short"}).format(segment.date).replace(".",""):new Intl.DateTimeFormat("es-AR",{month:"long",year:"numeric"}).format(segment.date)}))
 }
 
 function TimelineBands({days,today,settings,grid}){
-  return <div className={c.timelineBands} style={grid} aria-hidden="true">{days.map(day=>{
-    const weekend=settings.shadeWeekends&&[0,6].includes(fromKey(day).getDay())
-    return <span key={day} className={`${weekend?c.bandWeekend:""} ${day===today?c.bandToday:""}`}/>
-  })}</div>
+  return <div className={c.timelineBands} style={grid} aria-hidden="true">{days.map(day=>{const weekend=settings.shadeWeekends&&[0,6].includes(fromKey(day).getDay());return <span key={day} className={`${weekend?c.bandWeekend:""} ${day===today?c.bandToday:""}`}/>})}</div>
 }
 
 function InventoryStrip({days,rooms,reservations,today,settings,grid}){
   if(!settings.showAvailability&&!settings.showOccupancy)return null
   return <div className={c.inventoryRow}>
-    <div className={c.inventoryLabel}><b>Disponibilidad</b><small>{rooms.length} habitaciones visibles</small></div>
+    <div className={c.inventoryLabel}><b>Disponibilidad</b><small>{rooms.length} hab.</small></div>
     <div className={c.inventoryDays} style={grid}>{days.map(day=>{
       const occupied=rooms.filter(room=>reservations.some(item=>covers(item,room.id,day))).length
       const available=Math.max(0,rooms.length-occupied),pct=rooms.length?Math.round(occupied/rooms.length*100):0,weekend=settings.shadeWeekends&&[0,6].includes(fromKey(day).getDay())
