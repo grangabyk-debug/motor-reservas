@@ -17,13 +17,20 @@ export default function usePlanningData(propertyId,windowStart,windowEndExclusiv
     if(!propertyId||!windowStart||!windowEndExclusive)return
     setLoading(true);setError("")
     try{
-      const[roomRes,resRes]=await Promise.all([
-        supabase.from("habitaciones").select("id,nombre,tipo,capacidad,precio,estado,activa,sort_order,housekeeping_zone").eq("property_id",propertyId).eq("activa",true).order("sort_order").order("nombre"),
+      const[roomRes,resRes,floorRes]=await Promise.all([
+        supabase.from("habitaciones").select("id,nombre,tipo,capacidad,precio,estado,activa,sort_order,housekeeping_zone,floor_id").eq("property_id",propertyId).eq("activa",true),
         supabase.from("reservas").select("id,numero_reserva,nombre_huesped,email_huesped,telefono_huesped,habitacion_id,habitaciones_ids,fecha_entrada,fecha_salida,estado,tarifa_noche,precio_total,moneda,canal_reserva,cantidad_huespedes,no_show,tipo_estadia,notas").eq("property_id",propertyId).neq("estado","cancelada").lt("fecha_entrada",windowEndExclusive).gte("fecha_salida",windowStart).order("fecha_entrada"),
+        supabase.from("hotel_floors").select("id,name,sort_order,active").eq("property_id",propertyId).eq("active",true).order("sort_order"),
       ])
       if(roomRes.error)throw roomRes.error
       if(resRes.error)throw resRes.error
-      setRooms(roomRes.data||[])
+      if(floorRes.error)throw floorRes.error
+      const floorById=new Map((floorRes.data||[]).map(floor=>[String(floor.id),floor]))
+      const roomRows=(roomRes.data||[]).map(room=>{
+        const floor=floorById.get(String(room.floor_id||""))
+        return{...room,floor_name:floor?.name||"Sin piso",floor_sort:Number(floor?.sort_order??999)}
+      }).sort((a,b)=>a.floor_sort-b.floor_sort||Number(a.sort_order||0)-Number(b.sort_order||0)||String(a.nombre).localeCompare(String(b.nombre),"es",{numeric:true}))
+      setRooms(roomRows)
       setReservations(resRes.data||[])
     }catch(err){setError(err?.message||"No se pudo cargar el Planning.")}
     finally{setLoading(false)}
