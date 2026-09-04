@@ -41,7 +41,9 @@ export default function SettingsWorkspace({propertyId,property}){
   async function persistSettings(next,successMessage){
     const{error:writeError}=await supabase.from("property_settings").upsert({property_id:propertyId,settings:next,updated_at:new Date().toISOString()},{onConflict:"property_id"})
     if(writeError)throw writeError
-    setSettings(next);if(successMessage)setNotice(successMessage)
+    setSettings(next)
+    if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("hl:property-settings-updated",{detail:{propertyId,settings:next}}))
+    if(successMessage)setNotice(successMessage)
   }
 
   async function saveProperty(){
