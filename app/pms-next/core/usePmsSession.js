@@ -21,13 +21,15 @@ export default function usePmsSession(){
       setUser(currentUser)
       if(!currentUser){setProperties([]);setPropertyId(null);setStatus("unauthenticated");return}
 
-      const{data,error:propertiesError}=await supabase
-        .from("properties")
-        .select("id,name,city,owner_id,created_at")
-        .order("created_at",{ascending:true})
-      if(propertiesError)throw propertiesError
+      const[propertyResult,membershipResult]=await Promise.all([
+        supabase.from("properties").select("id,name,city,owner_id,created_at").order("created_at",{ascending:true}),
+        supabase.from("property_members").select("property_id,role").eq("user_id",currentUser.id),
+      ])
+      if(propertyResult.error)throw propertyResult.error
+      if(membershipResult.error)throw membershipResult.error
 
-      const allowed=Array.isArray(data)?data:[]
+      const membershipMap=Object.fromEntries((membershipResult.data||[]).map(item=>[item.property_id,item.role]))
+      const allowed=(Array.isArray(propertyResult.data)?propertyResult.data:[]).map(item=>({...item,role:item.owner_id===currentUser.id?"owner":membershipMap[item.id]||"member"}))
       setProperties(allowed)
       if(!allowed.length){setPropertyId(null);setStatus("no-property");return}
 
@@ -52,5 +54,5 @@ export default function usePmsSession(){
 
   const property=useMemo(()=>properties.find(item=>item.id===propertyId)||null,[properties,propertyId])
 
-  return{user,properties,property,propertyId,status,error,selectProperty,reload:load}
+  return{user,properties,property,propertyId,role:property?.role||null,status,error,selectProperty,reload:load}
 }
