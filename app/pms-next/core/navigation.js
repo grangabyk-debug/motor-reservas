@@ -2,6 +2,7 @@ export const PRIMARY_NAV=[
   {id:"dashboard",label:"Dashboard",icon:"grid"},
   {id:"planning",label:"Planning",icon:"calendar"},
   {id:"reservations",label:"Reservas",icon:"booking"},
+  {id:"quotes",label:"Presupuestos",icon:"quote"},
   {id:"guests",label:"Huéspedes",icon:"guest"},
   {id:"messages",label:"Mensajes",icon:"message"},
 ]
@@ -28,27 +29,35 @@ export const MANAGEMENT_NAV=[
 ]
 
 export const NAV_LABELS=[...PRIMARY_NAV,...OPERATIONS_NAV,...MANAGEMENT_NAV].reduce((acc,item)=>{acc[item.id]=item.label;return acc},{})
-
-const ALL_VIEWS=Object.keys(NAV_LABELS)
-const ROLE_VIEWS={
+export const ALL_VIEWS=Object.keys(NAV_LABELS)
+export const ROLE_VIEWS={
   owner:ALL_VIEWS,
-  admin:ALL_VIEWS,
   manager:ALL_VIEWS,
-  reception:["dashboard","planning","reservations","guests","messages","tasks","requests","housekeeping","maintenance","inventory","services","rates","finance","audit","support"],
-  night_audit:["dashboard","planning","reservations","guests","messages","tasks","requests","housekeeping","maintenance","inventory","services","rates","finance","reports","audit","support"],
+  admin:ALL_VIEWS,
+  reception:["dashboard","planning","reservations","quotes","guests","messages","tasks","requests","housekeeping","maintenance","inventory","services","rates","finance","audit","support"],
+  night_audit:["dashboard","planning","reservations","quotes","guests","messages","tasks","requests","housekeeping","maintenance","inventory","services","rates","finance","reports","audit","support"],
   housekeeping:["dashboard","planning","tasks","requests","housekeeping","maintenance","inventory","support"],
   maintenance:["dashboard","planning","tasks","requests","housekeeping","maintenance","inventory","support"],
-  revenue:["dashboard","planning","reservations","guests","services","rates","finance","growth","reports","support"],
+  revenue:["dashboard","planning","reservations","quotes","guests","services","rates","finance","growth","reports","support"],
   member:["dashboard","support"],
 }
 
-export function canOpenView(role,view,featureFlags={}){
-  if(!Object.prototype.hasOwnProperty.call(NAV_LABELS,view))return false
-  if(view==="requests"&&featureFlags.guest_requests!==true)return false
-  const allowed=ROLE_VIEWS[role]||ROLE_VIEWS.member
-  return allowed.includes(view)
+export function getAllowedViews(role,featureFlags={},rolePermissions={}){
+  const normalized=role||"member"
+  let allowed
+  if(normalized==="owner"||normalized==="manager")allowed=ALL_VIEWS
+  else if(Array.isArray(rolePermissions?.[normalized]))allowed=["dashboard",...rolePermissions[normalized]]
+  else allowed=ROLE_VIEWS[normalized]||ROLE_VIEWS.member
+  const unique=[...new Set(allowed.filter(view=>Object.prototype.hasOwnProperty.call(NAV_LABELS,view)))]
+  return unique.filter(view=>view!=="requests"||featureFlags.guest_requests===true)
 }
 
-export function filterNavForRole(items,role,featureFlags={}){
-  return items.filter(item=>canOpenView(role,item.id,featureFlags))
+export function canOpenView(role,view,featureFlags={},rolePermissions={}){
+  if(!Object.prototype.hasOwnProperty.call(NAV_LABELS,view))return false
+  return getAllowedViews(role,featureFlags,rolePermissions).includes(view)
+}
+
+export function filterNavForRole(items,role,featureFlags={},rolePermissions={}){
+  const allowed=new Set(getAllowedViews(role,featureFlags,rolePermissions))
+  return items.filter(item=>allowed.has(item.id))
 }
