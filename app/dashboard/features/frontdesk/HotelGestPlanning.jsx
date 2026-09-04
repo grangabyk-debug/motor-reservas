@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { addDays, isoDate } from "../../core/formatters"
 import s from "./hotelgest-planning.module.css"
 import { Inspector, OccupancyRow, RangeBar, ReservationBlock } from "./PlanningPresentation"
+import PlanningPulse from "./PlanningPulse"
 import {
   activeReservation,
   compactDate,
@@ -35,6 +36,7 @@ export default function HotelGestPlanning({
   const [range, setRange] = useState(null)
   const [selecting, setSelecting] = useState(null)
   const pointerDown = useRef(false)
+  const searchRef = useRef(null)
 
   const days = useMemo(() => Array.from({ length: count }, (_, index) => addDays(start, index)), [start, count])
   const activeRooms = useMemo(() => rooms.filter(room => room.activa !== false), [rooms])
@@ -73,6 +75,36 @@ export default function HotelGestPlanning({
     window.addEventListener("mouseup", finish)
     return () => window.removeEventListener("mouseup", finish)
   }, [selecting])
+
+  useEffect(() => {
+    const onKeyDown = event => {
+      const target = event.target
+      const typing = target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)
+      if (event.key === "/" && !typing) {
+        event.preventDefault()
+        searchRef.current?.focus()
+        return
+      }
+      if ((event.key === "t" || event.key === "T") && !typing) {
+        event.preventDefault()
+        setStart(today)
+        return
+      }
+      if (event.key === "Escape") {
+        if (typing) target?.blur?.()
+        setQuery("")
+        setType("")
+        setSelectedId("")
+        setMoveMode("")
+        setRange(null)
+        setSelecting(null)
+        setDrag(null)
+        setHover(null)
+      }
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [today])
 
   function flash(kind, text) {
     setNotice({ kind, text })
@@ -195,6 +227,14 @@ export default function HotelGestPlanning({
 
   return (
     <section className={s.page}>
+      <PlanningPulse
+        rooms={activeRooms}
+        reservations={reservations}
+        today={today}
+        onToday={() => setStart(today)}
+        onFocusSearch={() => searchRef.current?.focus()}
+      />
+
       <header className={s.toolbar}>
         <div className={s.navDate}>
           <button type="button" onClick={() => setStart(addDays(start, -7))}>‹</button>
@@ -203,7 +243,7 @@ export default function HotelGestPlanning({
           <b>{compactDate(days[0])} — {compactDate(days.at(-1))}</b>
         </div>
         <div className={s.filters}>
-          <label>⌕<input value={query} onChange={event => setQuery(event.target.value)} placeholder="Huésped, reserva o habitación" /></label>
+          <label>⌕<input ref={searchRef} value={query} onChange={event => setQuery(event.target.value)} placeholder="Huésped, reserva o habitación" /></label>
           <select value={type} onChange={event => setType(event.target.value)}>
             <option value="">Todas las tipologías</option>
             {types.map(item => <option key={item}>{item}</option>)}
