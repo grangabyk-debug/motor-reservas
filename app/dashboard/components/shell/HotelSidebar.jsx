@@ -2,6 +2,7 @@
 
 import{ROLE_LABELS}from"../../core/permissions"
 import HotelIcon from"./HotelIcon"
+import ThemeModeButton from"./ThemeModeButton"
 import ui from"./shell.module.css"
 
 const MAIN=[
@@ -36,6 +37,6 @@ export default function HotelSidebar({view,onView,hotelName="Hotel",hotelLogo=""
       <div className={ui.groupTitle}>Administración</div>
       <div className={ui.navGroup}>{MORE.map(([id,label])=><Item key={id} id={id} label={label} view={view} onView={onView} onNewReservation={onNewReservation}/>)}</div>
     </nav>
-    <footer className={ui.sideFooter}><div><span className={ui.footerMark}>HL</span><span><b>Habitación Llena</b><small>{ROLE_LABELS[role]||role}</small></span></div><button type="button" onClick={onLogout}>Salir</button></footer>
+    <footer className={ui.sideFooter}><div><span className={ui.footerMark}>HL</span><span><b>Habitación Llena</b><small>{ROLE_LABELS[role]||role}</small></span></div><div className={ui.sideFooterActions}><ThemeModeButton compact/><button type="button" className={ui.logoutButton} onClick={onLogout}>Salir</button></div></footer>
   </aside>
 }
