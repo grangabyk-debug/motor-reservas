@@ -1,0 +1,1 @@
+Opera Browser Connector was unavailable during the 2026-09-04 Heroes PMS live-demo audit attempt. Resume the action script in `planning-reference-audit.md` as soon as the connector session is active; do not infer unobserved interactions.
