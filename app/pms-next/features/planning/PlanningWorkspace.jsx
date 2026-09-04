@@ -38,10 +38,11 @@ export default function PlanningWorkspace({propertyId,property,onNavigate}){
   const[formOpen,setFormOpen]=useState(false)
   const[saving,setSaving]=useState(false)
   const[draft,setDraft]=useState(null)
-  const data=usePlanningData(propertyId)
 
   const monthStart=keyFromDate(new Date(year,month,1,12))
   const days=useMemo(()=>Array.from({length:35},(_,index)=>addDays(monthStart,index-1)),[monthStart])
+  const windowStart=days[0],windowEndExclusive=addDays(days.at(-1),1)
+  const data=usePlanningData(propertyId,windowStart,windowEndExclusive)
   const grid={gridTemplateColumns:`repeat(${days.length},minmax(44px,1fr))`}
   const roomById=useMemo(()=>new Map(data.rooms.map(room=>[Number(room.id),room])),[data.rooms])
   const visibleReservations=useMemo(()=>data.reservations.filter(item=>{
