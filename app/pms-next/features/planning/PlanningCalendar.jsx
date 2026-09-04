@@ -2,6 +2,7 @@
 
 import{ReservationBlock}from"./PlanningPieces"
 import c from"./planningCanvas.module.css"
+import t from"./planningToday.module.css"
 
 const DAY=86400000
 const pad=value=>String(value).padStart(2,"0")
@@ -23,7 +24,7 @@ function monthSegments(days){
 }
 
 function TimelineBands({days,today,settings,grid}){
-  return <div className={c.timelineBands} style={grid} aria-hidden="true">{days.map(day=>{const weekend=settings.shadeWeekends&&[0,6].includes(fromKey(day).getDay());return <span key={day} className={`${weekend?c.bandWeekend:""} ${day===today?c.bandToday:""}`}/>})}</div>
+  return <div className={c.timelineBands} style={grid} aria-hidden="true">{days.map(day=>{const weekend=settings.shadeWeekends&&[0,6].includes(fromKey(day).getDay());return <span key={day} className={`${weekend?c.bandWeekend:""} ${day===today?`${c.bandToday} ${t.todayBand}`:""}`}/>})}</div>
 }
 
 function InventoryStrip({days,rooms,reservations,today,settings,grid}){
@@ -33,7 +34,7 @@ function InventoryStrip({days,rooms,reservations,today,settings,grid}){
     <div className={c.inventoryDays} style={grid}>{days.map(day=>{
       const occupied=rooms.filter(room=>reservations.some(item=>covers(item,room.id,day))).length
       const available=Math.max(0,rooms.length-occupied),pct=rooms.length?Math.round(occupied/rooms.length*100):0,weekend=settings.shadeWeekends&&[0,6].includes(fromKey(day).getDay())
-      return <div key={day} className={`${available===0?c.soldOut:""} ${weekend?c.inventoryWeekend:""} ${day===today?c.inventoryToday:""}`}>{settings.showAvailability?<b>{available}</b>:null}{settings.showOccupancy?<small>{pct}%</small>:null}</div>
+      return <div key={day} className={`${available===0?c.soldOut:""} ${weekend?c.inventoryWeekend:""} ${day===today?`${c.inventoryToday} ${t.todayInventory}`:""}`}>{settings.showAvailability?<b>{available}</b>:null}{settings.showOccupancy?<small>{pct}%</small>:null}</div>
     })}</div>
   </div>
 }
@@ -61,7 +62,7 @@ export default function PlanningCalendar({property,days,today,settings,rooms,ava
   const grid={gridTemplateColumns:`repeat(${days.length},var(--day-width))`},months=monthSegments(days)
   return <div className={c.calendar}>
     <div className={c.monthRow}><div className={c.corner}><span>{property?.name||"Propiedad activa"}</span></div><div className={c.months} style={grid}>{months.map(segment=><div key={segment.key} style={{gridColumn:`${segment.start+1} / span ${segment.span}`}}>{segment.label}</div>)}</div></div>
-    <div className={c.dayRow}><div className={c.roomHead}>Habitación</div><div className={c.days} style={grid}>{days.map(day=>{const weekend=settings.shadeWeekends&&[0,6].includes(fromKey(day).getDay());return <div key={day} className={`${day===today?c.todayHead:""} ${weekend?c.weekendHead:""}`}><small>{dayName(day)}</small><b>{fromKey(day).getDate()}</b></div>})}</div></div>
+    <div className={c.dayRow}><div className={c.roomHead}>Habitación</div><div className={c.days} style={grid}>{days.map(day=>{const weekend=settings.shadeWeekends&&[0,6].includes(fromKey(day).getDay());return <div key={day} className={`${day===today?`${c.todayHead} ${t.todayHeader}`:""} ${weekend?c.weekendHead:""}`}><small>{dayName(day)}</small><b>{fromKey(day).getDate()}</b></div>})}</div></div>
     <InventoryStrip days={days} rooms={rooms} reservations={availabilityReservations} today={today} settings={settings} grid={grid}/>
     <div className={c.calendarBody} style={{"--timeline-width":`calc(${days.length} * var(--day-width))`}}>
       <TimelineBands days={days} today={today} settings={settings} grid={grid}/>
