@@ -117,9 +117,15 @@ begin
   if new.guest_profile_id is not null and not exists(select 1 from public.hotel_guest_profiles g where g.id=new.guest_profile_id and g.property_id=new.property_id) then
     raise exception using errcode='23514',message='El huésped no pertenece a la propiedad.';
   end if;
+
   new.updated_at:=now();
-  if new.status='completed' and old.status is distinct from 'completed' then new.completed_at:=coalesce(new.completed_at,now()); end if;
-  if new.status<>'completed' then new.completed_at:=null; end if;
+  if new.status='completed' then
+    if tg_op='INSERT' or old.status is distinct from 'completed' then
+      new.completed_at:=coalesce(new.completed_at,now());
+    end if;
+  else
+    new.completed_at:=null;
+  end if;
   return new;
 end
 $function$;
