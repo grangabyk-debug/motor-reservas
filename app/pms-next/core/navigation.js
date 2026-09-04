@@ -20,6 +20,7 @@ export const OPERATIONS_NAV=[
 export const MANAGEMENT_NAV=[
   {id:"setup",label:"Puesta a punto",icon:"setup"},
   {id:"reports",label:"Informes",icon:"report"},
+  {id:"audit",label:"Actividad",icon:"activity"},
   {id:"staff",label:"Equipo",icon:"team"},
   {id:"integrations",label:"Integraciones",icon:"link"},
   {id:"settings",label:"Configuración",icon:"settings"},
