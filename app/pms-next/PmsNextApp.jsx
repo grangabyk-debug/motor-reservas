@@ -31,7 +31,7 @@ function AccessGate({status,error}){const unauth=status==="unauthenticated";retu
 function WorkspacePane({id,active,mounted,children}){if(!mounted)return null;return <div className={s.workspacePane} data-workspace={id} hidden={!active} aria-hidden={!active}>{children}</div>}
 
 export default function PmsNextApp({buildId="local"}){
-  const[view,setView]=useState("dashboard"),[mountedViews,setMountedViews]=useState(()=>new Set(["dashboard"])),[theme,setTheme]=useState("light"),[bootChecked,setBootChecked]=useState(false),[bootDone,setBootDone]=useState(false)
+  const[view,setView]=useState("dashboard"),[mountedViews,setMountedViews]=useState(()=>new Set(["dashboard"])),[theme,setTheme]=useState("light"),[bootChecked,setBootChecked]=useState(false),[bootDone,setBootDone]=useState(false),[reservationFocus,setReservationFocus]=useState(null)
   const viewRef=useRef("dashboard"),scrollPositions=useRef({}),session=usePmsSession()
   const featureState=usePropertyFeatureFlags(session.propertyId)
   useEffect(()=>setTheme(readTheme()),[])
@@ -49,8 +49,9 @@ export default function PmsNextApp({buildId="local"}){
     setBootDone(true)
   },[session.user?.id])
 
-  const activateView=useCallback((requested,{historyMode="push",restoreScroll=true}={})=>{
+  const activateView=useCallback((requested,{historyMode="push",restoreScroll=true,reservationId=null}={})=>{
     const role=session.property?.role||"member",next=canOpenView(role,requested,featureState.flags)?requested:"dashboard"
+    if(next==="reservations"&&reservationId!=null)setReservationFocus(Number(reservationId))
     if(typeof window!=="undefined")scrollPositions.current[viewRef.current]=window.scrollY
     viewRef.current=next
     setMountedViews(current=>{if(current.has(next))return current;const nextSet=new Set(current);nextSet.add(next);return nextSet})
@@ -74,5 +75,5 @@ export default function PmsNextApp({buildId="local"}){
   const shared={propertyId:session.propertyId,property:session.property},isMounted=id=>mountedViews.has(id)
   const pane=(id,node)=><WorkspacePane id={id} active={view===id} mounted={isMounted(id)}>{node}</WorkspacePane>
   return <div className={s.app} data-theme={theme}><PmsSidebar view={view} onView={activateView} property={session.property} properties={session.properties} onProperty={session.selectProperty} user={session.user} featureFlags={featureState.flags} buildId={buildId}/><main className={s.workspace}><PmsTopbar title={NAV_LABELS[view]||"Dashboard"} theme={theme} onToggleTheme={toggleTheme} onNewReservation={()=>activateView("planning")}/>
-    {pane("dashboard",<DashboardWorkspace {...shared} onNavigate={activateView}/>)}{pane("planning",<PlanningWorkspace {...shared} onNavigate={activateView}/>)}{pane("reservations",<ReservationsWorkspace {...shared} onNavigate={activateView}/>)}{pane("guests",<GuestsWorkspace {...shared}/>)}{pane("messages",<MessagesWorkspace {...shared}/>)}{pane("maintenance",<OperationsWorkspace {...shared} initialTab="maintenance"/>)}{pane("tasks",<OperationsWorkspace {...shared} initialTab="tasks"/>)}{featureState.flags.guest_requests&&pane("requests",<OperationsWorkspace {...shared} initialTab="requests"/>)}{pane("housekeeping",<HousekeepingWorkspace {...shared}/>)}{pane("inventory",<InventoryWorkspace {...shared}/>)}{pane("services",<ServicesWorkspace {...shared}/>)}{pane("rates",<RatesWorkspace {...shared}/>)}{pane("finance",<FinanceWorkspace {...shared}/>)}{pane("reports",<ReportsWorkspace {...shared}/>)}{pane("audit",<AuditWorkspace {...shared}/>)}{pane("staff",<StaffWorkspace {...shared}/>)}{pane("integrations",<IntegrationsWorkspace {...shared}/>)}{pane("settings",<SettingsWorkspace {...shared}/>)}</main><PmsUpdateNotice buildId={buildId}/></div>
+    {pane("dashboard",<DashboardWorkspace {...shared} onNavigate={activateView}/>)}{pane("planning",<PlanningWorkspace {...shared} onNavigate={activateView}/>)}{pane("reservations",<ReservationsWorkspace {...shared} onNavigate={activateView} focusReservationId={reservationFocus} onFocusHandled={()=>setReservationFocus(null)}/>)}{pane("guests",<GuestsWorkspace {...shared}/>)}{pane("messages",<MessagesWorkspace {...shared}/>)}{pane("maintenance",<OperationsWorkspace {...shared} initialTab="maintenance"/>)}{pane("tasks",<OperationsWorkspace {...shared} initialTab="tasks"/>)}{featureState.flags.guest_requests&&pane("requests",<OperationsWorkspace {...shared} initialTab="requests"/>)}{pane("housekeeping",<HousekeepingWorkspace {...shared}/>)}{pane("inventory",<InventoryWorkspace {...shared}/>)}{pane("services",<ServicesWorkspace {...shared}/>)}{pane("rates",<RatesWorkspace {...shared}/>)}{pane("finance",<FinanceWorkspace {...shared}/>)}{pane("reports",<ReportsWorkspace {...shared}/>)}{pane("audit",<AuditWorkspace {...shared}/>)}{pane("staff",<StaffWorkspace {...shared}/>)}{pane("integrations",<IntegrationsWorkspace {...shared}/>)}{pane("settings",<SettingsWorkspace {...shared}/>)}</main><PmsUpdateNotice buildId={buildId}/></div>
 }
