@@ -1,7 +1,7 @@
 "use client"
 
-import{Lobby}from"./FrontDeskViews"
+import HotelGestDashboard from"./HotelGestDashboard"
 
 export default function DashboardExperience(props){
-  return <Lobby {...props}/>
+  return <HotelGestDashboard {...props}/>
 }
