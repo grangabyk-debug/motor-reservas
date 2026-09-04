@@ -23,7 +23,7 @@ import AuditWorkspace from"./features/audit/AuditWorkspace"
 import IntegrationsWorkspace from"./features/integrations/IntegrationsWorkspace"
 import usePmsSession from"./core/usePmsSession"
 import usePropertyFeatureFlags from"./core/usePropertyFeatureFlags"
-import{NAV_LABELS}from"./core/navigation"
+import{canOpenView,NAV_LABELS}from"./core/navigation"
 import{persistTheme,readTheme}from"./core/theme"
 import s from"./pms-next.module.css"
 
@@ -49,9 +49,22 @@ export default function PmsNextApp({buildId="local"}){
     setBootDone(true)
   },[session.user?.id])
 
-  const activateView=useCallback((next,{historyMode="push",restoreScroll=true}={})=>{const safe=Object.prototype.hasOwnProperty.call(NAV_LABELS,next)?next:"dashboard";if(typeof window!=="undefined")scrollPositions.current[viewRef.current]=window.scrollY;viewRef.current=safe;setMountedViews(current=>{if(current.has(safe))return current;const nextSet=new Set(current);nextSet.add(safe);return nextSet});setView(safe);if(typeof window!=="undefined"){const url=new URL(window.location.href);url.searchParams.set("view",safe);if(historyMode==="replace")window.history.replaceState({pmsView:safe},"",url);else if(historyMode==="push")window.history.pushState({pmsView:safe},"",url);if(restoreScroll)requestAnimationFrame(()=>window.scrollTo({top:scrollPositions.current[safe]||0,behavior:"auto"}))}},[])
-  useEffect(()=>{if(typeof window==="undefined")return;const initial=new URL(window.location.href).searchParams.get("view");activateView(initial&&Object.prototype.hasOwnProperty.call(NAV_LABELS,initial)?initial:"dashboard",{historyMode:"replace",restoreScroll:false});const onPopState=()=>{const next=new URL(window.location.href).searchParams.get("view")||"dashboard";activateView(next,{historyMode:"none"})};window.addEventListener("popstate",onPopState);return()=>window.removeEventListener("popstate",onPopState)},[activateView])
-  useEffect(()=>{if(featureState.status==="loading")return;if(view==="requests"&&!featureState.flags.guest_requests)activateView("dashboard",{historyMode:"replace"})},[featureState.status,featureState.flags.guest_requests,view,activateView])
+  const activateView=useCallback((requested,{historyMode="push",restoreScroll=true}={})=>{
+    const role=session.property?.role||"member",next=canOpenView(role,requested,featureState.flags)?requested:"dashboard"
+    if(typeof window!=="undefined")scrollPositions.current[viewRef.current]=window.scrollY
+    viewRef.current=next
+    setMountedViews(current=>{if(current.has(next))return current;const nextSet=new Set(current);nextSet.add(next);return nextSet})
+    setView(next)
+    if(typeof window!=="undefined"){
+      const url=new URL(window.location.href);url.searchParams.set("view",next)
+      if(historyMode==="replace")window.history.replaceState({pmsView:next},"",url)
+      else if(historyMode==="push")window.history.pushState({pmsView:next},"",url)
+      if(restoreScroll)requestAnimationFrame(()=>window.scrollTo({top:scrollPositions.current[next]||0,behavior:"auto"}))
+    }
+  },[session.property?.role,featureState.flags])
+
+  useEffect(()=>{if(typeof window==="undefined"||session.status!=="ready"||featureState.status==="loading")return;const initial=new URL(window.location.href).searchParams.get("view")||"dashboard";activateView(initial,{historyMode:"replace",restoreScroll:false});const onPopState=()=>activateView(new URL(window.location.href).searchParams.get("view")||"dashboard",{historyMode:"none"});window.addEventListener("popstate",onPopState);return()=>window.removeEventListener("popstate",onPopState)},[activateView,session.status,featureState.status])
+  useEffect(()=>{if(session.status!=="ready"||featureState.status==="loading")return;if(!canOpenView(session.property?.role||"member",view,featureState.flags))activateView("dashboard",{historyMode:"replace"})},[session.status,session.property?.role,featureState.status,featureState.flags,view,activateView])
   function toggleTheme(){setTheme(current=>{const next=current==="dark"?"light":"dark";persistTheme(next);return next})}
 
   if(session.status==="loading")return <PmsBootScreen ready={false}/>
