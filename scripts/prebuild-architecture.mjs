@@ -12,6 +12,7 @@ if(greenfield){
   console.log(`PMS Next prebuild: isolated validation for ${branch||"local PMS_NEXT_BUILD"}`)
   run("npm",["run","check:product-boundaries"])
   run("node",["scripts/check-pms-next-isolation.mjs"])
+  run("node",["scripts/check-pms-next-visual-consistency.mjs"])
 }else{
   console.log(`Habitación Llena prebuild: legacy architecture validation for ${branch||"local build"}`)
   run("npm",["run","check:hotel-architecture"])
