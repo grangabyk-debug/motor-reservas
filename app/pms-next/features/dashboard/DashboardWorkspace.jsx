@@ -1,16 +1,41 @@
-import s from"../../pms-next.module.css"
+import s from"./dashboard.module.css"
 
-const cards=[
-  ["Llegadas","12","4 pendientes"],
-  ["Salidas","9","2 late checkout"],
-  ["Ocupación","78%","24 de 31 habitaciones"],
-  ["Pendiente","$ 482.300","folios abiertos"],
+const shortcuts=[
+  {id:"planning",label:"Planning",icon:"▦"},
+  {id:"messages",label:"Mensajes",icon:"◌"},
+  {id:"cash",label:"Facturación",icon:"▤"},
+  {id:"rates",label:"Tarifas y disponibilidad",icon:"↗"},
 ]
 
-export default function DashboardWorkspace({onPlanning}){
-  return <section className={s.dashboardPage}>
-    <div className={s.heroPanel}><div><small>VIERNES · OPERACIÓN DE HOY</small><h1>Buen día, recepción.</h1><p>Una vista simple para saber qué necesita atención ahora mismo.</p><button type="button" onClick={onPlanning}>Abrir planning</button></div><aside><span>Hoy</span><b>78%</b><small>ocupación</small></aside></div>
-    <div className={s.metricGrid}>{cards.map(([label,value,note])=><article key={label} className={s.metricCard}><small>{label}</small><b>{value}</b><span>{note}</span></article>)}</div>
-    <div className={s.dashboardColumns}><article className={s.glassPanel}><header><div><small>PRÓXIMAS ACCIONES</small><h2>Recepción</h2></div><button type="button">Ver todo</button></header><div className={s.actionList}><button type="button"><span><b>Hab. 204</b><small>Check-in de Lucía Fernández</small></span><em>11:30</em></button><button type="button"><span><b>Hab. 101</b><small>Preparar salida y cochera</small></span><em>12:00</em></button><button type="button"><span><b>Hab. 305</b><small>Pago parcial pendiente</small></span><em>14:00</em></button></div></article><article className={s.glassPanel}><header><div><small>ESTADO DEL HOTEL</small><h2>Habitaciones</h2></div></header><div className={s.roomPulse}><span><b>19</b><small>Ocupadas</small></span><span><b>7</b><small>Libres</small></span><span><b>3</b><small>Limpieza</small></span><span><b>2</b><small>Bloqueadas</small></span></div></article></div>
+export default function DashboardWorkspace({onNavigate}){
+  return <section className={s.page}>
+    <header className={s.intro}>
+      <div><small>OPERACIÓN DE HOY</small><h1>Hola, Recepción 👋</h1><p>Todo lo importante del hotel, sin ruido y a un toque de distancia.</p></div>
+      <div className={s.statusPill}>Hotel operativo</div>
+    </header>
+
+    <div className={s.mainGrid}>
+      <button className={s.operationCard} type="button" onClick={()=>onNavigate?.("tasks")}>
+        <div className={s.operationHead}><small>CHECK-LISTS</small><span>›</span></div>
+        <div className={s.operationBody}>
+          <div className={s.ring} style={{"--progress":0}}><div className={s.ringContent}><b>0<span>/0</span></b><small>0%</small></div></div>
+          <small>completadas hoy</small>
+        </div>
+      </button>
+
+      <button className={s.operationCard} type="button" onClick={()=>onNavigate?.("maintenance")}>
+        <div className={s.operationHead}><small>MANTENIMIENTO</small><span>›</span></div>
+        <div className={s.operationBody}>
+          <div className={s.bigNumber}>0</div>
+          <small className={s.bigNumberNote}>tareas abiertas</small>
+        </div>
+      </button>
+    </div>
+
+    <div className={s.quickGrid}>
+      {shortcuts.map(item=><button key={item.id} className={s.quickLink} type="button" onClick={()=>onNavigate?.(item.id)}><span>{item.icon}</span>{item.label}</button>)}
+    </div>
+
+    <div className={s.hint}><span><b>Habitación Llena PMS Next</b> · Dashboard reconstruida como módulo independiente.</span><span>Modo día/noche activo · diseño responsive</span></div>
   </section>
 }
