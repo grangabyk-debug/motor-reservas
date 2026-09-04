@@ -7,6 +7,7 @@ import DashboardWorkspace from"./features/dashboard/DashboardWorkspace"
 import PlanningWorkspace from"./features/planning/PlanningWorkspace"
 import ReservationsWorkspace from"./features/reservations/ReservationsWorkspace"
 import GuestsWorkspace from"./features/guests/GuestsWorkspace"
+import MessagesWorkspace from"./features/messages/MessagesWorkspace"
 import{NAV_LABELS}from"./core/navigation"
 import{persistTheme,readTheme}from"./core/theme"
 import s from"./pms-next.module.css"
@@ -26,7 +27,7 @@ export default function PmsNextApp(){
     <PmsSidebar view={view} onView={setView} hotelName="Hotel Demo"/>
     <main className={s.workspace}>
       <PmsTopbar title={NAV_LABELS[view]||"Dashboard"} theme={theme} onToggleTheme={toggleTheme} onNewReservation={()=>setView("planning")}/>
-      {view==="dashboard"?<DashboardWorkspace onNavigate={setView}/>:view==="planning"?<PlanningWorkspace onNavigate={setView}/>:view==="reservations"?<ReservationsWorkspace onNavigate={setView}/>:view==="guests"?<GuestsWorkspace/>:<Placeholder view={view}/>} 
+      {view==="dashboard"?<DashboardWorkspace onNavigate={setView}/>:view==="planning"?<PlanningWorkspace onNavigate={setView}/>:view==="reservations"?<ReservationsWorkspace onNavigate={setView}/>:view==="guests"?<GuestsWorkspace/>:view==="messages"?<MessagesWorkspace/>:<Placeholder view={view}/>} 
     </main>
   </div>
 }
