@@ -12,6 +12,7 @@ export const OPERATIONS_NAV=[
   {id:"housekeeping",label:"Housekeeping",icon:"clean"},
   {id:"maintenance",label:"Mantenimiento",icon:"wrench"},
   {id:"inventory",label:"Inventario",icon:"inventory"},
+  {id:"services",label:"Servicios y extras",icon:"services"},
   {id:"rates",label:"Tarifas y disponibilidad",icon:"rates"},
   {id:"finance",label:"Finanzas",icon:"cash"},
 ]
@@ -23,7 +24,4 @@ export const MANAGEMENT_NAV=[
   {id:"settings",label:"Configuración",icon:"settings"},
 ]
 
-export const NAV_LABELS=[...PRIMARY_NAV,...OPERATIONS_NAV,...MANAGEMENT_NAV].reduce((acc,item)=>{
-  acc[item.id]=item.label
-  return acc
-},{})
+export const NAV_LABELS=[...PRIMARY_NAV,...OPERATIONS_NAV,...MANAGEMENT_NAV].reduce((acc,item)=>{acc[item.id]=item.label;return acc},{})
