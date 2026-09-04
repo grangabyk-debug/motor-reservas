@@ -1,8 +1,8 @@
 import PmsNextApp from"./PmsNextApp"
 
 export const metadata={
-  title:"Habitación Llena · PMS Next",
-  description:"Laboratorio aislado de la próxima versión del PMS de Habitación Llena.",
+  title:"Habitación Llena · PMS Hotelero",
+  description:"Gestión hotelera integral de Habitación Llena.",
   robots:{index:false,follow:false},
 }
 
