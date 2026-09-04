@@ -3,6 +3,7 @@ import StaticCaretGuard from"../components/StaticCaretGuard"
 import MercadoPagoOAuthBridge from"./components/MercadoPagoOAuthBridge"
 import PWAInstaller from"./components/PWAInstaller"
 import"./hotelgest-rebuild.css"
+import"./operations-liquid-glass.css"
 
 export const metadata={
   title:"Habitación Llena",
