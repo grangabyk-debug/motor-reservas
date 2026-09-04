@@ -1,5 +1,6 @@
 "use client"
 
+import "./planning-pulse.css"
 import { activeReservation, occupancyFor, sellableRoom, usesRoom } from "./planningModel"
 
 function uniqueReservations(reservations) {
