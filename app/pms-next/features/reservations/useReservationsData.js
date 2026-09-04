@@ -1,31 +1,59 @@
 "use client"
 
-import{useCallback,useEffect,useMemo,useState}from"react"
+import{useCallback,useEffect,useMemo,useRef,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
+
+const PAGE_SIZE=200
 
 export default function useReservationsData(propertyId){
   const[reservations,setReservations]=useState([])
   const[rooms,setRooms]=useState([])
   const[payments,setPayments]=useState([])
   const[loading,setLoading]=useState(true)
+  const[loadingMore,setLoadingMore]=useState(false)
+  const[hasMore,setHasMore]=useState(false)
   const[error,setError]=useState("")
+  const pageRef=useRef(0)
+
+  const fetchPage=useCallback(async(page,{replace=false}={})=>{
+    if(!propertyId)return
+    const from=page*PAGE_SIZE,to=from+PAGE_SIZE-1
+    const resQuery=supabase.from("reservas").select("id,numero_reserva,nombre_huesped,email_huesped,telefono_huesped,habitacion_id,habitaciones_ids,fecha_entrada,fecha_salida,estado,no_show,canal_reserva,precio_total,moneda,cantidad_huespedes,guest_profile_id,notas,created_at").eq("property_id",propertyId).order("fecha_entrada",{ascending:false}).range(from,to)
+    const roomQuery=replace?supabase.from("habitaciones").select("id,nombre,tipo").eq("property_id",propertyId):Promise.resolve({data:null,error:null})
+    const[resRes,roomRes]=await Promise.all([resQuery,roomQuery])
+    if(resRes.error)throw resRes.error
+    if(roomRes.error)throw roomRes.error
+    const pageReservations=resRes.data||[],ids=pageReservations.map(item=>item.id)
+    let pagePayments=[]
+    if(ids.length){
+      const payRes=await supabase.from("pagos").select("id,reserva_id,monto,estado,refunded_amount,moneda,created_at").eq("property_id",propertyId).in("reserva_id",ids).order("created_at",{ascending:false})
+      if(payRes.error)throw payRes.error
+      pagePayments=payRes.data||[]
+    }
+    setReservations(current=>replace?pageReservations:[...current,...pageReservations])
+    setPayments(current=>replace?pagePayments:[...current,...pagePayments])
+    if(replace)setRooms(roomRes.data||[])
+    setHasMore(pageReservations.length===PAGE_SIZE)
+    pageRef.current=page
+  },[propertyId])
 
   const load=useCallback(async()=>{
     if(!propertyId)return
-    setLoading(true);setError("")
-    try{
-      const[resRes,roomRes,payRes]=await Promise.all([
-        supabase.from("reservas").select("id,numero_reserva,nombre_huesped,email_huesped,telefono_huesped,habitacion_id,habitaciones_ids,fecha_entrada,fecha_salida,estado,no_show,canal_reserva,precio_total,moneda,cantidad_huespedes,guest_profile_id,notas,created_at").eq("property_id",propertyId).order("fecha_entrada",{ascending:false}).limit(1000),
-        supabase.from("habitaciones").select("id,nombre,tipo").eq("property_id",propertyId),
-        supabase.from("pagos").select("id,reserva_id,monto,estado,refunded_amount,moneda,created_at").eq("property_id",propertyId).order("created_at",{ascending:false}).limit(5000),
-      ])
-      if(resRes.error)throw resRes.error;if(roomRes.error)throw roomRes.error;if(payRes.error)throw payRes.error
-      setReservations(resRes.data||[]);setRooms(roomRes.data||[]);setPayments(payRes.data||[])
-    }catch(err){setError(err?.message||"No se pudieron cargar las reservas.")}
+    setLoading(true);setError("");pageRef.current=0
+    try{await fetchPage(0,{replace:true})}
+    catch(err){setError(err?.message||"No se pudieron cargar las reservas.")}
     finally{setLoading(false)}
-  },[propertyId])
+  },[propertyId,fetchPage])
 
   useEffect(()=>{load()},[load])
+
+  const loadMore=useCallback(async()=>{
+    if(!propertyId||loading||loadingMore||!hasMore)return
+    setLoadingMore(true);setError("")
+    try{await fetchPage(pageRef.current+1)}
+    catch(err){setError(err?.message||"No se pudo cargar más historial.")}
+    finally{setLoadingMore(false)}
+  },[propertyId,loading,loadingMore,hasMore,fetchPage])
 
   const paymentByReservation=useMemo(()=>{
     const map=new Map()
@@ -49,5 +77,5 @@ export default function useReservationsData(propertyId){
     setReservations(list=>list.map(item=>item.id===data.id?data:item));return data
   },[])
 
-  return{reservations,rooms,paymentByReservation,loading,error,setError,load,updateReservation,checkout}
+  return{reservations,rooms,paymentByReservation,loading,loadingMore,hasMore,error,setError,load,loadMore,updateReservation,checkout}
 }
