@@ -24,7 +24,7 @@ export default function PmsNextApp(){
     <PmsSidebar view={view} onView={setView} hotelName="Hotel Demo"/>
     <main className={s.workspace}>
       <PmsTopbar title={NAV_LABELS[view]||"Dashboard"} theme={theme} onToggleTheme={toggleTheme} onNewReservation={()=>setView("planning")}/>
-      {view==="dashboard"?<DashboardWorkspace onNavigate={setView}/>:view==="planning"?<PlanningWorkspace/>:<Placeholder view={view}/>} 
+      {view==="dashboard"?<DashboardWorkspace onNavigate={setView}/>:view==="planning"?<PlanningWorkspace onNavigate={setView}/>:<Placeholder view={view}/>} 
     </main>
   </div>
 }
