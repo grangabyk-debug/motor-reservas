@@ -1,6 +1,6 @@
 "use client"
 
-import{useMemo,useState}from"react"
+import{useEffect,useMemo,useState}from"react"
 import useReservationsData from"./useReservationsData"
 import s from"./reservations.module.css"
 
@@ -17,7 +17,7 @@ function paymentState(item,paid){
 const paymentLabel=value=>value==="paid"?"Pagado":value==="pending"?"Parcial":"Pendiente"
 const statusLabel=item=>item.no_show?"No-show":item.estado==="alojado"?"En hotel":item.estado==="finalizada"?"Finalizada":item.estado==="cancelada"?"Cancelada":item.estado==="tentativa"?"Tentativa":item.estado==="pendiente"?"Pendiente":"Confirmada"
 
-export default function ReservationsWorkspace({propertyId,onNavigate}){
+export default function ReservationsWorkspace({propertyId,onNavigate,focusReservationId,onFocusHandled}){
   const data=useReservationsData(propertyId)
   const[query,setQuery]=useState("")
   const[mode,setMode]=useState("active")
@@ -31,6 +31,8 @@ export default function ReservationsWorkspace({propertyId,onNavigate}){
     const paid=data.paymentByReservation.get(Number(item.id))||0
     return{...item,paid,payment:paymentState(item,paid),room:roomById.get(Number(item.habitacion_id))}
   }),[data.reservations,data.paymentByReservation,roomById])
+
+  useEffect(()=>{if(!focusReservationId)return;const target=items.find(item=>Number(item.id)===Number(focusReservationId));if(target){setMode(target.estado==="cancelada"?"trash":target.no_show?"noshow":"active");setSelected(target);onFocusHandled?.()}},[focusReservationId,items,onFocusHandled])
 
   const visible=useMemo(()=>items.filter(item=>{
     if(mode==="trash"&&item.estado!=="cancelada")return false
