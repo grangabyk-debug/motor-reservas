@@ -5,6 +5,7 @@ import{HOTEL_NAVIGATION,PRIMARY_NAVIGATION,groupForView}from"../../core/navigati
 import{ROLE_LABELS}from"../../core/permissions"
 import HotelIcon from"./HotelIcon"
 import ui from"./shell.module.css"
+import planning from"./planning-rail.module.css"
 
 function initials(name="Hotel"){return String(name).trim().split(/\s+/).map(part=>part[0]).join("").slice(0,2).toUpperCase()||"HL"}
 
@@ -37,8 +38,8 @@ export default function HotelSidebar({view,onView,hotelName="Hotel",hotelLogo=""
     </div>
 
     <nav className={ui.moduleList} aria-label="Módulos del hotel">
-      {PRIMARY_NAVIGATION.map(([id,label,,description])=><div key={id} className={`${ui.moduleItem} ${ui.primaryModuleItem}`}>
-        <button type="button" className={`${ui.moduleButton} ${ui.primaryModuleButton} ${view===id?`${ui.moduleButtonActive} ${ui.primaryModuleButtonActive}`:""}`} data-tip={label} aria-label={`Abrir ${label}`} aria-current={view===id?"page":undefined} onClick={()=>openView(id)}>
+      {PRIMARY_NAVIGATION.map(([id,label,,description])=><div key={id} className={`${ui.moduleItem} ${planning.primaryModuleItem}`}>
+        <button type="button" className={`${ui.moduleButton} ${planning.primaryModuleButton} ${view===id?`${ui.moduleButtonActive} ${planning.primaryModuleButtonActive}`:""}`} data-tip={label} aria-label={`Abrir ${label}`} aria-current={view===id?"page":undefined} onClick={()=>openView(id)}>
           <i className={ui.moduleGlyph} aria-hidden="true"><HotelIcon name={id}/></i>
           <span className={ui.mobileModuleText}><b>{label}</b><small>{description}</small></span>
           <span className={ui.mobileChevron} aria-hidden="true">→</span>
