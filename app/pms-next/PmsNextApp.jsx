@@ -15,14 +15,12 @@ import RatesWorkspace from"./features/rates/RatesWorkspace"
 import FinanceWorkspace from"./features/finance/FinanceWorkspace"
 import StaffWorkspace from"./features/staff/StaffWorkspace"
 import SettingsWorkspace from"./features/settings/SettingsWorkspace"
+import ReportsWorkspace from"./features/reports/ReportsWorkspace"
+import IntegrationsWorkspace from"./features/integrations/IntegrationsWorkspace"
 import usePmsSession from"./core/usePmsSession"
 import{NAV_LABELS}from"./core/navigation"
 import{persistTheme,readTheme}from"./core/theme"
 import s from"./pms-next.module.css"
-
-function Placeholder({view}){
-  return <section className={s.placeholder}><small>PRÓXIMO MÓDULO</small><h1>{NAV_LABELS[view]||"Módulo"}</h1><p>La función se habilitará cuando su flujo completo y persistencia estén listos. No mostramos controles ficticios.</p></section>
-}
 
 function AccessGate({status,error}){
   const loading=status==="loading"
@@ -91,9 +89,10 @@ export default function PmsNextApp(){
       <WorkspacePane id="inventory" active={view==="inventory"} mounted={isMounted("inventory")}><InventoryWorkspace {...shared}/></WorkspacePane>
       <WorkspacePane id="rates" active={view==="rates"} mounted={isMounted("rates")}><RatesWorkspace {...shared}/></WorkspacePane>
       <WorkspacePane id="finance" active={view==="finance"} mounted={isMounted("finance")}><FinanceWorkspace {...shared}/></WorkspacePane>
+      <WorkspacePane id="reports" active={view==="reports"} mounted={isMounted("reports")}><ReportsWorkspace {...shared}/></WorkspacePane>
       <WorkspacePane id="staff" active={view==="staff"} mounted={isMounted("staff")}><StaffWorkspace {...shared}/></WorkspacePane>
+      <WorkspacePane id="integrations" active={view==="integrations"} mounted={isMounted("integrations")}><IntegrationsWorkspace {...shared}/></WorkspacePane>
       <WorkspacePane id="settings" active={view==="settings"} mounted={isMounted("settings")}><SettingsWorkspace {...shared}/></WorkspacePane>
-      {["reports","integrations"].map(id=><WorkspacePane key={id} id={id} active={view===id} mounted={isMounted(id)}><Placeholder view={id}/></WorkspacePane>)}
     </main>
   </div>
 }
