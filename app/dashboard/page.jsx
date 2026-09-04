@@ -2,36 +2,7 @@ import HotelOSV2 from"./HotelOSV2"
 import StaticCaretGuard from"../components/StaticCaretGuard"
 import MercadoPagoOAuthBridge from"./components/MercadoPagoOAuthBridge"
 import PWAInstaller from"./components/PWAInstaller"
-import DashboardChrome from"./components/DashboardChrome"
-import DashboardWidgetEditBridge from"./components/DashboardWidgetEditBridge"
-import PlanningHoverPlacementBridge from"./components/PlanningHoverPlacementBridge"
-import ReservationCreateFlowBridge from"./components/ReservationCreateFlowBridge"
-import"./pms-unified.css"
-import"./pms-unified-modules.css"
-import"./simple-interaction-v2.css"
-import"./planning-ui.css"
-import"./app-simple-mode.css"
-import"./app-minimal-v2.css"
-import"./app-interaction-polish.css"
-import"./mobile-reservation-flow.css"
-import"./global-chrome.css"
-import"./pms-dark-theme-safe.css"
-import"./pms-premium-restyle.css"
-import"./pms-responsive.css"
-import"./pms-flyout-clarity.css"
-import"./pms-dark-complete.css"
-import"./pms-final-fixes.css"
-import"./pms-top-actions.css"
-import"./planning-quick-modal.css"
-import"./planning-quick-modal-v2.css"
-import"./planning-hover-placement.css"
-import"./planning-toolbar-clean.css"
-import"./planning-assignment-rack-dark.css"
-import"./reservation-panel-spacing.css"
-import"./reservation-color-rhythm.css"
-import"./reservation-flow-final.css"
-import"./reservation-create-cta-final.css"
-import"./reservation-create-flow.css"
+import"./hotelgest-rebuild.css"
 
 export const metadata={
   title:"Habitación Llena",
@@ -41,8 +12,8 @@ export const metadata={
   appleWebApp:{capable:true,title:"Habitación Llena",statusBarStyle:"default"}
 }
 
-export const viewport={themeColor:"#ffffff"}
+export const viewport={themeColor:"#f4f5f6"}
 
 export default function DashboardPage(){
-  return <><StaticCaretGuard/><MercadoPagoOAuthBridge/><DashboardWidgetEditBridge/><PlanningHoverPlacementBridge/><ReservationCreateFlowBridge/><div className="hlHotelgest"><DashboardChrome><HotelOSV2/></DashboardChrome></div><PWAInstaller/></>
+  return <><StaticCaretGuard/><MercadoPagoOAuthBridge/><div className="hlHotelgestRebuild"><HotelOSV2/></div><PWAInstaller/></>
 }
