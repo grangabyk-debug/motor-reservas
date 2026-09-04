@@ -58,6 +58,26 @@ For each test capture: URL/date range, screenshot before, action, screenshot aft
 - Calendar scroll position and visible date range should survive opening/closing drawers.
 - Light and dark themes must use the same geometry.
 
+## Live Heroes baseline — 2026-09-04
+
+Opera connection is active on `https://v2.heroespms.com/planning` with the Demo Grand Hôtel calendar visible.
+
+Observed directly from the live screen/accessibility tree:
+
+- Left room column is a single fixed strip with rooms 101, 102, 103…; there are no room-type group header rows interrupting the Gantt.
+- Date header is one continuous horizontal sequence of equal-width day columns.
+- The current day is indicated in the header with a filled blue date badge and a single vertical blue guide aligned to the same x-coordinate through the calendar.
+- Weekend/non-working columns are neutral vertical bands that visually continue through all room rows rather than restarting per row.
+- Room rows share the same horizontal day scale; borders form one coherent matrix.
+- Reservations are compact rounded horizontal pills/bars placed over the matrix. Their width maps directly to their visible stay duration.
+- Reservation visual states are differentiated mainly by border/fill color (for example teal outline, red outline, solid red) while preserving identical geometry.
+- Booking bars are exposed as actual interactive buttons in the accessibility tree, e.g. `D Elena Petrova`, `D Fatima Zahra`, `D Henrik Olsen`, `D Maria Garcia`, `D Jean Dupont`, etc.
+- Room numbers themselves are interactive controls and each row also exposes an operational/maintenance status control.
+- The calendar keeps a large uninterrupted viewport and does not insert availability summary rows between room rows in the default Heroes view.
+- Top controls remain outside the Gantt surface: Today, year/month navigation, filter/search and New reservation.
+
+Important consequence for PMS Next: the current type-group availability rows and per-row weekend/today backgrounds should not define the geometry of the calendar. The time surface should be global; summaries, if retained, must not break vertical continuity.
+
 ## Observation log
 
 | Time | Reference | Action | Observation | PMS Next action |
@@ -65,7 +85,9 @@ For each test capture: URL/date range, screenshot before, action, screenshot aft
 | 2026-09-04 | Hotelgest tutorial | Planning general view | Single continuous timeline; room bars align to date columns; reservation creation works from grid | Replace segmented vertical backgrounds with a single calendar surface |
 | 2026-09-04 | Current PMS Next | Click/hover reservation | Preview can be clipped by row/calendar stacking and appears broken | Move preview out of reservation DOM flow into top-level overlay/portal |
 | 2026-09-04 | Current PMS Next | Weekend/today visual layers | Weekend and today coloring restarts inside group/room rows, creating broken bands | Render global vertical background bands once behind all rows |
+| 2026-09-04 19:48 AR | Heroes live demo | Default Planning view | Fixed room column + one uninterrupted day matrix; no type separator rows; today and neutral day bands share a single continuous x-axis | Rebuild PMS Next body around one authoritative calendar canvas |
+| 2026-09-04 19:48 AR | Heroes live demo | Inspect interactive elements | Reservation bars and room labels are first-class interactive controls; bars keep identical geometry across statuses | Keep interaction layer independent from background/grid layer |
 
-## Connection note
+## Connector capability note
 
-Opera Browser Connector disconnected while starting the Heroes live-demo session. Continue this exact script when the connector is active; append every observed action/result here before changing PMS Next behavior.
+The current Opera Browser Connector session can read tabs, accessibility content, screenshots, history and navigate URLs. It does not expose a click/drag/resize command to ChatGPT in this session. Therefore live pointer interactions (click booking, drag, resize, double-click) must be observed by capturing before/after states while a human performs the pointer action. Do not infer an unobserved movement result.
