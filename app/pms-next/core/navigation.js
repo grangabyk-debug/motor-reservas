@@ -24,6 +24,7 @@ export const MANAGEMENT_NAV=[
   {id:"staff",label:"Equipo",icon:"team"},
   {id:"integrations",label:"Integraciones",icon:"link"},
   {id:"settings",label:"Configuración",icon:"settings"},
+  {id:"support",label:"Ayuda & feedback",icon:"help"},
 ]
 
 export const NAV_LABELS=[...PRIMARY_NAV,...OPERATIONS_NAV,...MANAGEMENT_NAV].reduce((acc,item)=>{acc[item.id]=item.label;return acc},{})
@@ -33,12 +34,12 @@ const ROLE_VIEWS={
   owner:ALL_VIEWS,
   admin:ALL_VIEWS,
   manager:ALL_VIEWS,
-  reception:["dashboard","planning","reservations","guests","messages","tasks","requests","housekeeping","maintenance","inventory","services","rates","finance","audit"],
-  night_audit:["dashboard","planning","reservations","guests","messages","tasks","requests","housekeeping","maintenance","inventory","services","rates","finance","reports","audit"],
-  housekeeping:["dashboard","planning","tasks","requests","housekeeping","maintenance","inventory"],
-  maintenance:["dashboard","planning","tasks","requests","housekeeping","maintenance","inventory"],
-  revenue:["dashboard","planning","reservations","guests","services","rates","finance","growth","reports"],
-  member:["dashboard"],
+  reception:["dashboard","planning","reservations","guests","messages","tasks","requests","housekeeping","maintenance","inventory","services","rates","finance","audit","support"],
+  night_audit:["dashboard","planning","reservations","guests","messages","tasks","requests","housekeeping","maintenance","inventory","services","rates","finance","reports","audit","support"],
+  housekeeping:["dashboard","planning","tasks","requests","housekeeping","maintenance","inventory","support"],
+  maintenance:["dashboard","planning","tasks","requests","housekeeping","maintenance","inventory","support"],
+  revenue:["dashboard","planning","reservations","guests","services","rates","finance","growth","reports","support"],
+  member:["dashboard","support"],
 }
 
 export function canOpenView(role,view,featureFlags={}){
