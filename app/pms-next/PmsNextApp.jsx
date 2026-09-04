@@ -21,6 +21,7 @@ import SettingsWorkspace from"./features/settings/SettingsWorkspace"
 import ReportsWorkspace from"./features/reports/ReportsWorkspace"
 import IntegrationsWorkspace from"./features/integrations/IntegrationsWorkspace"
 import usePmsSession from"./core/usePmsSession"
+import usePropertyFeatureFlags from"./core/usePropertyFeatureFlags"
 import{NAV_LABELS}from"./core/navigation"
 import{persistTheme,readTheme}from"./core/theme"
 import s from"./pms-next.module.css"
@@ -31,6 +32,7 @@ function WorkspacePane({id,active,mounted,children}){if(!mounted)return null;ret
 export default function PmsNextApp({buildId="local"}){
   const[view,setView]=useState("dashboard"),[mountedViews,setMountedViews]=useState(()=>new Set(["dashboard"])),[theme,setTheme]=useState("light"),[bootChecked,setBootChecked]=useState(false),[bootDone,setBootDone]=useState(false)
   const viewRef=useRef("dashboard"),scrollPositions=useRef({}),session=usePmsSession()
+  const featureState=usePropertyFeatureFlags(session.propertyId)
   useEffect(()=>setTheme(readTheme()),[])
 
   useEffect(()=>{
@@ -48,6 +50,7 @@ export default function PmsNextApp({buildId="local"}){
 
   const activateView=useCallback((next,{historyMode="push",restoreScroll=true}={})=>{const safe=Object.prototype.hasOwnProperty.call(NAV_LABELS,next)?next:"dashboard";if(typeof window!=="undefined")scrollPositions.current[viewRef.current]=window.scrollY;viewRef.current=safe;setMountedViews(current=>{if(current.has(safe))return current;const nextSet=new Set(current);nextSet.add(safe);return nextSet});setView(safe);if(typeof window!=="undefined"){const url=new URL(window.location.href);url.searchParams.set("view",safe);if(historyMode==="replace")window.history.replaceState({pmsView:safe},"",url);else if(historyMode==="push")window.history.pushState({pmsView:safe},"",url);if(restoreScroll)requestAnimationFrame(()=>window.scrollTo({top:scrollPositions.current[safe]||0,behavior:"auto"}))}},[])
   useEffect(()=>{if(typeof window==="undefined")return;const initial=new URL(window.location.href).searchParams.get("view");activateView(initial&&Object.prototype.hasOwnProperty.call(NAV_LABELS,initial)?initial:"dashboard",{historyMode:"replace",restoreScroll:false});const onPopState=()=>{const next=new URL(window.location.href).searchParams.get("view")||"dashboard";activateView(next,{historyMode:"none"})};window.addEventListener("popstate",onPopState);return()=>window.removeEventListener("popstate",onPopState)},[activateView])
+  useEffect(()=>{if(featureState.status==="loading")return;if(view==="requests"&&!featureState.flags.guest_requests)activateView("dashboard",{historyMode:"replace"})},[featureState.status,featureState.flags.guest_requests,view,activateView])
   function toggleTheme(){setTheme(current=>{const next=current==="dark"?"light":"dark";persistTheme(next);return next})}
 
   if(session.status==="loading")return <PmsBootScreen ready={false}/>
@@ -56,6 +59,6 @@ export default function PmsNextApp({buildId="local"}){
 
   const shared={propertyId:session.propertyId,property:session.property},isMounted=id=>mountedViews.has(id)
   const pane=(id,node)=><WorkspacePane id={id} active={view===id} mounted={isMounted(id)}>{node}</WorkspacePane>
-  return <div className={s.app} data-theme={theme}><PmsSidebar view={view} onView={activateView} property={session.property} properties={session.properties} onProperty={session.selectProperty} user={session.user}/><main className={s.workspace}><PmsTopbar title={NAV_LABELS[view]||"Dashboard"} theme={theme} onToggleTheme={toggleTheme} onNewReservation={()=>activateView("planning")}/>
-    {pane("dashboard",<DashboardWorkspace {...shared} onNavigate={activateView}/>)}{pane("planning",<PlanningWorkspace {...shared} onNavigate={activateView}/>)}{pane("reservations",<ReservationsWorkspace {...shared} onNavigate={activateView}/>)}{pane("guests",<GuestsWorkspace {...shared}/>)}{pane("messages",<MessagesWorkspace {...shared}/>)}{pane("maintenance",<OperationsWorkspace {...shared} initialTab="maintenance"/>)}{pane("tasks",<OperationsWorkspace {...shared} initialTab="tasks"/>)}{pane("requests",<OperationsWorkspace {...shared} initialTab="requests"/>)}{pane("housekeeping",<HousekeepingWorkspace {...shared}/>)}{pane("inventory",<InventoryWorkspace {...shared}/>)}{pane("services",<ServicesWorkspace {...shared}/>)}{pane("rates",<RatesWorkspace {...shared}/>)}{pane("finance",<FinanceWorkspace {...shared}/>)}{pane("reports",<ReportsWorkspace {...shared}/>)}{pane("staff",<StaffWorkspace {...shared}/>)}{pane("integrations",<IntegrationsWorkspace {...shared}/>)}{pane("settings",<SettingsWorkspace {...shared}/>)}</main><PmsUpdateNotice buildId={buildId}/></div>
+  return <div className={s.app} data-theme={theme}><PmsSidebar view={view} onView={activateView} property={session.property} properties={session.properties} onProperty={session.selectProperty} user={session.user} featureFlags={featureState.flags} buildId={buildId}/><main className={s.workspace}><PmsTopbar title={NAV_LABELS[view]||"Dashboard"} theme={theme} onToggleTheme={toggleTheme} onNewReservation={()=>activateView("planning")}/>
+    {pane("dashboard",<DashboardWorkspace {...shared} onNavigate={activateView}/>)}{pane("planning",<PlanningWorkspace {...shared} onNavigate={activateView}/>)}{pane("reservations",<ReservationsWorkspace {...shared} onNavigate={activateView}/>)}{pane("guests",<GuestsWorkspace {...shared}/>)}{pane("messages",<MessagesWorkspace {...shared}/>)}{pane("maintenance",<OperationsWorkspace {...shared} initialTab="maintenance"/>)}{pane("tasks",<OperationsWorkspace {...shared} initialTab="tasks"/>)}{featureState.flags.guest_requests&&pane("requests",<OperationsWorkspace {...shared} initialTab="requests"/>)}{pane("housekeeping",<HousekeepingWorkspace {...shared}/>)}{pane("inventory",<InventoryWorkspace {...shared}/>)}{pane("services",<ServicesWorkspace {...shared}/>)}{pane("rates",<RatesWorkspace {...shared}/>)}{pane("finance",<FinanceWorkspace {...shared}/>)}{pane("reports",<ReportsWorkspace {...shared}/>)}{pane("staff",<StaffWorkspace {...shared}/>)}{pane("integrations",<IntegrationsWorkspace {...shared}/>)}{pane("settings",<SettingsWorkspace {...shared}/>)}</main><PmsUpdateNotice buildId={buildId}/></div>
 }
