@@ -8,8 +8,10 @@ export const PRIMARY_NAV=[
 
 export const OPERATIONS_NAV=[
   {id:"tasks",label:"Tareas & check-lists",icon:"tasks"},
+  {id:"requests",label:"Solicitudes",icon:"request"},
   {id:"housekeeping",label:"Housekeeping",icon:"clean"},
   {id:"maintenance",label:"Mantenimiento",icon:"wrench"},
+  {id:"inventory",label:"Inventario",icon:"inventory"},
   {id:"rates",label:"Tarifas y disponibilidad",icon:"rates"},
   {id:"cash",label:"Caja y pagos",icon:"cash"},
 ]
