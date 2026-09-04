@@ -46,8 +46,9 @@ function RangeActions({days,range,onConfirm,onCancel}){
 
 function RoomRow({room,days,settings,grid,visibleReservations,selected,dragging,dropCell,rangeSelection,onRoom,onBeginRange,onExtendRange,onFinishRange,onDropCell,onDrop,onSelect,onDrag,onResize,onPreview,onConfirmRange,onCancelRange}){
   const reservations=visibleReservations.filter(item=>roomHas(item,room.id)),ownRange=rangeSelection&&String(rangeSelection.roomId)===String(room.id)?rangeSelection:null
+  const meta=[room.floor_name,room.tipo||"Sin tipo",`${room.capacidad||1} pax`].filter(Boolean).join(" · ")
   return <div className={c.roomRow}>
-    <button type="button" className={c.room} onClick={()=>onRoom()}><span><b>{room.nombre}</b><small>{room.tipo||"Sin tipo"} · {room.capacidad||1} pax</small></span>{room.estado==="mantenimiento"?<span className={c.maintenance} title="Mantenimiento">!</span>:null}</button>
+    <button type="button" className={c.room} onClick={()=>onRoom()}><span><b>{room.nombre}</b><small>{meta}</small></span>{room.estado==="mantenimiento"?<span className={c.maintenance} title="Mantenimiento">!</span>:null}</button>
     <div className={c.timelineRow} style={grid}>
       {days.map(day=>{const key=`${room.id}-${day}`,range=ownRange&&day>=ownRange.start&&day<ownRange.end;return <button type="button" key={day} className={`${c.cell} ${range?c.rangeCell:""} ${dropCell===key?c.dropTarget:""}`} aria-label={`${room.nombre} ${day}`} onMouseDown={event=>onBeginRange(event,room.id,day)} onMouseEnter={()=>onExtendRange(room.id,day)} onMouseUp={event=>onFinishRange(event,room.id)} onDoubleClick={event=>{event.preventDefault();event.stopPropagation();onRoom(day)}} onDragEnter={()=>dragging&&onDropCell(key)} onDragOver={event=>{if(dragging){event.preventDefault();event.dataTransfer.dropEffect="move"}}} onDragLeave={()=>dropCell===key&&onDropCell("")} onDrop={event=>onDrop(event,room.id,day)}/>})}
       {reservations.map(item=><ReservationBlock key={`${room.id}-${item.id}`} item={item} days={days} selected={selected?.id===item.id} settings={settings} onSelect={onSelect} onDragStart={onDrag} onResizeStart={onResize} onPreview={onPreview}/>) }
