@@ -1,71 +1,39 @@
 "use client"
 
 import{useMemo,useState}from"react"
+import useInboxData from"./useInboxData"
 import s from"./messages.module.css"
 
-const INITIAL_THREADS=[
-  {id:"t1",kind:"team",name:"Hotel Demo",preview:"hola",time:"11:31",messages:[{id:"m1",mine:true,text:"hola",time:"11:31"}]},
-  {id:"t2",kind:"guests",name:"Karim C.",preview:"¿Puedo llegar después de las 22?",time:"10:42",messages:[{id:"m2",mine:false,text:"¿Puedo llegar después de las 22?",time:"10:42"}]},
-  {id:"t3",kind:"guests",name:"Lena H.",preview:"Gracias por la información",time:"09:18",messages:[{id:"m3",mine:false,text:"Gracias por la información",time:"09:18"}]},
-  {id:"t4",kind:"external",name:"Marie R.",preview:"Factura recibida",time:"Ayer",messages:[{id:"m4",mine:false,text:"Factura recibida. Muchas gracias.",time:"Ayer"}]},
-  {id:"t5",kind:"team",name:"Tom M.",preview:"Reviso la 204",time:"Ayer",messages:[{id:"m5",mine:false,text:"Reviso la habitación 204 y te aviso.",time:"Ayer"}]},
-]
+const initials=name=>String(name||"H").trim().split(/\s+/).map(x=>x[0]).join("").slice(0,2).toUpperCase()
+const time=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}).format(new Date(value)):"—"
 
-const initials=name=>String(name).trim().split(/\s+/).map(x=>x[0]).join("").slice(0,2).toUpperCase()
-
-export default function MessagesWorkspace(){
-  const[threads,setThreads]=useState(INITIAL_THREADS)
-  const[mailbox,setMailbox]=useState("team")
-  const[filter,setFilter]=useState("all")
+export default function MessagesWorkspace({propertyId}){
+  const data=useInboxData(propertyId)
+  const[filter,setFilter]=useState("open")
   const[query,setQuery]=useState("")
-  const[selectedId,setSelectedId]=useState("t1")
-  const[draft,setDraft]=useState("")
+  const[selectedId,setSelectedId]=useState("")
   const[toast,setToast]=useState("")
+  const[saving,setSaving]=useState(false)
 
-  const visible=useMemo(()=>threads.filter(thread=>{
-    if(filter==="archive"&&!thread.archived)return false
-    if(filter==="trash"&&!thread.trashed)return false
-    if(filter==="all"&&(thread.archived||thread.trashed))return false
-    if(!["archive","trash"].includes(filter)&&thread.kind!==mailbox)return false
+  const visible=useMemo(()=>data.conversations.filter(thread=>{
+    if(filter!=="all"&&thread.status!==filter)return false
     const term=query.trim().toLowerCase()
-    return !term||`${thread.name} ${thread.preview}`.toLowerCase().includes(term)
-  }),[threads,mailbox,filter,query])
-  const selected=threads.find(thread=>thread.id===selectedId)||visible[0]||null
+    return !term||`${thread.contact_name||""} ${thread.contact_email||""} ${thread.contact_phone||""} ${thread.last_message_text||""} ${thread.channel||""}`.toLowerCase().includes(term)
+  }),[data.conversations,filter,query])
+  const selected=data.conversations.find(thread=>thread.id===selectedId)||visible[0]||null
+  const messages=selected?data.messagesByConversation.get(selected.id)||[]:[]
 
   function notify(text){setToast(text);window.setTimeout(()=>setToast(""),2200)}
-  function send(){
-    const text=draft.trim();if(!text||!selected)return
-    const time=new Intl.DateTimeFormat("es-AR",{hour:"2-digit",minute:"2-digit"}).format(new Date())
-    setThreads(list=>list.map(thread=>thread.id===selected.id?{...thread,preview:text,time,messages:[...thread.messages,{id:`m${Date.now()}`,mine:true,text,time}]}:thread))
-    setDraft("")
-  }
-  function patchSelected(patch,label){
-    if(!selected)return
-    setThreads(list=>list.map(thread=>thread.id===selected.id?{...thread,...patch}:thread));setSelectedId("");notify(label)
-  }
+  async function selectThread(thread){setSelectedId(thread.id);if(thread.unread_count>0){try{await data.markRead(thread.id)}catch(err){data.setError(err?.message||"No se pudo marcar como leído.")}}}
+  async function changeStatus(status,label){if(!selected)return;setSaving(true);data.setError("");try{await data.setConversationStatus(selected.id,status);setSelectedId("");notify(label)}catch(err){data.setError(err?.message||"No se pudo actualizar la conversación.")}finally{setSaving(false)}}
 
   return <section className={s.page}>
-    <aside className={s.mailbox}>
-      <small className={s.sectionTitle}>BUZONES</small>
-      {[["guests","◎","Huéspedes"],["external","▣","Externos"],["team","▦","Equipo"]].map(([id,icon,label])=><button type="button" key={id} className={`${s.mailButton} ${mailbox===id&&filter==="all"?s.mailActive:""}`} onClick={()=>{setMailbox(id);setFilter("all");setSelectedId("")}}><span>{icon}</span>{label}</button>)}
-      <small className={`${s.sectionTitle} ${s.filterTitle}`}>FILTROS</small>
-      {[["promotions","☆","Promociones"],["personal","✉","Personal"],["reminders","♧","Recordatorios"],["archive","▱","Archivo"],["trash","⌫","Papelera"]].map(([id,icon,label])=><button type="button" key={id} className={`${s.mailButton} ${filter===id?s.mailActive:""}`} onClick={()=>{setFilter(id);setSelectedId("")}}><span>{icon}</span>{label}</button>)}
-    </aside>
-
-    <section className={s.threads}>
-      <header className={s.threadHead}><h2>Mensajes</h2><div><button className={s.iconButton} onClick={()=>notify("Bandeja actualizada")}>↻</button><button className={s.iconButton} onClick={()=>notify("Configuración de mensajería")}>⚙</button></div></header>
-      <label className={s.threadSearch}>⌕<input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Buscar..."/></label>
-      <div className={s.threadList}>{visible.map(thread=><button type="button" key={thread.id} className={`${s.thread} ${selected?.id===thread.id?s.threadActive:""}`} onClick={()=>setSelectedId(thread.id)}><span className={s.avatar}>{initials(thread.name)}</span><span><b>{thread.name}</b><small>{thread.preview}</small></span><time>{thread.time}</time></button>)}</div>
-    </section>
-
+    <aside className={s.mailbox}><small className={s.sectionTitle}>BANDEJAS</small>{[["open","◎","Abiertas"],["archived","▱","Archivo"],["trash","⌫","Papelera"],["all","▦","Todas"]].map(([id,icon,label])=><button type="button" key={id} className={`${s.mailButton} ${filter===id?s.mailActive:""}`} onClick={()=>{setFilter(id);setSelectedId("")}}><span>{icon}</span>{label}</button>)}<small className={`${s.sectionTitle} ${s.filterTitle}`}>CANALES</small>{Array.from(new Set(data.conversations.map(c=>c.channel))).filter(Boolean).map(channel=><div key={channel} className={s.mailButton}><span>◌</span>{channel}</div>)}</aside>
+    <section className={s.threads}><header className={s.threadHead}><h2>Mensajes</h2><div><button className={s.iconButton} onClick={()=>data.load()}>↻</button></div></header><label className={s.threadSearch}>⌕<input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar conversación"/></label><div className={s.threadList}>{visible.map(thread=><button type="button" key={thread.id} className={`${s.thread} ${selected?.id===thread.id?s.threadActive:""}`} onClick={()=>selectThread(thread)}><span className={s.avatar}>{initials(thread.contact_name||thread.channel)}</span><span><b>{thread.contact_name||thread.contact_phone||thread.contact_email||"Contacto"}</b><small>{thread.last_message_text||"Sin mensajes"}</small></span><time>{time(thread.last_message_at)}</time>{thread.unread_count>0&&<em>{thread.unread_count}</em>}</button>)}</div>{data.loading&&<div className={s.emptyConversation}>Cargando mensajes…</div>}</section>
     <section className={`${s.conversation} ${selected?s.conversationOpen:""}`}>
-      <div className={s.setupBanner}><div><b>Configurá el envío y recepción de emails</b><small>Después esta bandeja podrá reunir mensajes reales del huésped.</small></div><button onClick={()=>notify("Configuración pendiente de conectar al servicio de correo")}>Configurar ›</button></div>
-      {selected?<>
-        <header className={s.conversationHead}><div className={s.conversationIdentity}><span className={s.avatar}>{initials(selected.name)}</span><span><b>{selected.name}</b><small>{selected.kind==="team"?"Equipo":selected.kind==="guests"?"Huésped":"Externo"}</small></span></div><div className={s.conversationActions}><button className={s.iconButton} onClick={()=>notify("Llamadas se conectarán en la capa de integración")}>☎</button><button className={s.iconButton} onClick={()=>notify("Videollamadas se conectarán en la capa de integración")}>◫</button></div></header>
-        <div className={s.messages}>{selected.messages.map(message=><div key={message.id} className={`${s.bubble} ${message.mine?s.mine:""}`}>{message.text}<time>{message.time}</time></div>)}</div>
-        <div className={s.composer}><button className={s.iconButton} onClick={()=>notify("Adjuntos preparados para la integración")}>＋</button><textarea value={draft} onChange={event=>setDraft(event.target.value)} onKeyDown={event=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();send()}}} placeholder="Escribí un mensaje..."/><button className={s.iconButton} onClick={()=>patchSelected({archived:true},"Conversación archivada")}>▱</button><button className={s.iconButton} onClick={()=>patchSelected({trashed:true},"Conversación movida a papelera")}>⌫</button><button className={s.send} onClick={send}>Enviar</button></div>
-      </>:<div className={s.emptyConversation}><div><b>Elegí una conversación</b>Los mensajes aparecerán acá.</div></div>}
-    </section>
-    {toast&&<div className={s.toast}>{toast}</div>}
+      <div className={s.setupBanner}><div><b>{selected?`${selected.channel||"Canal"} conectado para recepción`:"Inbox unificado"}</b><small>Los mensajes mostrados vienen de las conexiones reales de la propiedad.</small></div><button disabled>Envío pendiente de adaptador seguro</button></div>
+      {data.error&&<div className={s.setupBanner}><small>{data.error}</small></div>}
+      {selected?<><header className={s.conversationHead}><div className={s.conversationIdentity}><span className={s.avatar}>{initials(selected.contact_name||selected.channel)}</span><span><b>{selected.contact_name||selected.contact_phone||selected.contact_email||"Contacto"}</b><small>{selected.channel} · {selected.contact_phone||selected.contact_email||"Sin contacto visible"}</small></span></div><div className={s.conversationActions}><button className={s.iconButton} disabled={saving} onClick={()=>changeStatus("archived","Conversación archivada")}>▱</button><button className={s.iconButton} disabled={saving} onClick={()=>changeStatus("trash","Conversación movida a papelera")}>⌫</button></div></header><div className={s.messages}>{messages.map(message=><div key={message.id} className={`${s.bubble} ${message.direction==="outbound"?s.mine:""}`}>{message.text||"Mensaje sin texto"}<time>{time(message.occurred_at)}</time></div>)}{!messages.length&&<div className={s.emptyConversation}>Esta conversación todavía no tiene mensajes almacenados.</div>}</div><div className={s.composer}><textarea disabled placeholder="El envío se habilitará cuando exista un outbox seguro para este canal."/><button className={s.send} disabled>Enviar</button></div></>:<div className={s.emptyConversation}><div><b>Elegí una conversación</b>Los mensajes reales aparecerán acá.</div></div>}
+    </section>{toast&&<div className={s.toast}>{toast}</div>}
   </section>
 }
