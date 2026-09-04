@@ -1,41 +1,18 @@
+"use client"
+
+import useDashboardData from"./useDashboardData"
 import s from"./dashboard.module.css"
 
-const shortcuts=[
-  {id:"planning",label:"Planning",icon:"▦"},
-  {id:"messages",label:"Mensajes",icon:"◌"},
-  {id:"cash",label:"Facturación",icon:"▤"},
-  {id:"rates",label:"Tarifas y disponibilidad",icon:"↗"},
-]
+const shortcuts=[{id:"planning",label:"Planning",icon:"▦"},{id:"messages",label:"Mensajes",icon:"◌"},{id:"finance",label:"Finanzas",icon:"▤"},{id:"rates",label:"Tarifas y disponibilidad",icon:"↗"}]
 
-export default function DashboardWorkspace({onNavigate}){
+export default function DashboardWorkspace({propertyId,property,onNavigate}){
+  const data=useDashboardData(propertyId),m=data.metrics
   return <section className={s.page}>
-    <header className={s.intro}>
-      <div><small>OPERACIÓN DE HOY</small><h1>Hola, Recepción 👋</h1><p>Todo lo importante del hotel, sin ruido y a un toque de distancia.</p></div>
-      <div className={s.statusPill}>Hotel operativo</div>
-    </header>
-
-    <div className={s.mainGrid}>
-      <button className={s.operationCard} type="button" onClick={()=>onNavigate?.("tasks")}>
-        <div className={s.operationHead}><small>CHECK-LISTS</small><span>›</span></div>
-        <div className={s.operationBody}>
-          <div className={s.ring} style={{"--progress":0}}><div className={s.ringContent}><b>0<span>/0</span></b><small>0%</small></div></div>
-          <small>completadas hoy</small>
-        </div>
-      </button>
-
-      <button className={s.operationCard} type="button" onClick={()=>onNavigate?.("maintenance")}>
-        <div className={s.operationHead}><small>MANTENIMIENTO</small><span>›</span></div>
-        <div className={s.operationBody}>
-          <div className={s.bigNumber}>0</div>
-          <small className={s.bigNumberNote}>tareas abiertas</small>
-        </div>
-      </button>
-    </div>
-
-    <div className={s.quickGrid}>
-      {shortcuts.map(item=><button key={item.id} className={s.quickLink} type="button" onClick={()=>onNavigate?.(item.id)}><span>{item.icon}</span>{item.label}</button>)}
-    </div>
-
-    <div className={s.hint}><span><b>Habitación Llena PMS Next</b> · Dashboard reconstruida como módulo independiente.</span><span>Modo día/noche activo · diseño responsive</span></div>
+    <header className={s.intro}><div><small>OPERACIÓN DE HOY</small><h1>{property?.name||"Habitación Llena"}</h1><p>Lo importante del hotel, actualizado desde la propiedad activa.</p></div><button className={s.statusPill} onClick={data.load}>{data.loading?"Actualizando…":"Datos en vivo"}</button></header>
+    {data.error&&<div className={s.notice}>{data.error}</div>}
+    <div className={s.todayGrid}><button onClick={()=>onNavigate?.("reservations")}><small>Llegadas</small><b>{m.arrivals}</b><span>hoy</span></button><button onClick={()=>onNavigate?.("reservations")}><small>Salidas</small><b>{m.departures}</b><span>hoy</span></button><button onClick={()=>onNavigate?.("planning")}><small>Ocupación</small><b>{m.occupancy.toFixed(0)}%</b><span>{m.inhouse}/{m.totalRooms} habitaciones</span></button><button onClick={()=>onNavigate?.("housekeeping")}><small>Habitaciones sucias</small><b>{m.dirty}</b><span>{m.ready} listas</span></button></div>
+    <div className={s.mainGrid}><button className={s.operationCard} type="button" onClick={()=>onNavigate?.("tasks")}><div className={s.operationHead}><small>HOUSEKEEPING · CHECK-LISTS</small><span>›</span></div><div className={s.operationBody}><div className={s.ring} style={{"--progress":m.checkPct}}><div className={s.ringContent}><b>{m.checkDone}<span>/{m.checkTotal}</span></b><small>{m.checkPct}%</small></div></div><small>pasos completados hoy</small></div></button><button className={s.operationCard} type="button" onClick={()=>onNavigate?.("maintenance")}><div className={s.operationHead}><small>MANTENIMIENTO</small><span>›</span></div><div className={s.operationBody}><div className={s.bigNumber}>{m.maintenance}</div><small className={s.bigNumberNote}>tareas abiertas · {m.urgent} urgentes</small></div></button></div>
+    <div className={s.quickGrid}>{shortcuts.map(item=><button key={item.id} className={s.quickLink} type="button" onClick={()=>onNavigate?.(item.id)}><span>{item.icon}</span>{item.label}</button>)}</div>
+    <div className={s.hint}><span><b>{property?.name||"Propiedad"}</b> · {m.totalRooms} habitaciones activas</span><span>Navegación instantánea · modo día/noche · datos separados por tenant</span></div>
   </section>
 }
