@@ -37,6 +37,7 @@ export default function PmsNextApp(){
   const[view,setView]=useState("dashboard")
   const[mountedViews,setMountedViews]=useState(()=>new Set(["dashboard"]))
   const[theme,setTheme]=useState("light")
+  const viewRef=useRef("dashboard")
   const scrollPositions=useRef({})
   const session=usePmsSession()
 
@@ -44,26 +45,26 @@ export default function PmsNextApp(){
 
   const activateView=useCallback((next,{historyMode="push",restoreScroll=true}={})=>{
     const safe=Object.prototype.hasOwnProperty.call(NAV_LABELS,next)?next:"dashboard"
-    if(typeof window!=="undefined")scrollPositions.current[view]=window.scrollY
+    if(typeof window!=="undefined")scrollPositions.current[viewRef.current]=window.scrollY
+    viewRef.current=safe
     setMountedViews(current=>{if(current.has(safe))return current;const nextSet=new Set(current);nextSet.add(safe);return nextSet})
     setView(safe)
     if(typeof window!=="undefined"){
       const url=new URL(window.location.href);url.searchParams.set("view",safe)
       if(historyMode==="replace")window.history.replaceState({pmsView:safe},"",url)
       else if(historyMode==="push")window.history.pushState({pmsView:safe},"",url)
-      if(restoreScroll)requestAnimationFrame(()=>window.scrollTo({top:scrollPositions.current[safe]||0,behavior:"instant"}))
+      if(restoreScroll)requestAnimationFrame(()=>window.scrollTo({top:scrollPositions.current[safe]||0,behavior:"auto"}))
     }
-  },[view])
+  },[])
 
   useEffect(()=>{
     if(typeof window==="undefined")return
     const initial=new URL(window.location.href).searchParams.get("view")
-    if(initial&&Object.prototype.hasOwnProperty.call(NAV_LABELS,initial))activateView(initial,{historyMode:"replace",restoreScroll:false})
-    else activateView("dashboard",{historyMode:"replace",restoreScroll:false})
+    activateView(initial&&Object.prototype.hasOwnProperty.call(NAV_LABELS,initial)?initial:"dashboard",{historyMode:"replace",restoreScroll:false})
     const onPopState=()=>{const next=new URL(window.location.href).searchParams.get("view")||"dashboard";activateView(next,{historyMode:"none"})}
     window.addEventListener("popstate",onPopState)
     return()=>window.removeEventListener("popstate",onPopState)
-  },[])
+  },[activateView])
 
   function toggleTheme(){setTheme(current=>{const next=current==="dark"?"light":"dark";persistTheme(next);return next})}
 
