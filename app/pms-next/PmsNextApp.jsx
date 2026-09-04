@@ -4,6 +4,7 @@ import{useCallback,useEffect,useRef,useState}from"react"
 import PmsSidebar from"./components/shell/PmsSidebar"
 import PmsTopbar from"./components/shell/PmsTopbar"
 import PmsBootScreen from"./components/boot/PmsBootScreen"
+import PmsUpdateNotice from"./components/system/PmsUpdateNotice"
 import DashboardWorkspace from"./features/dashboard/DashboardWorkspace"
 import PlanningWorkspace from"./features/planning/PlanningWorkspace"
 import ReservationsWorkspace from"./features/reservations/ReservationsWorkspace"
@@ -27,7 +28,7 @@ import s from"./pms-next.module.css"
 function AccessGate({status,error}){const unauth=status==="unauthenticated";return <div className={s.app} data-theme="light"><div className={s.accessGate}><div className={s.accessCard}><span className={s.brandMark}>HL</span><small>HABITACIÓN LLENA</small><h1>{unauth?"Iniciá sesión":"No pudimos abrir el PMS"}</h1><p>{unauth?"Ingresá con tu cuenta para acceder únicamente a las propiedades que tenés autorizadas.":status==="no-property"?"Tu usuario no tiene ninguna propiedad habilitada todavía.":error||"Revisá la conexión y volvé a intentar."}</p>{unauth&&<a href="/login">Ir a iniciar sesión</a>}{status==="error"&&<button type="button" onClick={()=>window.location.reload()}>Reintentar</button>}</div></div></div>}
 function WorkspacePane({id,active,mounted,children}){if(!mounted)return null;return <div className={s.workspacePane} data-workspace={id} hidden={!active} aria-hidden={!active}>{children}</div>}
 
-export default function PmsNextApp(){
+export default function PmsNextApp({buildId="local"}){
   const[view,setView]=useState("dashboard"),[mountedViews,setMountedViews]=useState(()=>new Set(["dashboard"])),[theme,setTheme]=useState("light"),[bootChecked,setBootChecked]=useState(false),[bootDone,setBootDone]=useState(false)
   const viewRef=useRef("dashboard"),scrollPositions=useRef({}),session=usePmsSession()
   useEffect(()=>setTheme(readTheme()),[])
@@ -56,5 +57,5 @@ export default function PmsNextApp(){
   const shared={propertyId:session.propertyId,property:session.property},isMounted=id=>mountedViews.has(id)
   const pane=(id,node)=><WorkspacePane id={id} active={view===id} mounted={isMounted(id)}>{node}</WorkspacePane>
   return <div className={s.app} data-theme={theme}><PmsSidebar view={view} onView={activateView} property={session.property} properties={session.properties} onProperty={session.selectProperty} user={session.user}/><main className={s.workspace}><PmsTopbar title={NAV_LABELS[view]||"Dashboard"} theme={theme} onToggleTheme={toggleTheme} onNewReservation={()=>activateView("planning")}/>
-    {pane("dashboard",<DashboardWorkspace {...shared} onNavigate={activateView}/>)}{pane("planning",<PlanningWorkspace {...shared} onNavigate={activateView}/>)}{pane("reservations",<ReservationsWorkspace {...shared} onNavigate={activateView}/>)}{pane("guests",<GuestsWorkspace {...shared}/>)}{pane("messages",<MessagesWorkspace {...shared}/>)}{pane("maintenance",<OperationsWorkspace {...shared} initialTab="maintenance"/>)}{pane("tasks",<OperationsWorkspace {...shared} initialTab="tasks"/>)}{pane("requests",<OperationsWorkspace {...shared} initialTab="requests"/>)}{pane("housekeeping",<HousekeepingWorkspace {...shared}/>)}{pane("inventory",<InventoryWorkspace {...shared}/>)}{pane("services",<ServicesWorkspace {...shared}/>)}{pane("rates",<RatesWorkspace {...shared}/>)}{pane("finance",<FinanceWorkspace {...shared}/>)}{pane("reports",<ReportsWorkspace {...shared}/>)}{pane("staff",<StaffWorkspace {...shared}/>)}{pane("integrations",<IntegrationsWorkspace {...shared}/>)}{pane("settings",<SettingsWorkspace {...shared}/>)}</main></div>
+    {pane("dashboard",<DashboardWorkspace {...shared} onNavigate={activateView}/>)}{pane("planning",<PlanningWorkspace {...shared} onNavigate={activateView}/>)}{pane("reservations",<ReservationsWorkspace {...shared} onNavigate={activateView}/>)}{pane("guests",<GuestsWorkspace {...shared}/>)}{pane("messages",<MessagesWorkspace {...shared}/>)}{pane("maintenance",<OperationsWorkspace {...shared} initialTab="maintenance"/>)}{pane("tasks",<OperationsWorkspace {...shared} initialTab="tasks"/>)}{pane("requests",<OperationsWorkspace {...shared} initialTab="requests"/>)}{pane("housekeeping",<HousekeepingWorkspace {...shared}/>)}{pane("inventory",<InventoryWorkspace {...shared}/>)}{pane("services",<ServicesWorkspace {...shared}/>)}{pane("rates",<RatesWorkspace {...shared}/>)}{pane("finance",<FinanceWorkspace {...shared}/>)}{pane("reports",<ReportsWorkspace {...shared}/>)}{pane("staff",<StaffWorkspace {...shared}/>)}{pane("integrations",<IntegrationsWorkspace {...shared}/>)}{pane("settings",<SettingsWorkspace {...shared}/>)}</main><PmsUpdateNotice buildId={buildId}/></div>
 }
