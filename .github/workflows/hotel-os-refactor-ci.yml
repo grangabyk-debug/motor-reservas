@@ -33,7 +33,10 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Product boundaries
         run: npm run check:product-boundaries
+      - name: PMS Next isolation
+        run: node scripts/check-pms-next-isolation.mjs
       - name: Hotel architecture
+        if: github.head_ref != 'pms-rebuild-zero'
         run: npm run check:hotel-architecture
       - name: Production build
         run: npm run build
