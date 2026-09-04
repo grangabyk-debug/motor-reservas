@@ -1,1 +1,0 @@
-See `planning-reference-audit.md` for the canonical behavior test script and acceptance criteria. This file exists only as a pointer while the Opera capture session is being reconnected.
