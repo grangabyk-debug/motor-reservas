@@ -18,7 +18,6 @@ export const OPERATIONS_NAV=[
 ]
 
 export const MANAGEMENT_NAV=[
-  {id:"setup",label:"Puesta a punto",icon:"setup"},
   {id:"reports",label:"Informes",icon:"report"},
   {id:"audit",label:"Actividad",icon:"activity"},
   {id:"staff",label:"Equipo",icon:"team"},
@@ -27,3 +26,27 @@ export const MANAGEMENT_NAV=[
 ]
 
 export const NAV_LABELS=[...PRIMARY_NAV,...OPERATIONS_NAV,...MANAGEMENT_NAV].reduce((acc,item)=>{acc[item.id]=item.label;return acc},{})
+
+const ALL_VIEWS=Object.keys(NAV_LABELS)
+const ROLE_VIEWS={
+  owner:ALL_VIEWS,
+  admin:ALL_VIEWS,
+  manager:ALL_VIEWS,
+  reception:["dashboard","planning","reservations","guests","messages","tasks","requests","housekeeping","maintenance","inventory","services","rates","finance","audit"],
+  night_audit:["dashboard","planning","reservations","guests","messages","tasks","requests","housekeeping","maintenance","inventory","services","rates","finance","reports","audit"],
+  housekeeping:["dashboard","planning","tasks","requests","housekeeping","maintenance","inventory"],
+  maintenance:["dashboard","planning","tasks","requests","housekeeping","maintenance","inventory"],
+  revenue:["dashboard","planning","reservations","guests","services","rates","finance","reports"],
+  member:["dashboard"],
+}
+
+export function canOpenView(role,view,featureFlags={}){
+  if(!Object.prototype.hasOwnProperty.call(NAV_LABELS,view))return false
+  if(view==="requests"&&featureFlags.guest_requests!==true)return false
+  const allowed=ROLE_VIEWS[role]||ROLE_VIEWS.member
+  return allowed.includes(view)
+}
+
+export function filterNavForRole(items,role,featureFlags={}){
+  return items.filter(item=>canOpenView(role,item.id,featureFlags))
+}
