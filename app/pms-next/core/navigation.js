@@ -18,6 +18,7 @@ export const OPERATIONS_NAV=[
 ]
 
 export const MANAGEMENT_NAV=[
+  {id:"growth",label:"Ventas y crecimiento",icon:"growth"},
   {id:"reports",label:"Informes",icon:"report"},
   {id:"audit",label:"Actividad",icon:"activity"},
   {id:"staff",label:"Equipo",icon:"team"},
@@ -36,7 +37,7 @@ const ROLE_VIEWS={
   night_audit:["dashboard","planning","reservations","guests","messages","tasks","requests","housekeeping","maintenance","inventory","services","rates","finance","reports","audit"],
   housekeeping:["dashboard","planning","tasks","requests","housekeeping","maintenance","inventory"],
   maintenance:["dashboard","planning","tasks","requests","housekeeping","maintenance","inventory"],
-  revenue:["dashboard","planning","reservations","guests","services","rates","finance","reports"],
+  revenue:["dashboard","planning","reservations","guests","services","rates","finance","growth","reports"],
   member:["dashboard"],
 }
 
