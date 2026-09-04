@@ -20,11 +20,13 @@ export function createHotelRepository(client,propertyId){
         scoped("hotel_reservation_events").order("created_at",{ascending:false}).limit(160),
         scoped("hotel_automation_events").order("created_at",{ascending:false}).limit(160),
         scoped("inbox_conversations").order("last_message_at",{ascending:false}).limit(100),
+        scoped("hotel_housekeeping_tasks").order("scheduled_for",{ascending:false}).limit(180),
+        scoped("hotel_maintenance_tickets").order("created_at",{ascending:false}).limit(120),
       ])
       const error=results.find(result=>result.error)?.error
       if(error)throw error
-      const [rooms,floors,reservations,payments,blocks,charges,channels,keyIssues,packages,reservationEvents,automationEvents,inboxConversations]=results.map(result=>result.data||[])
-      return {rooms,floors,reservations,payments,blocks,charges,channels,keyIssues,packages,reservationEvents,automationEvents,inboxConversations}
+      const [rooms,floors,reservations,payments,blocks,charges,channels,keyIssues,packages,reservationEvents,automationEvents,inboxConversations,housekeepingTasks,maintenanceTickets]=results.map(result=>result.data||[])
+      return {rooms,floors,reservations,payments,blocks,charges,channels,keyIssues,packages,reservationEvents,automationEvents,inboxConversations,housekeepingTasks,maintenanceTickets}
     },
     async guestCRM(){const {data,error}=await scoped("hotel_guest_profiles").order("last_stay_at",{ascending:false}).limit(250);if(error)throw error;return data||[]},
     async partners(){const {data,error}=await scoped("hotel_partners").eq("active",true).order("name");if(error)throw error;return data||[]},
