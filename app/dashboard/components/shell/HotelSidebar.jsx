@@ -5,7 +5,7 @@ import HotelIcon from"./HotelIcon"
 import ui from"./shell.module.css"
 
 const MAIN=[
-  ["lobby","Dashboard"],["calendar","Planning"],["rates","Tarifas"],["reports","Informes"],["reservations","Reservas"],["guests","Huéspedes"]
+  ["lobby","Dashboard"],["calendar","Planning"],["rates","Tarifas"],["reports","Informes"],["reservations","Reservas"],["guests","Huéspedes"],["messages","Mensajes"]
 ]
 const QUICK=[
   ["new","Crear reserva"],["housekeeping","Rack de limpiezas"],["calendar","Rack de asignaciones"],["rooms","Rack de disponibilidad"],["maintenance","Última actividad"],["keys","Puertas"],["billing","Facturación de servicios"]
