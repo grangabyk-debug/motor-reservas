@@ -2,6 +2,7 @@
 
 import{useCallback,useEffect,useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
+import RolePermissionsPanel from"./RolePermissionsPanel"
 import s from"./settings.module.css"
 
 const DEFAULT_PREFS={currency:"ARS",timezone:"America/Argentina/Buenos_Aires",checkin_time:"15:00",checkout_time:"11:00",language:"es-AR"}
@@ -37,6 +38,7 @@ export default function SettingsWorkspace({propertyId,property}){
   const roomTypes=useMemo(()=>Array.from(new Map(rooms.filter(r=>r.tipo).map(r=>[r.tipo,{name:r.tipo,capacity:r.capacidad||0,rooms:rooms.filter(x=>x.tipo===r.tipo).length,basePrice:r.precio||0}])).values()),[rooms])
   const prefs={...DEFAULT_PREFS,...(settings.preferences||{})}
   const branding=settings.branding||{}
+  const canManagePermissions=["owner","manager"].includes(property?.role)
 
   async function persistSettings(next,successMessage){
     const{error:writeError}=await supabase.from("property_settings").upsert({property_id:propertyId,settings:next,updated_at:new Date().toISOString()},{onConflict:"property_id"})
@@ -57,6 +59,14 @@ export default function SettingsWorkspace({propertyId,property}){
     setSaving("prefs");setError("");setNotice("")
     try{await persistSettings({...settings,preferences:nextPrefs},"Preferencias guardadas.")}
     catch(err){setError(err?.message||"No se pudieron guardar las preferencias.")}
+    finally{setSaving("")}
+  }
+
+  async function saveRolePermissions(rolePermissions){
+    if(!canManagePermissions)return
+    setSaving("roles");setError("");setNotice("")
+    try{await persistSettings({...settings,role_permissions:rolePermissions},"Permisos por rol guardados. Los menús se actualizaron al instante.")}
+    catch(err){setError(err?.message||"No se pudieron guardar los permisos.")}
     finally{setSaving("")}
   }
 
@@ -109,7 +119,7 @@ export default function SettingsWorkspace({propertyId,property}){
   }
 
   return <section className={s.page}>
-    <header className={s.header}><div><small>CONFIGURACIÓN</small><h1>Propiedad y operación</h1><p>Todo el hotel en un mismo lenguaje visual: identidad, habitaciones, horarios y preferencias.</p></div><div className={s.tabs}>{[["property","Propiedad"],["rooms","Habitaciones"],["types","Tipos"],["preferences","Preferencias"]].map(([id,label])=><button key={id} className={tab===id?s.active:""} onClick={()=>setTab(id)}>{label}</button>)}</div></header>
+    <header className={s.header}><div><small>CONFIGURACIÓN</small><h1>Propiedad y operación</h1><p>Una sola identidad para el hotel: propiedad, habitaciones, horarios, permisos y preferencias.</p></div><div className={s.tabs}>{[["property","Propiedad"],["rooms","Habitaciones"],["types","Tipos"],["preferences","Preferencias"],["roles","Roles y permisos"]].map(([id,label])=><button key={id} className={tab===id?s.active:""} onClick={()=>setTab(id)}>{label}</button>)}</div></header>
     {error&&<div className={s.error}>{error}</div>}{notice&&<div className={s.notice}>{notice}</div>}
 
     {tab==="property"&&<div className={s.propertyLayout}><div className={s.panel}><h2>Datos de la propiedad</h2><p className={s.panelIntro}>Estos datos identifican al hotel dentro del PMS y se reutilizan donde corresponda.</p><div className={s.formGrid}><label>Nombre<input value={profile.name} onChange={e=>setProfile({...profile,name:e.target.value})}/></label><label>Ciudad<input value={profile.city} onChange={e=>setProfile({...profile,city:e.target.value})}/></label><label className={s.wide}>Descripción<textarea rows="4" value={profile.description} onChange={e=>setProfile({...profile,description:e.target.value})}/></label></div><footer><button className={s.primary} onClick={saveProperty} disabled={saving==="property"}>{saving==="property"?"Guardando…":"Guardar propiedad"}</button></footer></div><div className={s.photoPanel}><div className={s.photoFrame}>{branding.hotel_photo_url?<img src={branding.hotel_photo_url} alt={`Foto de ${profile.name||"hotel"}`}/>:<div className={s.photoPlaceholder}><span>HL</span><b>Foto principal del hotel</b><small>Se verá en el Dashboard y podrá reutilizarse en la experiencia de reservas.</small></div>}<div className={s.photoGlass}><b>{profile.name||"Tu hotel"}</b><span>{profile.city||"Ubicación sin configurar"}</span></div></div><div className={s.photoActions}><label className={s.uploadButton}>{saving==="photo"?"Subiendo…":"Subir foto"}<input type="file" accept="image/jpeg,image/png,image/webp" disabled={saving==="photo"} onChange={e=>{const file=e.target.files?.[0];if(file)uploadHotelPhoto(file);e.target.value=""}}/></label>{branding.hotel_photo_url&&<button type="button" onClick={removeHotelPhoto} disabled={saving==="photo"}>Quitar</button>}</div><small className={s.photoHelp}>JPG, PNG o WebP · máximo 8 MB · la escritura queda aislada por propiedad.</small></div></div>}
@@ -119,6 +129,7 @@ export default function SettingsWorkspace({propertyId,property}){
     {tab==="types"&&<div className={s.typeGrid}>{roomTypes.length?roomTypes.map(type=><article key={type.name}><small>TIPO DE HABITACIÓN</small><h2>{type.name}</h2><div><span>{type.rooms} habitaciones</span><span>{type.capacity||"—"} personas</span><span>Desde {new Intl.NumberFormat("es-AR",{style:"currency",currency:prefs.currency||"ARS",maximumFractionDigits:0}).format(Number(type.basePrice)||0)}</span></div><p>Los tipos se forman a partir de las habitaciones reales. Editando el tipo de una habitación se actualiza su agrupación en Planning y Tarifas.</p></article>):<div className={s.notice}>Todavía no hay tipos de habitación configurados.</div>}</div>}
 
     {tab==="preferences"&&<PreferencesForm key={JSON.stringify(prefs)} value={prefs} onSave={savePrefs} saving={saving==="prefs"}/>}
+    {tab==="roles"&&<RolePermissionsPanel key={JSON.stringify(settings.role_permissions||{})} value={settings.role_permissions||{}} canManage={canManagePermissions} saving={saving==="roles"} onSave={saveRolePermissions}/>}
 
     {editingRoom&&<RoomModal room={editingRoom} floors={floors} roomTypes={roomTypes} saving={saving==="room"} onClose={()=>setEditingRoom(null)} onSave={saveRoom}/>} 
   </section>
