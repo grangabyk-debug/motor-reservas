@@ -13,7 +13,7 @@ export const OPERATIONS_NAV=[
   {id:"maintenance",label:"Mantenimiento",icon:"wrench"},
   {id:"inventory",label:"Inventario",icon:"inventory"},
   {id:"rates",label:"Tarifas y disponibilidad",icon:"rates"},
-  {id:"cash",label:"Caja y pagos",icon:"cash"},
+  {id:"finance",label:"Finanzas",icon:"cash"},
 ]
 
 export const MANAGEMENT_NAV=[
