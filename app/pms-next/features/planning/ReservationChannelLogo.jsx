@@ -20,6 +20,7 @@ export function channelMeta(value){
 }
 
 function BrandIcon({path,className}){return <svg viewBox="0 0 24 24" className={`${c.logo} ${className||""}`} aria-hidden="true"><path d={path} fill="currentColor"/></svg>}
+function DespegarIcon(){return <svg viewBox="0 0 24 24" className={c.logo} aria-hidden="true"><path d="M5 4.5h5.5a7.5 7.5 0 1 1 0 15H5z" fill="#5b17f2"/><path d="M5 4.5a7.5 7.5 0 0 0 0 15z" fill="#c4a4ff"/></svg>}
 function WalkInIcon(){return <svg viewBox="0 0 24 24" className={c.logo} aria-hidden="true"><path d="M4.5 3.5h8.4v17H4.5z" fill="none" stroke="currentColor" strokeWidth="1.8"/><path d="M13.2 12h6.3m-2.6-2.7L19.6 12l-2.7 2.7" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"/><circle cx="10.2" cy="12" r=".8" fill="currentColor"/></svg>}
 function PhoneIcon(){return <svg viewBox="0 0 24 24" className={c.logo} aria-hidden="true"><path d="M7.3 3.8 10 8.1 8.2 9.9c1.2 2.5 3.3 4.6 5.8 5.8l1.8-1.8 4.3 2.7-.8 3.2c-.2.7-.8 1.2-1.6 1.2C9.7 20.5 3.5 14.3 3 6.3c-.1-.8.4-1.4 1.2-1.6z" fill="currentColor"/></svg>}
 function MotorIcon(){return <svg viewBox="0 0 24 24" className={c.logo} aria-hidden="true"><circle cx="12" cy="12" r="8.4" fill="none" stroke="currentColor" strokeWidth="1.7"/><path d="M3.8 12h16.4M12 3.6c2.1 2.2 3.2 5 3.2 8.4S14.1 18.2 12 20.4C9.9 18.2 8.8 15.4 8.8 12S9.9 5.8 12 3.6Z" fill="none" stroke="currentColor" strokeWidth="1.5"/></svg>}
@@ -33,7 +34,7 @@ export default function ReservationChannelLogo({value}){
   else if(meta.key==="airbnb")icon=<BrandIcon path={AIRBNB_PATH} className={c.airbnb}/>
   else if(meta.key==="expedia")icon=<BrandIcon path={EXPEDIA_PATH} className={c.expedia}/>
   else if(meta.key==="whatsapp")icon=<BrandIcon path={WHATSAPP_PATH} className={c.whatsapp}/>
-  else if(meta.key==="despegar")icon=<img src="https://dl.svgcdn.com/svg/arcticons/despegar.svg" alt="" className={c.despegar} draggable="false"/>
+  else if(meta.key==="despegar")icon=<DespegarIcon/>
   else if(meta.key==="phone")icon=<PhoneIcon/>
   else if(meta.key==="motor")icon=<MotorIcon/>
   else if(meta.key==="agency")icon=<AgencyIcon/>
