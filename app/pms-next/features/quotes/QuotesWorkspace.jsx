@@ -3,60 +3,11 @@
 import{useCallback,useEffect,useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 import useQuoteAvailability from"./useQuoteAvailability"
+import{addDays,buildQuoteText,dateKey,esc,freshForm,money,nights,picksFromSelection,roomingDetails,selectionFromLines}from"./quoteUtils"
 import s from"./quotes.module.css"
 
-const DAY=86400000
-const pad=v=>String(v).padStart(2,"0")
-const dateKey=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`
-const addDays=(value,n)=>{const d=new Date(`${value}T12:00:00`);d.setDate(d.getDate()+n);return dateKey(d)}
-const nights=(a,b)=>Math.max(1,Math.round((new Date(`${b}T12:00:00`)-new Date(`${a}T12:00:00`))/DAY))
 const STATUS={draft:"Borrador",sent:"Enviado",accepted:"Aceptado",rejected:"Cancelado",expired:"Vencido"}
-const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency,maximumFractionDigits:0}).format(Number(value)||0)
-const esc=value=>String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"})[char])
 function emit(detail){if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("hl:pms-toast",{detail}))}
-
-function freshForm(currency="ARS"){
-  const start=dateKey(new Date())
-  return{name:"",email:"",phone:"",start,end:addDays(start,1),pax:2,currency,validUntil:addDays(dateKey(new Date()),7),terms:"Tarifas sujetas a disponibilidad al momento de confirmar.",notes:"",selection:{}}
-}
-function roomCapacity(room){return Math.max(1,Number(room?.capacidad)||1)}
-function distributeGuests(picks,total){
-  const result=new Map(picks.map(pick=>[String(pick.room.id),0])),remaining={value:Math.max(0,Number(total)||0)}
-  for(const pick of picks){if(remaining.value<=0)break;const id=String(pick.room.id);if(roomCapacity(pick.room)>0){result.set(id,1);remaining.value--}}
-  while(remaining.value>0){let moved=false;for(const pick of picks){if(remaining.value<=0)break;const id=String(pick.room.id),current=result.get(id)||0,space=roomCapacity(pick.room)-current;if(space>0){result.set(id,current+1);remaining.value--;moved=true}}if(!moved)break}
-  return{distribution:result,remaining:remaining.value}
-}
-function defaultBeds(room,guests){
-  const g=Math.max(0,Math.min(roomCapacity(room),Number(guests)||0)),type=String(room?.tipo||"").toLowerCase()
-  if(!g)return{matrimonial:0,individual:0}
-  if(type.includes("twin")||type.includes("individual")||type.includes("single"))return{matrimonial:0,individual:g}
-  if(g===1)return{matrimonial:0,individual:1}
-  return{matrimonial:1,individual:Math.max(0,g-2)}
-}
-function picksFromSelection(selection,types){
-  const picks=[]
-  for(const[typeName,rawQty]of Object.entries(selection||{})){
-    const qty=Math.max(0,Math.round(Number(rawQty)||0));if(!qty)continue
-    const bucket=types.find(type=>type.name===typeName)
-    if(!bucket||bucket.available<qty)throw new Error(`Ya no hay ${qty} ${typeName} disponibles para esas fechas.`)
-    const candidates=bucket.freeRooms.slice(bucket.reserved,bucket.reserved+qty)
-    if(candidates.length<qty)throw new Error(`No pudimos asignar las habitaciones de ${typeName}.`)
-    candidates.forEach(room=>picks.push({room,soldAs:typeName,rate:Number(bucket.basePrice)||Number(room.precio)||0}))
-  }
-  return picks
-}
-function selectionFromLines(quoteLines){
-  const selection={}
-  for(const line of quoteLines||[]){if(line.category!=="room")continue;const type=line.metadata?.room_type||line.description,qty=Math.max(1,Math.round(Number(line.quantity)||1));selection[type]=(selection[type]||0)+qty}
-  return selection
-}
-function roomingDetails(picks,totalGuests){
-  const totalCapacity=picks.reduce((sum,pick)=>sum+roomCapacity(pick.room),0),requested=Math.max(1,Number(totalGuests)||1)
-  if(requested>totalCapacity)throw new Error(`Las habitaciones seleccionadas tienen capacidad para ${totalCapacity} huésped${totalCapacity===1?"":"es"}, pero el presupuesto indica ${requested}.`)
-  const{distribution,remaining}=distributeGuests(picks,requested)
-  if(remaining>0)throw new Error("No pudimos distribuir todos los huéspedes entre las habitaciones seleccionadas.")
-  return picks.map(pick=>{const guests=distribution.get(String(pick.room.id))||0,beds=defaultBeds(pick.room,guests);return{habitacion_id:Number(pick.room.id),nombre:pick.room.nombre,categoria_asignada:pick.room.tipo||"Habitación",categoria_vendida:pick.soldAs||pick.room.tipo||"Habitación",huespedes:guests,tarifa_noche:Math.max(0,Number(pick.rate)||0),rooming:{matrimonial:beds.matrimonial,individual:beds.individual}}})
-}
 
 export default function QuotesWorkspace({propertyId,property,onNavigate}){
   const[quotes,setQuotes]=useState([]),[groups,setGroups]=useState({}),[lines,setLines]=useState({}),[currency,setCurrency]=useState("ARS")
@@ -102,7 +53,7 @@ export default function QuotesWorkspace({propertyId,property,onNavigate}){
     const{data:existing,error:existingError}=await supabase.from("reservas").select("id,numero_reserva,estado").eq("property_id",propertyId).eq("group_id",group.id).neq("estado","cancelada").limit(1)
     if(existingError)throw existingError
     if(existing?.length)throw new Error(`Este presupuesto ya fue convertido en la reserva ${existing[0].numero_reserva||existing[0].id}.`)
-    const current=latestOverride||await checkAvailability(group.arrival_date,group.departure_date,{excludeGroupId:group.id}),selection=selectionFromLines(quoteLines),picks=picksFromSelection(selection,current.types)
+    const current=latestOverride||await checkAvailability(group.arrival_date,group.departure_date,{excludeGroupId:group.id}),picks=picksFromSelection(selectionFromLines(quoteLines),current.types)
     if(!picks.length)throw new Error("No hay habitaciones para convertir.")
     const details=roomingDetails(picks,group.estimated_pax),roomIds=details.map(detail=>Number(detail.habitacion_id)),stayNights=nights(group.arrival_date,group.departure_date),rate=details.reduce((sum,detail)=>sum+(Number(detail.tarifa_noche)||0),0)
     const{data:userData,error:userError}=await supabase.auth.getUser();if(userError)throw userError
@@ -112,8 +63,7 @@ export default function QuotesWorkspace({propertyId,property,onNavigate}){
     await supabase.from("hotel_group_inventory_blocks").update({status:"released",updated_at:new Date().toISOString(),notes:`Materializado en reserva ${reservation.numero_reserva||reservation.id}`}).eq("property_id",propertyId).eq("group_id",group.id).neq("status","released")
     if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("hl:pms-reservation-updated",{detail:{reservationId:reservation.id}}))
     emit({title:"Reserva creada",message:`${reservation.numero_reserva||reservation.id} · ${roomIds.length} habitación${roomIds.length===1?"":"es"} · datos del presupuesto reutilizados.`})
-    setFormOpen(false);setSelected(null);await load();onNavigate?.("reservations",{reservationId:reservation.id,restoreScroll:false})
-    return reservation
+    setFormOpen(false);setSelected(null);await load();onNavigate?.("reservations",{reservationId:reservation.id,restoreScroll:false});return reservation
   }
 
   async function createQuote(mode="send"){
@@ -121,8 +71,7 @@ export default function QuotesWorkspace({propertyId,property,onNavigate}){
     if(form.end<=form.start)return setError("La salida debe ser posterior a la entrada.")
     if(selectedRooms<1)return setError("Seleccioná al menos una habitación disponible.")
     if(Number(form.pax)>selectedCapacity)return setError("La capacidad seleccionada es menor que la cantidad de huéspedes.")
-    setSaving(true);setError("");setNotice("")
-    let groupId=null
+    setSaving(true);setError("");setNotice("");let groupId=null
     try{
       const latest=await checkAvailability(form.start,form.end)
       for(const[type,qty]of Object.entries(form.selection)){if(Number(qty)>0&&(latest.types.find(x=>x.name===type)?.available||0)<Number(qty))throw new Error(`Cambió la disponibilidad de ${type}. Volvé a seleccionar las habitaciones.`)}
@@ -138,19 +87,10 @@ export default function QuotesWorkspace({propertyId,property,onNavigate}){
     finally{setSaving(false)}
   }
 
-  async function markQuote(quote,status){
-    setSaving(true);setError("")
-    try{const{error:rpcError}=await supabase.rpc("hl_group_mark_quote_atomic",{p_property_id:propertyId,p_quote_id:quote.id,p_status:status});if(rpcError)throw rpcError;emit({title:status==="rejected"?"Presupuesto cancelado":"Presupuesto actualizado",message:`${quote.quote_number} · ${STATUS[status]||status}.`});await load();setSelected(null)}catch(err){setError(err?.message||"No se pudo actualizar el presupuesto.")}finally{setSaving(false)}
-  }
-
+  async function markQuote(quote,status){setSaving(true);setError("");try{const{error:rpcError}=await supabase.rpc("hl_group_mark_quote_atomic",{p_property_id:propertyId,p_quote_id:quote.id,p_status:status});if(rpcError)throw rpcError;emit({title:status==="rejected"?"Presupuesto cancelado":"Presupuesto actualizado",message:`${quote.quote_number} · ${STATUS[status]||status}.`});await load();setSelected(null)}catch(err){setError(err?.message||"No se pudo actualizar el presupuesto.")}finally{setSaving(false)}}
   async function convertToReservation(quote){setSaving(true);setError("");try{await createReservationFromQuote(quote)}catch(err){setError(err?.message||"No se pudo crear la reserva desde el presupuesto.")}finally{setSaving(false)}}
-
-  function quoteText(quote){
-    const group=groups[quote.group_id],quoteLines=lines[quote.id]||[],hotel=property?.name||"Hotel"
-    const concepts=quoteLines.filter(line=>line.category==="room").map(line=>`${Number(line.quantity)||1} × ${line.description}: ${money(line.total||line.unit_price,quote.currency)}`).join("\n")
-    return`Hola ${group?.contact_name||group?.name||""},\n\nTe compartimos el presupuesto ${quote.quote_number} de ${hotel}.\n\nEstadía: ${group?.arrival_date||"—"} al ${group?.departure_date||"—"}\nHuéspedes: ${group?.estimated_pax||0}\n${concepts?`${concepts}\n`:""}Total: ${money(quote.total,quote.currency)}\nVálido hasta: ${quote.valid_until||"—"}\n\n${quote.terms||"Tarifas sujetas a disponibilidad al momento de confirmar."}\n\nSi querés avanzar con la reserva, respondé este mensaje y la confirmamos.`
-  }
-  function sendQuoteEmail(quote){const group=groups[quote.group_id];if(!group?.contact_email)return emit({tone:"error",title:"Falta email",message:"Este presupuesto no tiene un email cargado."});const subject=`${property?.name||"Hotel"} · Presupuesto ${quote.quote_number}`,body=quoteText(quote);window.location.href=`mailto:${encodeURIComponent(group.contact_email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`}
+  function quoteText(quote){return buildQuoteText({quote,group:groups[quote.group_id],quoteLines:lines[quote.id]||[],propertyName:property?.name||"Hotel"})}
+  function sendQuoteEmail(quote){const group=groups[quote.group_id];if(!group?.contact_email)return emit({tone:"error",title:"Falta email",message:"Este presupuesto no tiene un email cargado."});const subject=`${property?.name||"Hotel"} · Presupuesto ${quote.quote_number}`;window.location.href=`mailto:${encodeURIComponent(group.contact_email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(quoteText(quote))}`}
   function sendQuoteWhatsApp(quote){const group=groups[quote.group_id],phone=String(group?.contact_phone||"").replace(/\D/g,""),text=encodeURIComponent(quoteText(quote)),url=phone?`https://wa.me/${phone}?text=${text}`:`https://api.whatsapp.com/send?text=${text}`;window.open(url,"_blank","noopener,noreferrer")}
 
   function printQuote(quote){
@@ -165,9 +105,7 @@ export default function QuotesWorkspace({propertyId,property,onNavigate}){
     {error&&<div className={s.error}>{error}</div>}{notice&&<div className={s.notice}>{notice}</div>}
     <div className={s.infoStrip}><span>◇ El presupuesto no ocupa habitaciones</span><span>✓ La disponibilidad se vuelve a validar al confirmar</span><span>↗ Un clic lo convierte en reserva real</span></div>
     {loading?<div className={s.notice}>Cargando presupuestos…</div>:<div className={s.list}>{quotes.length?quotes.map(quote=>{const group=groups[quote.group_id];return <button type="button" key={quote.id} className={s.quoteRow} onClick={()=>setSelected(quote)}><div><small>{quote.quote_number||"SIN NÚMERO"}</small><b>{group?.contact_name||group?.name||"Sin contacto"}</b></div><span>{group?.arrival_date||"—"} → {group?.departure_date||"—"}</span><span>{group?.room_block||0} hab. · {group?.estimated_pax||0} pax</span><strong>{money(quote.total,quote.currency)}</strong><em data-status={quote.status}>{STATUS[quote.status]||quote.status}</em><i>›</i></button>}):<div className={s.empty}><b>Todavía no hay presupuestos</b><span>Creá uno desde una llamada o consulta sin alterar la disponibilidad del Planning.</span></div>}</div>}
-
     {formOpen&&<div className={s.backdrop} onMouseDown={e=>e.target===e.currentTarget&&setFormOpen(false)}><div className={s.modal}><button className={s.close} onClick={()=>setFormOpen(false)} aria-label="Cerrar">×</button><small>NUEVO PRESUPUESTO</small><h2>Buscar disponibilidad y cotizar</h2><div className={s.formGrid}><label>Nombre / grupo<input autoFocus value={form.name} onChange={e=>patch({name:e.target.value})} placeholder="Familia Fernández / Empresa"/></label><label>Huéspedes<input type="number" min="1" value={form.pax} onChange={e=>patch({pax:e.target.value})}/></label><label>Email<input type="email" value={form.email} onChange={e=>patch({email:e.target.value})}/></label><label>Teléfono<input value={form.phone} onChange={e=>patch({phone:e.target.value})}/></label><label>Entrada<input type="date" value={form.start} onChange={e=>changeDates({start:e.target.value})}/></label><label>Salida<input type="date" min={addDays(form.start,1)} value={form.end} onChange={e=>changeDates({end:e.target.value})}/></label><label>Moneda<select value={form.currency} onChange={e=>patch({currency:e.target.value})}><option>ARS</option><option>USD</option><option>EUR</option></select></label><label>Válido hasta<input type="date" value={form.validUntil} onChange={e=>patch({validUntil:e.target.value})}/></label></div><div className={s.availabilityHead}><div><h3>Habitaciones disponibles</h3><p>{checking?"Comprobando Planning…":`${availability.types.reduce((sum,t)=>sum+t.available,0)} disponibles para ${nights(form.start,form.end)} noche${nights(form.start,form.end)===1?"":"s"}`}</p></div><button type="button" onClick={()=>refreshAvailability()}>Actualizar</button></div><div className={s.typeList}>{availability.types.map(type=><article key={type.name}><div><b>{type.name}</b><small>{type.available} disponibles · hasta {type.capacity} pax · desde {money(type.basePrice,form.currency)}/noche</small></div><div className={s.stepper}><button type="button" onClick={()=>setQty(type.name,(form.selection[type.name]||0)-1)}>−</button><input type="number" min="0" max={type.available} value={form.selection[type.name]||0} onChange={e=>setQty(type.name,e.target.value)}/><button type="button" onClick={()=>setQty(type.name,(form.selection[type.name]||0)+1)}>＋</button></div></article>)}{!checking&&!availability.types.length&&<div className={s.noAvailability}>No hay inventario disponible para esas fechas.</div>}</div><div className={s.quoteSummary}><div><span>Habitaciones</span><b>{selectedRooms}</b></div><div><span>Capacidad seleccionada</span><b>{selectedCapacity} pax</b></div><div><span>Estimado</span><b>{money(estimate,form.currency)}</b></div></div><label className={s.fullLabel}>Condiciones<textarea rows="3" value={form.terms} onChange={e=>patch({terms:e.target.value})}/></label><label className={s.fullLabel}>Notas internas<textarea rows="2" value={form.notes} onChange={e=>patch({notes:e.target.value})}/></label>{selectedCapacity>0&&Number(form.pax)>selectedCapacity&&<div className={s.warning}>La capacidad seleccionada es menor que la cantidad de huéspedes.</div>}<footer><button onClick={()=>setFormOpen(false)}>Cancelar</button><button disabled={saving||checking||selectedRooms<1} onClick={()=>createQuote("send")}>{saving?"Procesando…":"Preparar para enviar"}</button><button className={s.primary} disabled={saving||checking||selectedRooms<1} onClick={()=>createQuote("reservation")}>{saving?"Creando…":"Crear reserva"}</button></footer></div></div>}
-
     {selected&&<div className={s.backdrop} onMouseDown={e=>e.target===e.currentTarget&&setSelected(null)}><div className={`${s.modal} ${s.detailModal}`}><button className={s.close} onClick={()=>setSelected(null)}>×</button><small>{selected.quote_number}</small><h2>{selectedGroup?.contact_name||selectedGroup?.name}</h2><div className={s.detailMeta}><span><small>Estadía</small><b>{selectedGroup?.arrival_date} → {selectedGroup?.departure_date}</b></span><span><small>Huéspedes</small><b>{selectedGroup?.estimated_pax||0}</b></span><span><small>Estado</small><b>{STATUS[selected.status]||selected.status}</b></span><span><small>Total</small><b>{money(selected.total,selected.currency)}</b></span></div><div className={s.detailLines}>{(lines[selected.id]||[]).map(line=><div key={line.id}><span><b>{line.description}</b><small>{line.quantity} × {money(line.unit_price,selected.currency)}</small></span><strong>{money(line.total,selected.currency)}</strong></div>)}</div>{selected.terms&&<div className={s.terms}><b>Condiciones</b><p>{selected.terms}</p></div>}<footer className={s.detailActions}><button onClick={()=>sendQuoteEmail(selected)}>✉ Email</button><button onClick={()=>sendQuoteWhatsApp(selected)}>WhatsApp</button><button onClick={()=>printQuote(selected)}>Imprimir / PDF</button>{!["accepted","rejected"].includes(selected.status)&&<button className={s.primary} disabled={saving} onClick={()=>convertToReservation(selected)}>{saving?"Procesando…":"Crear reserva"}</button>}{!["accepted","rejected"].includes(selected.status)&&<button className={s.reject} disabled={saving} onClick={()=>markQuote(selected,"rejected")}>Cancelar presupuesto</button>}</footer></div></div>}
   </section>
 }
