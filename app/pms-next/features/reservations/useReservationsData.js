@@ -18,7 +18,7 @@ export default function useReservationsData(propertyId){
   const fetchPage=useCallback(async(page,{replace=false}={})=>{
     if(!propertyId)return
     const from=page*PAGE_SIZE,to=from+PAGE_SIZE-1
-    const resQuery=supabase.from("reservas").select("id,numero_reserva,nombre_huesped,email_huesped,telefono_huesped,habitacion_id,habitaciones_ids,habitaciones_detalle,fecha_entrada,fecha_salida,estado,no_show,canal_reserva,precio_total,subtotal,tarifa_noche,noches,moneda,cantidad_huespedes,guest_profile_id,notas,created_at,tipo_estadia,servicios,mascotas_total,cochera_total,extra,extra_descripcion,early_checkin_importe,late_checkout_importe,regimen,hora_llegada_estimada,hora_salida_estimada").eq("property_id",propertyId).order("fecha_entrada",{ascending:false}).range(from,to)
+    const resQuery=supabase.from("reservas").select("id,numero_reserva,nombre_huesped,email_huesped,telefono_huesped,habitacion_id,habitaciones_ids,habitaciones_detalle,fecha_entrada,fecha_salida,estado,no_show,canal_reserva,codigo_canal,precio_total,subtotal,descuento_tipo,descuento_valor,descuento_importe,tarifa_noche,noches,moneda,cantidad_huespedes,guest_profile_id,notas,created_at,tipo_estadia,servicios,mascotas_total,cochera_total,extra,extra_descripcion,early_checkin_importe,late_checkout_importe,regimen,hora_llegada_estimada,hora_salida_estimada,pais_huesped,nacionalidad_huesped,tipo_documento_huesped,dni_huesped").eq("property_id",propertyId).order("fecha_entrada",{ascending:false}).range(from,to)
     const roomQuery=replace?supabase.from("habitaciones").select("id,nombre,tipo,capacidad,precio").eq("property_id",propertyId):Promise.resolve({data:null,error:null})
     const[resRes,roomRes]=await Promise.all([resQuery,roomQuery])
     if(resRes.error)throw resRes.error
