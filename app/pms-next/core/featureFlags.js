@@ -1,5 +1,5 @@
 export const FEATURE_DEFAULTS=Object.freeze({
-  guest_requests:false,
+  guest_requests:true,
   outbound_inbox:false,
   suppliers:false,
   smart_access:false,
