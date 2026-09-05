@@ -9,9 +9,10 @@ import d from"./frontDesk.module.css"
 const shortcuts=[{id:"planning",label:"Planning",icon:"▦"},{id:"quotes",label:"Presupuestar",icon:"◇"},{id:"messages",label:"Mensajes",icon:"◌"},{id:"finance",label:"Finanzas",icon:"▤"},{id:"rates",label:"Tarifas y disponibilidad",icon:"↗"}]
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:0}).format(Number(value)||0)
 const initials=value=>String(value||"H").trim().split(/\s+/).map(part=>part[0]).join("").slice(0,2).toUpperCase()
+const actualVip=value=>{const normalized=String(value||"").trim();return normalized&&!['standard','normal','none','sin vip','default'].includes(normalized.toLowerCase())?normalized:""}
 
 function GuestRow({item,kind,onOpen}){
-  const time=kind==="arrival"?item.hora_llegada_estimada:kind==="departure"?item.hora_salida_estimada:null,roomLabel=item.roomNames?.length?item.roomNames.join(", "):"Sin habitación",vip=String(item.vipLevel||"").trim(),tags=(item.guestTags||[]).slice(0,2)
+  const time=kind==="arrival"?item.hora_llegada_estimada:kind==="departure"?item.hora_salida_estimada:null,roomLabel=item.roomNames?.length?item.roomNames.join(", "):"Sin habitación",vip=actualVip(item.vipLevel),tags=(item.guestTags||[]).slice(0,2)
   return <button type="button" className={d.guestRow} onClick={onOpen} title={item.guestProfileNotes||undefined}>
     <span className={d.guestAvatar}>{initials(item.nombre_huesped)}</span><span className={d.guestMain}><b>{item.nombre_huesped}</b><small>{roomLabel} · {item.canal_reserva||"Directa"}{time?` · ${time}`:""}</small><span className={d.guestFlags}>{vip?<em data-kind="vip">VIP {vip}</em>:null}{item.guestLanguage?<em data-kind="info">{item.guestLanguage}</em>:null}{tags.map(tag=><em data-kind="info" key={tag}>{tag}</em>)}{item.roomMaintenance?<em data-kind="danger">Mantenimiento</em>:item.roomDirty&&kind==="arrival"?<em data-kind="warn">Habitación sucia</em>:null}{item.balance>0?<em data-kind="money">Saldo {money(item.balance,item.moneda)}</em>:<em data-kind="ok">Pago cubierto</em>}</span></span><span className={d.guestPax}>{item.cantidad_huespedes||1} pax<br/><small>›</small></span>
   </button>
@@ -23,7 +24,7 @@ export default function DashboardWorkspace({propertyId,property,onNavigate,allow
   const allowed=useMemo(()=>new Set(allowedViews),[allowedViews]),can=id=>allowed.size===0||allowed.has(id)
   useEffect(()=>{let active=true;async function loadPhoto(){const{data:row}=await supabase.from("property_settings").select("settings").eq("property_id",propertyId).maybeSingle();if(active)setHotelPhoto(row?.settings?.branding?.hotel_photo_url||"")}if(propertyId)loadPhoto();const onSettings=event=>{if(event.detail?.propertyId===propertyId)setHotelPhoto(event.detail?.settings?.branding?.hotel_photo_url||"")};window.addEventListener("hl:property-settings-updated",onSettings);return()=>{active=false;window.removeEventListener("hl:property-settings-updated",onSettings)}},[propertyId])
   const quickLinks=shortcuts.filter(item=>can(item.id)),ops=data.operationsByOffset?.[opsDay]||{arrivals:[],inhouse:[],departures:[]}
-  const filterRows=rows=>{const term=opsQuery.trim().toLowerCase();return term?rows.filter(item=>`${item.nombre_huesped} ${item.numero_reserva||""} ${(item.roomNames||[]).join(" ")} ${item.canal_reserva||""} ${item.vipLevel||""} ${(item.guestTags||[]).join(" ")}`.toLowerCase().includes(term)):rows}
+  const filterRows=rows=>{const term=opsQuery.trim().toLowerCase();return term?rows.filter(item=>`${item.nombre_huesped} ${item.numero_reserva||""} ${(item.roomNames||[]).join(" ")} ${item.canal_reserva||""} ${actualVip(item.vipLevel)} ${(item.guestTags||[]).join(" ")}`.toLowerCase().includes(term)):rows}
   const columns=[{key:"arrivals",title:"Llegadas",kind:"arrival"},{key:"inhouse",title:"En casa",kind:"inhouse"},{key:"departures",title:"Salidas",kind:"departure"}]
   const openReservation=item=>onNavigate?.("reservations",{reservationId:item.id})
   return <section className={s.page}>
