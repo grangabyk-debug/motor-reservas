@@ -8,7 +8,7 @@ export function readTheme(){
     const saved=window.localStorage.getItem(THEME_STORAGE_KEY)
     if(saved==="light"||saved==="dark")return saved
   }catch{}
-  return window.matchMedia?.("(prefers-color-scheme: dark)")?.matches?"dark":"light"
+  return"light"
 }
 
 export function persistTheme(theme){
