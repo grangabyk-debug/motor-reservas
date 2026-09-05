@@ -1,5 +1,6 @@
 "use client"
 
+import{useState}from"react"
 import{ReservationBlock}from"./PlanningPieces"
 import c from"./planningCanvas.module.css"
 import t from"./planningToday.module.css"
@@ -39,6 +40,21 @@ function InventoryStrip({days,rooms,reservations,today,settings,grid}){
   </div>
 }
 
+function PlanningReference({onClose}){
+  return <aside className={c.referencePopover} role="dialog" aria-label="Referencia del Planning">
+    <header><div><small>REFERENCIA</small><b>Cómo leer el Planning</b></div><button type="button" onClick={onClose} aria-label="Cerrar referencia">×</button></header>
+    <div className={c.referenceRows}>
+      <div><i className={`${c.legendSwatch} ${c.legendInhouse}`}/><span><b>En hotel</b><small>Huésped alojado / check-in realizado</small></span></div>
+      <div><i className={`${c.legendSwatch} ${c.legendConfirmed}`}/><span><b>Confirmada</b><small>Reserva futura confirmada</small></span></div>
+      <div><i className={`${c.legendSwatch} ${c.legendAttention}`}/><span><b>Pendiente</b><small>Tentativa o pendiente de confirmar</small></span></div>
+      <div><i className={`${c.legendSwatch} ${c.legendFinished}`}/><span><b>Finalizada</b><small>Estadía cerrada</small></span></div>
+      <div><i className={`${c.legendSwatch} ${c.legendToday}`}/><span><b>Hoy</b><small>Columna celeste del día actual</small></span></div>
+      <div><i className={c.middaySample}/><span><b>Mediodía</b><small>Línea punteada: referencia de check-in / check-out</small></span></div>
+    </div>
+    <p>Las estadías normales comienzan a mitad del día de entrada y terminan a mitad del día de salida. Un day use se dibuja dentro de un solo día.</p>
+  </aside>
+}
+
 function RangeActions({days,range,onConfirm,onCancel}){
   if(!range)return null
   const start=Math.max(0,days.indexOf(range.start)),end=Math.max(start+1,days.indexOf(addDays(range.end,-1))+1),center=(start+end)/2
@@ -59,15 +75,19 @@ function RoomRow({room,days,settings,grid,visibleReservations,selected,dragging,
 }
 
 export default function PlanningCalendar({property,days,today,settings,rooms,availabilityReservations,visibleReservations,selected,dragging,dropCell,rangeSelection,onRoom,onBeginRange,onExtendRange,onFinishRange,onDropCell,onDrop,onSelect,onDrag,onResize,onPreview,onConfirmRange,onCancelRange}){
+  const[referenceOpen,setReferenceOpen]=useState(false)
   const grid={gridTemplateColumns:`repeat(${days.length},var(--day-width))`},months=monthSegments(days)
-  return <div className={c.calendar}>
-    <div className={c.monthRow}><div className={c.corner}><span>{property?.name||"Propiedad activa"}</span></div><div className={c.months} style={grid}>{months.map(segment=><div key={segment.key} style={{gridColumn:`${segment.start+1} / span ${segment.span}`}}>{segment.label}</div>)}</div></div>
-    <div className={c.dayRow}><div className={c.roomHead}>Habitación</div><div className={c.days} style={grid}>{days.map(day=>{const weekend=settings.shadeWeekends&&[0,6].includes(fromKey(day).getDay());return <div key={day} className={`${day===today?`${c.todayHead} ${t.todayHeader}`:""} ${weekend?c.weekendHead:""}`}><small>{dayName(day)}</small><b>{fromKey(day).getDate()}</b></div>})}</div></div>
-    <InventoryStrip days={days} rooms={rooms} reservations={availabilityReservations} today={today} settings={settings} grid={grid}/>
-    <div className={c.calendarBody} style={{"--timeline-width":`calc(${days.length} * var(--day-width))`}}>
-      <TimelineBands days={days} today={today} settings={settings} grid={grid}/>
-      {rooms.map(room=><RoomRow key={room.id} room={room} days={days} settings={settings} grid={grid} visibleReservations={visibleReservations} selected={selected} dragging={dragging} dropCell={dropCell} rangeSelection={rangeSelection} onRoom={day=>onRoom(room.id,day||today)} onBeginRange={onBeginRange} onExtendRange={onExtendRange} onFinishRange={onFinishRange} onDropCell={onDropCell} onDrop={onDrop} onSelect={onSelect} onDrag={onDrag} onResize={onResize} onPreview={onPreview} onConfirmRange={onConfirmRange} onCancelRange={onCancelRange}/>) }
-      {!rooms.length?<div className={c.noResults}>No hay habitaciones que coincidan con los filtros.</div>:null}
+  return <div className={c.calendarShell}>
+    <div className={c.calendar}>
+      <div className={c.monthRow}><div className={c.corner}><span>{property?.name||"Propiedad activa"}</span><button type="button" className={c.referenceButton} onClick={()=>setReferenceOpen(value=>!value)} aria-label="Ver referencia del Planning" title="Referencia de colores y horarios">i</button></div><div className={c.months} style={grid}>{months.map(segment=><div key={segment.key} style={{gridColumn:`${segment.start+1} / span ${segment.span}`}}>{segment.label}</div>)}</div></div>
+      <div className={c.dayRow}><div className={c.roomHead}>Habitación</div><div className={c.days} style={grid}>{days.map(day=>{const weekend=settings.shadeWeekends&&[0,6].includes(fromKey(day).getDay());return <div key={day} className={`${day===today?`${c.todayHead} ${t.todayHeader}`:""} ${weekend?c.weekendHead:""}`}><small>{dayName(day)}</small><b>{fromKey(day).getDate()}</b></div>})}</div></div>
+      <InventoryStrip days={days} rooms={rooms} reservations={availabilityReservations} today={today} settings={settings} grid={grid}/>
+      <div className={c.calendarBody} style={{"--timeline-width":`calc(${days.length} * var(--day-width))`}}>
+        <TimelineBands days={days} today={today} settings={settings} grid={grid}/>
+        {rooms.map(room=><RoomRow key={room.id} room={room} days={days} settings={settings} grid={grid} visibleReservations={visibleReservations} selected={selected} dragging={dragging} dropCell={dropCell} rangeSelection={rangeSelection} onRoom={day=>onRoom(room.id,day||today)} onBeginRange={onBeginRange} onExtendRange={onExtendRange} onFinishRange={onFinishRange} onDropCell={onDropCell} onDrop={onDrop} onSelect={onSelect} onDrag={onDrag} onResize={onResize} onPreview={onPreview} onConfirmRange={onConfirmRange} onCancelRange={onCancelRange}/>) }
+        {!rooms.length?<div className={c.noResults}>No hay habitaciones que coincidan con los filtros.</div>:null}
+      </div>
     </div>
+    {referenceOpen?<PlanningReference onClose={()=>setReferenceOpen(false)}/>:null}
   </div>
 }
