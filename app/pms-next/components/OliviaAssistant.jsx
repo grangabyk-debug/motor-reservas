@@ -15,6 +15,8 @@ function greeting(propertyName) {
   return `Hola, soy OlivIA. Estoy para ayudarte con ${property}: puedo leer la operación de hoy, explicarte cómo usar Habitación Llena y sugerirte próximos pasos.`
 }
 
+const photoStyle = { width: "100%", height: "100%", display: "block", objectFit: "cover", borderRadius: "inherit" }
+
 export default function OliviaAssistant({ propertyId, propertyName, context, onHide }) {
   const [open, setOpen] = useState(false)
   const [nudge, setNudge] = useState(true)
@@ -98,8 +100,7 @@ export default function OliviaAssistant({ propertyId, propertyName, context, onH
           <header className={styles.header}>
             <div className={styles.identity}>
               <span className={styles.avatar} aria-hidden="true">
-                <b>O</b>
-                <i>✦</i>
+                <img src="/olivia-avatar.png" alt="" style={photoStyle}/>
               </span>
               <span>
                 <small>ASISTENTE DEL PMS</small>
@@ -120,7 +121,7 @@ export default function OliviaAssistant({ propertyId, propertyName, context, onH
           <div className={styles.messages} aria-live="polite">
             {messages.map((message) => (
               <div key={message.id} className={`${styles.messageRow} ${styles[message.role]}`}>
-                {message.role === "assistant" ? <span className={styles.miniAvatar}>O</span> : null}
+                {message.role === "assistant" ? <span className={styles.miniAvatar}><img src="/olivia-avatar.png" alt="" style={photoStyle}/></span> : null}
                 <div className={`${styles.bubble} ${message.error ? styles.errorBubble : ""}`}>{message.text}</div>
               </div>
             ))}
@@ -137,7 +138,7 @@ export default function OliviaAssistant({ propertyId, propertyName, context, onH
 
             {sending ? (
               <div className={`${styles.messageRow} ${styles.assistant}`}>
-                <span className={styles.miniAvatar}>O</span>
+                <span className={styles.miniAvatar}><img src="/olivia-avatar.png" alt="" style={photoStyle}/></span>
                 <div className={`${styles.bubble} ${styles.typing}`} aria-label="OlivIA está escribiendo">
                   <i /> <i /> <i />
                 </div>
@@ -184,8 +185,7 @@ export default function OliviaAssistant({ propertyId, propertyName, context, onH
           aria-expanded={open}
           title="OlivIA · Asistente hotelero"
         >
-          <span className={styles.launcherHalo} />
-          <span className={styles.launcherAvatar}>O</span>
+          <img className={styles.launcherAvatar} src="/olivia-avatar.png" alt="" style={photoStyle}/>
           <span className={styles.launcherSpark}>✦</span>
         </button>
       ) : null}
