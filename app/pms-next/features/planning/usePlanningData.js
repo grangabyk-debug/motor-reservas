@@ -6,6 +6,8 @@ import{supabase}from"../../../../lib/supabase"
 const DAY=86400000
 const nightsBetween=(start,end)=>Math.max(1,Math.round((new Date(`${end}T12:00:00`)-new Date(`${start}T12:00:00`))/DAY))
 function toast(detail){if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("hl:pms-toast",{detail}))}
+const uniqueNumeric=values=>[...new Set((values||[]).map(Number).filter(Number.isFinite))]
+const reservationRooms=item=>uniqueNumeric([item.habitacion_id,...(item.habitaciones_ids||[])])
 
 export default function usePlanningData(propertyId,windowStart,windowEndExclusive){
   const[rooms,setRooms]=useState([])
@@ -26,12 +28,8 @@ export default function usePlanningData(propertyId,windowStart,windowEndExclusiv
       if(resRes.error)throw resRes.error
       if(floorRes.error)throw floorRes.error
       const floorById=new Map((floorRes.data||[]).map(floor=>[String(floor.id),floor]))
-      const roomRows=(roomRes.data||[]).map(room=>{
-        const floor=floorById.get(String(room.floor_id||""))
-        return{...room,floor_name:floor?.name||"Sin piso",floor_sort:Number(floor?.sort_order??999)}
-      }).sort((a,b)=>a.floor_sort-b.floor_sort||Number(a.sort_order||0)-Number(b.sort_order||0)||String(a.nombre).localeCompare(String(b.nombre),"es",{numeric:true}))
-      setRooms(roomRows)
-      setReservations(resRes.data||[])
+      const roomRows=(roomRes.data||[]).map(room=>{const floor=floorById.get(String(room.floor_id||""));return{...room,floor_name:floor?.name||"Sin piso",floor_sort:Number(floor?.sort_order??999)}}).sort((a,b)=>a.floor_sort-b.floor_sort||Number(a.sort_order||0)-Number(b.sort_order||0)||String(a.nombre).localeCompare(String(b.nombre),"es",{numeric:true}))
+      setRooms(roomRows);setReservations(resRes.data||[])
     }catch(err){setError(err?.message||"No se pudo cargar el Planning.")}
     finally{setLoading(false)}
   },[propertyId,windowStart,windowEndExclusive])
@@ -50,35 +48,36 @@ export default function usePlanningData(propertyId,windowStart,windowEndExclusiv
       const{data,error:rpcError}=await supabase.rpc("hl_planning_move_reservation_atomic",{p_reserva_id:numericId,p_habitacion_id:numericRoom,p_fecha_entrada:start,p_fecha_salida:end})
       if(rpcError)throw rpcError
       setReservations(list=>list.map(item=>Number(item.id)===Number(data.id)?data:item).filter(item=>item.fecha_entrada<windowEndExclusive&&item.fecha_salida>=windowStart))
-      const oldRoom=rooms.find(room=>Number(room.id)===Number(previous.habitacion_id))?.nombre||previous.habitacion_id
-      const newRoom=rooms.find(room=>Number(room.id)===numericRoom)?.nombre||numericRoom
-      const roomChanged=Number(previous.habitacion_id)!==numericRoom
-      const startChanged=previous.fecha_entrada!==start
-      const durationChanged=oldNights!==newNights
+      const oldRoom=rooms.find(room=>Number(room.id)===Number(previous.habitacion_id))?.nombre||previous.habitacion_id,newRoom=rooms.find(room=>Number(room.id)===numericRoom)?.nombre||numericRoom
+      const roomChanged=Number(previous.habitacion_id)!==numericRoom,startChanged=previous.fecha_entrada!==start,durationChanged=oldNights!==newNights
       let message="Cambio guardado en el Planning."
       if(roomChanged&&startChanged)message=`Habitación ${oldRoom} → ${newRoom} · nueva entrada ${start}.`
       else if(roomChanged)message=`Habitación ${oldRoom} → ${newRoom}.`
       else if(durationChanged)message=`Estadía ${newNights>oldNights?"ampliada":"reducida"}: ${oldNights} → ${newNights} noches.`
       else if(startChanged)message=`Reserva movida a ${start}.`
-      toast({title:"Planning actualizado",message})
-      return data
+      toast({title:"Planning actualizado",message});return data
     }catch(err){
-      setReservations(list=>{
-        const withoutOptimistic=list.filter(item=>Number(item.id)!==numericId)
-        return previous.fecha_entrada<windowEndExclusive&&previous.fecha_salida>=windowStart?[...withoutOptimistic,previous]:withoutOptimistic
-      })
-      toast({tone:"error",title:"Cambio revertido",message:"El servidor no pudo confirmar el movimiento y el Planning volvió al estado anterior.",duration:4200})
-      throw err
+      setReservations(list=>{const withoutOptimistic=list.filter(item=>Number(item.id)!==numericId);return previous.fecha_entrada<windowEndExclusive&&previous.fecha_salida>=windowStart?[...withoutOptimistic,previous]:withoutOptimistic})
+      toast({tone:"error",title:"Cambio revertido",message:"El servidor no pudo confirmar el movimiento y el Planning volvió al estado anterior.",duration:4200});throw err
     }
   },[reservations,rooms,windowStart,windowEndExclusive])
 
   const createReservation=useCallback(async draft=>{
     const{data:userData,error:userError}=await supabase.auth.getUser();if(userError)throw userError
-    const nights=nightsBetween(draft.start,draft.end)
-    const room=rooms.find(item=>String(item.id)===String(draft.roomId))
-    const rate=Number(draft.rate||room?.precio||0)
+    const roomIds=uniqueNumeric(draft.roomIds?.length?draft.roomIds:[draft.roomId])
+    if(!roomIds.length)throw new Error("Elegí al menos una habitación.")
+    const selectedRooms=roomIds.map(id=>rooms.find(room=>Number(room.id)===id)).filter(Boolean)
+    if(selectedRooms.length!==roomIds.length)throw new Error("Hay una habitación seleccionada que ya no está disponible en esta propiedad.")
+
+    const{data:conflicts,error:conflictError}=await supabase.from("reservas").select("id,numero_reserva,habitacion_id,habitaciones_ids,fecha_entrada,fecha_salida,estado,no_show").eq("property_id",propertyId).neq("estado","cancelada").eq("no_show",false).lt("fecha_entrada",draft.end).gt("fecha_salida",draft.start)
+    if(conflictError)throw conflictError
+    const conflict=(conflicts||[]).find(item=>reservationRooms(item).some(id=>roomIds.includes(id)))
+    if(conflict){const conflictRoom=selectedRooms.find(room=>reservationRooms(conflict).includes(Number(room.id)));throw new Error(`La habitación ${conflictRoom?.nombre||"seleccionada"} ya tiene una reserva que se superpone con esas fechas.`)}
+
+    const nights=nightsBetween(draft.start,draft.end),defaultRate=selectedRooms.reduce((sum,room)=>sum+(Number(room.precio)||0),0),rate=Number(draft.rate||defaultRate||0)
     const payload={
-      property_id:propertyId,user_id:userData?.user?.id||null,habitacion_id:Number(draft.roomId),habitaciones_ids:[Number(draft.roomId)],habitaciones_detalle:[],
+      property_id:propertyId,user_id:userData?.user?.id||null,habitacion_id:roomIds[0],habitaciones_ids:roomIds,
+      habitaciones_detalle:selectedRooms.map(room=>({habitacion_id:Number(room.id),nombre:room.nombre,tipo:room.tipo||null,tarifa_noche:Number(room.precio)||0})),
       fecha_entrada:draft.start,fecha_salida:draft.end,tipo_estadia:"overnight",nombre_huesped:draft.guest.trim(),email_huesped:draft.email?.trim()||null,telefono_huesped:draft.phone?.trim()||null,
       cantidad_huespedes:Number(draft.guests)||1,canal_reserva:draft.channel||"Directa",tarifa_noche:rate,noches:nights,precio_total:rate*nights,moneda:draft.currency||"ARS",notas:draft.notes?.trim()||null,
       mascotas:[],mascotas_total:0,servicios:[],pasajeros:[],vehiculos:0,cochera_total:0,estado:draft.status||"confirmada",no_show:false,
@@ -86,7 +85,8 @@ export default function usePlanningData(propertyId,windowStart,windowEndExclusiv
     const{data,error:rpcError}=await supabase.rpc("hl_create_reservation_atomic",{p_reservation:payload,p_payments:[]})
     if(rpcError)throw rpcError
     if(data.fecha_entrada<windowEndExclusive&&data.fecha_salida>=windowStart)setReservations(list=>[...list,data])
-    toast({title:"Reserva creada",message:`${draft.guest.trim()} · Habitación ${room?.nombre||draft.roomId} · ${nights} noche${nights===1?"":"s"}.`})
+    const names=selectedRooms.map(room=>room.nombre).join(", ")
+    toast({title:roomIds.length>1?"Reserva grupal creada":"Reserva creada",message:`${draft.guest.trim()} · ${roomIds.length>1?`${roomIds.length} habitaciones (${names})`:`Habitación ${names}`} · ${nights} noche${nights===1?"":"s"}.`})
     return data
   },[propertyId,rooms,windowStart,windowEndExclusive])
 
