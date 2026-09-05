@@ -1,6 +1,7 @@
 "use client"
 
 import{useEffect,useMemo,useRef,useState}from"react"
+import{supabase}from"../../../../lib/supabase"
 import usePlanningData from"./usePlanningData"
 import{PlanningSettingsMenu}from"./PlanningPieces"
 import PlanningCalendar from"./PlanningCalendar"
@@ -35,7 +36,7 @@ export default function PlanningWorkspace({propertyId,property,onNavigate,newRes
   const days=useMemo(()=>Array.from({length:31},(_,index)=>addDays(anchor,index-2)),[anchor]),windowStart=days[0],windowEndExclusive=addDays(days.at(-1),1)
   const data=usePlanningData(propertyId,windowStart,windowEndExclusive),dayWidth=Math.max(28,Math.min(62,Number(settings.zoom)||38))
   const roomById=useMemo(()=>new Map(data.rooms.map(room=>[Number(room.id),room])),[data.rooms])
-  const draftKey=propertyId?`hl:pms-next:reservation-draft:${propertyId}`:"",settingsKey=propertyId?`hl:pms-next:planning-settings:${propertyId}`:""
+  const draftKey=propertyId?`hl:pms-next:reservation-draft:${propertyId}`:"",settingsKey=propertyId?`hl:pms-next:planning-settings:${propertyId}`:"",quoteSeedKey=propertyId?`hl:pms-next:quote-reservation-seed:${propertyId}`:""
   const roomTypes=useMemo(()=>[...new Set(data.rooms.map(room=>room.tipo||"Sin tipo"))].sort(),[data.rooms]),channels=useMemo(()=>[...new Set(data.reservations.map(item=>item.canal_reserva||"Walk-in"))].sort(),[data.reservations])
   const availabilityReservations=useMemo(()=>data.reservations.filter(item=>!item.no_show),[data.reservations])
 
@@ -69,12 +70,32 @@ export default function PlanningWorkspace({propertyId,property,onNavigate,newRes
     if(!roomId)return data.setError("Primero configurá una habitación activa.")
     setPreview(null);setSelected(null);setRateMove(null);setRangeSelection(null);setSelecting(false);setDraft(makeDraft(roomId,start,end,roomIds));setDrawerStep(0);setDraftState("Los cambios se guardan automáticamente en este dispositivo");setFormError("");data.setError("");setFormOpen(true)
   }
+  function consumeQuoteSeed(){
+    if(!quoteSeedKey||!data.rooms.length||typeof window==="undefined")return
+    let seed=null
+    try{const raw=window.localStorage.getItem(quoteSeedKey);if(!raw)return;seed=JSON.parse(raw);window.localStorage.removeItem(quoteSeedKey)}catch{return}
+    const ids=uniqueIds(seed?.roomIds||[]).filter(id=>roomById.has(Number(id)))
+    if(!ids.length)return data.setError("Las habitaciones del presupuesto ya no están disponibles para preparar la reserva.")
+    const start=seed.start||today,end=seed.end&&seed.end>start?seed.end:addDays(start,1),base=makeDraft(ids[0],start,end,ids)
+    setAnchor(start);setPreview(null);setSelected(null);setRateMove(null);setRangeSelection(null);setSelecting(false);setDraft({...base,...seed,roomId:ids[0],roomIds:ids,start,end,roomSelectionManual:true});setDrawerStep(0);setDraftState(`Datos precargados desde ${seed.quoteNumber||"presupuesto"}`);setFormError("");data.setError("");setFormOpen(true)
+  }
   function openNewReservation(){if(!data.rooms[0]?.id)return data.setError("Primero configurá una habitación activa.");if(draftKey)try{localStorage.removeItem(draftKey)}catch{}setHasSavedDraft(false);openFreshForm()}
   useEffect(()=>{if(!newReservationRequest||!data.rooms.length||lastNewReservationRequest.current===newReservationRequest)return;lastNewReservationRequest.current=newReservationRequest;openNewReservation()},[newReservationRequest,data.rooms.length])
+  useEffect(()=>{if(!quoteSeedKey||!data.rooms.length||typeof window==="undefined")return;const handler=()=>consumeQuoteSeed();handler();window.addEventListener("hl:pms-start-reservation-from-quote",handler);return()=>window.removeEventListener("hl:pms-start-reservation-from-quote",handler)},[quoteSeedKey,data.rooms.length])
   function clearDraft(){if(draftKey)try{localStorage.removeItem(draftKey)}catch{}setHasSavedDraft(false);setDraft(null);setDraftState("");setFormError("")}
   function discardDraft(){clearDraft();setFormOpen(false);setDrawerStep(0);data.setError("")}
   function nextStep(){if(drawerStep===0&&draft.end<=draft.start)return showFormError("La salida debe ser posterior a la entrada.");if(drawerStep===1&&!uniqueIds(draft.roomIds).length)return showFormError("Elegí al menos una habitación.");if(drawerStep===2&&(!String(draft.firstName||"").trim()||!String(draft.lastName||"").trim()))return showFormError("Completá nombre y apellido para continuar.");setFormError("");data.setError("");setDrawerStep(step=>Math.min(3,step+1))}
-  async function saveReservation(){if(saving)return;const guest=`${draft?.firstName||""} ${draft?.lastName||""}`.trim();if(!String(draft?.firstName||"").trim()||!String(draft?.lastName||"").trim())return showFormError("Completá nombre y apellido para crear la reserva.");setSaving(true);setFormError("");try{const created=await data.createReservation({...draft,guest});clearDraft();setFormOpen(false);setDrawerStep(0);onNavigate?.("reservations",{reservationId:created.id,restoreScroll:false})}catch(err){showFormError(err?.message||"No se pudo crear la reserva.")}finally{setSaving(false)}}
+  async function saveReservation(){
+    if(saving)return
+    const guest=`${draft?.firstName||""} ${draft?.lastName||""}`.trim();if(!String(draft?.firstName||"").trim()||!String(draft?.lastName||"").trim())return showFormError("Completá nombre y apellido para crear la reserva.")
+    setSaving(true);setFormError("")
+    try{
+      const quoteId=draft?.quoteId,created=await data.createReservation({...draft,guest})
+      if(quoteId){const{error:quoteError}=await supabase.rpc("hl_group_mark_quote_atomic",{p_property_id:propertyId,p_quote_id:quoteId,p_status:"accepted"});if(quoteError&&typeof window!=="undefined")window.dispatchEvent(new CustomEvent("hl:pms-toast",{detail:{tone:"warning",title:"Reserva creada",message:"La reserva quedó creada, pero el presupuesto no pudo marcarse como aceptado automáticamente."}}))}
+      clearDraft();setFormOpen(false);setDrawerStep(0);onNavigate?.("reservations",{reservationId:created.id,restoreScroll:false})
+    }catch(err){showFormError(err?.message||"No se pudo crear la reserva.")}
+    finally{setSaving(false)}
+  }
 
   function showPreview(item,rect){if(!item||!rect){setPreview(null);return}setPreview({item,rect})}
   function selectReservation(item){setPreview(null);setRateMove(null);setFormOpen(false);setFormError("");setRangeSelection(null);setSelected(item)}
