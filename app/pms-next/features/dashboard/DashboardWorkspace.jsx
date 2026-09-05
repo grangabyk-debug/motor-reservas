@@ -1,13 +1,12 @@
 "use client"
 
 import{useEffect,useMemo,useState}from"react"
-import{supabase}from"../../../../lib/supabase"
 import useDashboardData from"./useDashboardData"
-import VirtualHotelWidget from"./VirtualHotelWidget"
 import s from"./dashboard.module.css"
 import d from"./frontDesk.module.css"
 
 const shortcuts=[{id:"planning",label:"Planning",icon:"▦"},{id:"quotes",label:"Presupuestar",icon:"◇"},{id:"messages",label:"Mensajes",icon:"◌"},{id:"finance",label:"Finanzas",icon:"▤"},{id:"rates",label:"Tarifas y disponibilidad",icon:"↗"}]
+const DEFAULT_WIDGETS=["arrivals","departures","occupancy","dirty","maintenance","checks"]
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:0}).format(Number(value)||0)
 const initials=value=>String(value||"H").trim().split(/\s+/).map(part=>part[0]).join("").slice(0,2).toUpperCase()
 const actualVip=value=>{const normalized=String(value||"").trim();return normalized&&!['standard','normal','none','sin vip','default'].includes(normalized.toLowerCase())?normalized:""}
@@ -19,24 +18,37 @@ function GuestRow({item,kind,onOpen}){
   </button>
 }
 
+function PixelHotel({name}){
+  const hour=new Date().getHours(),period=hour<7?"night":hour<11?"morning":hour<17?"day":hour<20?"sunset":"night"
+  return <div className={s.pixelHotel} data-period={period} aria-label={`Vista ilustrada de ${name||"hotel"}`}><div className={s.pixelSun}/><div className={s.pixelCloud}/><div className={s.pixelBuilding}><div className={s.pixelSign}>{name||"Hotel"}</div><div className={s.pixelWindows}>{Array.from({length:12},(_,i)=><i key={i} data-lit={period==="night"&&i%3!==1?"1":"0"}/>)}</div><div className={s.pixelDoor}/></div><div className={s.pixelGround}/></div>
+}
+
 export default function DashboardWorkspace({propertyId,property,onNavigate,allowedViews=[]}){
   const data=useDashboardData(propertyId),m=data.metrics
-  const[hotelPhoto,setHotelPhoto]=useState(""),[opsDay,setOpsDay]=useState(0),[opsQuery,setOpsQuery]=useState("")
+  const[opsDay,setOpsDay]=useState(0),[opsQuery,setOpsQuery]=useState(""),[widgetOrder,setWidgetOrder]=useState(DEFAULT_WIDGETS),[dragging,setDragging]=useState("")
   const allowed=useMemo(()=>new Set(allowedViews),[allowedViews]),can=id=>allowed.size===0||allowed.has(id)
-  useEffect(()=>{let active=true;async function loadPhoto(){const{data:row}=await supabase.from("property_settings").select("settings").eq("property_id",propertyId).maybeSingle();if(active)setHotelPhoto(row?.settings?.branding?.hotel_photo_url||"")}if(propertyId)loadPhoto();const onSettings=event=>{if(event.detail?.propertyId===propertyId)setHotelPhoto(event.detail?.settings?.branding?.hotel_photo_url||"")};window.addEventListener("hl:property-settings-updated",onSettings);return()=>{active=false;window.removeEventListener("hl:property-settings-updated",onSettings)}},[propertyId])
+  useEffect(()=>{try{const saved=JSON.parse(localStorage.getItem(`hl:dashboard-widgets:${propertyId}`)||"null");if(Array.isArray(saved)&&saved.length)setWidgetOrder([...saved.filter(id=>DEFAULT_WIDGETS.includes(id)),...DEFAULT_WIDGETS.filter(id=>!saved.includes(id))])}catch{}},[propertyId])
+  function saveOrder(next){setWidgetOrder(next);try{localStorage.setItem(`hl:dashboard-widgets:${propertyId}`,JSON.stringify(next))}catch{}}
+  function dropOn(target){if(!dragging||dragging===target)return;const next=widgetOrder.filter(id=>id!==dragging),index=next.indexOf(target);next.splice(index,0,dragging);saveOrder(next);setDragging("")}
   const quickLinks=shortcuts.filter(item=>can(item.id)),ops=data.operationsByOffset?.[opsDay]||{arrivals:[],inhouse:[],departures:[]}
   const filterRows=rows=>{const term=opsQuery.trim().toLowerCase();return term?rows.filter(item=>`${item.nombre_huesped} ${item.numero_reserva||""} ${(item.roomNames||[]).join(" ")} ${item.canal_reserva||""} ${actualVip(item.vipLevel)} ${(item.guestTags||[]).join(" ")}`.toLowerCase().includes(term)):rows}
   const columns=[{key:"arrivals",title:"Llegadas",kind:"arrival"},{key:"inhouse",title:"En casa",kind:"inhouse"},{key:"departures",title:"Salidas",kind:"departure"}]
   const openReservation=item=>onNavigate?.("reservations",{reservationId:item.id})
+  const widgets={
+    arrivals:{label:"Llegadas",value:m.arrivals,note:"hoy",view:"reservations",tone:"blue"},
+    departures:{label:"Salidas",value:m.departures,note:"hoy",view:"reservations",tone:"violet"},
+    occupancy:{label:"Ocupación",value:`${m.occupancy.toFixed(0)}%`,note:`${m.inhouse}/${m.totalRooms} habitaciones`,view:"planning",tone:"green"},
+    dirty:{label:"Habitaciones sucias",value:m.dirty,note:`${m.ready} listas`,view:"housekeeping",tone:m.dirty?"amber":"green"},
+    maintenance:{label:"Mantenimiento",value:m.maintenance,note:`${m.urgent} urgentes`,view:"maintenance",tone:m.urgent?"red":"neutral"},
+    checks:{label:"Check-lists",value:`${m.checkPct}%`,note:`${m.checkDone}/${m.checkTotal} pasos`,view:"tasks",tone:"cyan"},
+  }
+  const visibleWidgets=widgetOrder.filter(id=>widgets[id]&&can(widgets[id].view))
   return <section className={s.page}>
-    <header className={s.intro}><div><small>OPERACIÓN DE HOY</small><h1>{property?.name||"Habitación Llena"}</h1><p>Lo importante del hotel, actualizado desde la propiedad activa.</p></div><button className={s.statusPill} onClick={data.load}>{data.loading?"Actualizando…":"Datos en vivo"}</button></header>
+    <header className={s.intro}><div><small>OPERACIÓN DE HOY</small><h1>Hoy</h1><p>Entradas, salidas, ocupación y tareas que requieren atención.</p></div><div className={s.introTools}><button className={s.resetWidgets} type="button" onClick={()=>saveOrder(DEFAULT_WIDGETS)}>Restablecer widgets</button><button className={s.statusPill} onClick={data.load}>{data.loading?"Actualizando…":"Datos en vivo"}</button></div></header>
     {data.error&&<div className={s.notice}>{data.error}</div>}
-    <div className={`${s.hotelHero} ${hotelPhoto?s.hasPhoto:""}`}>{hotelPhoto?<img src={hotelPhoto} alt={`Vista de ${property?.name||"hotel"}`}/>:null}<div className={s.heroGlow}/><div className={s.heroGlass}><small>MI PROPIEDAD</small><b>{property?.name||"Habitación Llena"}</b><span>{hotelPhoto?"Imagen configurada por el hotel":"Agregá una foto para personalizar el panel de recepción."}</span></div>{can("settings")&&<button type="button" className={s.heroEdit} onClick={()=>onNavigate?.("settings")}>{hotelPhoto?"Cambiar foto":"Subir foto"}</button>}</div>
-    <div className={s.todayGrid}>{can("reservations")&&<button onClick={()=>onNavigate?.("reservations")}><small>Llegadas</small><b>{m.arrivals}</b><span>hoy</span></button>}{can("reservations")&&<button onClick={()=>onNavigate?.("reservations")}><small>Salidas</small><b>{m.departures}</b><span>hoy</span></button>}{can("planning")&&<button onClick={()=>onNavigate?.("planning")}><small>Ocupación</small><b>{m.occupancy.toFixed(0)}%</b><span>{m.inhouse}/{m.totalRooms} habitaciones</span></button>}{can("housekeeping")&&<button onClick={()=>onNavigate?.("housekeeping")}><small>Habitaciones sucias</small><b>{m.dirty}</b><span>{m.ready} listas</span></button>}</div>
+    <div className={s.topStrip}><div><b>{new Intl.DateTimeFormat("es-AR",{weekday:"long",day:"numeric",month:"long"}).format(new Date())}</b><span>{m.totalRooms} habitaciones activas · arrastrá los widgets para ordenarlos</span></div><PixelHotel name={property?.name}/></div>
+    <div className={s.todayGrid}>{visibleWidgets.map(id=>{const w=widgets[id];return <button key={id} draggable onDragStart={()=>setDragging(id)} onDragEnd={()=>setDragging("")} onDragOver={e=>e.preventDefault()} onDrop={()=>dropOn(id)} data-tone={w.tone} className={dragging===id?s.dragging:""} onClick={()=>onNavigate?.(w.view)}><i className={s.dragHandle}>⋮⋮</i><small>{w.label}</small><b>{w.value}</b><span>{w.note}</span></button>})}</div>
     {can("reservations")&&<section className={d.frontDesk}><header className={d.frontDeskHead}><div><small>RECEPCIÓN</small><h2>Movimiento del hotel</h2><p>Entradas, huéspedes alojados y salidas con alertas operativas.</p></div><div className={d.frontDeskTools}><div className={d.dayTabs}>{[[-1,"Ayer"],[0,"Hoy"],[1,"Mañana"]].map(([value,label])=><button type="button" key={value} className={opsDay===value?d.dayActive:""} onClick={()=>setOpsDay(value)}>{label}</button>)}</div><label className={d.deskSearch}>⌕<input value={opsQuery} onChange={event=>setOpsQuery(event.target.value)} placeholder="Huésped, habitación o reserva"/></label></div></header><div className={d.frontDeskGrid}>{columns.map(column=>{const rows=filterRows(ops[column.key]||[]);return <article className={d.deskColumn} key={column.key}><header><b>{column.title}</b><span>{rows.length}</span></header><div className={d.guestList}>{rows.length?rows.map(item=><GuestRow key={`${column.key}-${item.id}`} item={item} kind={column.kind} onOpen={()=>openReservation(item)}/>):<div className={d.emptyOps}>Sin movimientos para esta vista.</div>}</div></article>})}</div></section>}
-    <VirtualHotelWidget propertyId={propertyId} propertyName={property?.name}/>
-    {(can("tasks")||can("maintenance"))&&<div className={s.mainGrid}>{can("tasks")&&<button className={s.operationCard} type="button" onClick={()=>onNavigate?.("tasks")}><div className={s.operationHead}><small>HOUSEKEEPING · CHECK-LISTS</small><span>›</span></div><div className={s.operationBody}><div className={s.ring} style={{"--progress":m.checkPct}}><div className={s.ringContent}><b>{m.checkDone}<span>/{m.checkTotal}</span></b><small>{m.checkPct}%</small></div></div><small>pasos completados hoy</small></div></button>}{can("maintenance")&&<button className={s.operationCard} type="button" onClick={()=>onNavigate?.("maintenance")}><div className={s.operationHead}><small>MANTENIMIENTO</small><span>›</span></div><div className={s.operationBody}><div className={s.bigNumber}>{m.maintenance}</div><small className={s.bigNumberNote}>tareas abiertas · {m.urgent} urgentes</small></div></button>}</div>}
     {quickLinks.length>0&&<div className={s.quickGrid}>{quickLinks.map(item=><button key={item.id} className={s.quickLink} type="button" onClick={()=>onNavigate?.(item.id)}><span>{item.icon}</span>{item.label}</button>)}</div>}
-    <div className={s.hint}><span><b>{property?.name||"Propiedad"}</b> · {m.totalRooms} habitaciones activas</span><span>Accesos adaptados al rol · modo día/noche · datos separados por propiedad</span></div>
   </section>
 }
