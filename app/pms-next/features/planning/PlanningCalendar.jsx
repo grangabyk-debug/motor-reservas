@@ -2,8 +2,10 @@
 
 import{useState}from"react"
 import{ReservationBlock}from"./PlanningPieces"
+import{PLANNING_STAGES}from"./planningLifecycle"
 import c from"./planningCanvas.module.css"
 import t from"./planningToday.module.css"
+import l from"./planningLifecycle.module.css"
 
 const DAY=86400000
 const pad=value=>String(value).padStart(2,"0")
@@ -13,6 +15,8 @@ const addDays=(value,amount)=>keyFromDate(new Date(fromKey(value).getTime()+amou
 const dayName=value=>new Intl.DateTimeFormat("es-AR",{weekday:"short"}).format(fromKey(value)).replace(".","")
 const roomHas=(item,roomId)=>Number(item.habitacion_id)===Number(roomId)||(item.habitaciones_ids||[]).map(Number).includes(Number(roomId))
 const covers=(item,roomId,day)=>roomHas(item,roomId)&&item.fecha_entrada<=day&&item.fecha_salida>day
+const coversDay=(item,day)=>item.fecha_entrada<=day&&item.fecha_salida>day
+const assignedIds=item=>new Set([item.habitacion_id,...(item.habitaciones_ids||[])].filter(Boolean).map(Number))
 
 function monthSegments(days){
   const result=[]
@@ -40,18 +44,26 @@ function InventoryStrip({days,rooms,reservations,today,settings,grid}){
   </div>
 }
 
+function UnassignedStrip({days,reservations,grid}){
+  const unassigned=reservations.filter(item=>item.estado!=="finalizada"&&assignedIds(item).size===0)
+  if(!unassigned.length)return null
+  const counts=days.map(day=>unassigned.filter(item=>coversDay(item,day)).length),total=new Set(unassigned.map(item=>item.id)).size
+  return <div className={l.unassignedRow}>
+    <div className={l.unassignedLabel}><b>Sin asignar</b><small>{total}</small></div>
+    <div className={l.unassignedDays} style={grid}>{days.map((day,index)=><div key={day} data-active={counts[index]>0?"true":"false"}>{counts[index]||"·"}</div>)}</div>
+  </div>
+}
+
 function PlanningReference({onClose}){
   return <aside className={c.referencePopover} role="dialog" aria-label="Referencia del Planning">
-    <header><div><small>REFERENCIA</small><b>Cómo leer el Planning</b></div><button type="button" onClick={onClose} aria-label="Cerrar referencia">×</button></header>
+    <header><div><small>REFERENCIA</small><b>Estados operativos del Planning</b></div><button type="button" onClick={onClose} aria-label="Cerrar referencia">×</button></header>
     <div className={c.referenceRows}>
-      <div><i className={`${c.legendSwatch} ${c.legendInhouse}`}/><span><b>En hotel</b><small>Huésped alojado / check-in realizado</small></span></div>
-      <div><i className={`${c.legendSwatch} ${c.legendConfirmed}`}/><span><b>Confirmada</b><small>Reserva futura confirmada</small></span></div>
-      <div><i className={`${c.legendSwatch} ${c.legendAttention}`}/><span><b>Pendiente</b><small>Tentativa o pendiente de confirmar</small></span></div>
-      <div><i className={`${c.legendSwatch} ${c.legendFinished}`}/><span><b>Finalizada</b><small>Estadía cerrada</small></span></div>
+      {PLANNING_STAGES.map(stage=><div key={stage.key}><i className={`${l.legendSwatch} ${l[stage.key]}`}/><span><b>{stage.label}</b><small>{stage.description}</small></span></div>)}
       <div><i className={`${c.legendSwatch} ${c.legendToday}`}/><span><b>Hoy</b><small>Columna celeste del día actual</small></span></div>
+      <div><i className={l.weekendLegend}/><span><b>Fin de semana</b><small>Sábado y domingo con fondo gris suave</small></span></div>
       <div><i className={c.middaySample}/><span><b>Mediodía</b><small>Línea punteada: referencia de check-in / check-out</small></span></div>
     </div>
-    <p>Las estadías normales comienzan a mitad del día de entrada y terminan a mitad del día de salida. Arrastrá en diagonal para seleccionar varias habitaciones y crear una reserva grupal.</p>
+    <p>Los colores representan el momento operativo de la estadía. Preventa y Venta son estados comerciales; Check-in, In-house y Check-out se derivan automáticamente de la fecha y de si el huésped ya ingresó.</p>
   </aside>
 }
 
@@ -83,6 +95,7 @@ export default function PlanningCalendar({property,days,today,settings,rooms,ava
       <div className={c.monthRow}><div className={c.corner}><span>{property?.name||"Propiedad activa"}</span><button type="button" className={c.referenceButton} onClick={()=>setReferenceOpen(value=>!value)} aria-label="Ver referencia del Planning" title="Referencia de colores y horarios">i</button></div><div className={c.months} style={grid}>{months.map(segment=><div key={segment.key} style={{gridColumn:`${segment.start+1} / span ${segment.span}`}}>{segment.label}</div>)}</div></div>
       <div className={c.dayRow}><div className={c.roomHead}>Habitación</div><div className={c.days} style={grid}>{days.map(day=>{const weekend=settings.shadeWeekends&&[0,6].includes(fromKey(day).getDay());return <div key={day} className={`${day===today?`${c.todayHead} ${t.todayHeader}`:""} ${weekend?c.weekendHead:""}`}><small>{dayName(day)}</small><b>{fromKey(day).getDate()}</b></div>})}</div></div>
       <InventoryStrip days={days} rooms={rooms} reservations={availabilityReservations} today={today} settings={settings} grid={grid}/>
+      <UnassignedStrip days={days} reservations={availabilityReservations} grid={grid}/>
       <div className={c.calendarBody} style={{"--timeline-width":`calc(${days.length} * var(--day-width))`}}>
         <TimelineBands days={days} today={today} settings={settings} grid={grid}/>
         {rooms.map(room=><RoomRow key={room.id} room={room} days={days} settings={settings} grid={grid} visibleReservations={visibleReservations} selected={selected} dragging={dragging} dropCell={dropCell} rangeSelection={rangeSelection} onRoom={day=>onRoom(room.id,day||today)} onBeginRange={onBeginRange} onExtendRange={onExtendRange} onFinishRange={onFinishRange} onDropCell={onDropCell} onDrop={onDrop} onSelect={onSelect} onDrag={onDrag} onResize={onResize} onPreview={onPreview} onConfirmRange={onConfirmRange} onCancelRange={onCancelRange}/>) }
