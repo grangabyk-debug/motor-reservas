@@ -6,6 +6,7 @@ import{attachPayments}from"./planningPayment"
 
 const DAY=86400000
 const nightsBetween=(start,end)=>Math.max(1,Math.round((new Date(`${end}T12:00:00`)-new Date(`${start}T12:00:00`))/DAY))
+const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:0}).format(Number(value)||0)
 function toast(detail){if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("hl:pms-toast",{detail}))}
 const uniqueNumeric=values=>[...new Set((values||[]).map(Number).filter(Number.isFinite))]
 const reservationRooms=item=>uniqueNumeric([item.habitacion_id,...(item.habitaciones_ids||[])])
@@ -41,7 +42,7 @@ export default function usePlanningData(propertyId,windowStart,windowEndExclusiv
   useEffect(()=>{load()},[load])
   useEffect(()=>{if(typeof window==="undefined")return;const refresh=()=>load(true);window.addEventListener("hl:pms-payment-updated",refresh);return()=>window.removeEventListener("hl:pms-payment-updated",refresh)},[load])
 
-  const moveReservation=useCallback(async({reservationId,roomId,start,end})=>{
+  const moveReservation=useCallback(async({reservationId,roomId,start,end,reprice=false})=>{
     const numericId=Number(reservationId),numericRoom=Number(roomId)
     const previous=reservations.find(item=>Number(item.id)===numericId)
     if(!previous)throw new Error("No encontramos la reserva en el Planning actual.")
@@ -50,14 +51,19 @@ export default function usePlanningData(propertyId,windowStart,windowEndExclusiv
     setReservations(list=>list.map(item=>Number(item.id)===numericId?optimistic:item).filter(item=>item.fecha_entrada<windowEndExclusive&&item.fecha_salida>=windowStart))
     setError("")
     try{
-      const{data,error:rpcError}=await supabase.rpc("hl_planning_move_reservation_atomic",{p_reserva_id:numericId,p_habitacion_id:numericRoom,p_fecha_entrada:start,p_fecha_salida:end})
+      const{data,error:rpcError}=await supabase.rpc("hl_planning_move_reservation_priced_atomic",{p_reserva_id:numericId,p_habitacion_id:numericRoom,p_fecha_entrada:start,p_fecha_salida:end,p_reprice:Boolean(reprice)})
       if(rpcError)throw rpcError
       setReservations(list=>list.map(item=>Number(item.id)===Number(data.id)?{...data,payment_paid:item.payment_paid||0,payment_foreign_count:item.payment_foreign_count||0,payment_last_id:item.payment_last_id||null,payment_last_at:item.payment_last_at||null}:item).filter(item=>item.fecha_entrada<windowEndExclusive&&item.fecha_salida>=windowStart))
-      const oldRoom=rooms.find(room=>Number(room.id)===Number(previous.habitacion_id))?.nombre||previous.habitacion_id,newRoom=rooms.find(room=>Number(room.id)===numericRoom)?.nombre||numericRoom
+      const oldRoomData=rooms.find(room=>Number(room.id)===Number(previous.habitacion_id)),newRoomData=rooms.find(room=>Number(room.id)===numericRoom)
+      const oldRoom=oldRoomData?.nombre||previous.habitacion_id,newRoom=newRoomData?.nombre||numericRoom
       const roomChanged=Number(previous.habitacion_id)!==numericRoom,startChanged=previous.fecha_entrada!==start,durationChanged=oldNights!==newNights
+      const categoryChanged=roomChanged&&String(oldRoomData?.tipo||"")!==String(newRoomData?.tipo||"")
+      const oldRate=Number(previous.tarifa_noche)||0,newRate=Number(data?.tarifa_noche)||0,currency=data?.moneda||previous.moneda||"ARS"
+      const direction=Number(newRoomData?.precio||0)>Number(oldRoomData?.precio||0)?"Upgrade":Number(newRoomData?.precio||0)<Number(oldRoomData?.precio||0)?"Downgrade":"Cambio de categoría"
       let message="Cambio guardado en el Planning."
-      if(roomChanged&&startChanged)message=`Habitación ${oldRoom} → ${newRoom} · nueva entrada ${start}.`
-      else if(roomChanged)message=`Habitación ${oldRoom} → ${newRoom}.`
+      if(categoryChanged)message=`${direction}: ${oldRoom} (${oldRoomData?.tipo||"sin categoría"}) → ${newRoom} (${newRoomData?.tipo||"sin categoría"}) · ${reprice&&oldRate!==newRate?`tarifa ${money(oldRate,currency)} → ${money(newRate,currency)}`:"tarifa original mantenida"}.`
+      else if(roomChanged&&startChanged)message=`Habitación ${oldRoom} → ${newRoom} · nueva entrada ${start}${reprice&&oldRate!==newRate?` · tarifa ${money(oldRate,currency)} → ${money(newRate,currency)}`:""}.`
+      else if(roomChanged)message=`Habitación ${oldRoom} → ${newRoom}${reprice&&oldRate!==newRate?` · tarifa ${money(oldRate,currency)} → ${money(newRate,currency)}`:""}.`
       else if(durationChanged)message=`Estadía ${newNights>oldNights?"ampliada":"reducida"}: ${oldNights} → ${newNights} noches.`
       else if(startChanged)message=`Reserva movida a ${start}.`
       toast({title:"Planning actualizado",message});return data
