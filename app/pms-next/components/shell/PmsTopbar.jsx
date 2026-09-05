@@ -18,7 +18,7 @@ export default function PmsTopbar({title,theme,onToggleTheme,onNewReservation,on
       <button className={s.iconButton} type="button" onClick={onToggleTheme} aria-label={theme==="dark"?"Activar modo día":"Activar modo noche"}>{theme==="dark"?"☀":"☾"}</button>
       {onOpenActivity&&<button className={s.iconButton} type="button" onClick={onOpenActivity} aria-label="Abrir actividad reciente" title="Actividad reciente">◇</button>}
       {onNewQuote&&<button className={s.iconButton} type="button" onClick={onNewQuote} aria-label="Crear presupuesto" title="Presupuestar">$</button>}
-      {onNewReservation&&<button className={s.primaryButton} type="button" onClick={onNewReservation}>＋ Reserva</button>}
+      {onNewReservation&&<button className={s.primaryButton} type="button" onClick={onNewReservation}>＋ Nueva reserva</button>}
     </div>
   </header>
 }
