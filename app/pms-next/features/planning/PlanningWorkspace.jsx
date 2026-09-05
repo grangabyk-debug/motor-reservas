@@ -63,7 +63,7 @@ export default function PlanningWorkspace({propertyId,property,onNavigate,newRes
   function roomRate(roomIds){return uniqueIds(roomIds).reduce((sum,id)=>sum+(Number(data.rooms.find(room=>String(room.id)===id)?.precio)||0),0)}
   function makeDraft(roomId=data.rooms[0]?.id,start=today,end=addDays(start,1),roomIds=[roomId]){
     const ids=uniqueIds(roomIds.length?roomIds:[roomId])
-    return{firstName:"",lastName:"",email:"",phone:"",country:"",roomId:ids[0]||"",roomIds:ids,start,end,status:"confirmada",guests:1,rate:roomRate(ids),currency:"ARS",channel:"Walk-in",voucher:"",bedType:"",discountType:"none",discountValue:0,notes:""}
+    return{firstName:"",lastName:"",email:"",phone:"",country:"",roomId:ids[0]||"",roomIds:ids,start,end,status:"confirmada",guests:1,rate:roomRate(ids),currency:"ARS",channel:"Walk-in",voucher:"",discountType:"none",discountValue:0,notes:""}
   }
   function openFreshForm(roomId=data.rooms[0]?.id,start=today,end=addDays(start,1),roomIds=[roomId]){
     if(!roomId)return data.setError("Primero configurá una habitación activa.")
