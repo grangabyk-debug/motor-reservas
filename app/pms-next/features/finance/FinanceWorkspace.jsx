@@ -17,10 +17,16 @@ const TABS=[
   ["cash","Arqueo y turnos"],
   ["expenses","Gastos"],
 ]
+const validTab=value=>TABS.some(([id])=>id===value)
 
 export default function FinanceWorkspace({propertyId,property}){
   const[tab,setTab]=useState("dashboard")
-  useEffect(()=>{if(typeof window==="undefined")return;const requested=new URL(window.location.href).searchParams.get("finance_tab");if(TABS.some(([id])=>id===requested))setTab(requested)},[])
+  useEffect(()=>{
+    if(typeof window==="undefined")return
+    const readUrl=()=>{const requested=new URL(window.location.href).searchParams.get("finance_tab");if(validTab(requested))setTab(requested)}
+    const onRequested=event=>{if(validTab(event.detail))setTab(event.detail)}
+    readUrl();window.addEventListener("hl:pms-finance-tab",onRequested);return()=>window.removeEventListener("hl:pms-finance-tab",onRequested)
+  },[])
   function chooseTab(next){setTab(next);if(typeof window!=="undefined"){const url=new URL(window.location.href);if(next==="dashboard")url.searchParams.delete("finance_tab");else url.searchParams.set("finance_tab",next);window.history.replaceState({},"",url)}}
   return <section className={s.page}>
     <header className={s.header}><div><small>FINANZAS</small><h1>Control financiero</h1><p>{property?.name||"Propiedad activa"} · ingresos, pagos, documentos, caja y egresos.</p></div><div className={s.tabs}>{TABS.map(([id,label])=><button key={id} className={tab===id?s.active:""} onClick={()=>chooseTab(id)}>{label}</button>)}</div></header>
