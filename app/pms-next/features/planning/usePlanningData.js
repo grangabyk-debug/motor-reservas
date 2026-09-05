@@ -93,16 +93,18 @@ export default function usePlanningData(propertyId,windowStart,windowEndExclusiv
     const conflict=(conflicts||[]).find(item=>reservationRooms(item).some(id=>roomIds.includes(id)))
     if(conflict){const conflictRoom=selectedRooms.find(room=>reservationRooms(conflict).includes(Number(room.id)));throw new Error(`La habitación ${conflictRoom?.nombre||"seleccionada"} ya tiene una reserva que se superpone con esas fechas.`)}
 
-    const roomAssignments=draft.roomAssignments||{}
-    const details=selectedRooms.map(room=>{const assignment=roomAssignments[String(room.id)]||{};return{habitacion_id:Number(room.id),nombre:room.nombre,categoria_asignada:room.tipo||"Habitación",categoria_vendida:assignment.soldAs||room.tipo||"Habitación",huespedes:Math.max(1,Number(assignment.guests)||1),tarifa_noche:Math.max(0,Number(assignment.rate??room.precio)||0),rooming:{matrimonial:Math.max(0,Number(assignment.matrimonial)||0),individual:Math.max(0,Number(assignment.individual)||0)}}})
-    const totalGuests=details.reduce((sum,item)=>sum+item.huespedes,0),defaultRate=details.reduce((sum,item)=>sum+item.tarifa_noche,0),nights=nightsBetween(draft.start,draft.end),rate=Number(draft.rate||defaultRate||0),subtotal=rate*nights
+    const roomAssignments=draft.roomAssignments||{},requestedGuests=Math.max(1,Number(draft.guests)||1)
+    const details=selectedRooms.map(room=>{const assignment=roomAssignments[String(room.id)]||{};return{habitacion_id:Number(room.id),nombre:room.nombre,categoria_asignada:room.tipo||"Habitación",categoria_vendida:assignment.soldAs||room.tipo||"Habitación",huespedes:Math.max(0,Number(assignment.guests)||0),tarifa_noche:Math.max(0,Number(assignment.rate??room.precio)||0),rooming:{matrimonial:Math.max(0,Number(assignment.matrimonial)||0),individual:Math.max(0,Number(assignment.individual)||0)}}})
+    const assignedGuests=details.reduce((sum,item)=>sum+item.huespedes,0)
+    if(assignedGuests!==requestedGuests)throw new Error(`Distribuí los ${requestedGuests} huésped${requestedGuests===1?"":"es"} entre las habitaciones seleccionadas antes de crear la reserva.`)
+    const totalGuests=requestedGuests,defaultRate=details.reduce((sum,item)=>sum+item.tarifa_noche,0),nights=nightsBetween(draft.start,draft.end),rate=Number(draft.rate||defaultRate||0),subtotal=rate*nights
     const discountType=draft.discountType||"none",discountValue=Math.max(0,Number(draft.discountValue)||0)
     const discountAmount=discountType==="percent"?Math.min(subtotal,subtotal*Math.min(100,discountValue)/100):discountType==="amount"?Math.min(subtotal,discountValue):0,total=Math.max(0,subtotal-discountAmount)
     const payload={
       property_id:propertyId,user_id:userData?.user?.id||null,habitacion_id:roomIds[0],habitaciones_ids:roomIds,
       habitaciones_detalle:details,
       fecha_entrada:draft.start,fecha_salida:draft.end,tipo_estadia:"overnight",nombre_huesped:draft.guest.trim(),email_huesped:draft.email?.trim()||null,telefono_huesped:draft.phone?.trim()||null,pais_huesped:draft.country?.trim()||null,
-      cantidad_huespedes:totalGuests||Number(draft.guests)||1,canal_reserva:draft.channel||"Walk-in",codigo_canal:draft.voucher?.trim()||null,tarifa_noche:rate,noches:nights,subtotal,descuento_tipo:discountType==="none"?null:discountType,descuento_valor:discountType==="none"?0:discountValue,descuento_importe:discountAmount,precio_total:total,moneda:draft.currency||"ARS",notas:draft.notes?.trim()||null,
+      cantidad_huespedes:totalGuests,canal_reserva:draft.channel||"Walk-in",codigo_canal:draft.voucher?.trim()||null,tarifa_noche:rate,noches:nights,subtotal,descuento_tipo:discountType==="none"?null:discountType,descuento_valor:discountType==="none"?0:discountValue,descuento_importe:discountAmount,precio_total:total,moneda:draft.currency||"ARS",notas:draft.notes?.trim()||null,
       mascotas:[],mascotas_total:0,servicios:[],pasajeros:[],vehiculos:0,cochera_total:0,estado:draft.status||"confirmada",no_show:false,
     }
     const{data,error:rpcError}=await supabase.rpc("hl_create_reservation_atomic",{p_reservation:payload,p_payments:[]})
