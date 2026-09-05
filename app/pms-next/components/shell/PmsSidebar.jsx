@@ -1,5 +1,6 @@
 import{filterNavForRole,MANAGEMENT_NAV,OPERATIONS_NAV,PRIMARY_NAV}from"../../core/navigation"
 import s from"../../pms-next.module.css"
+import brand from"./pmsSidebarBrand.module.css"
 
 const ROLE_LABELS={owner:"Propietario",admin:"Administrador",manager:"Gerencia",reception:"Recepción",night_audit:"Auditoría nocturna",housekeeping:"Housekeeping",maintenance:"Mantenimiento",revenue:"Revenue",member:"Equipo"}
 const PROPERTY_CARD_STYLE={gridTemplateColumns:"28px minmax(0,1fr)"}
@@ -11,7 +12,7 @@ export default function PmsSidebar({view,onView,property,properties=[],onPropert
   const propertyName=property?.name||"Seleccionar propiedad",role=property?.role||"member",primary=filterNavForRole(PRIMARY_NAV,role,featureFlags,rolePermissions),operations=filterNavForRole(OPERATIONS_NAV,role,featureFlags,rolePermissions),management=filterNavForRole(MANAGEMENT_NAV,role,featureFlags,rolePermissions),version=buildId&&buildId!=="local"?buildId.slice(0,7):"local",roleLabel=ROLE_LABELS[role]||"Equipo"
   return <aside className={s.sidebar}>
     <div className={s.brandBlock}>
-      <button className={s.brandButton} type="button" onClick={()=>onView("dashboard")}><span><b>HabitacionLlena.com</b></span></button>
+      <button className={s.brandButton} type="button" onClick={()=>onView("dashboard")}><span className={brand.brandName}>HabitacionLlena.com</span></button>
       <div className={s.propertyCard} style={PROPERTY_CARD_STYLE}><span className={s.propertyAvatar}>{propertyName.slice(0,1).toUpperCase()}</span><label style={{minWidth:0}}><b>{propertyName}</b><small>{property?.city||"Propiedad activa"} · {roleLabel}</small></label>{properties.length>1?<select style={PROPERTY_SELECT_STYLE} aria-label="Cambiar propiedad" value={property?.id||""} onChange={e=>onProperty?.(e.target.value)}>{properties.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select>:<span className={s.propertyLock} style={PROPERTY_LOCK_STYLE}>✓</span>}</div>
     </div>
     <nav className={s.navScroll}><NavGroup items={primary} view={view} onView={onView}/><NavGroup title="Operación" items={operations} view={view} onView={onView}/><NavGroup title="Gestión" items={management} view={view} onView={onView}/></nav>
