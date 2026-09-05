@@ -4,6 +4,7 @@ import{useEffect,useMemo,useRef,useState}from"react"
 import useReservationsData from"./useReservationsData"
 import ReservationRecord from"./ReservationRecord"
 import ReservationEditPanel from"./ReservationEditPanel"
+import ReservationActionBar from"./ReservationActionBar"
 import s from"./reservations.module.css"
 
 const fmtDate=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"2-digit",year:"numeric"}).format(new Date(`${value}T12:00:00`)):"—"
@@ -50,7 +51,7 @@ export default function ReservationsWorkspace({propertyId,onNavigate,focusReserv
   async function toggleNoShow(item){await patch(item,{no_show:!item.no_show},item.no_show?"quitar el no-show":"marcar no-show")}
 
   if(selected)return <>
-    <div style={{display:"flex",justifyContent:"flex-end",margin:"0 0 8px",padding:"0 2px"}}><button type="button" onClick={()=>setEditOpen(true)} style={{height:38,padding:"0 14px",border:"1px solid color-mix(in srgb,var(--accent) 24%,var(--line))",borderRadius:11,background:"color-mix(in srgb,var(--accent) 7%,var(--panelSolid))",color:"var(--accent)",font:"inherit",fontSize:11,fontWeight:850,boxShadow:"inset 0 1px color-mix(in srgb,#fff 45%,transparent)",cursor:"pointer"}}>✎ Editar reserva</button></div>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap",margin:"0 0 8px",padding:"0 2px"}}><ReservationActionBar item={selected} rooms={selected.rooms} propertyId={propertyId} onRefresh={data.load}/><button type="button" onClick={()=>setEditOpen(true)} style={{height:38,padding:"0 14px",border:"1px solid color-mix(in srgb,var(--accent) 24%,var(--line))",borderRadius:11,background:"color-mix(in srgb,var(--accent) 7%,var(--panelSolid))",color:"var(--accent)",font:"inherit",fontSize:11,fontWeight:850,boxShadow:"inset 0 1px color-mix(in srgb,#fff 45%,transparent)",cursor:"pointer"}}>✎ Editar reserva</button></div>
     <ReservationRecord item={selected} room={selected.room} rooms={selected.rooms} payments={data.payments} propertyId={propertyId} onBack={closeRecord} onNavigate={onNavigate} saving={saving===String(selected.id)} onPrimaryAction={()=>selected.estado==="alojado"?checkout(selected):checkIn(selected)}/>
     {editOpen?<ReservationEditPanel item={selected} assignedRooms={selected.rooms} allRooms={data.rooms} saving={saving===String(selected.id)} onCancel={()=>setEditOpen(false)} onPreviewMove={data.previewMove} onMove={data.moveReservation} onUpdate={data.updateReservation} onSaved={()=>{setEditOpen(false);data.load()}}/>:null}
   </>
