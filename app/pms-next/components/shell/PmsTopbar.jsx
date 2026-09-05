@@ -5,7 +5,7 @@ import s from"../../pms-next.module.css"
 import c from"./pmsTopbarControls.module.css"
 import PmsIcon from"./PmsIcons"
 
-export default function PmsTopbar({title,theme,onToggleTheme,onNewReservation,onNewQuote,onOpenSearch,onOpenActivity,timeZone}){
+export default function PmsTopbar({title,info,theme,onToggleTheme,onNewReservation,onNewQuote,onOpenSearch,onOpenActivity,timeZone}){
   const[now,setNow]=useState(()=>new Date())
   useEffect(()=>{const timer=setInterval(()=>setNow(new Date()),30000);return()=>clearInterval(timer)},[])
   const clock=useMemo(()=>{
@@ -13,7 +13,7 @@ export default function PmsTopbar({title,theme,onToggleTheme,onNewReservation,on
     try{return{date:new Intl.DateTimeFormat("es-AR",{weekday:"short",day:"2-digit",month:"short",timeZone:zone}).format(now),time:new Intl.DateTimeFormat("es-AR",{hour:"2-digit",minute:"2-digit",hour12:false,timeZone:zone}).format(now)}}catch{return{date:new Intl.DateTimeFormat("es-AR",{weekday:"short",day:"2-digit",month:"short"}).format(now),time:new Intl.DateTimeFormat("es-AR",{hour:"2-digit",minute:"2-digit",hour12:false}).format(now)}}
   },[now,timeZone])
   return <header className={s.topbar}>
-    <div className={s.topbarTitle}><small>HABITACIÓN LLENA</small><b>{title}</b></div>
+    <div className={s.topbarTitle}><small>HABITACIÓN LLENA</small><span style={{display:"flex",alignItems:"center",gap:6}}><b>{title}</b>{info?<button type="button" aria-label={`Información sobre ${title}`} title={info} style={{width:18,height:18,padding:0,border:"1px solid var(--lineStrong)",borderRadius:"50%",background:"color-mix(in srgb,var(--panelSolid) 80%,transparent)",color:"var(--muted)",fontSize:10,fontWeight:900,lineHeight:1,cursor:"help"}}>i</button>:null}</span></div>
     <button className={s.globalSearch} type="button" onClick={onOpenSearch}><span>⌕</span><span>Buscar huésped, reserva o habitación…</span><kbd>Ctrl K</kbd></button>
     <div className={s.topbarActions}>
       <time title={timeZone||"Zona horaria del dispositivo"} style={{display:"grid",textAlign:"right",lineHeight:1.08,minWidth:76}}><b>{clock.time}</b><small style={{opacity:.6,textTransform:"capitalize"}}>{clock.date}</small></time>
