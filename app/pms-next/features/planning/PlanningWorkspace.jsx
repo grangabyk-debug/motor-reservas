@@ -6,6 +6,7 @@ import{PlanningSettingsMenu}from"./PlanningPieces"
 import PlanningCalendar from"./PlanningCalendar"
 import ReservationPreview from"./ReservationPreview"
 import{CreateReservationDrawer,ReservationDetailDrawer}from"./PlanningDrawers"
+import{planningStage}from"./planningLifecycle"
 import s from"./planning.module.css"
 
 const DAY=86400000
@@ -41,12 +42,11 @@ export default function PlanningWorkspace({propertyId,property,onNavigate,newRes
   },[data.rooms,typeFilter,roomQuery])
 
   const visibleReservations=useMemo(()=>data.reservations.filter(item=>{
-    if(item.no_show)return false
-    if(statusFilter!=="all"&&!(statusFilter==="attention"?["tentativa","pendiente"].includes(item.estado):item.estado===statusFilter))return false
+    if(statusFilter!=="all"&&planningStage(item,today)!==statusFilter)return false
     if(channelFilter!=="all"&&(item.canal_reserva||"Directa")!==channelFilter)return false
     const term=query.trim().toLowerCase(),room=roomById.get(Number(item.habitacion_id))
     return !term||`${item.numero_reserva||item.id} ${item.nombre_huesped} ${room?.nombre||""} ${item.canal_reserva||""}`.toLowerCase().includes(term)
-  }),[data.reservations,statusFilter,channelFilter,query,roomById])
+  }),[data.reservations,statusFilter,channelFilter,query,roomById,today])
 
   useEffect(()=>{if(draftKey)try{setHasSavedDraft(Boolean(localStorage.getItem(draftKey)))}catch{}},[draftKey])
   useEffect(()=>{if(settingsKey)try{const raw=localStorage.getItem(settingsKey);if(raw)setSettings({...DEFAULT_SETTINGS,...JSON.parse(raw)})}catch{}},[settingsKey])
@@ -59,17 +59,11 @@ export default function PlanningWorkspace({propertyId,property,onNavigate,newRes
     const ids=uniqueIds(roomIds.length?roomIds:[roomId])
     return{firstName:"",lastName:"",email:"",phone:"",roomId:ids[0]||"",roomIds:ids,start,end,status:"confirmada",guests:1,rate:roomRate(ids),currency:"ARS",channel:"Directa",notes:""}
   }
-  function normalizeDraft(saved){
-    const savedIds=uniqueIds(saved?.roomIds?.length?saved.roomIds:[saved?.roomId||data.rooms[0]?.id])
-    const base=makeDraft(savedIds[0],saved?.start||today,saved?.end||addDays(saved?.start||today,1),savedIds)
-    if(saved?.guest&&!saved.firstName){const parts=String(saved.guest).trim().split(/\s+/);saved={...saved,firstName:parts.shift()||"",lastName:parts.join(" ")}}
-    return{...base,...saved,roomId:savedIds[0]||base.roomId,roomIds:savedIds}
-  }
   function openFreshForm(roomId=data.rooms[0]?.id,start=today,end=addDays(start,1),roomIds=[roomId]){
     if(!roomId)return data.setError("Primero configurá una habitación activa.")
     setPreview(null);setSelected(null);setRangeSelection(null);setSelecting(false);setDraft(makeDraft(roomId,start,end,roomIds));setDrawerStep(0);setDraftState("Los cambios se guardan automáticamente en este dispositivo");data.setError("");setFormOpen(true)
   }
-  function openNewReservation(){if(!data.rooms[0]?.id)return data.setError("Primero configurá una habitación activa.");if(draftKey)try{const raw=localStorage.getItem(draftKey);if(raw){const saved=normalizeDraft(JSON.parse(raw));if(saved.roomId&&saved.start&&saved.end){setDraft(saved);setDrawerStep(0);setDraftState("Borrador recuperado");setFormOpen(true);return}}}catch{}openFreshForm()}
+  function openNewReservation(){if(!data.rooms[0]?.id)return data.setError("Primero configurá una habitación activa.");if(draftKey)try{localStorage.removeItem(draftKey)}catch{}setHasSavedDraft(false);openFreshForm()}
   useEffect(()=>{if(!newReservationRequest||!data.rooms.length||lastNewReservationRequest.current===newReservationRequest)return;lastNewReservationRequest.current=newReservationRequest;openNewReservation()},[newReservationRequest,data.rooms.length])
   function clearDraft(){if(draftKey)try{localStorage.removeItem(draftKey)}catch{}setHasSavedDraft(false);setDraft(null);setDraftState("")}
   function discardDraft(){clearDraft();setFormOpen(false);setDrawerStep(0);data.setError("")}
@@ -100,15 +94,16 @@ export default function PlanningWorkspace({propertyId,property,onNavigate,newRes
   function cancelRange(){setSelecting(false);setRangeSelection(null)}
 
   const availableRooms=useMemo(()=>draft?data.rooms.map(room=>({...room,available:!availabilityReservations.some(item=>roomHas(item,room.id)&&overlaps(item,draft.start,draft.end))})):data.rooms,[data.rooms,availabilityReservations,draft])
+  const selectedRooms=useMemo(()=>selected?uniqueIds([selected.habitacion_id,...(selected.habitaciones_ids||[])]).map(id=>roomById.get(Number(id))).filter(Boolean):[],[selected,roomById])
   const nights=draft?Math.max(1,diffDays(draft.start,draft.end)):1,total=draft?(Number(draft.rate)||0)*nights:0,visibleLabel=`${shortDate(days[0])} — ${shortDate(days.at(-1))}`
 
   return <section className={s.page} style={{"--day-width":`${dayWidth}px`,"--room-width":settings.expanded?"190px":"160px"}}>
-    <div className={s.toolbar}><div className={s.navCluster}><button type="button" className={s.navArrow} onClick={()=>setAnchor(value=>addDays(value,-7))}>‹</button><button type="button" className={s.todayButton} onClick={()=>setAnchor(today)}>Hoy</button><button type="button" className={s.navArrow} onClick={()=>setAnchor(value=>addDays(value,7))}>›</button><label className={s.datePicker}><span>{visibleLabel}</span><input type="date" value={anchor} onChange={event=>setAnchor(event.target.value||today)}/></label></div><div className={s.toolbarActions}><label className={s.quickSearch}>⌕<input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Huésped o Nº de reserva"/></label><button type="button" className={`${s.toolButton} ${settings.showFilters?s.toolActive:""}`} onClick={()=>changeSetting("showFilters",!settings.showFilters)} title="Filtros">▽</button><div className={s.settingsWrap}><button type="button" className={`${s.toolButton} ${settingsOpen?s.toolActive:""}`} onClick={()=>setSettingsOpen(value=>!value)}>⚙</button>{settingsOpen?<PlanningSettingsMenu settings={settings} onChange={changeSetting} onClose={()=>setSettingsOpen(false)}/>:null}</div></div></div>
-    {settings.showFilters?<div className={s.filters}><label><span>Habitación</span><input value={roomQuery} onChange={event=>setRoomQuery(event.target.value)} placeholder="Nombre o número"/></label><label><span>Tipo</span><select value={typeFilter} onChange={event=>setTypeFilter(event.target.value)}><option value="all">Todos los tipos</option>{roomTypes.map(type=><option key={type}>{type}</option>)}</select></label><label><span>Canal</span><select value={channelFilter} onChange={event=>setChannelFilter(event.target.value)}><option value="all">Todos los canales</option>{channels.map(channel=><option key={channel}>{channel}</option>)}</select></label><label><span>Estado</span><select value={statusFilter} onChange={event=>setStatusFilter(event.target.value)}><option value="all">Todas</option><option value="alojado">Alojados</option><option value="confirmada">Confirmadas</option><option value="attention">Pendientes / tentativas</option><option value="finalizada">Finalizadas</option></select></label></div>:null}
+    <div className={s.toolbar}><div className={s.navCluster}><button type="button" className={s.navArrow} onClick={()=>setAnchor(value=>addDays(value,-7))}>‹</button><button type="button" className={s.todayButton} onClick={()=>setAnchor(today)}>Hoy</button><button type="button" className={s.navArrow} onClick={()=>setAnchor(value=>addDays(value,7))}>›</button><label className={s.datePicker}><span>{visibleLabel}</span><input type="date" value={anchor} onChange={event=>setAnchor(event.target.value||today)}/></label></div><div className={s.toolbarActions}><label className={s.quickSearch}>⌕<input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Huésped o Nº de reserva"/></label><button type="button" className={`${s.toolButton} ${settings.showFilters?s.toolActive:""}`} onClick={()=>changeSetting("showFilters",!settings.showFilters)} title="Filtros">▽</button><button type="button" className={s.toolButton} onClick={data.load} title="Actualizar Planning" aria-label="Actualizar Planning">↻</button><div className={s.settingsWrap}><button type="button" className={`${s.toolButton} ${settingsOpen?s.toolActive:""}`} onClick={()=>setSettingsOpen(value=>!value)}>⚙</button>{settingsOpen?<PlanningSettingsMenu settings={settings} onChange={changeSetting} onClose={()=>setSettingsOpen(false)}/>:null}</div></div></div>
+    {settings.showFilters?<div className={s.filters}><label><span>Habitación</span><input value={roomQuery} onChange={event=>setRoomQuery(event.target.value)} placeholder="Nombre o número"/></label><label><span>Tipo</span><select value={typeFilter} onChange={event=>setTypeFilter(event.target.value)}><option value="all">Todos los tipos</option>{roomTypes.map(type=><option key={type}>{type}</option>)}</select></label><label><span>Canal</span><select value={channelFilter} onChange={event=>setChannelFilter(event.target.value)}><option value="all">Todos los canales</option>{channels.map(channel=><option key={channel}>{channel}</option>)}</select></label><label><span>Estado en Planning</span><select value={statusFilter} onChange={event=>setStatusFilter(event.target.value)}><option value="all">Todos</option><option value="preventa">Preventa</option><option value="venta">Venta</option><option value="checkin">Check-in</option><option value="inhouse">In-house</option><option value="checkout">Check-out</option><option value="postventa">Postventa</option><option value="noshow">No-show</option></select></label></div>:null}
     {data.error?<div className={s.error}>{data.error}</div>:null}{saving?<div className={s.savingBar}>Guardando cambios…</div>:null}
     {data.loading?<div className={s.error}>Cargando Planning…</div>:!data.rooms.length?<div className={s.error}>No hay habitaciones activas.</div>:<PlanningCalendar property={property} days={days} today={today} settings={settings} rooms={visibleRooms} availabilityReservations={availabilityReservations} visibleReservations={visibleReservations} selected={selected} dragging={dragging} dropCell={dropCell} rangeSelection={rangeSelection} onRoom={openFreshForm} onBeginRange={beginRange} onExtendRange={extendRange} onFinishRange={finishRange} onDropCell={setDropCell} onDrop={dropReservation} onSelect={selectReservation} onDrag={beginDrag} onResize={beginResize} onPreview={showPreview} onConfirmRange={confirmRange} onCancelRange={cancelRange}/>} 
     <ReservationPreview preview={preview}/>
-    {selected&&!formOpen?<ReservationDetailDrawer selected={selected} room={roomById.get(Number(selected.habitacion_id))} onClose={()=>setSelected(null)} onOpen={()=>onNavigate?.("reservations",{reservationId:selected.id})}/>:null}
+    {selected&&!formOpen?<ReservationDetailDrawer selected={selected} room={roomById.get(Number(selected.habitacion_id))} rooms={selectedRooms} onClose={()=>setSelected(null)} onOpen={()=>onNavigate?.("reservations",{reservationId:selected.id})}/>:null}
     {formOpen&&draft?<CreateReservationDrawer draft={draft} setDraft={setDraft} drawerStep={drawerStep} setDrawerStep={setDrawerStep} draftState={draftState} availableRooms={availableRooms} roomById={roomById} nights={nights} total={total} saving={saving} onClose={()=>setFormOpen(false)} onDiscard={discardDraft} onNext={nextStep} onSave={saveReservation}/>:null}
   </section>
 }
