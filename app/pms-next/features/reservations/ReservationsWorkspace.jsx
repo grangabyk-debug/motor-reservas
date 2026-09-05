@@ -3,6 +3,7 @@
 import{useEffect,useMemo,useRef,useState}from"react"
 import useReservationsData from"./useReservationsData"
 import ReservationRecord from"./ReservationRecord"
+import ReservationEditPanel from"./ReservationEditPanel"
 import s from"./reservations.module.css"
 
 const fmtDate=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"2-digit",year:"numeric"}).format(new Date(`${value}T12:00:00`)):"—"
@@ -13,14 +14,14 @@ const paymentLabel=value=>value==="paid"?"Pagado":value==="pending"?"Parcial":"P
 
 export default function ReservationsWorkspace({propertyId,onNavigate,focusReservationId,onFocusHandled}){
   const data=useReservationsData(propertyId)
-  const[query,setQuery]=useState(""),[mode,setMode]=useState("active"),[filterOpen,setFilterOpen]=useState(false),[paymentFilter,setPaymentFilter]=useState("all"),[createdFilter,setCreatedFilter]=useState("all"),[sortMode,setSortMode]=useState("created-desc"),[selected,setSelected]=useState(null),[saving,setSaving]=useState("")
+  const[query,setQuery]=useState(""),[mode,setMode]=useState("active"),[filterOpen,setFilterOpen]=useState(false),[paymentFilter,setPaymentFilter]=useState("all"),[createdFilter,setCreatedFilter]=useState("all"),[sortMode,setSortMode]=useState("created-desc"),[selected,setSelected]=useState(null),[saving,setSaving]=useState(""),[editOpen,setEditOpen]=useState(false)
   const focusReloadRef=useRef(null)
   const roomById=useMemo(()=>new Map(data.rooms.map(room=>[Number(room.id),room])),[data.rooms])
   const items=useMemo(()=>data.reservations.map(item=>{const paid=data.paymentByReservation.get(Number(item.id))||0,rooms=roomIds(item).map(id=>roomById.get(id)).filter(Boolean);return{...item,paid,payment:paymentState(item,paid),room:rooms[0]||roomById.get(Number(item.habitacion_id)),rooms}}),[data.reservations,data.paymentByReservation,roomById])
 
   function syncRecordUrl(id){if(typeof window==="undefined")return;const url=new URL(window.location.href);if(id==null)url.searchParams.delete("reservation");else url.searchParams.set("reservation",String(id));window.history.replaceState({pmsView:"reservations",reservationId:id??null},"",url)}
-  function openRecord(item){setSelected(item);syncRecordUrl(item.id)}
-  function closeRecord(){setSelected(null);syncRecordUrl(null)}
+  function openRecord(item){setEditOpen(false);setSelected(item);syncRecordUrl(item.id)}
+  function closeRecord(){setEditOpen(false);setSelected(null);syncRecordUrl(null)}
 
   useEffect(()=>{if(!focusReservationId){focusReloadRef.current=null;return}const target=items.find(item=>Number(item.id)===Number(focusReservationId));if(target){focusReloadRef.current=null;setMode(target.estado==="cancelada"?"trash":target.no_show?"noshow":"active");setSelected(target);syncRecordUrl(target.id);onFocusHandled?.();return}if(!data.loading&&focusReloadRef.current!==String(focusReservationId)){focusReloadRef.current=String(focusReservationId);data.load()}},[focusReservationId,items,onFocusHandled,data.loading,data.load])
   useEffect(()=>{if(focusReservationId||selected||typeof window==="undefined")return;const requested=Number(new URL(window.location.href).searchParams.get("reservation"));if(!requested)return;const target=items.find(item=>Number(item.id)===requested);if(target){setMode(target.estado==="cancelada"?"trash":target.no_show?"noshow":"active");setSelected(target)}},[focusReservationId,items,selected])
@@ -48,7 +49,11 @@ export default function ReservationsWorkspace({propertyId,onNavigate,focusReserv
   async function restore(item){await patch(item,{estado:"confirmada",no_show:false},"restaurar la reserva")}
   async function toggleNoShow(item){await patch(item,{no_show:!item.no_show},item.no_show?"quitar el no-show":"marcar no-show")}
 
-  if(selected)return <ReservationRecord item={selected} room={selected.room} rooms={selected.rooms} payments={data.payments} propertyId={propertyId} onBack={closeRecord} onNavigate={onNavigate} saving={saving===String(selected.id)} onPrimaryAction={()=>selected.estado==="alojado"?checkout(selected):checkIn(selected)}/>
+  if(selected)return <>
+    <div style={{display:"flex",justifyContent:"flex-end",margin:"0 0 8px",padding:"0 2px"}}><button type="button" onClick={()=>setEditOpen(true)} style={{height:38,padding:"0 14px",border:"1px solid color-mix(in srgb,var(--accent) 24%,var(--line))",borderRadius:11,background:"color-mix(in srgb,var(--accent) 7%,var(--panelSolid))",color:"var(--accent)",font:"inherit",fontSize:11,fontWeight:850,boxShadow:"inset 0 1px color-mix(in srgb,#fff 45%,transparent)",cursor:"pointer"}}>✎ Editar reserva</button></div>
+    <ReservationRecord item={selected} room={selected.room} rooms={selected.rooms} payments={data.payments} propertyId={propertyId} onBack={closeRecord} onNavigate={onNavigate} saving={saving===String(selected.id)} onPrimaryAction={()=>selected.estado==="alojado"?checkout(selected):checkIn(selected)}/>
+    {editOpen?<ReservationEditPanel item={selected} assignedRooms={selected.rooms} allRooms={data.rooms} saving={saving===String(selected.id)} onCancel={()=>setEditOpen(false)} onPreviewMove={data.previewMove} onMove={data.moveReservation} onUpdate={data.updateReservation} onSaved={()=>{setEditOpen(false);data.load()}}/>:null}
+  </>
 
   return <section className={s.page}>
     <header className={s.heading}><div><small>RESERVAS</small><h1>Reservas</h1><p>{items.filter(item=>item.estado!=="cancelada").length} reservas cargadas de la propiedad activa.</p></div><div className={s.tools}><label className={s.search}>⌕<input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar reserva, huésped o habitación"/></label><select className={s.tool} value={sortMode} onChange={event=>setSortMode(event.target.value)} aria-label="Ordenar reservas"><option value="created-desc">Últimas creadas</option><option value="created-asc">Primeras creadas</option><option value="arrival-next">Próximas llegadas</option><option value="arrival-desc">Llegadas más lejanas</option></select><button type="button" className={`${s.tool} ${mode==="noshow"?s.toolActive:""}`} onClick={()=>setMode(v=>v==="noshow"?"active":"noshow")}>⊘ No-show</button><button type="button" className={`${s.tool} ${mode==="trash"?s.toolActive:""}`} onClick={()=>setMode(v=>v==="trash"?"active":"trash")}>♲ Canceladas</button><button type="button" className={`${s.tool} ${filterOpen?s.toolActive:""}`} onClick={()=>setFilterOpen(v=>!v)}>≡ Filtrar</button></div></header>
