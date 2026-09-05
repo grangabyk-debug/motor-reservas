@@ -22,6 +22,7 @@ const covers=(item,roomId,day)=>roomHas(item,roomId)&&item.fecha_entrada<=day&&i
 const coversDay=(item,day)=>item.fecha_entrada<=day&&item.fecha_salida>day
 const overlaps=(item,start,end)=>item.fecha_entrada<end&&item.fecha_salida>start
 const assignedIds=item=>new Set([item.habitacion_id,...(item.habitaciones_ids||[])].filter(Boolean).map(Number))
+const dayDivider={borderRight:"1px solid color-mix(in srgb,var(--muted) 48%,var(--line))"}
 function toast(detail){if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("hl:pms-toast",{detail}))}
 
 function monthSegments(days){
@@ -35,7 +36,7 @@ function monthSegments(days){
 }
 
 function TimelineBands({days,today,settings,grid}){
-  return <div className={c.timelineBands} style={grid} aria-hidden="true">{days.map(day=>{const weekend=settings.shadeWeekends&&[0,6].includes(fromKey(day).getDay());return <span key={day} className={`${weekend?c.bandWeekend:""} ${day===today?`${c.bandToday} ${t.todayBand}`:""}`}/>})}</div>
+  return <div className={c.timelineBands} style={grid} aria-hidden="true">{days.map(day=>{const weekend=settings.shadeWeekends&&[0,6].includes(fromKey(day).getDay());return <span key={day} style={dayDivider} className={`${weekend?c.bandWeekend:""} ${day===today?`${c.bandToday} ${t.todayBand}`:""}`}/>})}</div>
 }
 
 function InventoryStrip({days,rooms,reservations,today,settings,grid}){
@@ -45,7 +46,7 @@ function InventoryStrip({days,rooms,reservations,today,settings,grid}){
     <div className={c.inventoryDays} style={grid}>{days.map(day=>{
       const occupied=rooms.filter(room=>reservations.some(item=>covers(item,room.id,day))).length
       const available=Math.max(0,rooms.length-occupied),pct=rooms.length?Math.round(occupied/rooms.length*100):0,weekend=settings.shadeWeekends&&[0,6].includes(fromKey(day).getDay())
-      return <div key={day} className={`${available===0?c.soldOut:""} ${weekend?c.inventoryWeekend:""} ${day===today?`${c.inventoryToday} ${t.todayInventory}`:""}`}>{settings.showAvailability?<b>{available}</b>:null}{settings.showOccupancy?<small>{pct}%</small>:null}</div>
+      return <div key={day} style={dayDivider} className={`${available===0?c.soldOut:""} ${weekend?c.inventoryWeekend:""} ${day===today?`${c.inventoryToday} ${t.todayInventory}`:""}`}>{settings.showAvailability?<b>{available}</b>:null}{settings.showOccupancy?<small>{pct}%</small>:null}</div>
     })}</div>
   </div>
 }
@@ -56,7 +57,7 @@ function UnassignedStrip({days,reservations,grid}){
   const counts=days.map(day=>unassigned.filter(item=>coversDay(item,day)).length),total=new Set(unassigned.map(item=>item.id)).size
   return <div className={l.unassignedRow}>
     <div className={l.unassignedLabel}><b>Sin asignar</b><small>{total}</small></div>
-    <div className={l.unassignedDays} style={grid}>{days.map((day,index)=><div key={day} data-active={counts[index]>0?"true":"false"}>{counts[index]||"·"}</div>)}</div>
+    <div className={l.unassignedDays} style={grid}>{days.map((day,index)=><div key={day} style={dayDivider} data-active={counts[index]>0?"true":"false"}>{counts[index]||"·"}</div>)}</div>
   </div>
 }
 
@@ -138,7 +139,7 @@ export default function PlanningCalendar({property,days,today,settings,rooms,ava
   return <div className={c.calendarShell}>
     <div className={c.calendar}>
       <div className={c.monthRow}><div className={c.corner}><span>{property?.name||"Propiedad activa"}</span><button type="button" className={c.referenceButton} onClick={()=>setReferenceOpen(value=>!value)} aria-label="Ver referencia del Planning" title="Referencia de colores, pagos y horarios">i</button></div><div className={c.months} style={grid}>{months.map(segment=><div key={segment.key} style={{gridColumn:`${segment.start+1} / span ${segment.span}`}}>{segment.label}</div>)}</div></div>
-      <div className={c.dayRow}><div className={c.roomHead}>Habitación</div><div className={c.days} style={grid}>{days.map(day=>{const weekend=settings.shadeWeekends&&[0,6].includes(fromKey(day).getDay());return <div key={day} className={`${day===today?`${c.todayHead} ${t.todayHeader}`:""} ${weekend?c.weekendHead:""}`}><small>{dayName(day)}</small><b>{fromKey(day).getDate()}</b></div>})}</div></div>
+      <div className={c.dayRow}><div className={c.roomHead}>Habitación</div><div className={c.days} style={grid}>{days.map(day=>{const weekend=settings.shadeWeekends&&[0,6].includes(fromKey(day).getDay());return <div key={day} style={dayDivider} className={`${day===today?`${c.todayHead} ${t.todayHeader}`:""} ${weekend?c.weekendHead:""}`}><small>{dayName(day)}</small><b>{fromKey(day).getDate()}</b></div>})}</div></div>
       <InventoryStrip days={days} rooms={rooms} reservations={availabilityReservations} today={today} settings={settings} grid={grid}/>
       <UnassignedStrip days={days} reservations={availabilityReservations} grid={grid}/>
       <div className={c.calendarBody} style={{"--timeline-width":`calc(${days.length} * var(--day-width))`}}>
