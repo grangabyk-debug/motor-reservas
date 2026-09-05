@@ -46,9 +46,11 @@
 .maintenance{width:20px;height:20px;display:grid;place-items:center;border-radius:50%;background:color-mix(in srgb,#e8a43d 13%,var(--panelSolid));color:#b77816;font-size:11px;font-weight:900}
 .timelineRow{position:relative;z-index:2;height:46px;display:grid;background:transparent}
 .cell{height:46px;min-width:0;border:0;background:transparent;cursor:crosshair;padding:0;position:relative;z-index:1}
-.cell:hover{background:color-mix(in srgb,var(--accent) 5%,transparent)}
+.cell:hover{background:linear-gradient(90deg,transparent 0 50%,color-mix(in srgb,var(--accent) 7%,transparent) 50% 100%)}
 .dropTarget{background:color-mix(in srgb,var(--accent) 14%,transparent)!important;box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--accent) 55%,transparent)}
 .rangeCell{background:color-mix(in srgb,var(--accent) 13%,transparent)!important;box-shadow:inset 0 2px color-mix(in srgb,var(--accent) 42%,transparent),inset 0 -2px color-mix(in srgb,var(--accent) 42%,transparent)}
+.rangeHighlight{position:absolute;top:4px;height:38px;z-index:3;border:1px solid color-mix(in srgb,var(--accent) 58%,var(--line));border-radius:7px;background:color-mix(in srgb,var(--accent) 12%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 14%,transparent);pointer-events:none}
+.rangeHighlightBlocked{border-color:color-mix(in srgb,var(--red) 70%,var(--line));background:color-mix(in srgb,var(--red) 12%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--red) 18%,transparent)}
 .rangeActions{position:absolute;top:7px;z-index:12;display:flex;gap:5px;transform:translateX(-50%);filter:drop-shadow(0 7px 13px rgba(20,34,60,.16))}
 .rangeActions button{width:30px;height:30px;display:grid;place-items:center;border:1px solid var(--line);border-radius:7px;background:var(--panelSolid);color:var(--red);font-size:16px;font-weight:900;cursor:pointer}
 .rangeActions .rangeConfirm{border-color:color-mix(in srgb,#39a762 42%,var(--line));background:#35a660;color:#fff}
