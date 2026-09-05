@@ -79,12 +79,14 @@ export default function usePlanningData(propertyId,windowStart,windowEndExclusiv
     const conflict=(conflicts||[]).find(item=>reservationRooms(item).some(id=>roomIds.includes(id)))
     if(conflict){const conflictRoom=selectedRooms.find(room=>reservationRooms(conflict).includes(Number(room.id)));throw new Error(`La habitación ${conflictRoom?.nombre||"seleccionada"} ya tiene una reserva que se superpone con esas fechas.`)}
 
-    const nights=nightsBetween(draft.start,draft.end),defaultRate=selectedRooms.reduce((sum,room)=>sum+(Number(room.precio)||0),0),rate=Number(draft.rate||defaultRate||0)
+    const nights=nightsBetween(draft.start,draft.end),defaultRate=selectedRooms.reduce((sum,room)=>sum+(Number(room.precio)||0),0),rate=Number(draft.rate||defaultRate||0),subtotal=rate*nights
+    const discountType=draft.discountType||"none",discountValue=Math.max(0,Number(draft.discountValue)||0)
+    const discountAmount=discountType==="percent"?Math.min(subtotal,subtotal*Math.min(100,discountValue)/100):discountType==="amount"?Math.min(subtotal,discountValue):0,total=Math.max(0,subtotal-discountAmount)
     const payload={
       property_id:propertyId,user_id:userData?.user?.id||null,habitacion_id:roomIds[0],habitaciones_ids:roomIds,
       habitaciones_detalle:selectedRooms.map(room=>({habitacion_id:Number(room.id),nombre:room.nombre,tipo:room.tipo||null,tarifa_noche:Number(room.precio)||0})),
-      fecha_entrada:draft.start,fecha_salida:draft.end,tipo_estadia:"overnight",nombre_huesped:draft.guest.trim(),email_huesped:draft.email?.trim()||null,telefono_huesped:draft.phone?.trim()||null,
-      cantidad_huespedes:Number(draft.guests)||1,canal_reserva:draft.channel||"Directa",tarifa_noche:rate,noches:nights,precio_total:rate*nights,moneda:draft.currency||"ARS",notas:draft.notes?.trim()||null,
+      fecha_entrada:draft.start,fecha_salida:draft.end,tipo_estadia:"overnight",nombre_huesped:draft.guest.trim(),email_huesped:draft.email?.trim()||null,telefono_huesped:draft.phone?.trim()||null,pais_huesped:draft.country?.trim()||null,
+      cantidad_huespedes:Number(draft.guests)||1,canal_reserva:draft.channel||"Walk-in",codigo_canal:draft.voucher?.trim()||null,tarifa_noche:rate,noches:nights,subtotal,descuento_tipo:discountType==="none"?null:discountType,descuento_valor:discountType==="none"?0:discountValue,descuento_importe:discountAmount,precio_total:total,moneda:draft.currency||"ARS",notas:draft.notes?.trim()||null,
       mascotas:[],mascotas_total:0,servicios:[],pasajeros:[],vehiculos:0,cochera_total:0,estado:draft.status||"confirmada",no_show:false,
     }
     const{data,error:rpcError}=await supabase.rpc("hl_create_reservation_atomic",{p_reservation:payload,p_payments:[]})
