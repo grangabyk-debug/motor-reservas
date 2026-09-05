@@ -5,14 +5,15 @@ function publicClient(){const url=process.env.NEXT_PUBLIC_SUPABASE_URL,key=proce
 const text=(value,max)=>String(value||"").trim().slice(0,max)
 function clientKey(request){const ip=(request.headers.get("x-forwarded-for")||request.headers.get("x-real-ip")||"unknown").split(",")[0].trim(),agent=request.headers.get("user-agent")||"";return createHash("sha256").update(`${ip}|${agent}`).digest("hex").slice(0,48)}
 function money(value,currency="ARS"){try{return new Intl.NumberFormat("es-AR",{style:"currency",currency,maximumFractionDigits:0}).format(Number(value)||0)}catch{return `${currency} ${Number(value)||0}`}}
-const BED_LABELS={matrimonial:"1 cama matrimonial",twin:"2 camas twin",individual:"1 cama individual",matrimonial_twin:"1 matrimonial + 1 twin",triple_twin:"3 camas twin"}
+const count=value=>Math.min(8,Math.max(0,Number(value)||0))
+const cleanRooming=value=>({matrimonial:count(value?.matrimonial),individual:count(value?.individual)})
+const roomingLabel=value=>{const rooming=cleanRooming(value),parts=[];if(rooming.matrimonial)parts.push(`${rooming.matrimonial} matrimonial${rooming.matrimonial===1?"":"es"}`);if(rooming.individual)parts.push(`${rooming.individual} individual${rooming.individual===1?"":"es"}`);return parts.join(" + ")||"Sin preferencia"}
 async function sendConfirmation(client,slug,payload,booking,baseUrl){
   if(!process.env.RESEND_API_KEY||!process.env.HOTEL_EMAIL_FROM||!payload.email||booking?.idempotent_replay)return false
   try{
     const{data:config,error}=await client.rpc("hl_public_booking_config",{p_slug:slug});if(error)throw error
     const hotel=config?.name||"Hotel",subject=`${hotel} · Reserva ${booking.numero_reserva||booking.id}`
-    const lines=[`Hola ${payload.name},`,``,`Tu reserva en ${hotel} quedó confirmada.`,`Habitación: ${booking.room_type||payload.room_type}`]
-    if(payload.bed_type)lines.push(`Cama: ${BED_LABELS[payload.bed_type]||payload.bed_type}`)
+    const lines=[`Hola ${payload.name},`,``,`Tu reserva en ${hotel} quedó confirmada.`,`Habitación: ${booking.room_type||payload.room_type}`,`Rooming: ${roomingLabel(booking.rooming||payload.rooming)}`]
     lines.push(`Entrada: ${booking.check_in||payload.check_in}`,`Salida: ${booking.check_out||payload.check_out}`,`Total: ${money(booking.total,booking.currency||config?.currency||"ARS")}`)
     if(config?.cancellation_policy)lines.push("",`Política de cancelación: ${config.cancellation_policy}`)
     lines.push("",`Número de reserva: ${booking.numero_reserva||booking.id}`)
@@ -25,7 +26,7 @@ async function sendConfirmation(client,slug,payload,booking,baseUrl){
 export async function POST(request,{params}){
   try{
     const{slug}=await params,raw=await request.json().catch(()=>null);if(!raw)return Response.json({error:"Solicitud inválida."},{status:400})
-    const payload={check_in:text(raw.check_in,10),check_out:text(raw.check_out,10),guests:Math.min(20,Math.max(1,Number(raw.guests)||1)),name:text(raw.name,160),email:text(raw.email,180),phone:text(raw.phone,80),bed_type:text(raw.bed_type,80),room_type:text(raw.room_type,120),request_id:text(raw.request_id,120)}
+    const payload={check_in:text(raw.check_in,10),check_out:text(raw.check_out,10),guests:Math.min(20,Math.max(1,Number(raw.guests)||1)),name:text(raw.name,160),email:text(raw.email,180),phone:text(raw.phone,80),rooming:cleanRooming(raw.rooming),room_type:text(raw.room_type,120),request_id:text(raw.request_id,120)}
     if(!payload.name||!payload.room_type||!payload.email)return Response.json({error:"Faltan datos para confirmar la reserva."},{status:400})
     const client=publicClient(),limit=await client.rpc("hl_public_booking_rate_limit",{p_slug:slug,p_client_key:`book:${clientKey(request)}`,p_limit:12,p_window_minutes:15});if(limit.error)throw limit.error
     if(limit.data!==true)return Response.json({error:"Se realizaron demasiados intentos de reserva. Esperá unos minutos y volvé a intentar."},{status:429,headers:{"Retry-After":"300","Cache-Control":"no-store"}})
