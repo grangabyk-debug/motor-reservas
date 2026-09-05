@@ -12,12 +12,15 @@ const STATUS_CLASS={alojado:"inhouse",confirmada:"confirmed",tentativa:"attentio
 const isDayUse=item=>["day_use","dayuse","day-use"].includes(String(item.tipo_estadia||"").toLowerCase())
 
 export function ReservationBlock({item,days,selected,onSelect,onDragStart,onResizeStart,settings,onPreview}){
-  const first=days[0],lastDate=new Date(fromKey(days.at(-1)).getTime()+DAY),last=`${lastDate.getFullYear()}-${String(lastDate.getMonth()+1).padStart(2,"0")}-${String(lastDate.getDate()).padStart(2,"0")}`
-  if(item.fecha_salida<=first||item.fecha_entrada>=last)return null
-  const visibleStart=item.fecha_entrada<first?first:item.fecha_entrada,visibleEnd=item.fecha_salida>last?last:item.fecha_salida
-  const start=Math.max(0,diffDays(first,visibleStart)),baseSpan=Math.max(1,diffDays(visibleStart,visibleEnd)),checkoutVisible=days.includes(item.fecha_salida),checkoutTail=!isDayUse(item)&&checkoutVisible?.5:0,span=Math.min(days.length-start,baseSpan+checkoutTail),nights=Math.max(1,diffDays(item.fecha_entrada,item.fecha_salida)),kind=STATUS_CLASS[item.estado]||"confirmed"
+  const first=days[0],dayUse=isDayUse(item),entryOffset=diffDays(first,item.fecha_entrada)
+  const rawStart=dayUse?entryOffset+.08:entryOffset+.5
+  const rawEnd=dayUse?entryOffset+.92:diffDays(first,item.fecha_salida)+.5
+  const start=Math.max(0,rawStart),end=Math.min(days.length,rawEnd)
+  if(end<=0||start>=days.length||end<=start)return null
+  const span=Math.max(.5,end-start),nights=Math.max(1,diffDays(item.fecha_entrada,item.fecha_salida)),kind=STATUS_CLASS[item.estado]||"confirmed"
   const showPreview=event=>onPreview?.(item,event.currentTarget.getBoundingClientRect())
-  return <div draggable role="button" tabIndex="0" aria-label={`${item.nombre_huesped}, ${nights} noches`} className={`${c.stay} ${c[kind]} ${selected?c.selected:""}`} style={{left:`calc(${start} * var(--day-width) + 3px)`,width:`calc(${span} * var(--day-width) - 6px)`}} onMouseEnter={showPreview} onMouseLeave={()=>onPreview?.(null)} onFocus={showPreview} onBlur={()=>onPreview?.(null)} onClick={()=>{onPreview?.(null);onSelect(item)}} onKeyDown={event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();onPreview?.(null);onSelect(item)}}} onDragStart={event=>{onPreview?.(null);onDragStart(event,item)}}>
+  const stayLabel=dayUse?`${item.nombre_huesped}, day use`:`${item.nombre_huesped}, ${nights} noches`
+  return <div draggable role="button" tabIndex="0" aria-label={stayLabel} className={`${c.stay} ${c[kind]} ${selected?c.selected:""}`} style={{left:`calc(${start} * var(--day-width) + 3px)`,width:`calc(${span} * var(--day-width) - 6px)`}} onMouseEnter={showPreview} onMouseLeave={()=>onPreview?.(null)} onFocus={showPreview} onBlur={()=>onPreview?.(null)} onClick={()=>{onPreview?.(null);onSelect(item)}} onKeyDown={event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();onPreview?.(null);onSelect(item)}}} onDragStart={event=>{onPreview?.(null);onDragStart(event,item)}}>
     <span className={c.stayContent}><span className={c.avatar}>{initials(item.nombre_huesped)}</span><span className={c.stayText}>{settings.showId&&item.numero_reserva?<small>{item.numero_reserva}</small>:null}<b>{item.nombre_huesped}</b></span>{settings.showPrice?<span className={c.stayPrice}>{money(item.precio_total,item.moneda)}</span>:null}</span>
     <span className={c.resizeHandle} draggable title="Cambiar fecha de salida" aria-label="Cambiar fecha de salida" onMouseDown={event=>event.stopPropagation()} onClick={event=>event.stopPropagation()} onDragStart={event=>{event.stopPropagation();onPreview?.(null);onResizeStart(event,item)}}>↔</span>
   </div>
