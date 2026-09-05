@@ -38,7 +38,7 @@ export function ReservationBlock({item,days,selected,onSelect,onDragStart,onResi
   function startResize(event){
     if(group)return
     event.preventDefault();event.stopPropagation();onPreview?.(null)
-    const row=event.currentTarget.parentElement,rowRect=row?.getBoundingClientRect?.()
+    const stay=event.currentTarget.parentElement,row=stay?.parentElement,rowRect=row?.getBoundingClientRect?.()
     if(!rowRect)return
     setResizing(true);resizeValue.current=item.fecha_salida
     const move=pointerEvent=>{const next=resizeCandidate(pointerEvent.clientX,rowRect);resizeValue.current=next;setResizeEnd(next)}
