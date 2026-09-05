@@ -461,8 +461,4 @@
     right: 72px;
     width: min(218px, calc(100vw - 104px));
   }
-
-  .hideButton {
-    display: none;
-  }
 }
