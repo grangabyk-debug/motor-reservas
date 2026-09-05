@@ -18,6 +18,7 @@ const shortDate=value=>new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"sho
 const DEFAULT_SETTINGS={zoom:38,expanded:true,showAvailability:true,showOccupancy:false,showPrice:false,showId:false,showFilters:true,shadeWeekends:true,blockDiagonal:false}
 const roomHas=(item,roomId)=>Number(item.habitacion_id)===Number(roomId)||(item.habitaciones_ids||[]).map(Number).includes(Number(roomId))
 const overlaps=(item,start,end)=>item.fecha_entrada<end&&item.fecha_salida>start
+const uniqueIds=values=>[...new Set((values||[]).filter(Boolean).map(value=>String(value)))]
 
 export default function PlanningWorkspace({propertyId,property,onNavigate,newReservationRequest=0}){
   const today=keyFromDate(new Date())
@@ -53,26 +54,33 @@ export default function PlanningWorkspace({propertyId,property,onNavigate,newRes
   useEffect(()=>{if(!draftKey||!draft)return;const timer=setTimeout(()=>{try{localStorage.setItem(draftKey,JSON.stringify({...draft,savedAt:new Date().toISOString()}));setHasSavedDraft(true);setDraftState("Borrador guardado automáticamente")}catch{setDraftState("No se pudo guardar el borrador")}},220);return()=>clearTimeout(timer)},[draft,draftKey])
 
   function changeSetting(name,value){setSettings(current=>({...current,[name]:value}))}
-  function makeDraft(roomId=data.rooms[0]?.id,start=today,end=addDays(start,1)){const room=data.rooms.find(item=>String(item.id)===String(roomId));return{firstName:"",lastName:"",email:"",phone:"",roomId:String(roomId||""),start,end,status:"confirmada",guests:1,rate:Number(room?.precio)||0,currency:"ARS",channel:"Directa",notes:""}}
-  function normalizeDraft(saved){const base=makeDraft(saved?.roomId||data.rooms[0]?.id,saved?.start||today,saved?.end||addDays(saved?.start||today,1));if(saved?.guest&&!saved.firstName){const parts=String(saved.guest).trim().split(/\s+/);saved={...saved,firstName:parts.shift()||"",lastName:parts.join(" ")}}return{...base,...saved}}
-  function openFreshForm(roomId=data.rooms[0]?.id,start=today,end=addDays(start,1)){if(!roomId)return data.setError("Primero configurá una habitación activa.");setPreview(null);setSelected(null);setRangeSelection(null);setDraft(makeDraft(roomId,start,end));setDrawerStep(0);setDraftState("Los cambios se guardan automáticamente en este dispositivo");data.setError("");setFormOpen(true)}
+  function roomRate(roomIds){return uniqueIds(roomIds).reduce((sum,id)=>sum+(Number(data.rooms.find(room=>String(room.id)===id)?.precio)||0),0)}
+  function makeDraft(roomId=data.rooms[0]?.id,start=today,end=addDays(start,1),roomIds=[roomId]){
+    const ids=uniqueIds(roomIds.length?roomIds:[roomId])
+    return{firstName:"",lastName:"",email:"",phone:"",roomId:ids[0]||"",roomIds:ids,start,end,status:"confirmada",guests:1,rate:roomRate(ids),currency:"ARS",channel:"Directa",notes:""}
+  }
+  function normalizeDraft(saved){
+    const savedIds=uniqueIds(saved?.roomIds?.length?saved.roomIds:[saved?.roomId||data.rooms[0]?.id])
+    const base=makeDraft(savedIds[0],saved?.start||today,saved?.end||addDays(saved?.start||today,1),savedIds)
+    if(saved?.guest&&!saved.firstName){const parts=String(saved.guest).trim().split(/\s+/);saved={...saved,firstName:parts.shift()||"",lastName:parts.join(" ")}}
+    return{...base,...saved,roomId:savedIds[0]||base.roomId,roomIds:savedIds}
+  }
+  function openFreshForm(roomId=data.rooms[0]?.id,start=today,end=addDays(start,1),roomIds=[roomId]){
+    if(!roomId)return data.setError("Primero configurá una habitación activa.")
+    setPreview(null);setSelected(null);setRangeSelection(null);setSelecting(false);setDraft(makeDraft(roomId,start,end,roomIds));setDrawerStep(0);setDraftState("Los cambios se guardan automáticamente en este dispositivo");data.setError("");setFormOpen(true)
+  }
   function openNewReservation(){if(!data.rooms[0]?.id)return data.setError("Primero configurá una habitación activa.");if(draftKey)try{const raw=localStorage.getItem(draftKey);if(raw){const saved=normalizeDraft(JSON.parse(raw));if(saved.roomId&&saved.start&&saved.end){setDraft(saved);setDrawerStep(0);setDraftState("Borrador recuperado");setFormOpen(true);return}}}catch{}openFreshForm()}
   useEffect(()=>{if(!newReservationRequest||!data.rooms.length||lastNewReservationRequest.current===newReservationRequest)return;lastNewReservationRequest.current=newReservationRequest;openNewReservation()},[newReservationRequest,data.rooms.length])
   function clearDraft(){if(draftKey)try{localStorage.removeItem(draftKey)}catch{}setHasSavedDraft(false);setDraft(null);setDraftState("")}
   function discardDraft(){clearDraft();setFormOpen(false);setDrawerStep(0);data.setError("")}
-  function nextStep(){if(drawerStep===0&&draft.end<=draft.start)return data.setError("La salida debe ser posterior a la entrada.");if(drawerStep===1&&!draft.roomId)return data.setError("Elegí una habitación.");if(drawerStep===2&&!`${draft.firstName} ${draft.lastName}`.trim())return data.setError("Ingresá el nombre del huésped.");data.setError("");setDrawerStep(step=>Math.min(3,step+1))}
+  function nextStep(){if(drawerStep===0&&draft.end<=draft.start)return data.setError("La salida debe ser posterior a la entrada.");if(drawerStep===1&&!uniqueIds(draft.roomIds).length)return data.setError("Elegí al menos una habitación.");if(drawerStep===2&&!`${draft.firstName} ${draft.lastName}`.trim())return data.setError("Ingresá el nombre del huésped.");data.setError("");setDrawerStep(step=>Math.min(3,step+1))}
   async function saveReservation(){const guest=`${draft?.firstName||""} ${draft?.lastName||""}`.trim();if(!guest)return data.setError("Ingresá el nombre del huésped.");setSaving(true);try{await data.createReservation({...draft,guest});clearDraft();setFormOpen(false);setDrawerStep(0)}catch(err){data.setError(err?.message||"No se pudo crear la reserva.")}finally{setSaving(false)}}
 
-  function showPreview(item,rect){
-    if(!item||!rect){setPreview(null);return}
-    const width=330,height=245,gap=8
-    let x=Math.max(12,Math.min(rect.left,window.innerWidth-width-12)),y=rect.bottom+gap
-    if(y+height>window.innerHeight-12)y=Math.max(12,rect.top-height-gap)
-    setPreview({item,x,y})
-  }
+  function showPreview(item,rect){if(!item||!rect){setPreview(null);return}const width=330,height=245,gap=8;let x=Math.max(12,Math.min(rect.left,window.innerWidth-width-12)),y=rect.bottom+gap;if(y+height>window.innerHeight-12)y=Math.max(12,rect.top-height-gap);setPreview({item,x,y})}
   function selectReservation(item){setPreview(null);setFormOpen(false);setRangeSelection(null);setSelected(item)}
-  function beginDrag(event,item){event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("text/plain",String(item.id));setPreview(null);setDragging({item,mode:"move"});setSelected(null);setRangeSelection(null)}
-  function beginResize(event,item){event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("text/plain",String(item.id));setPreview(null);setDragging({item,mode:"resize"});setSelected(null);setRangeSelection(null)}
+  function isGroup(item){return uniqueIds([item.habitacion_id,...(item.habitaciones_ids||[])]).length>1}
+  function beginDrag(event,item){if(isGroup(item)){event.preventDefault();data.setError("Las reservas grupales se modifican desde su ficha para conservar todas las habitaciones asignadas.");return}event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("text/plain",String(item.id));setPreview(null);setDragging({item,mode:"move"});setSelected(null);setRangeSelection(null)}
+  function beginResize(event,item){if(isGroup(item)){event.preventDefault();data.setError("Las reservas grupales se modifican desde su ficha para conservar todas las habitaciones asignadas.");return}event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("text/plain",String(item.id));setPreview(null);setDragging({item,mode:"resize"});setSelected(null);setRangeSelection(null)}
   async function dropReservation(event,roomId,day){
     event.preventDefault();if(!dragging)return
     const source=dragging.item;let start=day,end,finalRoomId=roomId
@@ -80,10 +88,15 @@ export default function PlanningWorkspace({propertyId,property,onNavigate,newRes
     else{const roomChanged=Number(source.habitacion_id)!==Number(roomId),dateChanged=source.fecha_entrada!==day;if(settings.blockDiagonal&&roomChanged&&dateChanged){data.setError("El movimiento diagonal está bloqueado. Cambiá primero fecha o habitación.");setDragging(null);setDropCell("");return}end=addDays(day,Math.max(1,diffDays(source.fecha_entrada,source.fecha_salida)))}
     setSaving(true);data.setError("");try{await data.moveReservation({reservationId:source.id,roomId:finalRoomId,start,end})}catch(err){data.setError(err?.message||"No se pudo mover la reserva.")}finally{setSaving(false);setDragging(null);setDropCell("")}
   }
-  function beginRange(event,roomId,day){if(event.button!==0||dragging||event.detail>1)return;event.preventDefault();setPreview(null);setSelected(null);setRangeSelection({roomId:String(roomId),anchorDay:day,start:day,end:addDays(day,1)});setSelecting(true)}
-  function extendRange(roomId,day){if(!selecting)return;setRangeSelection(current=>!current||String(current.roomId)!==String(roomId)?current:day>=current.anchorDay?{...current,start:current.anchorDay,end:addDays(day,1)}:{...current,start:day,end:addDays(current.anchorDay,1)})}
-  function finishRange(event,roomId){if(!selecting||!rangeSelection||String(rangeSelection.roomId)!==String(roomId))return;event.stopPropagation();setSelecting(false)}
-  function confirmRange(){if(!rangeSelection)return;const{roomId,start,end}=rangeSelection;openFreshForm(roomId,start,end)}
+  function roomsBetween(anchorRoomId,currentRoomId){
+    const a=visibleRooms.findIndex(room=>String(room.id)===String(anchorRoomId)),b=visibleRooms.findIndex(room=>String(room.id)===String(currentRoomId))
+    if(a<0||b<0)return[String(anchorRoomId)]
+    return visibleRooms.slice(Math.min(a,b),Math.max(a,b)+1).map(room=>String(room.id))
+  }
+  function beginRange(event,roomId,day){if(event.button!==0||dragging||event.detail>1)return;event.preventDefault();setPreview(null);setSelected(null);setRangeSelection({anchorRoomId:String(roomId),roomIds:[String(roomId)],anchorDay:day,start:day,end:addDays(day,1)});setSelecting(true)}
+  function extendRange(roomId,day){if(!selecting)return;setRangeSelection(current=>{if(!current)return current;const roomIds=roomsBetween(current.anchorRoomId,roomId);return day>=current.anchorDay?{...current,roomIds,start:current.anchorDay,end:addDays(day,1)}:{...current,roomIds,start:day,end:addDays(current.anchorDay,1)}})}
+  function finishRange(event){if(!selecting)return;event.stopPropagation();setSelecting(false)}
+  function confirmRange(){if(!rangeSelection)return;const ids=uniqueIds(rangeSelection.roomIds);openFreshForm(ids[0],rangeSelection.start,rangeSelection.end,ids)}
   function cancelRange(){setSelecting(false);setRangeSelection(null)}
 
   const availableRooms=useMemo(()=>draft?data.rooms.map(room=>({...room,available:!availabilityReservations.some(item=>roomHas(item,room.id)&&overlaps(item,draft.start,draft.end))})):data.rooms,[data.rooms,availabilityReservations,draft])
