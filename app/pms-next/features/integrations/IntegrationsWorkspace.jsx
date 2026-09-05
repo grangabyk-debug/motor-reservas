@@ -1,29 +1,238 @@
 "use client"
 
-import{useCallback,useEffect,useMemo,useState}from"react"
-import{supabase}from"../../../../lib/supabase"
-import s from"./integrations.module.css"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { supabase } from "../../../../lib/supabase"
+import s from "./integrations.module.css"
 
-const OTAS=[{id:"booking",name:"Booking.com",mark:"B",aliases:["booking","booking.com"]},{id:"expedia",name:"Expedia",mark:"E",aliases:["expedia"]},{id:"airbnb",name:"Airbnb",mark:"A",aliases:["airbnb"]},{id:"despegar",name:"Despegar",mark:"D",aliases:["despegar","decolar"]},{id:"agoda",name:"Agoda",mark:"Ag",aliases:["agoda"]},{id:"hotelbeds",name:"Hotelbeds",mark:"H",aliases:["hotelbeds"]}]
-const STATUS_LABELS={not_connected:"Disponible",sandbox:"En prueba",connected:"Conectado",error:"Revisar",paused:"Pausado"}
-const fmtDate=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}).format(new Date(value)):"Sin sincronizar"
-const norm=value=>String(value||"").trim().toLowerCase(),otaFromText=value=>OTAS.find(ota=>ota.aliases.some(alias=>norm(value).includes(alias)))
-const slugify=value=>String(value||"hotel").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,54)||"hotel"
-const ENGINE_FIELDS="id,slug,enabled,display_name,currency,primary_color,accent_color,logo_url,hero_url,booking_message,confirmation_message,contact_phone,contact_email,allowed_origins,min_advance_days,max_advance_days,min_nights,template,cancellation_policy,terms_url,privacy_url,payment_mode,deposit_percent,room_type_rules,gallery,seo_title,seo_description,allow_self_cancel,self_cancel_cutoff_hours,updated_at"
+const OTAS = [
+  { id: "booking", name: "Booking.com", mark: "B", aliases: ["booking", "booking.com"] },
+  { id: "expedia", name: "Expedia", mark: "E", aliases: ["expedia"] },
+  { id: "airbnb", name: "Airbnb", mark: "A", aliases: ["airbnb"] },
+  { id: "despegar", name: "Despegar", mark: "D", aliases: ["despegar", "decolar"] },
+  { id: "agoda", name: "Agoda", mark: "Ag", aliases: ["agoda"] },
+  { id: "hotelbeds", name: "Hotelbeds", mark: "H", aliases: ["hotelbeds"] },
+]
+const STATUS_LABELS = { not_connected: "Disponible", sandbox: "En prueba", connected: "Conectado", error: "Revisar", paused: "Pausado" }
+const ENGINE_FIELDS = "id,slug,enabled,display_name,currency,primary_color,accent_color,logo_url,hero_url,booking_message,confirmation_message,contact_phone,contact_email,allowed_origins,min_advance_days,max_advance_days,min_nights,template,cancellation_policy,terms_url,privacy_url,payment_mode,deposit_percent,room_type_rules,gallery,seo_title,seo_description,allow_self_cancel,self_cancel_cutoff_hours,updated_at"
+const fmtDate = value => value ? new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(value)) : "Sin sincronizar"
+const norm = value => String(value || "").trim().toLowerCase()
+const otaFromText = value => OTAS.find(ota => ota.aliases.some(alias => norm(value).includes(alias)))
+const slugify = value => String(value || "hotel").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 54) || "hotel"
 
-export default function IntegrationsWorkspace({propertyId,property}){
-  const[tab,setTab]=useState("engine"),[connections,setConnections]=useState([]),[mappings,setMappings]=useState([]),[runs,setRuns]=useState([]),[rooms,setRooms]=useState([]),[engine,setEngine]=useState(null),[draft,setDraft]=useState(null),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState(""),[copied,setCopied]=useState("")
-  const load=useCallback(async()=>{if(!propertyId)return;setLoading(true);setError("");try{const[connRes,mapRes,runRes,roomRes,engineRes]=await Promise.all([supabase.from("hotel_channel_connections").select("id,provider,status,last_sync_at,last_error,updated_at").eq("property_id",propertyId).order("updated_at",{ascending:false}),supabase.from("hotel_channel_mappings").select("id,connection_id,mapping_type,local_key,channel_code,external_id,metadata,updated_at").eq("property_id",propertyId).order("mapping_type"),supabase.from("hotel_channel_sync_runs").select("id,connection_id,direction,kind,status,item_count,summary,started_at").eq("property_id",propertyId).order("started_at",{ascending:false}).limit(100),supabase.from("habitaciones").select("id,nombre,tipo,activa,online_bookable,precio,capacidad").eq("property_id",propertyId).eq("activa",true).order("tipo").order("nombre"),supabase.from("hotel_booking_engines").select(ENGINE_FIELDS).eq("property_id",propertyId).maybeSingle()]);for(const result of[connRes,mapRes,runRes,roomRes,engineRes])if(result.error)throw result.error;setConnections(connRes.data||[]);setMappings(mapRes.data||[]);setRuns(runRes.data||[]);setRooms(roomRes.data||[]);setEngine(engineRes.data||null);setDraft(engineRes.data?{...engineRes.data}:null)}catch(err){setError(err?.message||"No se pudo cargar Integraciones.")}finally{setLoading(false)}},[propertyId])
-  useEffect(()=>{load()},[load])
-  const roomTypes=useMemo(()=>Array.from(new Set(rooms.map(r=>r.tipo||"Habitación"))),[rooms])
-  const connectionById=useMemo(()=>new Map(connections.map(item=>[item.id,item])),[connections])
-  const channelState=useMemo(()=>OTAS.map(ota=>{const direct=connections.find(connection=>ota.aliases.some(alias=>norm(connection.provider).includes(alias))),relatedMappings=mappings.filter(mapping=>otaFromText(`${mapping.channel_code||""} ${mapping.metadata?.channel||""} ${mapping.metadata?.provider||""}`)?.id===ota.id),viaHub=relatedMappings.map(mapping=>connectionById.get(mapping.connection_id)).find(Boolean),connection=direct||viaHub;return{...ota,status:connection?.status||"not_connected",lastSync:connection?.last_sync_at||null,lastError:connection?.last_error||null,mappingCount:relatedMappings.length||mappings.filter(mapping=>mapping.connection_id===direct?.id).length}}),[connections,mappings,connectionById])
-  async function copy(value,label){try{await navigator.clipboard.writeText(value);setCopied(label);setTimeout(()=>setCopied(""),1500)}catch{setError("No se pudo copiar automáticamente.")}}
-  async function createEngine(){if(saving)return;setSaving(true);setError("");setNotice("");try{const name=property?.name||"Mi hotel",base=slugify(name);let payload={property_id:propertyId,slug:base,enabled:true,display_name:name,currency:"ARS",booking_message:"Reservá online con disponibilidad real.",confirmation_message:`Tu reserva quedó registrada directamente en ${name}.`,allow_self_cancel:false,self_cancel_cutoff_hours:48},{data,error:insertError}=await supabase.from("hotel_booking_engines").insert(payload).select(ENGINE_FIELDS).single();if(insertError?.code==="23505"){payload.slug=`${base}-${String(propertyId).slice(0,6)}`;const retry=await supabase.from("hotel_booking_engines").insert(payload).select(ENGINE_FIELDS).single();data=retry.data;insertError=retry.error}if(insertError)throw insertError;setEngine(data);setDraft({...data});setNotice("Motor creado y conectado al inventario real del hotel.")}catch(err){setError(err?.message||"No se pudo crear el motor.")}finally{setSaving(false)}}
-  async function saveEngine(){if(!draft||saving)return;setSaving(true);setError("");setNotice("");try{const payload={display_name:draft.display_name?.trim()||property?.name||"Hotel",currency:draft.currency||"ARS",enabled:Boolean(draft.enabled),primary_color:draft.primary_color||"#5B5CEB",accent_color:draft.accent_color||"#7C5CFC",hero_url:draft.hero_url||null,logo_url:draft.logo_url||null,booking_message:draft.booking_message||null,confirmation_message:draft.confirmation_message||null,contact_phone:draft.contact_phone||null,contact_email:draft.contact_email||null,min_advance_days:Math.max(0,Number(draft.min_advance_days)||0),max_advance_days:Math.max(1,Number(draft.max_advance_days)||730),min_nights:Math.max(1,Number(draft.min_nights)||1),template:draft.template||"classic",cancellation_policy:draft.cancellation_policy||null,terms_url:draft.terms_url||null,privacy_url:draft.privacy_url||null,payment_mode:draft.payment_mode||"at_property",deposit_percent:Math.min(100,Math.max(0,Number(draft.deposit_percent)||0)),room_type_rules:draft.room_type_rules||{},seo_title:draft.seo_title||null,seo_description:draft.seo_description||null,allow_self_cancel:Boolean(draft.allow_self_cancel),self_cancel_cutoff_hours:Math.min(720,Math.max(0,Number(draft.self_cancel_cutoff_hours)||0)),updated_at:new Date().toISOString()};const{data,error:updateError}=await supabase.from("hotel_booking_engines").update(payload).eq("id",engine.id).eq("property_id",propertyId).select(ENGINE_FIELDS).single();if(updateError)throw updateError;setEngine(data);setDraft({...data});setNotice("Configuración del motor guardada.")}catch(err){setError(err?.message||"No se pudo guardar el motor.")}finally{setSaving(false)}}
-  async function uploadHero(file){if(!file||!engine)return;setSaving(true);setError("");try{if(file.size>8*1024*1024)throw new Error("La imagen no puede superar 8 MB.");const ext=(file.name.split(".").pop()||"jpg").replace(/[^a-z0-9]/gi,"");const path=`${propertyId}/booking/hero-${Date.now()}.${ext}`;const{data,error:upError}=await supabase.storage.from("hotel-media").upload(path,file,{contentType:file.type,upsert:false});if(upError)throw upError;const{data:publicData}=supabase.storage.from("hotel-media").getPublicUrl(data.path);setDraft(current=>({...current,hero_url:publicData.publicUrl}));setNotice("Imagen cargada. Guardá los cambios para publicarla.")}catch(err){setError(err?.message||"No se pudo subir la imagen.")}finally{setSaving(false)}}
-  function setTypeEnabled(type,enabled){setDraft(current=>({...current,room_type_rules:{...(current?.room_type_rules||{}),[type]:{...((current?.room_type_rules||{})[type]||{}),enabled}}}))}
-  const origin=typeof window!=="undefined"?window.location.origin:"",bookingUrl=engine&&origin?`${origin}/book/${engine.slug}`:"",embedCode=engine&&origin?`<iframe src="${origin}/book/${engine.slug}?embed=1" title="Reservas online" style="width:100%;height:620px;border:0;border-radius:18px"></iframe>`:""
-  const box={border:"1px solid var(--line)",borderRadius:16,background:"var(--panelSolid)",padding:18},field={width:"100%",height:38,border:"1px solid var(--line)",borderRadius:9,background:"var(--panelSolid)",color:"var(--text)",padding:"0 10px",font:"inherit"},area={width:"100%",minHeight:82,border:"1px solid var(--line)",borderRadius:9,background:"var(--panelSolid)",color:"var(--text)",padding:10,font:"inherit",resize:"vertical"},button={height:36,border:"1px solid var(--line)",borderRadius:9,background:"var(--panelSolid)",color:"var(--text)",padding:"0 12px",fontWeight:800,cursor:"pointer"},label={display:"grid",gap:6,fontSize:10,fontWeight:850,color:"var(--muted)"}
-  return <section className={s.page}><header className={s.header}><div><small>INTEGRACIONES</small><h1>Canales y venta directa</h1><p>Un solo inventario para OTAs, web propia y motor de reservas.</p></div><div className={s.tabs}>{[["engine","Motor web"],["channels","Canales"],["rooms","Mapeos"],["history","Actividad"]].map(([id,label])=><button key={id} className={tab===id?s.active:""} onClick={()=>setTab(id)}>{label}</button>)}</div></header>{error&&<div className={s.notice}>{error}</div>}{notice&&<div className={s.security}><span>✓</span><div><b>{notice}</b></div></div>}{loading?<div className={s.notice}>Cargando…</div>:tab==="engine"?<div style={{display:"grid",gap:12}}>{!engine?<section style={box}><small>MOTOR WEB</small><h2>Activá la reserva directa</h2><p style={{color:"var(--muted)",fontSize:12,maxWidth:720}}>Se conecta a las mismas habitaciones, tarifas y cierres de venta del PMS. Después podés usar un enlace, incrustarlo en la web del hotel o usar una web plantilla de Habitación Llena.</p><button style={{...button,background:"linear-gradient(145deg,var(--accent),var(--accent2))",color:"#fff",border:0}} disabled={saving} onClick={createEngine}>{saving?"Creando…":"Crear motor"}</button></section>:<><section style={box}><div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"center",flexWrap:"wrap"}}><div><small>MOTOR PROPIO</small><h2 style={{margin:"5px 0"}}>{engine.display_name}</h2><span style={{fontSize:12,color:"var(--muted)"}}>{engine.enabled?"Venta online activa":"Venta online pausada"} · {engine.slug}</span></div><div style={{display:"flex",gap:8}}><button style={button} onClick={()=>setDraft(v=>({...v,enabled:!v.enabled}))}>{draft?.enabled?"Pausar":"Activar"}</button><a href={`/book/${engine.slug}`} target="_blank" rel="noreferrer" style={{...button,display:"inline-flex",alignItems:"center",textDecoration:"none"}}>Vista previa ↗</a><button style={{...button,background:"var(--accent)",color:"#fff",borderColor:"transparent"}} disabled={saving} onClick={saveEngine}>{saving?"Guardando…":"Guardar"}</button></div></div></section><section style={{...box,display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:12}}><label style={label}>Nombre público<input style={field} value={draft?.display_name||""} onChange={e=>setDraft(v=>({...v,display_name:e.target.value}))}/></label><label style={label}>Plantilla<select style={field} value={draft?.template||"classic"} onChange={e=>setDraft(v=>({...v,template:e.target.value}))}><option value="classic">Clásica</option><option value="boutique">Boutique</option><option value="minimal">Minimal</option></select></label><label style={label}>Moneda<select style={field} value={draft?.currency||"ARS"} onChange={e=>setDraft(v=>({...v,currency:e.target.value}))}><option>ARS</option><option>USD</option><option>EUR</option><option>BRL</option><option>UYU</option></select></label><label style={label}>Estadía mínima<input style={field} type="number" min="1" value={draft?.min_nights||1} onChange={e=>setDraft(v=>({...v,min_nights:e.target.value}))}/></label><label style={label}>Anticipación mínima<input style={field} type="number" min="0" value={draft?.min_advance_days||0} onChange={e=>setDraft(v=>({...v,min_advance_days:e.target.value}))}/></label><label style={label}>Anticipación máxima<input style={field} type="number" min="1" value={draft?.max_advance_days||730} onChange={e=>setDraft(v=>({...v,max_advance_days:e.target.value}))}/></label><label style={{...label,gridColumn:"1/-1"}}>Mensaje de venta<textarea style={area} value={draft?.booking_message||""} onChange={e=>setDraft(v=>({...v,booking_message:e.target.value}))}/></label><label style={{...label,gridColumn:"1/-1"}}>Política de cancelación<textarea style={area} value={draft?.cancellation_policy||""} onChange={e=>setDraft(v=>({...v,cancellation_policy:e.target.value}))} placeholder="Ej. Cancelación sin cargo hasta 48 h antes. Luego se cobra una noche."/></label><label style={{...label,display:"flex",alignItems:"center",gap:9,padding:"11px 12px",border:"1px solid var(--line)",borderRadius:10,color:"var(--text)"}}><input type="checkbox" checked={Boolean(draft?.allow_self_cancel)} onChange={e=>setDraft(v=>({...v,allow_self_cancel:e.target.checked}))}/><span><b style={{display:"block",fontSize:12}}>Permitir cancelación desde el portal</b><small style={{color:"var(--muted)"}}>Sólo reservas web y dentro de la ventana configurada.</small></span></label><label style={label}>Límite para cancelar (horas antes)<input style={field} type="number" min="0" max="720" disabled={!draft?.allow_self_cancel} value={draft?.self_cancel_cutoff_hours??48} onChange={e=>setDraft(v=>({...v,self_cancel_cutoff_hours:e.target.value}))}/></label><div/><label style={label}>Cobro<select style={field} value={draft?.payment_mode||"at_property"} onChange={e=>setDraft(v=>({...v,payment_mode:e.target.value}))}><option value="at_property">Pago en el hotel</option><option value="deposit">Seña online</option><option value="full">Pago total online</option></select></label>{draft?.payment_mode==="deposit"?<label style={label}>Seña %<input style={field} type="number" min="0" max="100" value={draft?.deposit_percent||0} onChange={e=>setDraft(v=>({...v,deposit_percent:e.target.value}))}/></label>:<div/>}<label style={label}>Teléfono<input style={field} value={draft?.contact_phone||""} onChange={e=>setDraft(v=>({...v,contact_phone:e.target.value}))}/></label><label style={label}>Email<input style={field} value={draft?.contact_email||""} onChange={e=>setDraft(v=>({...v,contact_email:e.target.value}))}/></label><label style={label}>Términos URL<input style={field} value={draft?.terms_url||""} onChange={e=>setDraft(v=>({...v,terms_url:e.target.value}))}/></label><label style={label}>Privacidad URL<input style={field} value={draft?.privacy_url||""} onChange={e=>setDraft(v=>({...v,privacy_url:e.target.value}))}/></label></section><section style={box}><small>QUÉ SE VENDE ONLINE</small><h3>Tipos de habitación</h3><p style={{fontSize:12,color:"var(--muted)"}}>Los cierres por fecha se hacen desde Tarifas y disponibilidad. Acá decidís qué categorías existen en el canal directo.</p><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:8}}>{roomTypes.map(type=>{const enabled=draft?.room_type_rules?.[type]?.enabled!==false,count=rooms.filter(r=>(r.tipo||"Habitación")===type).length;return <label key={type} style={{display:"flex",alignItems:"center",gap:9,padding:11,border:"1px solid var(--line)",borderRadius:10}}><input type="checkbox" checked={enabled} onChange={e=>setTypeEnabled(type,e.target.checked)}/><span><b style={{display:"block",fontSize:12}}>{type}</b><small style={{color:"var(--muted)"}}>{count} unidad{count===1?"":"es"}</small></span></label>})}</div></section><section style={{...box,display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}><div><small>IMAGEN PRINCIPAL</small><div style={{height:130,border:"1px solid var(--line)",borderRadius:12,overflow:"hidden",margin:"8px 0",background:"var(--bg)"}}>{draft?.hero_url?<img src={draft.hero_url} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<div style={{height:"100%",display:"grid",placeItems:"center",color:"var(--muted)",fontSize:12}}>Sin imagen</div>}</div><label style={{...button,display:"inline-flex",alignItems:"center"}}>Subir foto<input hidden type="file" accept="image/jpeg,image/png,image/webp" onChange={e=>{const file=e.target.files?.[0];if(file)uploadHero(file);e.target.value=""}}/></label></div><div><small>COLORES</small><label style={{...label,marginTop:8}}>Principal<input style={field} type="color" value={draft?.primary_color||"#5B5CEB"} onChange={e=>setDraft(v=>({...v,primary_color:e.target.value}))}/></label><label style={{...label,marginTop:8}}>Acento<input style={field} type="color" value={draft?.accent_color||"#7C5CFC"} onChange={e=>setDraft(v=>({...v,accent_color:e.target.value}))}/></label></div></section><section style={{...box,display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}><div><small>BOTÓN RESERVAR</small><code style={{display:"block",marginTop:7,padding:10,borderRadius:9,background:"var(--bg)",fontSize:10,overflow:"auto"}}>{bookingUrl}</code><button style={{...button,marginTop:8}} onClick={()=>copy(bookingUrl,"url")}>{copied==="url"?"Copiado ✓":"Copiar enlace"}</button></div><div><small>EMBEBIDO</small><code style={{display:"block",marginTop:7,padding:10,borderRadius:9,background:"var(--bg)",fontSize:10,overflow:"auto",maxHeight:64}}>{embedCode}</code><button style={{...button,marginTop:8}} onClick={()=>copy(embedCode,"embed")}>{copied==="embed"?"Copiado ✓":"Copiar código"}</button></div></section></>}</div>:tab==="channels"?<div className={s.cards}>{channelState.map(channel=><article key={channel.id} className={s.card}><div className={s.cardTop}><div className={s.brand}><span className={s.brandMark}>{channel.mark}</span><div><small>CANAL</small><h2>{channel.name}</h2></div></div><span data-status={channel.status}>{STATUS_LABELS[channel.status]||channel.status}</span></div><div className={s.channelInfo}><div><small>Última sincronización</small><b>{fmtDate(channel.lastSync)}</b></div><div><small>Mapeos</small><b>{channel.mappingCount||0}</b></div></div>{channel.lastError?<div className={s.errorBox}>{channel.lastError}</div>:null}</article>)}</div>:tab==="rooms"?<div className={s.table}><div className={s.head}><span>Canal</span><span>Tipo</span><span>Habitación / tarifa</span><span>Código</span><span>Referencia</span><span>Actualizado</span></div>{mappings.map(mapping=><article key={mapping.id}><b>{otaFromText(`${mapping.channel_code||""} ${mapping.metadata?.channel||""}`)?.name||"Canal"}</b><span>{mapping.mapping_type}</span><span>{mapping.local_key}</span><span>{mapping.channel_code||"—"}</span><span>{mapping.external_id||"—"}</span><span>{fmtDate(mapping.updated_at)}</span></article>)}</div>:<div className={s.table}><div className={s.headHistory}><span>Canal</span><span>Dirección</span><span>Tipo</span><span>Estado</span><span>Ítems</span><span>Inicio</span><span>Detalle</span></div>{runs.map(run=><article className={s.historyRow} key={run.id}><b>{connectionById.get(run.connection_id)?.provider||"Hub"}</b><span>{run.direction}</span><span>{run.kind}</span><span>{run.status}</span><span>{run.item_count}</span><span>{fmtDate(run.started_at)}</span><span>{run.summary||"—"}</span></article>)}</div>}<div className={s.security}><span>HL</span><div><b>Una sola disponibilidad central</b><p>Los cierres, tarifas y reservas del canal directo consumen el mismo inventario que el PMS. Para una fecha concreta, abrí o cerrá venta desde Tarifas y disponibilidad.</p></div></div></section>
+export default function IntegrationsWorkspace({ propertyId, property }) {
+  const [tab, setTab] = useState("engine")
+  const [connections, setConnections] = useState([])
+  const [mappings, setMappings] = useState([])
+  const [runs, setRuns] = useState([])
+  const [rooms, setRooms] = useState([])
+  const [engine, setEngine] = useState(null)
+  const [draft, setDraft] = useState(null)
+  const [paymentConnection, setPaymentConnection] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState("")
+  const [notice, setNotice] = useState("")
+  const [copied, setCopied] = useState("")
+
+  const load = useCallback(async () => {
+    if (!propertyId) return
+    setLoading(true)
+    setError("")
+    try {
+      const [connRes, mapRes, runRes, roomRes, engineRes, paymentRes] = await Promise.all([
+        supabase.from("hotel_channel_connections").select("id,provider,status,last_sync_at,last_error,updated_at").eq("property_id", propertyId).order("updated_at", { ascending: false }),
+        supabase.from("hotel_channel_mappings").select("id,connection_id,mapping_type,local_key,channel_code,external_id,metadata,updated_at").eq("property_id", propertyId).order("mapping_type"),
+        supabase.from("hotel_channel_sync_runs").select("id,connection_id,direction,kind,status,item_count,summary,started_at").eq("property_id", propertyId).order("started_at", { ascending: false }).limit(100),
+        supabase.from("habitaciones").select("id,nombre,tipo,activa,online_bookable,precio,capacidad").eq("property_id", propertyId).eq("activa", true).order("tipo").order("nombre"),
+        supabase.from("hotel_booking_engines").select(ENGINE_FIELDS).eq("property_id", propertyId).maybeSingle(),
+        supabase.from("hotel_payment_connections").select("status,provider,live_mode,updated_at").eq("property_id", propertyId).maybeSingle(),
+      ])
+      for (const result of [connRes, mapRes, runRes, roomRes, engineRes, paymentRes]) if (result.error) throw result.error
+      setConnections(connRes.data || [])
+      setMappings(mapRes.data || [])
+      setRuns(runRes.data || [])
+      setRooms(roomRes.data || [])
+      setEngine(engineRes.data || null)
+      setDraft(engineRes.data ? { ...engineRes.data } : null)
+      setPaymentConnection(paymentRes.data || null)
+    } catch (err) {
+      setError(err?.message || "No se pudo cargar Integraciones.")
+    } finally {
+      setLoading(false)
+    }
+  }, [propertyId])
+
+  useEffect(() => { load() }, [load])
+
+  const roomTypes = useMemo(() => Array.from(new Set(rooms.map(room => room.tipo || "Habitación"))), [rooms])
+  const connectionById = useMemo(() => new Map(connections.map(item => [item.id, item])), [connections])
+  const paymentConnected = paymentConnection?.status === "connected"
+  const channelState = useMemo(() => OTAS.map(ota => {
+    const direct = connections.find(connection => ota.aliases.some(alias => norm(connection.provider).includes(alias)))
+    const relatedMappings = mappings.filter(mapping => otaFromText(`${mapping.channel_code || ""} ${mapping.metadata?.channel || ""} ${mapping.metadata?.provider || ""}`)?.id === ota.id)
+    const viaHub = relatedMappings.map(mapping => connectionById.get(mapping.connection_id)).find(Boolean)
+    const connection = direct || viaHub
+    return { ...ota, status: connection?.status || "not_connected", lastSync: connection?.last_sync_at || null, lastError: connection?.last_error || null, mappingCount: relatedMappings.length || mappings.filter(mapping => mapping.connection_id === direct?.id).length }
+  }), [connections, mappings, connectionById])
+
+  async function copy(value, label) {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopied(label)
+      setTimeout(() => setCopied(""), 1500)
+    } catch {
+      setError("No se pudo copiar automáticamente.")
+    }
+  }
+
+  async function createEngine() {
+    if (saving) return
+    setSaving(true)
+    setError("")
+    setNotice("")
+    try {
+      const name = property?.name || "Mi hotel"
+      const base = slugify(name)
+      let payload = { property_id: propertyId, slug: base, enabled: true, display_name: name, currency: "ARS", booking_message: "Reservá online con disponibilidad real.", confirmation_message: `Tu reserva quedó registrada directamente en ${name}.`, payment_mode: "at_property", deposit_percent: 0, allow_self_cancel: false, self_cancel_cutoff_hours: 48 }
+      let { data, error: insertError } = await supabase.from("hotel_booking_engines").insert(payload).select(ENGINE_FIELDS).single()
+      if (insertError?.code === "23505") {
+        payload = { ...payload, slug: `${base}-${String(propertyId).slice(0, 6)}` }
+        const retry = await supabase.from("hotel_booking_engines").insert(payload).select(ENGINE_FIELDS).single()
+        data = retry.data
+        insertError = retry.error
+      }
+      if (insertError) throw insertError
+      setEngine(data)
+      setDraft({ ...data })
+      setNotice("Motor creado y conectado al inventario real del hotel.")
+    } catch (err) {
+      setError(err?.message || "No se pudo crear el motor.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function saveEngine() {
+    if (!draft || saving) return
+    setError("")
+    setNotice("")
+    if (draft.payment_mode !== "at_property" && !paymentConnected) {
+      setError("Conectá Mercado Pago antes de activar una seña o un pago total online. Mientras tanto el motor puede cobrar en el hotel.")
+      return
+    }
+    if (draft.payment_mode === "deposit" && Number(draft.deposit_percent || 0) <= 0) {
+      setError("Definí un porcentaje de seña mayor a cero.")
+      return
+    }
+    setSaving(true)
+    try {
+      const payload = {
+        display_name: draft.display_name?.trim() || property?.name || "Hotel",
+        currency: draft.currency || "ARS",
+        enabled: Boolean(draft.enabled),
+        primary_color: draft.primary_color || "#5B5CEB",
+        accent_color: draft.accent_color || "#7C5CFC",
+        hero_url: draft.hero_url || null,
+        logo_url: draft.logo_url || null,
+        booking_message: draft.booking_message || null,
+        confirmation_message: draft.confirmation_message || null,
+        contact_phone: draft.contact_phone || null,
+        contact_email: draft.contact_email || null,
+        min_advance_days: Math.max(0, Number(draft.min_advance_days) || 0),
+        max_advance_days: Math.max(1, Number(draft.max_advance_days) || 730),
+        min_nights: Math.max(1, Number(draft.min_nights) || 1),
+        template: draft.template || "classic",
+        cancellation_policy: draft.cancellation_policy || null,
+        terms_url: draft.terms_url || null,
+        privacy_url: draft.privacy_url || null,
+        payment_mode: draft.payment_mode || "at_property",
+        deposit_percent: draft.payment_mode === "deposit" ? Math.min(100, Math.max(1, Number(draft.deposit_percent) || 1)) : 0,
+        room_type_rules: draft.room_type_rules || {},
+        seo_title: draft.seo_title || null,
+        seo_description: draft.seo_description || null,
+        allow_self_cancel: Boolean(draft.allow_self_cancel),
+        self_cancel_cutoff_hours: Math.min(720, Math.max(0, Number(draft.self_cancel_cutoff_hours) || 0)),
+        updated_at: new Date().toISOString(),
+      }
+      const { data, error: updateError } = await supabase.from("hotel_booking_engines").update(payload).eq("id", engine.id).eq("property_id", propertyId).select(ENGINE_FIELDS).single()
+      if (updateError) throw updateError
+      setEngine(data)
+      setDraft({ ...data })
+      setNotice("Configuración del motor guardada.")
+    } catch (err) {
+      setError(err?.message || "No se pudo guardar el motor.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function uploadHero(file) {
+    if (!file || !engine) return
+    setSaving(true)
+    setError("")
+    try {
+      if (file.size > 8 * 1024 * 1024) throw new Error("La imagen no puede superar 8 MB.")
+      const ext = (file.name.split(".").pop() || "jpg").replace(/[^a-z0-9]/gi, "")
+      const path = `${propertyId}/booking/hero-${Date.now()}.${ext}`
+      const { data, error: upError } = await supabase.storage.from("hotel-media").upload(path, file, { contentType: file.type, upsert: false })
+      if (upError) throw upError
+      const { data: publicData } = supabase.storage.from("hotel-media").getPublicUrl(data.path)
+      setDraft(current => ({ ...current, hero_url: publicData.publicUrl }))
+      setNotice("Imagen cargada. Guardá los cambios para publicarla.")
+    } catch (err) {
+      setError(err?.message || "No se pudo subir la imagen.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function setTypeEnabled(type, enabled) {
+    setDraft(current => ({ ...current, room_type_rules: { ...(current?.room_type_rules || {}), [type]: { ...((current?.room_type_rules || {})[type] || {}), enabled } } }))
+  }
+
+  const origin = typeof window !== "undefined" ? window.location.origin : ""
+  const bookingUrl = engine && origin ? `${origin}/book/${engine.slug}` : ""
+  const embedCode = engine && origin ? `<iframe src="${origin}/book/${engine.slug}?embed=1" title="Reservas online" style="width:100%;height:620px;border:0;border-radius:18px"></iframe>` : ""
+  const box = { border: "1px solid var(--line)", borderRadius: 16, background: "var(--panelSolid)", padding: 18 }
+  const field = { width: "100%", height: 38, border: "1px solid var(--line)", borderRadius: 9, background: "var(--panelSolid)", color: "var(--text)", padding: "0 10px", font: "inherit" }
+  const area = { width: "100%", minHeight: 82, border: "1px solid var(--line)", borderRadius: 9, background: "var(--panelSolid)", color: "var(--text)", padding: 10, font: "inherit", resize: "vertical" }
+  const button = { height: 36, border: "1px solid var(--line)", borderRadius: 9, background: "var(--panelSolid)", color: "var(--text)", padding: "0 12px", fontWeight: 800, cursor: "pointer" }
+  const label = { display: "grid", gap: 6, fontSize: 10, fontWeight: 850, color: "var(--muted)" }
+
+  return <section className={s.page}>
+    <header className={s.header}>
+      <div><small>INTEGRACIONES</small><h1>Canales y venta directa</h1><p>Un solo inventario para OTAs, web propia y motor de reservas.</p></div>
+      <div className={s.tabs}>{[["engine", "Motor web"], ["channels", "Canales"], ["rooms", "Mapeos"], ["history", "Actividad"]].map(([id, name]) => <button key={id} className={tab === id ? s.active : ""} onClick={() => setTab(id)}>{name}</button>)}</div>
+    </header>
+    {error && <div className={s.notice}>{error}</div>}
+    {notice && <div className={s.security}><span>✓</span><div><b>{notice}</b></div></div>}
+    {loading ? <div className={s.notice}>Cargando…</div> : tab === "engine" ? <div style={{ display: "grid", gap: 12 }}>
+      {!engine ? <section style={box}><small>MOTOR WEB</small><h2>Activá la reserva directa</h2><p style={{ color: "var(--muted)", fontSize: 12, maxWidth: 720 }}>Se conecta a las mismas habitaciones, tarifas y cierres de venta del PMS.</p><button style={{ ...button, background: "linear-gradient(145deg,var(--accent),var(--accent2))", color: "#fff", border: 0 }} disabled={saving} onClick={createEngine}>{saving ? "Creando…" : "Crear motor"}</button></section> : <>
+        <section style={box}><div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}><div><small>MOTOR PROPIO</small><h2 style={{ margin: "5px 0" }}>{engine.display_name}</h2><span style={{ fontSize: 12, color: "var(--muted)" }}>{engine.enabled ? "Venta online activa" : "Venta online pausada"} · {engine.slug}</span></div><div style={{ display: "flex", gap: 8 }}><button style={button} onClick={() => setDraft(value => ({ ...value, enabled: !value.enabled }))}>{draft?.enabled ? "Pausar" : "Activar"}</button><a href={`/book/${engine.slug}`} target="_blank" rel="noreferrer" style={{ ...button, display: "inline-flex", alignItems: "center", textDecoration: "none" }}>Vista previa ↗</a><button style={{ ...button, background: "var(--accent)", color: "#fff", borderColor: "transparent" }} disabled={saving} onClick={saveEngine}>{saving ? "Guardando…" : "Guardar"}</button></div></div></section>
+        <section style={{ ...box, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap", borderColor: paymentConnected ? "color-mix(in srgb,var(--green) 35%,var(--line))" : "color-mix(in srgb,var(--red) 20%,var(--line))" }}><div><small>PASARELA DE PAGO</small><h3 style={{ margin: "5px 0", fontSize: 15 }}>{paymentConnected ? "Mercado Pago conectado" : "Mercado Pago no conectado"}</h3><span style={{ color: "var(--muted)", fontSize: 12 }}>{paymentConnected ? `Cuenta lista para cobros online${paymentConnection?.live_mode ? " · modo real" : " · revisar modo de la cuenta"}.` : "El motor puede reservar normalmente, pero no puede exigir una seña o pago online hasta conectar una cuenta."}</span></div><span style={{ padding: "7px 10px", borderRadius: 999, fontSize: 11, fontWeight: 900, background: paymentConnected ? "color-mix(in srgb,var(--green) 10%,var(--panelSolid))" : "color-mix(in srgb,var(--red) 8%,var(--panelSolid))", color: paymentConnected ? "var(--green)" : "var(--red)" }}>{paymentConnected ? "Conectado" : "Pendiente"}</span></section>
+        <section style={{ ...box, display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 12 }}>
+          <label style={label}>Nombre público<input style={field} value={draft?.display_name || ""} onChange={event => setDraft(value => ({ ...value, display_name: event.target.value }))} /></label>
+          <label style={label}>Plantilla<select style={field} value={draft?.template || "classic"} onChange={event => setDraft(value => ({ ...value, template: event.target.value }))}><option value="classic">Clásica</option><option value="boutique">Boutique</option><option value="minimal">Minimal</option></select></label>
+          <label style={label}>Moneda<select style={field} value={draft?.currency || "ARS"} onChange={event => setDraft(value => ({ ...value, currency: event.target.value }))}><option>ARS</option><option>USD</option><option>EUR</option><option>BRL</option><option>UYU</option></select></label>
+          <label style={label}>Estadía mínima<input style={field} type="number" min="1" value={draft?.min_nights || 1} onChange={event => setDraft(value => ({ ...value, min_nights: event.target.value }))} /></label>
+          <label style={label}>Anticipación mínima<input style={field} type="number" min="0" value={draft?.min_advance_days || 0} onChange={event => setDraft(value => ({ ...value, min_advance_days: event.target.value }))} /></label>
+          <label style={label}>Anticipación máxima<input style={field} type="number" min="1" value={draft?.max_advance_days || 730} onChange={event => setDraft(value => ({ ...value, max_advance_days: event.target.value }))} /></label>
+          <label style={{ ...label, gridColumn: "1/-1" }}>Mensaje de venta<textarea style={area} value={draft?.booking_message || ""} onChange={event => setDraft(value => ({ ...value, booking_message: event.target.value }))} /></label>
+          <label style={{ ...label, gridColumn: "1/-1" }}>Política de cancelación<textarea style={area} value={draft?.cancellation_policy || ""} onChange={event => setDraft(value => ({ ...value, cancellation_policy: event.target.value }))} placeholder="Ej. Cancelación sin cargo hasta 48 h antes. Luego se cobra una noche." /></label>
+          <label style={{ ...label, display: "flex", alignItems: "center", gap: 9, padding: "11px 12px", border: "1px solid var(--line)", borderRadius: 10, color: "var(--text)" }}><input type="checkbox" checked={Boolean(draft?.allow_self_cancel)} onChange={event => setDraft(value => ({ ...value, allow_self_cancel: event.target.checked }))} /><span><b style={{ display: "block", fontSize: 12 }}>Permitir cancelación desde el portal</b><small style={{ color: "var(--muted)" }}>Sólo reservas web y dentro de la ventana configurada.</small></span></label>
+          <label style={label}>Límite para cancelar (horas antes)<input style={field} type="number" min="0" max="720" disabled={!draft?.allow_self_cancel} value={draft?.self_cancel_cutoff_hours ?? 48} onChange={event => setDraft(value => ({ ...value, self_cancel_cutoff_hours: event.target.value }))} /></label><div />
+          <label style={label}>Cobro<select style={field} value={draft?.payment_mode || "at_property"} onChange={event => setDraft(value => ({ ...value, payment_mode: event.target.value }))}><option value="at_property">Pago en el hotel</option><option value="deposit" disabled={!paymentConnected}>Seña online{!paymentConnected ? " · requiere Mercado Pago" : ""}</option><option value="full" disabled={!paymentConnected}>Pago total online{!paymentConnected ? " · requiere Mercado Pago" : ""}</option></select></label>
+          {draft?.payment_mode === "deposit" ? <label style={label}>Seña %<input style={field} type="number" min="1" max="100" value={draft?.deposit_percent || 0} onChange={event => setDraft(value => ({ ...value, deposit_percent: event.target.value }))} /></label> : <div />}
+          <label style={label}>Teléfono<input style={field} value={draft?.contact_phone || ""} onChange={event => setDraft(value => ({ ...value, contact_phone: event.target.value }))} /></label>
+          <label style={label}>Email<input style={field} value={draft?.contact_email || ""} onChange={event => setDraft(value => ({ ...value, contact_email: event.target.value }))} /></label>
+          <label style={label}>Términos URL<input style={field} value={draft?.terms_url || ""} onChange={event => setDraft(value => ({ ...value, terms_url: event.target.value }))} /></label>
+          <label style={label}>Privacidad URL<input style={field} value={draft?.privacy_url || ""} onChange={event => setDraft(value => ({ ...value, privacy_url: event.target.value }))} /></label>
+        </section>
+        <section style={box}><small>QUÉ SE VENDE ONLINE</small><h3>Tipos de habitación</h3><p style={{ fontSize: 12, color: "var(--muted)" }}>Los cierres por fecha se hacen desde Tarifas y disponibilidad. Acá decidís qué categorías existen en el canal directo.</p><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 8 }}>{roomTypes.map(type => { const enabled = draft?.room_type_rules?.[type]?.enabled !== false; const count = rooms.filter(room => (room.tipo || "Habitación") === type).length; return <label key={type} style={{ display: "flex", alignItems: "center", gap: 9, padding: 11, border: "1px solid var(--line)", borderRadius: 10 }}><input type="checkbox" checked={enabled} onChange={event => setTypeEnabled(type, event.target.checked)} /><span><b style={{ display: "block", fontSize: 12 }}>{type}</b><small style={{ color: "var(--muted)" }}>{count} unidad{count === 1 ? "" : "es"}</small></span></label> })}</div></section>
+        <section style={{ ...box, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}><div><small>IMAGEN PRINCIPAL</small><div style={{ height: 130, border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden", margin: "8px 0", background: "var(--bg)" }}>{draft?.hero_url ? <img src={draft.hero_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <div style={{ height: "100%", display: "grid", placeItems: "center", color: "var(--muted)", fontSize: 12 }}>Sin imagen</div>}</div><label style={{ ...button, display: "inline-flex", alignItems: "center" }}>Subir foto<input hidden type="file" accept="image/jpeg,image/png,image/webp" onChange={event => { const file = event.target.files?.[0]; if (file) uploadHero(file); event.target.value = "" }} /></label></div><div><small>COLORES</small><label style={{ ...label, marginTop: 8 }}>Principal<input style={field} type="color" value={draft?.primary_color || "#5B5CEB"} onChange={event => setDraft(value => ({ ...value, primary_color: event.target.value }))} /></label><label style={{ ...label, marginTop: 8 }}>Acento<input style={field} type="color" value={draft?.accent_color || "#7C5CFC"} onChange={event => setDraft(value => ({ ...value, accent_color: event.target.value }))} /></label></div></section>
+        <section style={{ ...box, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}><div><small>BOTÓN RESERVAR</small><code style={{ display: "block", marginTop: 7, padding: 10, borderRadius: 9, background: "var(--bg)", fontSize: 10, overflow: "auto" }}>{bookingUrl}</code><button style={{ ...button, marginTop: 8 }} onClick={() => copy(bookingUrl, "url")}>{copied === "url" ? "Copiado ✓" : "Copiar enlace"}</button></div><div><small>EMBEBIDO</small><code style={{ display: "block", marginTop: 7, padding: 10, borderRadius: 9, background: "var(--bg)", fontSize: 10, overflow: "auto", maxHeight: 64 }}>{embedCode}</code><button style={{ ...button, marginTop: 8 }} onClick={() => copy(embedCode, "embed")}>{copied === "embed" ? "Copiado ✓" : "Copiar código"}</button></div></section>
+      </>}
+    </div> : tab === "channels" ? <div className={s.cards}>{channelState.map(channel => <article key={channel.id} className={s.card}><div className={s.cardTop}><div className={s.brand}><span className={s.brandMark}>{channel.mark}</span><div><small>CANAL</small><h2>{channel.name}</h2></div></div><span data-status={channel.status}>{STATUS_LABELS[channel.status] || channel.status}</span></div><div className={s.channelInfo}><div><small>Última sincronización</small><b>{fmtDate(channel.lastSync)}</b></div><div><small>Mapeos</small><b>{channel.mappingCount || 0}</b></div></div>{channel.lastError ? <div className={s.errorBox}>{channel.lastError}</div> : null}</article>)}</div> : tab === "rooms" ? <div className={s.table}><div className={s.head}><span>Canal</span><span>Tipo</span><span>Habitación / tarifa</span><span>Código</span><span>Referencia</span><span>Actualizado</span></div>{mappings.map(mapping => <article key={mapping.id}><b>{otaFromText(`${mapping.channel_code || ""} ${mapping.metadata?.channel || ""}`)?.name || "Canal"}</b><span>{mapping.mapping_type}</span><span>{mapping.local_key}</span><span>{mapping.channel_code || "—"}</span><span>{mapping.external_id || "—"}</span><span>{fmtDate(mapping.updated_at)}</span></article>)}</div> : <div className={s.table}><div className={s.headHistory}><span>Canal</span><span>Dirección</span><span>Tipo</span><span>Estado</span><span>Ítems</span><span>Inicio</span><span>Detalle</span></div>{runs.map(run => <article className={s.historyRow} key={run.id}><b>{connectionById.get(run.connection_id)?.provider || "Hub"}</b><span>{run.direction}</span><span>{run.kind}</span><span>{run.status}</span><span>{run.item_count}</span><span>{fmtDate(run.started_at)}</span><span>{run.summary || "—"}</span></article>)}</div>}
+    <div className={s.security}><span>HL</span><div><b>Una sola disponibilidad central</b><p>Los cierres, tarifas y reservas del canal directo consumen el mismo inventario que el PMS. Para una fecha concreta, abrí o cerrá venta desde Tarifas y disponibilidad.</p></div></div>
+  </section>
 }
