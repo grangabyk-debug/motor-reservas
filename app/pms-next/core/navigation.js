@@ -29,6 +29,29 @@ export const MANAGEMENT_NAV=[
 ]
 
 export const NAV_LABELS=[...PRIMARY_NAV,...OPERATIONS_NAV,...MANAGEMENT_NAV].reduce((acc,item)=>{acc[item.id]=item.label;return acc},{})
+export const VIEW_DESCRIPTIONS={
+  dashboard:"Resumen operativo del hotel: llegadas, huéspedes alojados, salidas, ocupación, habitaciones y alertas que requieren atención.",
+  planning:"Calendario operativo para crear, mover, extender y revisar reservas y disponibilidad por habitación.",
+  reservations:"Listado y ficha completa de cada reserva, con huéspedes, estadía, pagos, documentos, historial y acciones de recepción.",
+  quotes:"Creá y seguí presupuestos antes de convertirlos en reservas, con fechas, habitaciones, tarifas y condiciones.",
+  guests:"Historial y perfil de huéspedes para reconocer repetidores, preferencias, idioma, etiquetas y datos de contacto.",
+  messages:"Centraliza comunicaciones vinculadas a huéspedes y reservas para que el seguimiento quede asociado a la operación.",
+  tasks:"Tareas internas y check-lists para coordinar rutinas del hotel y controlar su cumplimiento.",
+  requests:"Solicitudes de huéspedes vinculadas a reserva, habitación, prioridad, responsable, vencimiento y estado.",
+  housekeeping:"Estado de limpieza e inspección de habitaciones, asignación de tareas y preparación para próximas llegadas.",
+  maintenance:"Incidencias técnicas del hotel con prioridad, habitación, responsable, vencimiento y seguimiento hasta resolución.",
+  inventory:"Stock operativo, movimientos y niveles de reposición de insumos utilizados por el hotel.",
+  services:"Catálogo y cargos de servicios y extras que pueden agregarse a reservas y cuentas de huéspedes.",
+  rates:"Tarifas, disponibilidad y restricciones comerciales por fecha para controlar lo que se vende.",
+  finance:"Cobros, saldos, documentos, solicitudes de pago y movimientos financieros vinculados a las reservas.",
+  growth:"Indicadores y herramientas comerciales para entender origen de reservas, producción y oportunidades de venta.",
+  reports:"Informes operativos, comerciales y financieros construidos con los datos reales de la propiedad.",
+  audit:"Trazabilidad de cambios y acciones realizadas en el PMS para saber qué pasó, cuándo y sobre qué registro.",
+  staff:"Usuarios, roles y permisos de la propiedad para separar correctamente responsabilidades y accesos.",
+  integrations:"Canales de venta, motor web y conexiones externas de la propiedad, con estado y herramientas de implementación.",
+  settings:"Configuración de la propiedad, preferencias operativas, branding, reglas y funciones habilitadas.",
+  support:"Primero te ayuda el asistente de Habitación Llena; si no alcanza, podés escalar la conversación completa al equipo de soporte.",
+}
 export const ALL_VIEWS=Object.keys(NAV_LABELS)
 export const ROLE_VIEWS={
   owner:ALL_VIEWS,
