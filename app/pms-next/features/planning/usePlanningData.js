@@ -3,7 +3,6 @@
 import{useCallback,useEffect,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 import{attachPayments}from"./planningPayment"
-import{legacyBedTypeFromRooming}from"./RoomingEditor"
 
 const DAY=86400000
 const nightsBetween=(start,end)=>Math.max(1,Math.round((new Date(`${end}T12:00:00`)-new Date(`${start}T12:00:00`))/DAY))
@@ -25,7 +24,7 @@ export default function usePlanningData(propertyId,windowStart,windowEndExclusiv
     try{
       const[roomRes,resRes,floorRes,paymentRes]=await Promise.all([
         supabase.from("habitaciones").select("id,nombre,tipo,capacidad,precio,estado,activa,sort_order,housekeeping_zone,floor_id").eq("property_id",propertyId).eq("activa",true),
-        supabase.from("reservas").select("id,numero_reserva,nombre_huesped,email_huesped,telefono_huesped,habitacion_id,habitaciones_ids,habitaciones_detalle,fecha_entrada,fecha_salida,estado,tarifa_noche,precio_total,moneda,canal_reserva,cantidad_huespedes,no_show,tipo_estadia,tipo_cama,notas").eq("property_id",propertyId).neq("estado","cancelada").lt("fecha_entrada",windowEndExclusive).gte("fecha_salida",windowStart).order("fecha_entrada"),
+        supabase.from("reservas").select("id,numero_reserva,nombre_huesped,email_huesped,telefono_huesped,habitacion_id,habitaciones_ids,habitaciones_detalle,fecha_entrada,fecha_salida,estado,tarifa_noche,precio_total,moneda,canal_reserva,cantidad_huespedes,no_show,tipo_estadia,notas").eq("property_id",propertyId).neq("estado","cancelada").lt("fecha_entrada",windowEndExclusive).gte("fecha_salida",windowStart).order("fecha_entrada"),
         supabase.from("hotel_floors").select("id,name,sort_order,active").eq("property_id",propertyId).eq("active",true).order("sort_order"),
         supabase.from("pagos").select("id,reserva_id,monto,moneda,estado,created_at").eq("property_id",propertyId).eq("estado","confirmado"),
       ])
@@ -95,15 +94,14 @@ export default function usePlanningData(propertyId,windowStart,windowEndExclusiv
     if(conflict){const conflictRoom=selectedRooms.find(room=>reservationRooms(conflict).includes(Number(room.id)));throw new Error(`La habitación ${conflictRoom?.nombre||"seleccionada"} ya tiene una reserva que se superpone con esas fechas.`)}
 
     const roomAssignments=draft.roomAssignments||{}
-    const details=selectedRooms.map(room=>{const assignment=roomAssignments[String(room.id)]||{};return{habitacion_id:Number(room.id),nombre:room.nombre,tipo:room.tipo||null,vendida_como:assignment.soldAs||room.tipo||null,huespedes:Math.max(1,Number(assignment.guests)||1),tarifa_noche:Math.max(0,Number(assignment.rate??room.precio)||0),rooming:{matrimonial:Math.max(0,Number(assignment.matrimonial)||0),individual:Math.max(0,Number(assignment.individual)||0)}}})
+    const details=selectedRooms.map(room=>{const assignment=roomAssignments[String(room.id)]||{};return{habitacion_id:Number(room.id),nombre:room.nombre,categoria_asignada:room.tipo||"Habitación",categoria_vendida:assignment.soldAs||room.tipo||"Habitación",huespedes:Math.max(1,Number(assignment.guests)||1),tarifa_noche:Math.max(0,Number(assignment.rate??room.precio)||0),rooming:{matrimonial:Math.max(0,Number(assignment.matrimonial)||0),individual:Math.max(0,Number(assignment.individual)||0)}}})
     const totalGuests=details.reduce((sum,item)=>sum+item.huespedes,0),defaultRate=details.reduce((sum,item)=>sum+item.tarifa_noche,0),nights=nightsBetween(draft.start,draft.end),rate=Number(draft.rate||defaultRate||0),subtotal=rate*nights
     const discountType=draft.discountType||"none",discountValue=Math.max(0,Number(draft.discountValue)||0)
     const discountAmount=discountType==="percent"?Math.min(subtotal,subtotal*Math.min(100,discountValue)/100):discountType==="amount"?Math.min(subtotal,discountValue):0,total=Math.max(0,subtotal-discountAmount)
-    const legacyBedType=details.length===1?legacyBedTypeFromRooming(details[0].rooming):null
     const payload={
       property_id:propertyId,user_id:userData?.user?.id||null,habitacion_id:roomIds[0],habitaciones_ids:roomIds,
       habitaciones_detalle:details,
-      fecha_entrada:draft.start,fecha_salida:draft.end,tipo_estadia:"overnight",tipo_cama:legacyBedType,nombre_huesped:draft.guest.trim(),email_huesped:draft.email?.trim()||null,telefono_huesped:draft.phone?.trim()||null,pais_huesped:draft.country?.trim()||null,
+      fecha_entrada:draft.start,fecha_salida:draft.end,tipo_estadia:"overnight",nombre_huesped:draft.guest.trim(),email_huesped:draft.email?.trim()||null,telefono_huesped:draft.phone?.trim()||null,pais_huesped:draft.country?.trim()||null,
       cantidad_huespedes:totalGuests||Number(draft.guests)||1,canal_reserva:draft.channel||"Walk-in",codigo_canal:draft.voucher?.trim()||null,tarifa_noche:rate,noches:nights,subtotal,descuento_tipo:discountType==="none"?null:discountType,descuento_valor:discountType==="none"?0:discountValue,descuento_importe:discountAmount,precio_total:total,moneda:draft.currency||"ARS",notas:draft.notes?.trim()||null,
       mascotas:[],mascotas_total:0,servicios:[],pasajeros:[],vehiculos:0,cochera_total:0,estado:draft.status||"confirmada",no_show:false,
     }
