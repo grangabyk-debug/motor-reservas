@@ -68,7 +68,7 @@ export default function PlanningWorkspace({propertyId,property,onNavigate,newRes
   function clearDraft(){if(draftKey)try{localStorage.removeItem(draftKey)}catch{}setHasSavedDraft(false);setDraft(null);setDraftState("")}
   function discardDraft(){clearDraft();setFormOpen(false);setDrawerStep(0);data.setError("")}
   function nextStep(){if(drawerStep===0&&draft.end<=draft.start)return data.setError("La salida debe ser posterior a la entrada.");if(drawerStep===1&&!uniqueIds(draft.roomIds).length)return data.setError("Elegí al menos una habitación.");if(drawerStep===2&&!`${draft.firstName} ${draft.lastName}`.trim())return data.setError("Ingresá el nombre del huésped.");data.setError("");setDrawerStep(step=>Math.min(3,step+1))}
-  async function saveReservation(){const guest=`${draft?.firstName||""} ${draft?.lastName||""}`.trim();if(!guest)return data.setError("Ingresá el nombre del huésped.");setSaving(true);try{await data.createReservation({...draft,guest});clearDraft();setFormOpen(false);setDrawerStep(0)}catch(err){data.setError(err?.message||"No se pudo crear la reserva.")}finally{setSaving(false)}}
+  async function saveReservation(){if(saving)return;const guest=`${draft?.firstName||""} ${draft?.lastName||""}`.trim();if(!guest)return data.setError("Ingresá el nombre del huésped.");setSaving(true);try{await data.createReservation({...draft,guest});clearDraft();setFormOpen(false);setDrawerStep(0)}catch(err){data.setError(err?.message||"No se pudo crear la reserva.")}finally{setSaving(false)}}
 
   function showPreview(item,rect){if(!item||!rect){setPreview(null);return}const width=330,height=245,gap=8;let x=Math.max(12,Math.min(rect.left,window.innerWidth-width-12)),y=rect.bottom+gap;if(y+height>window.innerHeight-12)y=Math.max(12,rect.top-height-gap);setPreview({item,x,y})}
   function selectReservation(item){setPreview(null);setFormOpen(false);setRangeSelection(null);setSelected(item)}
@@ -88,7 +88,7 @@ export default function PlanningWorkspace({propertyId,property,onNavigate,newRes
     return visibleRooms.slice(Math.min(a,b),Math.max(a,b)+1).map(room=>String(room.id))
   }
   function beginRange(event,roomId,day){if(event.button!==0||dragging||event.detail>1)return;event.preventDefault();setPreview(null);setSelected(null);setRangeSelection({anchorRoomId:String(roomId),roomIds:[String(roomId)],anchorDay:day,start:day,end:addDays(day,1)});setSelecting(true)}
-  function extendRange(roomId,day){if(!selecting)return;setRangeSelection(current=>{if(!current)return current;const roomIds=roomsBetween(current.anchorRoomId,roomId);return day>=current.anchorDay?{...current,roomIds,start:current.anchorDay,end:addDays(day,1)}:{...current,roomIds,start:day,end:addDays(current.anchorDay,1)}})}
+  function extendRange(roomId,day){if(!selecting)return;setRangeSelection(current=>{if(!current)return current;const roomIds=roomsBetween(current.anchorRoomId,roomId);if(day===current.anchorDay)return{...current,roomIds,start:current.anchorDay,end:addDays(current.anchorDay,1)};return day>current.anchorDay?{...current,roomIds,start:current.anchorDay,end:day}:{...current,roomIds,start:day,end:current.anchorDay}})}
   function finishRange(event){if(!selecting)return;event.stopPropagation();setSelecting(false)}
   function confirmRange(){if(!rangeSelection)return;const ids=uniqueIds(rangeSelection.roomIds);openFreshForm(ids[0],rangeSelection.start,rangeSelection.end,ids)}
   function cancelRange(){setSelecting(false);setRangeSelection(null)}
