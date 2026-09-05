@@ -1,5 +1,6 @@
 "use client"
 
+import{useRef,useState}from"react"
 import s from"./planning.module.css"
 import c from"./planningCanvas.module.css"
 import g from"./planningGroup.module.css"
@@ -10,26 +11,49 @@ import{planningStage,planningStageLabel}from"./planningLifecycle"
 import{paymentState}from"./planningPayment"
 
 const DAY=86400000
+const pad=value=>String(value).padStart(2,"0")
 const fromKey=value=>{const[y,m,d]=String(value).split("-").map(Number);return new Date(y,m-1,d,12)}
+const keyFromDate=date=>`${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`
+const addDays=(value,amount)=>keyFromDate(new Date(fromKey(value).getTime()+amount*DAY))
 const diffDays=(a,b)=>Math.round((fromKey(b)-fromKey(a))/DAY)
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:0}).format(Number(value)||0)
 const isDayUse=item=>["day_use","dayuse","day-use"].includes(String(item.tipo_estadia||"").toLowerCase())
 const roomCount=item=>new Set([item.habitacion_id,...(item.habitaciones_ids||[])].filter(Boolean).map(Number)).size
 
 export function ReservationBlock({item,days,selected,onSelect,onDragStart,onResizeStart,settings,onPreview}){
-  const first=days[0],dayUse=isDayUse(item),entryOffset=diffDays(first,item.fecha_entrada),rooms=roomCount(item),group=rooms>1,pax=Math.max(1,Number(item.cantidad_huespedes)||1),channel=channelMeta(item.canal_reserva)
+  const[resizeEnd,setResizeEnd]=useState(null),[resizing,setResizing]=useState(false),resizeValue=useRef(null)
+  const first=days[0],dayUse=isDayUse(item),effectiveEnd=resizeEnd||item.fecha_salida,entryOffset=diffDays(first,item.fecha_entrada),rooms=roomCount(item),group=rooms>1,pax=Math.max(1,Number(item.cantidad_huespedes)||1),channel=channelMeta(item.canal_reserva)
   const rawStart=dayUse?entryOffset+.08:entryOffset+.5
-  const rawEnd=dayUse?entryOffset+.92:diffDays(first,item.fecha_salida)+.5
+  const rawEnd=dayUse?entryOffset+.92:diffDays(first,effectiveEnd)+.5
   const start=Math.max(0,rawStart),end=Math.min(days.length,rawEnd)
   if(end<=0||start>=days.length||end<=start)return null
-  const span=Math.max(.5,end-start),nights=Math.max(1,diffDays(item.fecha_entrada,item.fecha_salida)),kind=planningStage(item),stageLabel=planningStageLabel(item),payment=paymentState(item)
-  const showPreview=event=>onPreview?.(item,event.currentTarget.getBoundingClientRect())
+  const span=Math.max(.5,end-start),nights=Math.max(1,diffDays(item.fecha_entrada,effectiveEnd)),kind=planningStage(item),stageLabel=planningStageLabel(item),payment=paymentState(item)
+  const showPreview=event=>{if(!resizing)onPreview?.(item,event.currentTarget.getBoundingClientRect())}
   const stayLabel=dayUse?`${item.nombre_huesped}, ${pax} pasajeros, ${channel.label}, ${stageLabel}, ${payment.label}, day use`:group?`${item.nombre_huesped}, ${pax} pasajeros, ${channel.label}, ${stageLabel}, ${payment.label}, ${rooms} habitaciones, ${nights} noches`:`${item.nombre_huesped}, ${pax} pasajeros, ${channel.label}, ${stageLabel}, ${payment.label}, ${nights} noches`
   const paxStyle={height:20,minWidth:26,padding:"0 5px",flex:"0 0 auto",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:2,borderRadius:5,background:"color-mix(in srgb,currentColor 14%,transparent)",fontSize:9,fontWeight:900,lineHeight:1}
-  return <div draggable={!group} role="button" tabIndex="0" aria-label={stayLabel} title={`${channel.label} · ${pax} pax · ${stageLabel} · ${payment.label}`} className={`${c.stay} ${l.stageBar} ${l[kind]} ${selected?c.selected:""}`} style={{left:`calc(${start} * var(--day-width) + 3px)`,width:`calc(${span} * var(--day-width) - 6px)`}} onMouseEnter={showPreview} onMouseLeave={()=>onPreview?.(null)} onFocus={showPreview} onBlur={()=>onPreview?.(null)} onClick={()=>{onPreview?.(null);onSelect(item)}} onKeyDown={event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();onPreview?.(null);onSelect(item)}}} onDragStart={event=>{onPreview?.(null);onDragStart(event,item)}}>
+  function resizeCandidate(clientX,rowRect){
+    const width=Math.max(1,rowRect.width/days.length),index=Math.max(0,Math.min(days.length-1,Math.floor((clientX-rowRect.left)/width))),candidate=addDays(days[index],1),minimum=addDays(item.fecha_entrada,1)
+    return candidate<minimum?minimum:candidate
+  }
+  function startResize(event){
+    if(group)return
+    event.preventDefault();event.stopPropagation();onPreview?.(null)
+    const row=event.currentTarget.parentElement,rowRect=row?.getBoundingClientRect?.()
+    if(!rowRect)return
+    setResizing(true);resizeValue.current=item.fecha_salida
+    const move=pointerEvent=>{const next=resizeCandidate(pointerEvent.clientX,rowRect);resizeValue.current=next;setResizeEnd(next)}
+    const finish=pointerEvent=>{
+      move(pointerEvent);window.removeEventListener("pointermove",move);window.removeEventListener("pointerup",finish);window.removeEventListener("pointercancel",cancel)
+      const next=resizeValue.current;setResizeEnd(null);setResizing(false);resizeValue.current=null
+      if(next&&next!==item.fecha_salida)onResizeStart?.(item,next)
+    }
+    const cancel=()=>{window.removeEventListener("pointermove",move);window.removeEventListener("pointerup",finish);window.removeEventListener("pointercancel",cancel);setResizeEnd(null);setResizing(false);resizeValue.current=null}
+    window.addEventListener("pointermove",move,{passive:true});window.addEventListener("pointerup",finish,{once:true});window.addEventListener("pointercancel",cancel,{once:true})
+  }
+  return <div draggable={!group&&!resizing} role="button" tabIndex="0" aria-label={stayLabel} title={`${channel.label} · ${pax} pax · ${stageLabel} · ${payment.label}`} className={`${c.stay} ${l.stageBar} ${l[kind]} ${selected?c.selected:""}`} style={{left:`calc(${start} * var(--day-width) + 3px)`,width:`calc(${span} * var(--day-width) - 6px)`,transition:resizing?"none":undefined}} onMouseEnter={showPreview} onMouseLeave={()=>onPreview?.(null)} onFocus={showPreview} onBlur={()=>onPreview?.(null)} onClick={()=>{if(resizing)return;onPreview?.(null);onSelect(item)}} onKeyDown={event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();onPreview?.(null);onSelect(item)}}} onDragStart={event=>{onPreview?.(null);onDragStart(event,item)}}>
     <span className={c.stayContent}><span style={paxStyle} title={`${pax} pasajero${pax===1?"":"s"}`}>{pax===1?"👤":"👥"}{pax}</span><ReservationChannelLogo value={item.canal_reserva}/><span className={c.stayText}>{settings.showId&&item.numero_reserva?<small>{item.numero_reserva}</small>:null}<b>{item.nombre_huesped}</b></span>{group?<span className={g.barGroupBadge}>{rooms} hab.</span>:settings.showPrice?<span className={c.stayPrice}>{money(item.precio_total,item.moneda)}</span>:null}</span>
     <span className={`${p.paymentStripe} ${p[payment.key]}`} aria-hidden="true"/>
-    {!group?<span className={c.resizeHandle} draggable title="Cambiar fecha de salida" aria-label="Cambiar fecha de salida" onMouseDown={event=>event.stopPropagation()} onClick={event=>event.stopPropagation()} onDragStart={event=>{event.stopPropagation();onPreview?.(null);onResizeStart(event,item)}}>↔</span>:null}
+    {!group?<span className={c.resizeHandle} title={resizing?`${nights} noche${nights===1?"":"s"}`:"Cambiar fecha de salida"} aria-label="Cambiar fecha de salida: arrastrá para alargar o acortar" onPointerDown={startResize} onMouseDown={event=>event.stopPropagation()} onClick={event=>event.stopPropagation()}>↔</span>:null}
   </div>
 }
 
