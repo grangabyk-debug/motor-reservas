@@ -36,6 +36,10 @@ const launcherPhotoStyle = {
   filter: "drop-shadow(0 8px 14px rgba(20, 35, 55, .24))",
 }
 
+function OliviaWordmark() {
+  return <><span>Oliv</span><span className={styles.aiAccent}>IA</span></>
+}
+
 export default function OliviaAssistant({ propertyId, propertyName, context, onHide }) {
   const [open, setOpen] = useState(false)
   const [nudge, setNudge] = useState(true)
@@ -123,7 +127,7 @@ export default function OliviaAssistant({ propertyId, propertyName, context, onH
               </span>
               <span>
                 <small>ASISTENTE DEL PMS</small>
-                <strong>OlivIA</strong>
+                <strong><OliviaWordmark /></strong>
                 <em><i /> En línea</em>
               </span>
             </div>
@@ -190,7 +194,7 @@ export default function OliviaAssistant({ propertyId, propertyName, context, onH
 
       {!open && nudge ? (
         <button type="button" className={styles.nudge} onClick={openAssistant}>
-          <b>Hola, soy OlivIA</b>
+          <b>Hola, soy <OliviaWordmark /></b>
           <span>¿Te ayudo con la operación de hoy?</span>
         </button>
       ) : null}
