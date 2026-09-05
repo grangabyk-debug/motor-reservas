@@ -67,7 +67,11 @@ export default function DailyCashWorkspace({propertyId,property,onNavigate}){
   const isToday=day===dateKey(new Date())
 
   function openReservation(id){if(!id)return;onNavigate?.("reservations",{reservationId:Number(id),restoreScroll:false})}
-  function goCashControl(){if(typeof window!=="undefined"){const url=new URL(window.location.href);url.searchParams.set("finance_tab","cash");window.history.replaceState({},"",url)}onNavigate?.("finance")}
+  function goCashControl(){
+    if(typeof window!=="undefined"){const url=new URL(window.location.href);url.searchParams.set("finance_tab","cash");window.history.replaceState({},"",url)}
+    onNavigate?.("finance")
+    if(typeof window!=="undefined")requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent("hl:pms-finance-tab",{detail:"cash"})))
+  }
 
   return <section className={s.page}>
     <header className={s.header}><div><small>OPERACIÓN · RECEPCIÓN</small><h1>Caja diaria</h1><p>{property?.name||"Propiedad activa"} · cobros, movimientos, efectivo y comprobantes del día.</p></div><div className={s.headerActions}><input type="date" value={day} onChange={event=>setDay(event.target.value)}/>{!isToday?<button type="button" onClick={()=>setDay(dateKey(new Date()))}>Hoy</button>:null}<button type="button" onClick={load}>↻ Actualizar</button><button type="button" className={s.primary} onClick={goCashControl}>{session?"Arqueo / cerrar caja":"Abrir caja"}</button></div></header>
