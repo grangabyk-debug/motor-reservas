@@ -5,7 +5,7 @@ function publicClient(){const url=process.env.NEXT_PUBLIC_SUPABASE_URL,key=proce
 const text=(value,max)=>String(value||"").trim().slice(0,max)
 function clientKey(request){const ip=(request.headers.get("x-forwarded-for")||request.headers.get("x-real-ip")||"unknown").split(",")[0].trim(),agent=request.headers.get("user-agent")||"";return createHash("sha256").update(`${ip}|${agent}`).digest("hex").slice(0,48)}
 function money(value,currency="ARS"){try{return new Intl.NumberFormat("es-AR",{style:"currency",currency,maximumFractionDigits:0}).format(Number(value)||0)}catch{return `${currency} ${Number(value)||0}`}}
-async function sendConfirmation(client,slug,payload,booking){
+async function sendConfirmation(client,slug,payload,booking,baseUrl){
   if(!process.env.RESEND_API_KEY||!process.env.HOTEL_EMAIL_FROM||!payload.email||booking?.idempotent_replay)return false
   try{
     const{data:config,error}=await client.rpc("hl_public_booking_config",{p_slug:slug});if(error)throw error
@@ -13,6 +13,7 @@ async function sendConfirmation(client,slug,payload,booking){
     const lines=[`Hola ${payload.name},`,``,`Tu reserva en ${hotel} quedó confirmada.`,`Habitación: ${booking.room_type||payload.room_type}`,`Entrada: ${booking.check_in||payload.check_in}`,`Salida: ${booking.check_out||payload.check_out}`,`Total: ${money(booking.total,booking.currency||config?.currency||"ARS")}`]
     if(config?.cancellation_policy)lines.push("",`Política de cancelación: ${config.cancellation_policy}`)
     lines.push("",`Número de reserva: ${booking.numero_reserva||booking.id}`)
+    if(baseUrl&&booking?.manage_token)lines.push("",`Ver o gestionar la reserva: ${baseUrl}/book/${encodeURIComponent(slug)}/manage/${booking.manage_token}`)
     const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{Authorization:`Bearer ${process.env.RESEND_API_KEY}`,"Content-Type":"application/json"},body:JSON.stringify({from:process.env.HOTEL_EMAIL_FROM,to:[payload.email],subject,text:lines.join("\n"),reply_to:config?.contact_email||process.env.HOTEL_EMAIL_REPLY_TO||undefined})})
     return response.ok
   }catch(error){console.error("booking confirmation email",error);return false}
@@ -26,7 +27,7 @@ export async function POST(request,{params}){
     const client=publicClient(),limit=await client.rpc("hl_public_booking_rate_limit",{p_slug:slug,p_client_key:`book:${clientKey(request)}`,p_limit:12,p_window_minutes:15});if(limit.error)throw limit.error
     if(limit.data!==true)return Response.json({error:"Se realizaron demasiados intentos de reserva. Esperá unos minutos y volvé a intentar."},{status:429,headers:{"Retry-After":"300","Cache-Control":"no-store"}})
     const{data,error}=await client.rpc("hl_public_booking_create",{p_slug:slug,p_payload:payload});if(error)throw error
-    const email_sent=await sendConfirmation(client,slug,payload,data)
+    const email_sent=await sendConfirmation(client,slug,payload,data,new URL(request.url).origin)
     return Response.json({...data,email_sent},{status:data?.idempotent_replay?200:201,headers:{"Cache-Control":"no-store"}})
   }catch(error){
     console.error("public booking create",error)
