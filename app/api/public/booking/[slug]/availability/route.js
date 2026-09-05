@@ -1,0 +1,6 @@
+import{createClient}from"@supabase/supabase-js"
+
+function publicClient(){const url=process.env.NEXT_PUBLIC_SUPABASE_URL,key=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY||process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;if(!url||!key)throw new Error("Motor de reservas sin configuración de servidor.");return createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}})}
+const cleanDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(String(value||""))?String(value):null
+
+export async function GET(request,{params}){try{const{slug}=await params,url=new URL(request.url),checkIn=cleanDate(url.searchParams.get("check_in")),checkOut=cleanDate(url.searchParams.get("check_out")),guests=Math.min(20,Math.max(1,Number(url.searchParams.get("guests"))||1));if(!checkIn||!checkOut)return Response.json({error:"Fechas inválidas."},{status:400});const client=publicClient(),{data,error}=await client.rpc("hl_public_booking_availability",{p_slug:slug,p_check_in:checkIn,p_check_out:checkOut,p_guests:guests});if(error)throw error;return Response.json(data,{headers:{"Cache-Control":"no-store"}})}catch(error){console.error("booking availability",error);return Response.json({error:error?.message?.includes("máximo")?"La fecha supera la anticipación permitida.":"No se pudo consultar la disponibilidad para esas fechas."},{status:400,headers:{"Cache-Control":"no-store"}})}}
