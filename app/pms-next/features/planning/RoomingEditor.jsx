@@ -16,6 +16,13 @@ function defaultBeds(room,guests){
   return{matrimonial:1,individual:Math.max(0,g-2)}
 }
 function makeAssignment(room,guests){const beds=defaultBeds(room,guests);return{soldAs:clean(room?.tipo)||"Habitación",guests:clamp(guests,0,roomCapacity(room)),matrimonial:beds.matrimonial,individual:beds.individual,rate:Number(room?.precio)||0}}
+function distributedGuests(rooms,total){
+  const result=new Map(),capacities=new Map(rooms.map(room=>[String(room.id),roomCapacity(room)])),remaining={value:Math.max(0,Number(total)||0)}
+  rooms.forEach(room=>result.set(String(room.id),0))
+  for(const room of rooms){if(remaining.value<=0)break;const id=String(room.id);if(capacities.get(id)>0){result.set(id,1);remaining.value--}}
+  while(remaining.value>0){let moved=false;for(const room of rooms){if(remaining.value<=0)break;const id=String(room.id),current=result.get(id)||0,space=(capacities.get(id)||0)-current;if(space>0){result.set(id,current+1);remaining.value--;moved=true}}if(!moved)break}
+  return result
+}
 
 export function roomingLabel(rooming){
   const m=Math.max(0,Number(rooming?.matrimonial)||0),i=Math.max(0,Number(rooming?.individual)||0),parts=[]
@@ -48,19 +55,14 @@ export default function RoomingEditor({draft,setDraft,rooms=[],categories=[],cur
     if(!rooms.length)return
     setDraft(current=>{
       if(!current)return current
-      const ids=idsOf(rooms),existing=current.roomAssignments||{},next={},requested=Math.max(1,Number(current.guests)||1)
+      const ids=idsOf(rooms),existing=current.roomAssignments||{},requested=Math.max(1,Number(current.guests)||1),distribution=distributedGuests(rooms,requested),next={}
       rooms.forEach(room=>{
-        const id=String(room.id),previous=existing[id]
-        next[id]=previous?{soldAs:clean(previous.soldAs)||clean(room.tipo)||"Habitación",guests:clamp(previous.guests,0,roomCapacity(room)),matrimonial:Math.max(0,Number(previous.matrimonial)||0),individual:Math.max(0,Number(previous.individual)||0),rate:Number(previous.rate??room.precio)||0}:makeAssignment(room,0)
+        const id=String(room.id),desired=distribution.get(id)||0,previous=existing[id]
+        if(previous){
+          const guestChanged=Number(previous.guests||0)!==desired,beds=guestChanged?defaultBeds(room,desired):{matrimonial:Math.max(0,Number(previous.matrimonial)||0),individual:Math.max(0,Number(previous.individual)||0)}
+          next[id]={soldAs:clean(previous.soldAs)||clean(room.tipo)||"Habitación",guests:desired,matrimonial:beds.matrimonial,individual:beds.individual,rate:Number(previous.rate??room.precio)||0}
+        }else next[id]=makeAssignment(room,desired)
       })
-      let assigned=ids.reduce((sum,id)=>sum+next[id].guests,0)
-      if(assigned>requested){
-        let excess=assigned-requested
-        for(let index=rooms.length-1;index>=0&&excess>0;index--){const id=String(rooms[index].id),take=Math.min(excess,next[id].guests);next[id].guests-=take;excess-=take}
-      }else if(assigned<requested){
-        let missing=requested-assigned
-        for(const room of rooms){if(missing<=0)break;const id=String(room.id),space=Math.max(0,roomCapacity(room)-next[id].guests),add=Math.min(space,missing);next[id].guests+=add;missing-=add}
-      }
       const totalRate=ids.reduce((sum,id)=>sum+(Number(next[id].rate)||0),0)
       const sameKeys=Object.keys(existing).length===ids.length&&ids.every(id=>existing[id])
       const sameAssignments=sameKeys&&ids.every(id=>{const a=existing[id],b=next[id];return clean(a.soldAs)===clean(b.soldAs)&&Number(a.guests||0)===Number(b.guests||0)&&Number(a.matrimonial||0)===Number(b.matrimonial||0)&&Number(a.individual||0)===Number(b.individual||0)&&Number(a.rate||0)===Number(b.rate||0)})
