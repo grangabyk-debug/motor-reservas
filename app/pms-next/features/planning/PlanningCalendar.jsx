@@ -73,11 +73,25 @@ function PlanningReference({onClose}){
   </aside>
 }
 
+function rangeGeometry(days,range){
+  const startIndex=days.indexOf(range?.start),endIndex=days.indexOf(range?.end)
+  if(startIndex<0||endIndex<0||endIndex<=startIndex)return null
+  const left=startIndex+.5,right=endIndex+.5
+  return{left,width:right-left,center:(left+right)/2}
+}
+
+function RangeHighlight({days,range,blocked}){
+  const geometry=rangeGeometry(days,range)
+  if(!geometry)return null
+  return <div className={`${c.rangeHighlight} ${blocked?c.rangeHighlightBlocked:""}`} style={{left:`calc(${geometry.left} * var(--day-width) + 2px)`,width:`calc(${geometry.width} * var(--day-width) - 4px)`}} aria-hidden="true"/>
+}
+
 function RangeActions({days,range,onConfirm,onCancel,blocked,blockedMessage}){
   if(!range)return null
-  const start=Math.max(0,days.indexOf(range.start)),end=Math.max(start+1,days.indexOf(addDays(range.end,-1))+1),center=(start+end)/2
+  const geometry=rangeGeometry(days,range)
+  if(!geometry)return null
   function confirm(){if(blocked){toast({tone:"error",title:"Habitación ocupada",message:blockedMessage||"Ese rango contiene una habitación ocupada. Elegí otro rango.",duration:4200});return}onConfirm()}
-  return <div className={c.rangeActions} style={{left:`calc(${center} * var(--day-width))`}}><button type="button" onClick={onCancel} aria-label="Cancelar rango">×</button><button type="button" className={c.rangeConfirm} onClick={confirm} aria-disabled={blocked?"true":"false"} title={blocked?blockedMessage:"Crear reserva en este rango"} style={blocked?{opacity:.48,cursor:"not-allowed"}:undefined} aria-label={blocked?"Rango no disponible":"Crear reserva en este rango"}>✓</button></div>
+  return <div className={c.rangeActions} style={{left:`calc(${geometry.center} * var(--day-width))`}}><button type="button" onClick={onCancel} aria-label="Cancelar rango">×</button><button type="button" className={c.rangeConfirm} onClick={confirm} aria-disabled={blocked?"true":"false"} title={blocked?blockedMessage:"Crear reserva en este rango"} style={blocked?{opacity:.48,cursor:"not-allowed"}:undefined} aria-label={blocked?"Rango no disponible":"Crear reserva en este rango"}>✓</button></div>
 }
 
 function RoomRow({room,days,today,settings,grid,availabilityReservations,visibleReservations,selected,dragging,dropCell,rangeSelection,rangeBlocked,rangeBlockedMessage,onRoom,onBeginRange,onExtendRange,onFinishRange,onDropCell,onDrop,onSelect,onDrag,onResize,onPreview,onConfirmRange,onCancelRange}){
@@ -85,12 +99,13 @@ function RoomRow({room,days,today,settings,grid,availabilityReservations,visible
   const selectedRooms=(rangeSelection?.roomIds||[]).map(String),ownRange=rangeSelection&&selectedRooms.includes(String(room.id))?rangeSelection:null,showRangeActions=ownRange&&String(selectedRooms[0])===String(room.id)
   const meta=[room.floor_name,room.tipo||"Sin tipo",`${room.capacidad||1} pax`].filter(Boolean).join(" · ")
   const occupied=(start,end)=>availabilityReservations.some(item=>roomHas(item,room.id)&&overlaps(item,start,end))
-  function occupiedNotice(start,end){toast({tone:"error",title:`Habitación ${room.nombre} ocupada`,message:`No se puede seleccionar del ${start} al ${end}: ya existe una reserva en ese rango.`,duration:4200})}
+  function occupiedNotice(start,end){toast({tone:"error",title:`Habitación ${room.nombre} ocupada`,message:`No se puede iniciar una estadía el ${start}: la habitación está ocupada después del mediodía.`,duration:4200})}
   const todayBlocked=occupied(today,addDays(today,1))
   return <div className={c.roomRow}>
     <button type="button" className={c.room} onClick={()=>{if(todayBlocked){occupiedNotice(today,addDays(today,1));return}onRoom(today)}}><span><b>{room.nombre}</b><small>{meta}</small></span>{room.estado==="mantenimiento"?<span className={c.maintenance} title="Mantenimiento">!</span>:null}</button>
     <div className={c.timelineRow} style={grid}>
-      {days.map(day=>{const key=`${room.id}-${day}`,range=ownRange&&day>=ownRange.start&&day<ownRange.end,blocked=occupied(day,addDays(day,1));return <button type="button" key={day} className={`${c.cell} ${range?c.rangeCell:""} ${dropCell===key?c.dropTarget:""}`} aria-label={`${room.nombre} ${day}${blocked?" · ocupada":""}`} aria-disabled={blocked?"true":"false"} title={blocked?`Habitación ${room.nombre} ocupada para esa noche`:undefined} style={blocked?{cursor:"not-allowed"}:undefined} onMouseDown={event=>{if(blocked){event.preventDefault();event.stopPropagation();occupiedNotice(day,addDays(day,1));return}onBeginRange(event,room.id,day)}} onMouseEnter={()=>{if(!blocked)onExtendRange(room.id,day)}} onMouseUp={event=>onFinishRange(event,room.id)} onDoubleClick={event=>{event.preventDefault();event.stopPropagation();if(blocked){occupiedNotice(day,addDays(day,1));return}onRoom(day)}} onDragEnter={()=>dragging&&onDropCell(key)} onDragOver={event=>{if(dragging){event.preventDefault();event.dataTransfer.dropEffect="move"}}} onDragLeave={()=>dropCell===key&&onDropCell("")} onDrop={event=>onDrop(event,room.id,day)}/>})}
+      {days.map(day=>{const key=`${room.id}-${day}`,startBlocked=occupied(day,addDays(day,1));return <button type="button" key={day} className={`${c.cell} ${dropCell===key?c.dropTarget:""}`} aria-label={`${room.nombre} ${day}${startBlocked?" · ocupada para ingreso":""}`} aria-disabled={startBlocked?"true":"false"} title={startBlocked?`No se puede iniciar una reserva en ${room.nombre} este día`:"Ingreso desde el mediodía"} style={startBlocked?{cursor:"not-allowed"}:undefined} onMouseDown={event=>{if(startBlocked){event.preventDefault();event.stopPropagation();occupiedNotice(day,addDays(day,1));return}onBeginRange(event,room.id,day)}} onMouseEnter={()=>onExtendRange(room.id,day)} onMouseUp={event=>onFinishRange(event,room.id)} onDoubleClick={event=>{event.preventDefault();event.stopPropagation();if(startBlocked){occupiedNotice(day,addDays(day,1));return}onRoom(day)}} onDragEnter={()=>dragging&&onDropCell(key)} onDragOver={event=>{if(dragging){event.preventDefault();event.dataTransfer.dropEffect="move"}}} onDragLeave={()=>dropCell===key&&onDropCell("")} onDrop={event=>onDrop(event,room.id,day)}/>})}
+      {ownRange?<RangeHighlight days={days} range={ownRange} blocked={rangeBlocked}/>:null}
       {reservations.map(item=><ReservationBlock key={`${room.id}-${item.id}`} item={item} days={days} selected={selected?.id===item.id} settings={settings} onSelect={onSelect} onDragStart={onDrag} onResizeStart={onResize} onPreview={onPreview}/>) }
       {showRangeActions?<RangeActions days={days} range={ownRange} blocked={rangeBlocked} blockedMessage={rangeBlockedMessage} onConfirm={onConfirmRange} onCancel={onCancelRange}/>:null}
     </div>
