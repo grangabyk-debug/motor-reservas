@@ -40,6 +40,10 @@ export default function OliviaAssistant({ propertyId, propertyName, context, onH
     const question = String(rawQuestion || "").trim()
     if (!question || sending) return
 
+    const history = messages
+      .filter((message) => !message.error)
+      .slice(-8)
+      .map((message) => ({ role: message.role, text: message.text }))
     const userMessage = { id: `user-${Date.now()}`, role: "user", text: question }
     setMessages((current) => [...current, userMessage])
     setInput("")
@@ -49,7 +53,7 @@ export default function OliviaAssistant({ propertyId, propertyName, context, onH
       const response = await fetch("/api/assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, context }),
+        body: JSON.stringify({ question, context, history }),
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data?.error || "No pude responder en este momento.")
