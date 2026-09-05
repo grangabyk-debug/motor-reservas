@@ -49,10 +49,7 @@ export default function ReservationEditPanel({item,assignedRooms=[],allRooms=[],
     if(Number(draft.guests)>totalCapacity)throw new Error(`La capacidad seleccionada es de ${totalCapacity} huésped${totalCapacity===1?"":"es"}.`)
     if(assignedGuests!==Number(draft.guests))throw new Error(`Distribuí los ${draft.guests} huésped${Number(draft.guests)===1?"":"es"} en el Rooming antes de guardar.`)
     if(isGroup&&(datesChanged||currentIds.join("|")!==ids.join("|")))throw new Error("Las fechas y la reasignación física de una reserva grupal todavía requieren edición por habitación. El Rooming, huéspedes, teléfono y régimen sí se pueden editar desde esta ficha.")
-    if(datesChanged||roomChanged){
-      if(item.no_show)throw new Error("Esta reserva está marcada como No-show. Quitá el No-show antes de cambiar fechas o habitación.")
-      const preview=await onPreviewMove({reservationId:item.id,roomId:Number(draft.roomId),start:draft.start,end:draft.end});if(!preview?.ok)throw new Error(preview?.message||"La habitación no está disponible para ese cambio.")
-    }
+    if(datesChanged||roomChanged){const preview=await onPreviewMove({reservationId:item.id,roomId:Number(draft.roomId),start:draft.start,end:draft.end});if(!preview?.ok)throw new Error(preview?.message||"La habitación no está disponible para ese cambio.")}
   }
   async function commitMove(reprice=false){
     setWorking(true);setError("")
