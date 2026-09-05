@@ -98,6 +98,13 @@
   line-height: 1.35;
 }
 
+.aiAccent {
+  display: inline !important;
+  color: #a855f7 !important;
+  font-weight: 800;
+  text-shadow: 0 0 14px rgba(168, 85, 247, 0.28);
+}
+
 .panel {
   position: absolute;
   right: 0;
