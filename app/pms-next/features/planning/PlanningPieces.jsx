@@ -31,26 +31,35 @@ export function ReservationBlock({item,days,selected,onSelect,onDragStart,onResi
   const showPreview=event=>{if(!resizing)onPreview?.(item,event.currentTarget.getBoundingClientRect())}
   const stayLabel=dayUse?`${item.nombre_huesped}, ${pax} pasajeros, ${channel.label}, ${stageLabel}, ${payment.label}, day use`:group?`${item.nombre_huesped}, ${pax} pasajeros, ${channel.label}, ${stageLabel}, ${payment.label}, ${rooms} habitaciones, ${nights} noches`:`${item.nombre_huesped}, ${pax} pasajeros, ${channel.label}, ${stageLabel}, ${payment.label}, ${nights} noches`
   const paxStyle={height:20,minWidth:26,padding:"0 5px",flex:"0 0 auto",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:2,borderRadius:5,background:"color-mix(in srgb,currentColor 14%,transparent)",fontSize:9,fontWeight:900,lineHeight:1}
-  function resizeCandidate(clientX,rowRect){
-    const width=Math.max(1,rowRect.width/days.length),index=Math.max(0,Math.min(days.length-1,Math.floor((clientX-rowRect.left)/width))),candidate=addDays(days[index],1),minimum=addDays(item.fecha_entrada,1)
+  function resizeCandidate(clientX,rowRect,dayWidth){
+    const width=Math.max(1,Number(dayWidth)||rowRect.width/days.length),local=clientX-rowRect.left,index=Math.max(0,Math.min(days.length-1,Math.floor(local/width))),candidate=addDays(days[index],1),minimum=addDays(item.fecha_entrada,1)
     return candidate<minimum?minimum:candidate
   }
   function startResize(event){
     if(group)return
     event.preventDefault();event.stopPropagation();onPreview?.(null)
-    const stay=event.currentTarget.parentElement,row=stay?.parentElement,rowRect=row?.getBoundingClientRect?.()
+    const handle=event.currentTarget,stay=handle.parentElement,row=stay?.parentElement,rowRect=row?.getBoundingClientRect?.()
     if(!rowRect)return
+    const cssWidth=typeof window!=="undefined"?parseFloat(getComputedStyle(row).getPropertyValue("--day-width")):0,dayWidth=Number.isFinite(cssWidth)&&cssWidth>0?cssWidth:rowRect.width/days.length
+    const previousDraggable=stay?.draggable
+    if(stay)stay.draggable=false
+    try{handle.setPointerCapture?.(event.pointerId)}catch{}
     setResizing(true);resizeValue.current=item.fecha_salida
-    const move=pointerEvent=>{const next=resizeCandidate(pointerEvent.clientX,rowRect);resizeValue.current=next;setResizeEnd(next)}
+    const move=pointerEvent=>{const next=resizeCandidate(pointerEvent.clientX,rowRect,dayWidth);resizeValue.current=next;setResizeEnd(next)}
+    const cleanup=()=>{
+      window.removeEventListener("pointermove",move);window.removeEventListener("pointerup",finish);window.removeEventListener("pointercancel",cancel);window.removeEventListener("blur",cancel)
+      if(stay)stay.draggable=Boolean(previousDraggable)
+      try{if(handle.hasPointerCapture?.(event.pointerId))handle.releasePointerCapture?.(event.pointerId)}catch{}
+    }
     const finish=pointerEvent=>{
-      move(pointerEvent);window.removeEventListener("pointermove",move);window.removeEventListener("pointerup",finish);window.removeEventListener("pointercancel",cancel)
+      move(pointerEvent);cleanup()
       const next=resizeValue.current;setResizeEnd(null);setResizing(false);resizeValue.current=null
       if(next&&next!==item.fecha_salida)onResizeStart?.(item,next)
     }
-    const cancel=()=>{window.removeEventListener("pointermove",move);window.removeEventListener("pointerup",finish);window.removeEventListener("pointercancel",cancel);setResizeEnd(null);setResizing(false);resizeValue.current=null}
-    window.addEventListener("pointermove",move,{passive:true});window.addEventListener("pointerup",finish,{once:true});window.addEventListener("pointercancel",cancel,{once:true})
+    const cancel=()=>{cleanup();setResizeEnd(null);setResizing(false);resizeValue.current=null}
+    window.addEventListener("pointermove",move,{passive:true});window.addEventListener("pointerup",finish);window.addEventListener("pointercancel",cancel);window.addEventListener("blur",cancel,{once:true})
   }
-  return <div draggable={!group&&!resizing} role="button" tabIndex="0" aria-label={stayLabel} title={`${channel.label} · ${pax} pax · ${stageLabel} · ${payment.label}`} className={`${c.stay} ${l.stageBar} ${l[kind]} ${selected?c.selected:""}`} style={{left:`calc(${start} * var(--day-width) + 3px)`,width:`calc(${span} * var(--day-width) - 6px)`,transition:resizing?"none":undefined}} onMouseEnter={showPreview} onMouseLeave={()=>onPreview?.(null)} onFocus={showPreview} onBlur={()=>onPreview?.(null)} onClick={()=>{if(resizing)return;onPreview?.(null);onSelect(item)}} onKeyDown={event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();onPreview?.(null);onSelect(item)}}} onDragStart={event=>{onPreview?.(null);onDragStart(event,item)}}>
+  return <div draggable={!group&&!resizing} role="button" tabIndex="0" aria-label={stayLabel} title={`${channel.label} · ${pax} pax · ${stageLabel} · ${payment.label}`} className={`${c.stay} ${l.stageBar} ${l[kind]} ${selected?c.selected:""}`} style={{left:`calc(${start} * var(--day-width) + 3px)`,width:`calc(${span} * var(--day-width) - 6px)`,transition:resizing?"none":undefined}} onMouseEnter={showPreview} onMouseLeave={()=>onPreview?.(null)} onFocus={showPreview} onBlur={()=>onPreview?.(null)} onClick={()=>{if(resizing)return;onPreview?.(null);onSelect(item)}} onKeyDown={event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();onPreview?.(null);onSelect(item)}}} onDragStart={event=>{if(resizing){event.preventDefault();return}onPreview?.(null);onDragStart(event,item)}}>
     <span className={c.stayContent}><span style={paxStyle} title={`${pax} pasajero${pax===1?"":"s"}`}>{pax===1?"👤":"👥"}{pax}</span><ReservationChannelLogo value={item.canal_reserva}/><span className={c.stayText}>{settings.showId&&item.numero_reserva?<small>{item.numero_reserva}</small>:null}<b>{item.nombre_huesped}</b></span>{group?<span className={g.barGroupBadge}>{rooms} hab.</span>:settings.showPrice?<span className={c.stayPrice}>{money(item.precio_total,item.moneda)}</span>:null}</span>
     <span className={`${p.paymentStripe} ${p[payment.key]}`} aria-hidden="true"/>
     {!group?<span className={c.resizeHandle} title={resizing?`${nights} noche${nights===1?"":"s"}`:"Cambiar fecha de salida"} aria-label="Cambiar fecha de salida: arrastrá para alargar o acortar" onPointerDown={startResize} onMouseDown={event=>event.stopPropagation()} onClick={event=>event.stopPropagation()}>↔</span>:null}
