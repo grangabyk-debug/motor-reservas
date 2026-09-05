@@ -2,6 +2,7 @@
 
 import{useCallback,useEffect,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
+import{attachPayments}from"./planningPayment"
 
 const DAY=86400000
 const nightsBetween=(start,end)=>Math.max(1,Math.round((new Date(`${end}T12:00:00`)-new Date(`${start}T12:00:00`))/DAY))
@@ -15,26 +16,30 @@ export default function usePlanningData(propertyId,windowStart,windowEndExclusiv
   const[loading,setLoading]=useState(true)
   const[error,setError]=useState("")
 
-  const load=useCallback(async()=>{
+  const load=useCallback(async(silent=false)=>{
     if(!propertyId||!windowStart||!windowEndExclusive)return
-    setLoading(true);setError("")
+    if(!silent)setLoading(true)
+    setError("")
     try{
-      const[roomRes,resRes,floorRes]=await Promise.all([
+      const[roomRes,resRes,floorRes,paymentRes]=await Promise.all([
         supabase.from("habitaciones").select("id,nombre,tipo,capacidad,precio,estado,activa,sort_order,housekeeping_zone,floor_id").eq("property_id",propertyId).eq("activa",true),
         supabase.from("reservas").select("id,numero_reserva,nombre_huesped,email_huesped,telefono_huesped,habitacion_id,habitaciones_ids,fecha_entrada,fecha_salida,estado,tarifa_noche,precio_total,moneda,canal_reserva,cantidad_huespedes,no_show,tipo_estadia,notas").eq("property_id",propertyId).neq("estado","cancelada").lt("fecha_entrada",windowEndExclusive).gte("fecha_salida",windowStart).order("fecha_entrada"),
         supabase.from("hotel_floors").select("id,name,sort_order,active").eq("property_id",propertyId).eq("active",true).order("sort_order"),
+        supabase.from("pagos").select("id,reserva_id,monto,moneda,estado,created_at").eq("property_id",propertyId).eq("estado","confirmado"),
       ])
       if(roomRes.error)throw roomRes.error
       if(resRes.error)throw resRes.error
       if(floorRes.error)throw floorRes.error
       const floorById=new Map((floorRes.data||[]).map(floor=>[String(floor.id),floor]))
       const roomRows=(roomRes.data||[]).map(room=>{const floor=floorById.get(String(room.floor_id||""));return{...room,floor_name:floor?.name||"Sin piso",floor_sort:Number(floor?.sort_order??999)}}).sort((a,b)=>a.floor_sort-b.floor_sort||Number(a.sort_order||0)-Number(b.sort_order||0)||String(a.nombre).localeCompare(String(b.nombre),"es",{numeric:true}))
-      setRooms(roomRows);setReservations(resRes.data||[])
+      const enriched=attachPayments(resRes.data||[],paymentRes.error?[]:paymentRes.data||[])
+      setRooms(roomRows);setReservations(enriched)
     }catch(err){setError(err?.message||"No se pudo cargar el Planning.")}
-    finally{setLoading(false)}
+    finally{if(!silent)setLoading(false)}
   },[propertyId,windowStart,windowEndExclusive])
 
   useEffect(()=>{load()},[load])
+  useEffect(()=>{if(typeof window==="undefined")return;const refresh=()=>load(true);window.addEventListener("hl:pms-payment-updated",refresh);return()=>window.removeEventListener("hl:pms-payment-updated",refresh)},[load])
 
   const moveReservation=useCallback(async({reservationId,roomId,start,end})=>{
     const numericId=Number(reservationId),numericRoom=Number(roomId)
@@ -47,7 +52,7 @@ export default function usePlanningData(propertyId,windowStart,windowEndExclusiv
     try{
       const{data,error:rpcError}=await supabase.rpc("hl_planning_move_reservation_atomic",{p_reserva_id:numericId,p_habitacion_id:numericRoom,p_fecha_entrada:start,p_fecha_salida:end})
       if(rpcError)throw rpcError
-      setReservations(list=>list.map(item=>Number(item.id)===Number(data.id)?data:item).filter(item=>item.fecha_entrada<windowEndExclusive&&item.fecha_salida>=windowStart))
+      setReservations(list=>list.map(item=>Number(item.id)===Number(data.id)?{...data,payment_paid:item.payment_paid||0,payment_foreign_count:item.payment_foreign_count||0,payment_last_id:item.payment_last_id||null,payment_last_at:item.payment_last_at||null}:item).filter(item=>item.fecha_entrada<windowEndExclusive&&item.fecha_salida>=windowStart))
       const oldRoom=rooms.find(room=>Number(room.id)===Number(previous.habitacion_id))?.nombre||previous.habitacion_id,newRoom=rooms.find(room=>Number(room.id)===numericRoom)?.nombre||numericRoom
       const roomChanged=Number(previous.habitacion_id)!==numericRoom,startChanged=previous.fecha_entrada!==start,durationChanged=oldNights!==newNights
       let message="Cambio guardado en el Planning."
@@ -84,10 +89,11 @@ export default function usePlanningData(propertyId,windowStart,windowEndExclusiv
     }
     const{data,error:rpcError}=await supabase.rpc("hl_create_reservation_atomic",{p_reservation:payload,p_payments:[]})
     if(rpcError)throw rpcError
-    if(data.fecha_entrada<windowEndExclusive&&data.fecha_salida>=windowStart)setReservations(list=>[...list,data])
+    const created={...data,payment_paid:0,payment_foreign_count:0,payment_last_id:null,payment_last_at:null}
+    if(data.fecha_entrada<windowEndExclusive&&data.fecha_salida>=windowStart)setReservations(list=>[...list,created])
     const names=selectedRooms.map(room=>room.nombre).join(", ")
     toast({title:roomIds.length>1?"Reserva grupal creada":"Reserva creada",message:`${draft.guest.trim()} · ${roomIds.length>1?`${roomIds.length} habitaciones (${names})`:`Habitación ${names}`} · ${nights} noche${nights===1?"":"s"}.`})
-    return data
+    return created
   },[propertyId,rooms,windowStart,windowEndExclusive])
 
   return{rooms,reservations,loading,error,setError,load,moveReservation,createReservation}
