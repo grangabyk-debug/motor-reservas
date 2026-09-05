@@ -3,9 +3,11 @@
 import{useState}from"react"
 import{ReservationBlock}from"./PlanningPieces"
 import{PLANNING_STAGES}from"./planningLifecycle"
+import{PAYMENT_STATES}from"./planningPayment"
 import c from"./planningCanvas.module.css"
 import t from"./planningToday.module.css"
 import l from"./planningLifecycle.module.css"
+import p from"./planningPayment.module.css"
 
 const DAY=86400000
 const pad=value=>String(value).padStart(2,"0")
@@ -56,14 +58,16 @@ function UnassignedStrip({days,reservations,grid}){
 
 function PlanningReference({onClose}){
   return <aside className={c.referencePopover} role="dialog" aria-label="Referencia del Planning">
-    <header><div><small>REFERENCIA</small><b>Estados operativos del Planning</b></div><button type="button" onClick={onClose} aria-label="Cerrar referencia">×</button></header>
+    <header><div><small>REFERENCIA</small><b>Cómo leer el Planning</b></div><button type="button" onClick={onClose} aria-label="Cerrar referencia">×</button></header>
     <div className={c.referenceRows}>
       {PLANNING_STAGES.map(stage=><div key={stage.key}><i className={`${l.legendSwatch} ${l[stage.key]}`}/><span><b>{stage.label}</b><small>{stage.description}</small></span></div>)}
       <div><i className={`${c.legendSwatch} ${c.legendToday}`}/><span><b>Hoy</b><small>Columna celeste del día actual</small></span></div>
       <div><i className={l.weekendLegend}/><span><b>Fin de semana</b><small>Sábado y domingo con fondo gris suave</small></span></div>
       <div><i className={c.middaySample}/><span><b>Mediodía</b><small>Línea punteada: referencia de check-in / check-out</small></span></div>
     </div>
-    <p>Los colores representan el momento operativo de la estadía. Preventa y Venta son estados comerciales; Check-in, In-house y Check-out se derivan automáticamente de la fecha y de si el huésped ya ingresó.</p>
+    <div className={c.referenceSection}><small>ESTADO DE PAGO · LÍNEA INFERIOR</small></div>
+    <div className={c.referenceRows}>{PAYMENT_STATES.map(state=><div key={state.key}><i className={`${p.paymentLegend} ${p[state.key]}`}/><span><b>{state.label}</b><small>{state.description}</small></span></div>)}</div>
+    <p>El color grande siempre representa el momento operativo de la estadía. La línea inferior es independiente y muestra únicamente el cobro, para no mezclar una reserva confirmada con una reserva pagada.</p>
   </aside>
 }
 
@@ -92,7 +96,7 @@ export default function PlanningCalendar({property,days,today,settings,rooms,ava
   const grid={gridTemplateColumns:`repeat(${days.length},var(--day-width))`},months=monthSegments(days)
   return <div className={c.calendarShell}>
     <div className={c.calendar}>
-      <div className={c.monthRow}><div className={c.corner}><span>{property?.name||"Propiedad activa"}</span><button type="button" className={c.referenceButton} onClick={()=>setReferenceOpen(value=>!value)} aria-label="Ver referencia del Planning" title="Referencia de colores y horarios">i</button></div><div className={c.months} style={grid}>{months.map(segment=><div key={segment.key} style={{gridColumn:`${segment.start+1} / span ${segment.span}`}}>{segment.label}</div>)}</div></div>
+      <div className={c.monthRow}><div className={c.corner}><span>{property?.name||"Propiedad activa"}</span><button type="button" className={c.referenceButton} onClick={()=>setReferenceOpen(value=>!value)} aria-label="Ver referencia del Planning" title="Referencia de colores, pagos y horarios">i</button></div><div className={c.months} style={grid}>{months.map(segment=><div key={segment.key} style={{gridColumn:`${segment.start+1} / span ${segment.span}`}}>{segment.label}</div>)}</div></div>
       <div className={c.dayRow}><div className={c.roomHead}>Habitación</div><div className={c.days} style={grid}>{days.map(day=>{const weekend=settings.shadeWeekends&&[0,6].includes(fromKey(day).getDay());return <div key={day} className={`${day===today?`${c.todayHead} ${t.todayHeader}`:""} ${weekend?c.weekendHead:""}`}><small>{dayName(day)}</small><b>{fromKey(day).getDate()}</b></div>})}</div></div>
       <InventoryStrip days={days} rooms={rooms} reservations={availabilityReservations} today={today} settings={settings} grid={grid}/>
       <UnassignedStrip days={days} reservations={availabilityReservations} grid={grid}/>
