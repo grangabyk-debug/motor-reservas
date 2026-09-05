@@ -1,5 +1,6 @@
 "use client"
 
+import{useLayoutEffect,useRef,useState}from"react"
 import c from"./planningCanvas.module.css"
 import l from"./planningLifecycle.module.css"
 import p from"./planningPayment.module.css"
@@ -14,9 +15,23 @@ const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"curren
 const roomCount=item=>new Set([item.habitacion_id,...(item.habitaciones_ids||[])].filter(Boolean).map(Number)).size
 
 export default function ReservationPreview({preview}){
+  const cardRef=useRef(null)
+  const[position,setPosition]=useState({left:12,top:12,ready:false})
+  useLayoutEffect(()=>{
+    if(!preview?.item||!preview?.rect||!cardRef.current)return
+    const rect=preview.rect,card=cardRef.current,gap=9,margin=12
+    const width=card.offsetWidth||330,height=card.offsetHeight||280
+    const left=Math.max(margin,Math.min(rect.left,window.innerWidth-width-margin))
+    const below=rect.bottom+gap
+    const above=rect.top-height-gap
+    let top=below
+    if(below+height>window.innerHeight-margin)top=above
+    top=Math.max(margin,Math.min(top,window.innerHeight-height-margin))
+    setPosition({left,top,ready:true})
+  },[preview])
   if(!preview?.item)return null
-  const{item,x,y}=preview,nights=diffDays(item.fecha_entrada,item.fecha_salida),rooms=roomCount(item),stage=planningStage(item),stageLabel=planningStageLabel(item),payment=paymentState(item),currency=item.moneda||"ARS"
-  return <aside className={c.reservationPreview} style={{left:x,top:y}} aria-hidden="true">
+  const{item}=preview,nights=diffDays(item.fecha_entrada,item.fecha_salida),rooms=roomCount(item),stage=planningStage(item),stageLabel=planningStageLabel(item),payment=paymentState(item),currency=item.moneda||"ARS"
+  return <aside ref={cardRef} className={c.reservationPreview} style={{left:position.left,top:position.top,visibility:position.ready?"visible":"hidden"}} aria-hidden="true">
     <div className={c.previewTop}><div><small>{item.canal_reserva||"Directa"}</small><b>{item.nombre_huesped}</b></div><span className={`${l.stagePill} ${l[stage]}`}>{stageLabel}</span></div>
     <div className={c.previewMeta}>{item.numero_reserva?<p><small>Reserva</small><b>{item.numero_reserva}</b></p>:null}{rooms>1?<p><small>Habitaciones</small><b>{rooms}</b></p>:null}{item.telefono_huesped?<p><small>Teléfono</small><b>{item.telefono_huesped}</b></p>:null}</div>
     <div className={c.previewDates}><div><small>Llegada</small><b>{longDate(item.fecha_entrada)}</b></div><div><small>Salida</small><b>{longDate(item.fecha_salida)}</b></div><div><small>Noches</small><b>{nights}</b></div></div>
