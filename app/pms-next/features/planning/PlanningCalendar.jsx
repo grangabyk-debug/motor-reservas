@@ -18,7 +18,9 @@ const dayName=value=>new Intl.DateTimeFormat("es-AR",{weekday:"short"}).format(f
 const roomHas=(item,roomId)=>Number(item.habitacion_id)===Number(roomId)||(item.habitaciones_ids||[]).map(Number).includes(Number(roomId))
 const covers=(item,roomId,day)=>roomHas(item,roomId)&&item.fecha_entrada<=day&&item.fecha_salida>day
 const coversDay=(item,day)=>item.fecha_entrada<=day&&item.fecha_salida>day
+const overlaps=(item,start,end)=>item.fecha_entrada<end&&item.fecha_salida>start
 const assignedIds=item=>new Set([item.habitacion_id,...(item.habitaciones_ids||[])].filter(Boolean).map(Number))
+function toast(detail){if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("hl:pms-toast",{detail}))}
 
 function monthSegments(days){
   const result=[]
@@ -71,22 +73,26 @@ function PlanningReference({onClose}){
   </aside>
 }
 
-function RangeActions({days,range,onConfirm,onCancel}){
+function RangeActions({days,range,onConfirm,onCancel,blocked,blockedMessage}){
   if(!range)return null
   const start=Math.max(0,days.indexOf(range.start)),end=Math.max(start+1,days.indexOf(addDays(range.end,-1))+1),center=(start+end)/2
-  return <div className={c.rangeActions} style={{left:`calc(${center} * var(--day-width))`}}><button type="button" onClick={onCancel} aria-label="Cancelar rango">×</button><button type="button" className={c.rangeConfirm} onClick={onConfirm} aria-label="Crear reserva en este rango">✓</button></div>
+  function confirm(){if(blocked){toast({tone:"error",title:"Habitación ocupada",message:blockedMessage||"Ese rango contiene una habitación ocupada. Elegí otro rango.",duration:4200});return}onConfirm()}
+  return <div className={c.rangeActions} style={{left:`calc(${center} * var(--day-width))`}}><button type="button" onClick={onCancel} aria-label="Cancelar rango">×</button><button type="button" className={c.rangeConfirm} onClick={confirm} aria-disabled={blocked?"true":"false"} title={blocked?blockedMessage:"Crear reserva en este rango"} style={blocked?{opacity:.48,cursor:"not-allowed"}:undefined} aria-label={blocked?"Rango no disponible":"Crear reserva en este rango"}>✓</button></div>
 }
 
-function RoomRow({room,days,settings,grid,visibleReservations,selected,dragging,dropCell,rangeSelection,onRoom,onBeginRange,onExtendRange,onFinishRange,onDropCell,onDrop,onSelect,onDrag,onResize,onPreview,onConfirmRange,onCancelRange}){
+function RoomRow({room,days,today,settings,grid,availabilityReservations,visibleReservations,selected,dragging,dropCell,rangeSelection,rangeBlocked,rangeBlockedMessage,onRoom,onBeginRange,onExtendRange,onFinishRange,onDropCell,onDrop,onSelect,onDrag,onResize,onPreview,onConfirmRange,onCancelRange}){
   const reservations=visibleReservations.filter(item=>roomHas(item,room.id))
   const selectedRooms=(rangeSelection?.roomIds||[]).map(String),ownRange=rangeSelection&&selectedRooms.includes(String(room.id))?rangeSelection:null,showRangeActions=ownRange&&String(selectedRooms[0])===String(room.id)
   const meta=[room.floor_name,room.tipo||"Sin tipo",`${room.capacidad||1} pax`].filter(Boolean).join(" · ")
+  const occupied=(start,end)=>availabilityReservations.some(item=>roomHas(item,room.id)&&overlaps(item,start,end))
+  function occupiedNotice(start,end){toast({tone:"error",title:`Habitación ${room.nombre} ocupada`,message:`No se puede seleccionar del ${start} al ${end}: ya existe una reserva en ese rango.`,duration:4200})}
+  const todayBlocked=occupied(today,addDays(today,1))
   return <div className={c.roomRow}>
-    <button type="button" className={c.room} onClick={()=>onRoom()}><span><b>{room.nombre}</b><small>{meta}</small></span>{room.estado==="mantenimiento"?<span className={c.maintenance} title="Mantenimiento">!</span>:null}</button>
+    <button type="button" className={c.room} onClick={()=>{if(todayBlocked){occupiedNotice(today,addDays(today,1));return}onRoom(today)}}><span><b>{room.nombre}</b><small>{meta}</small></span>{room.estado==="mantenimiento"?<span className={c.maintenance} title="Mantenimiento">!</span>:null}</button>
     <div className={c.timelineRow} style={grid}>
-      {days.map(day=>{const key=`${room.id}-${day}`,range=ownRange&&day>=ownRange.start&&day<ownRange.end;return <button type="button" key={day} className={`${c.cell} ${range?c.rangeCell:""} ${dropCell===key?c.dropTarget:""}`} aria-label={`${room.nombre} ${day}`} onMouseDown={event=>onBeginRange(event,room.id,day)} onMouseEnter={()=>onExtendRange(room.id,day)} onMouseUp={event=>onFinishRange(event,room.id)} onDoubleClick={event=>{event.preventDefault();event.stopPropagation();onRoom(day)}} onDragEnter={()=>dragging&&onDropCell(key)} onDragOver={event=>{if(dragging){event.preventDefault();event.dataTransfer.dropEffect="move"}}} onDragLeave={()=>dropCell===key&&onDropCell("")} onDrop={event=>onDrop(event,room.id,day)}/>})}
+      {days.map(day=>{const key=`${room.id}-${day}`,range=ownRange&&day>=ownRange.start&&day<ownRange.end,blocked=occupied(day,addDays(day,1));return <button type="button" key={day} className={`${c.cell} ${range?c.rangeCell:""} ${dropCell===key?c.dropTarget:""}`} aria-label={`${room.nombre} ${day}${blocked?" · ocupada":""}`} aria-disabled={blocked?"true":"false"} title={blocked?`Habitación ${room.nombre} ocupada para esa noche`:undefined} style={blocked?{cursor:"not-allowed"}:undefined} onMouseDown={event=>{if(blocked){event.preventDefault();event.stopPropagation();occupiedNotice(day,addDays(day,1));return}onBeginRange(event,room.id,day)}} onMouseEnter={()=>{if(!blocked)onExtendRange(room.id,day)}} onMouseUp={event=>onFinishRange(event,room.id)} onDoubleClick={event=>{event.preventDefault();event.stopPropagation();if(blocked){occupiedNotice(day,addDays(day,1));return}onRoom(day)}} onDragEnter={()=>dragging&&onDropCell(key)} onDragOver={event=>{if(dragging){event.preventDefault();event.dataTransfer.dropEffect="move"}}} onDragLeave={()=>dropCell===key&&onDropCell("")} onDrop={event=>onDrop(event,room.id,day)}/>})}
       {reservations.map(item=><ReservationBlock key={`${room.id}-${item.id}`} item={item} days={days} selected={selected?.id===item.id} settings={settings} onSelect={onSelect} onDragStart={onDrag} onResizeStart={onResize} onPreview={onPreview}/>) }
-      {showRangeActions?<RangeActions days={days} range={ownRange} onConfirm={onConfirmRange} onCancel={onCancelRange}/>:null}
+      {showRangeActions?<RangeActions days={days} range={ownRange} blocked={rangeBlocked} blockedMessage={rangeBlockedMessage} onConfirm={onConfirmRange} onCancel={onCancelRange}/>:null}
     </div>
   </div>
 }
@@ -94,6 +100,9 @@ function RoomRow({room,days,settings,grid,visibleReservations,selected,dragging,
 export default function PlanningCalendar({property,days,today,settings,rooms,availabilityReservations,visibleReservations,selected,dragging,dropCell,rangeSelection,onRoom,onBeginRange,onExtendRange,onFinishRange,onDropCell,onDrop,onSelect,onDrag,onResize,onPreview,onConfirmRange,onCancelRange}){
   const[referenceOpen,setReferenceOpen]=useState(false)
   const grid={gridTemplateColumns:`repeat(${days.length},var(--day-width))`},months=monthSegments(days)
+  const selectedRangeIds=new Set((rangeSelection?.roomIds||[]).map(String))
+  const rangeConflictRooms=rangeSelection?rooms.filter(room=>selectedRangeIds.has(String(room.id))&&availabilityReservations.some(item=>roomHas(item,room.id)&&overlaps(item,rangeSelection.start,rangeSelection.end))):[]
+  const rangeBlocked=rangeConflictRooms.length>0,rangeBlockedMessage=rangeBlocked?`${rangeConflictRooms.length===1?`La habitación ${rangeConflictRooms[0].nombre} ya está ocupada`:`Las habitaciones ${rangeConflictRooms.slice(0,3).map(room=>room.nombre).join(", ")}${rangeConflictRooms.length>3?"…":""} ya están ocupadas`} en parte de ese rango. Elegí fechas o habitaciones disponibles.`:""
   return <div className={c.calendarShell}>
     <div className={c.calendar}>
       <div className={c.monthRow}><div className={c.corner}><span>{property?.name||"Propiedad activa"}</span><button type="button" className={c.referenceButton} onClick={()=>setReferenceOpen(value=>!value)} aria-label="Ver referencia del Planning" title="Referencia de colores, pagos y horarios">i</button></div><div className={c.months} style={grid}>{months.map(segment=><div key={segment.key} style={{gridColumn:`${segment.start+1} / span ${segment.span}`}}>{segment.label}</div>)}</div></div>
@@ -102,7 +111,7 @@ export default function PlanningCalendar({property,days,today,settings,rooms,ava
       <UnassignedStrip days={days} reservations={availabilityReservations} grid={grid}/>
       <div className={c.calendarBody} style={{"--timeline-width":`calc(${days.length} * var(--day-width))`}}>
         <TimelineBands days={days} today={today} settings={settings} grid={grid}/>
-        {rooms.map(room=><RoomRow key={room.id} room={room} days={days} settings={settings} grid={grid} visibleReservations={visibleReservations} selected={selected} dragging={dragging} dropCell={dropCell} rangeSelection={rangeSelection} onRoom={day=>onRoom(room.id,day||today)} onBeginRange={onBeginRange} onExtendRange={onExtendRange} onFinishRange={onFinishRange} onDropCell={onDropCell} onDrop={onDrop} onSelect={onSelect} onDrag={onDrag} onResize={onResize} onPreview={onPreview} onConfirmRange={onConfirmRange} onCancelRange={onCancelRange}/>) }
+        {rooms.map(room=><RoomRow key={room.id} room={room} days={days} today={today} settings={settings} grid={grid} availabilityReservations={availabilityReservations} visibleReservations={visibleReservations} selected={selected} dragging={dragging} dropCell={dropCell} rangeSelection={rangeSelection} rangeBlocked={rangeBlocked} rangeBlockedMessage={rangeBlockedMessage} onRoom={day=>onRoom(room.id,day||today)} onBeginRange={onBeginRange} onExtendRange={onExtendRange} onFinishRange={onFinishRange} onDropCell={onDropCell} onDrop={onDrop} onSelect={onSelect} onDrag={onDrag} onResize={onResize} onPreview={onPreview} onConfirmRange={onConfirmRange} onCancelRange={onCancelRange}/>) }
         {!rooms.length?<div className={c.noResults}>No hay habitaciones que coincidan con los filtros.</div>:null}
       </div>
     </div>
