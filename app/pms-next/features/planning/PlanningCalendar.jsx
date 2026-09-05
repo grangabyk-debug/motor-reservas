@@ -57,7 +57,7 @@ function UnassignedStrip({days,reservations,grid}){
 }
 
 function PlanningReference({onClose}){
-  return <aside className={c.referencePopover} role="dialog" aria-label="Referencia del Planning">
+  return <aside className={c.referencePopover} style={{maxHeight:"calc(100dvh - 110px)",overflow:"auto"}} role="dialog" aria-label="Referencia del Planning">
     <header><div><small>REFERENCIA</small><b>Cómo leer el Planning</b></div><button type="button" onClick={onClose} aria-label="Cerrar referencia">×</button></header>
     <div className={c.referenceRows}>
       {PLANNING_STAGES.map(stage=><div key={stage.key}><i className={`${l.legendSwatch} ${l[stage.key]}`}/><span><b>{stage.label}</b><small>{stage.description}</small></span></div>)}
@@ -65,7 +65,7 @@ function PlanningReference({onClose}){
       <div><i className={l.weekendLegend}/><span><b>Fin de semana</b><small>Sábado y domingo con fondo gris suave</small></span></div>
       <div><i className={c.middaySample}/><span><b>Mediodía</b><small>Línea punteada: referencia de check-in / check-out</small></span></div>
     </div>
-    <div className={c.referenceSection}><small>ESTADO DE PAGO · LÍNEA INFERIOR</small></div>
+    <div className={p.referenceSection}><small>ESTADO DE PAGO · LÍNEA INFERIOR</small></div>
     <div className={c.referenceRows}>{PAYMENT_STATES.map(state=><div key={state.key}><i className={`${p.paymentLegend} ${p[state.key]}`}/><span><b>{state.label}</b><small>{state.description}</small></span></div>)}</div>
     <p>El color grande siempre representa el momento operativo de la estadía. La línea inferior es independiente y muestra únicamente el cobro, para no mezclar una reserva confirmada con una reserva pagada.</p>
   </aside>
