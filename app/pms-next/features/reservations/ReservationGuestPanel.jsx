@@ -1,6 +1,6 @@
 "use client"
 
-import{useEffect,useMemo,useState}from"react"
+import{useEffect,useMemo,useRef,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 
 const blankGuest=(role="companion",roomId=null)=>({id:null,role,room_id:roomId||null,full_name:"",email:"",phone:"",document_type:"DNI",document_number:"",birth_date:"",sex:"",marital_status:"",cuil:"",nationality:"",address:"",city:"",province:"",country:"Argentina",postal_code:"",occupation:"",travel_reason:"",relationship:"",document_front_path:"",document_back_path:"",notes:""})
@@ -12,6 +12,7 @@ function Select({value,onChange,children}){return <select value={value||""} onCh
 
 export default function ReservationGuestPanel({item,rooms=[],propertyId,onClose,onSaved}){
   const[guests,setGuests]=useState([]),[selectedId,setSelectedId]=useState(""),[draft,setDraft]=useState(null),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("")
+  const mainRef=useRef(null)
   const selected=useMemo(()=>guests.find(guest=>String(guest.id)===String(selectedId))||null,[guests,selectedId])
   const primary=useMemo(()=>guests.find(guest=>guest.role==="primary")||null,[guests])
   const companions=useMemo(()=>guests.filter(guest=>guest.role!=="primary"),[guests])
@@ -35,9 +36,10 @@ export default function ReservationGuestPanel({item,rooms=[],propertyId,onClose,
   useEffect(()=>{let cancelled=false;async function load(){setLoading(true);setError("");try{await fetchGuests()}catch(err){if(!cancelled)setError(err?.message||"No se pudieron cargar los huéspedes.")}finally{if(!cancelled)setLoading(false)}}load();return()=>{cancelled=true}},[item.id,propertyId])
   useEffect(()=>{if(selected)setDraft({...selected})},[selectedId])
 
+  function scrollEditorTop(){requestAnimationFrame(()=>mainRef.current?.scrollTo({top:0,behavior:"smooth"}))}
   function setField(key,value){setNotice("");setError("");setDraft(current=>({...current,[key]:value}))}
   function selectPerson(guest){setSelectedId(String(guest.id));setDraft({...guest});setNotice("");setError("")}
-  function addCompanion(){const roomId=rooms[0]?.id||item.habitacion_id||null,setId=`new-${Date.now()}`,next={...blankGuest("companion",roomId),id:setId,property_id:propertyId,reservation_id:item.id,sort_order:companions.length+1};setGuests(current=>[...current,next]);setSelectedId(setId);setDraft(next);setNotice("");setError("")}
+  function addCompanion(){const roomId=rooms[0]?.id||item.habitacion_id||null,setId=`new-${Date.now()}`,next={...blankGuest("companion",roomId),id:setId,property_id:propertyId,reservation_id:item.id,sort_order:companions.length+1};setGuests(current=>[...current,next]);setSelectedId(setId);setDraft(next);setNotice("");setError("");scrollEditorTop()}
 
   async function persistGuest(current=draft){
     if(!current?.full_name?.trim())throw new Error("Ingresá nombre y apellido.")
@@ -72,7 +74,7 @@ export default function ReservationGuestPanel({item,rooms=[],propertyId,onClose,
 
   return <div style={overlay} onMouseDown={event=>event.target===event.currentTarget&&!saving&&onClose?.()}><section style={shell} role="dialog" aria-modal="true" aria-label="Datos del huésped y acompañantes">
     <header style={{padding:"16px 18px",display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:14,borderBottom:"1px solid var(--line)"}}><div><small style={{fontSize:10,fontWeight:900,letterSpacing:".1em",color:"var(--accent)"}}>{draft?.role==="primary"?"DATOS DEL HUÉSPED PRINCIPAL":"DATOS DEL ACOMPAÑANTE"}</small><h2 style={{margin:"4px 0 0",fontSize:20}}>{draft?.full_name||item.nombre_huesped||"Huésped"}</h2><p style={{margin:"5px 0 0",fontSize:10.5,color:"var(--muted)"}}>{draft?.role==="primary"?"Información personal, legal y documentación del titular de la reserva.":"Información personal y documentación del acompañante seleccionado."}</p></div><button type="button" disabled={saving} onClick={onClose} style={{width:38,height:38,border:"1px solid var(--line)",borderRadius:11,background:"var(--panel)",color:"var(--text)",fontSize:19}}>×</button></header>
-    <main style={{padding:14,overflow:"auto"}}>{loading?<div style={{padding:34,textAlign:"center",color:"var(--muted)"}}>Cargando datos del huésped…</div>:draft?<>
+    <main ref={mainRef} style={{padding:14,overflow:"auto"}}>{loading?<div style={{padding:34,textAlign:"center",color:"var(--muted)"}}>Cargando datos del huésped…</div>:draft?<>
       {(error||notice)?<div style={{marginBottom:10,padding:"9px 11px",border:`1px solid ${error?"color-mix(in srgb,var(--red) 30%,var(--line))":"color-mix(in srgb,#2e9b61 28%,var(--line))"}`,borderRadius:10,background:error?"color-mix(in srgb,var(--red) 7%,var(--panelSolid))":"color-mix(in srgb,#39a96c 7%,var(--panelSolid))",color:error?"var(--red)":"#26794d",fontSize:10.5,fontWeight:800}}>{error||notice}</div>:null}
 
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginBottom:10,flexWrap:"wrap"}}><div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>{draft.role==="primary"?<span style={{padding:"6px 9px",borderRadius:999,background:"color-mix(in srgb,#2e9b61 10%,var(--panelSolid))",color:"#26794d",fontSize:9.5,fontWeight:900}}>✓ Huésped principal</span>:primary?<button type="button" onClick={()=>selectPerson(primary)} style={{height:32,padding:"0 10px",border:"1px solid var(--line)",borderRadius:9,background:"var(--panelSolid)",color:"var(--text)",font:"inherit",fontSize:10,fontWeight:820}}>← Volver a {primary.full_name}</button>:null}</div>{draft.role!=="primary"?<div style={{display:"flex",gap:7,flexWrap:"wrap"}}><button type="button" onClick={makePrimary} disabled={saving} style={{height:34,padding:"0 11px",border:"1px solid color-mix(in srgb,#2e9b61 34%,var(--line))",borderRadius:9,background:"color-mix(in srgb,#2e9b61 7%,var(--panelSolid))",color:"#26794d",font:"inherit",fontSize:10,fontWeight:850}}>✓ Marcar como huésped principal</button><button type="button" onClick={removeGuest} disabled={saving} style={{height:34,padding:"0 10px",border:"1px solid color-mix(in srgb,var(--red) 30%,var(--line))",borderRadius:9,background:"transparent",color:"var(--red)",font:"inherit",fontSize:10,fontWeight:820}}>Quitar acompañante</button></div>:null}</div>
