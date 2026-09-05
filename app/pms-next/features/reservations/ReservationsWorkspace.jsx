@@ -1,6 +1,7 @@
 "use client"
 
 import{useEffect,useMemo,useRef,useState}from"react"
+import{supabase}from"../../../../lib/supabase"
 import useReservationsData from"./useReservationsData"
 import ReservationRecord from"./ReservationRecord"
 import ReservationEditPanel from"./ReservationEditPanel"
@@ -12,6 +13,7 @@ const roomIds=item=>[...new Set([item.habitacion_id,...(item.habitaciones_ids||[
 const dateKey=date=>{const value=date instanceof Date?date:new Date(date);return`${value.getFullYear()}-${String(value.getMonth()+1).padStart(2,"0")}-${String(value.getDate()).padStart(2,"0")}`}
 function paymentState(item,paid){const total=Number(item.precio_total)||0;if(total<=0)return"paid";if(paid<=0)return"due";if(paid>=total)return"paid";return"pending"}
 const paymentLabel=value=>value==="paid"?"Pagado":value==="pending"?"Parcial":"Pendiente"
+const RECORD_SELECT="id,numero_reserva,nombre_huesped,email_huesped,telefono_huesped,habitacion_id,habitaciones_ids,habitaciones_detalle,fecha_entrada,fecha_salida,estado,no_show,canal_reserva,codigo_canal,precio_total,subtotal,descuento_tipo,descuento_valor,descuento_importe,tarifa_noche,noches,moneda,cantidad_huespedes,guest_profile_id,notas,created_at,tipo_estadia,servicios,mascotas_total,cochera_total,extra,extra_descripcion,early_checkin_importe,late_checkout_importe,regimen,hora_llegada_estimada,hora_salida_estimada,pais_huesped,nacionalidad_huesped,tipo_documento_huesped,dni_huesped"
 
 export default function ReservationsWorkspace({propertyId,onNavigate,focusReservationId,onFocusHandled}){
   const data=useReservationsData(propertyId)
@@ -21,10 +23,39 @@ export default function ReservationsWorkspace({propertyId,onNavigate,focusReserv
   const items=useMemo(()=>data.reservations.map(item=>{const paid=data.paymentByReservation.get(Number(item.id))||0,rooms=roomIds(item).map(id=>roomById.get(id)).filter(Boolean);return{...item,paid,payment:paymentState(item,paid),room:rooms[0]||roomById.get(Number(item.habitacion_id)),rooms}}),[data.reservations,data.paymentByReservation,roomById])
 
   function syncRecordUrl(id){if(typeof window==="undefined")return;const url=new URL(window.location.href);if(id==null)url.searchParams.delete("reservation");else url.searchParams.set("reservation",String(id));window.history.replaceState({pmsView:"reservations",reservationId:id??null},"",url)}
+  function enrichRecord(item){const paid=data.paymentByReservation.get(Number(item.id))||0,rooms=roomIds(item).map(id=>roomById.get(id)).filter(Boolean);return{...item,paid,payment:paymentState(item,paid),room:rooms[0]||roomById.get(Number(item.habitacion_id)),rooms}}
   function openRecord(item){setEditOpen(false);setSelected(item);syncRecordUrl(item.id)}
   function closeRecord(){setEditOpen(false);setSelected(null);syncRecordUrl(null)}
 
-  useEffect(()=>{if(!focusReservationId){focusReloadRef.current=null;return}const target=items.find(item=>Number(item.id)===Number(focusReservationId));if(target){focusReloadRef.current=null;setMode(target.estado==="cancelada"?"trash":target.no_show?"noshow":"active");setSelected(target);syncRecordUrl(target.id);onFocusHandled?.();return}if(!data.loading&&focusReloadRef.current!==String(focusReservationId)){focusReloadRef.current=String(focusReservationId);data.load()}},[focusReservationId,items,onFocusHandled,data.loading,data.load])
+  useEffect(()=>{
+    if(!focusReservationId){focusReloadRef.current=null;return}
+    const wanted=Number(focusReservationId)
+    let cancelled=false
+    syncRecordUrl(wanted)
+    setEditOpen(false)
+    if(selected&&Number(selected.id)!==wanted)setSelected(null)
+    const target=items.find(item=>Number(item.id)===wanted)
+    if(target){focusReloadRef.current=null;setMode(target.estado==="cancelada"?"trash":target.no_show?"noshow":"active");setSelected(target);onFocusHandled?.();return}
+    if(focusReloadRef.current===String(wanted))return
+    focusReloadRef.current=String(wanted)
+    ;(async()=>{
+      try{
+        const{data:row,error:rowError}=await supabase.from("reservas").select(RECORD_SELECT).eq("property_id",propertyId).eq("id",wanted).single()
+        if(rowError)throw rowError
+        if(cancelled)return
+        const record=enrichRecord(row)
+        setMode(record.estado==="cancelada"?"trash":record.no_show?"noshow":"active")
+        setSelected(record)
+        onFocusHandled?.()
+        data.load()
+      }catch{
+        if(cancelled)return
+        focusReloadRef.current=null
+        data.load()
+      }
+    })()
+    return()=>{cancelled=true}
+  },[focusReservationId,items,onFocusHandled,propertyId,roomById,data.paymentByReservation])
   useEffect(()=>{if(focusReservationId||selected||typeof window==="undefined")return;const requested=Number(new URL(window.location.href).searchParams.get("reservation"));if(!requested)return;const target=items.find(item=>Number(item.id)===requested);if(target){setMode(target.estado==="cancelada"?"trash":target.no_show?"noshow":"active");setSelected(target)}},[focusReservationId,items,selected])
   useEffect(()=>{if(!selected)return;const fresh=items.find(item=>Number(item.id)===Number(selected.id));if(fresh&&fresh!==selected)setSelected(fresh)},[items,selected])
 
