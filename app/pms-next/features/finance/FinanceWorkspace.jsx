@@ -14,7 +14,7 @@ const TABS=[
   ["payments","Pagos"],
   ["online","Cobros online"],
   ["documents","Facturas y documentos"],
-  ["cash","Caja"],
+  ["cash","Arqueo y turnos"],
   ["expenses","Gastos"],
 ]
 
