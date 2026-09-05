@@ -75,7 +75,7 @@ export default function RoomingEditor({draft,setDraft,rooms=[],currency="ARS"}){
       const assignments={...(current.roomAssignments||{})},base=assignments[id]||makeAssignment(room,1),next={...base,...patch}
       next.guests=clamp(next.guests,1,roomCapacity(room));next.matrimonial=clamp(next.matrimonial,0,roomCapacity(room));next.individual=clamp(next.individual,0,roomCapacity(room));next.rate=Math.max(0,Number(next.rate)||0);assignments[id]=next
       const selected=idsOf(rooms),totalGuests=selected.reduce((sum,key)=>sum+Math.max(1,Number(assignments[key]?.guests)||1),0),totalRate=selected.reduce((sum,key)=>sum+(Number(assignments[key]?.rate)||0),0)
-      return{...current,roomAssignments:assignments,guests:totalGuests,rate:totalRate}
+      return{...current,roomAssignments:assignments,guests:totalGuests,rate:totalRate,roomSelectionManual:true}
     })
   }
 
