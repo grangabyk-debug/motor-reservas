@@ -194,8 +194,11 @@ export default function OliviaAssistant({ propertyId, propertyName, context, onH
 
       {!open && nudge ? (
         <button type="button" className={styles.nudge} onClick={openAssistant}>
-          <b>Hola, soy <OliviaWordmark /></b>
-          <span>¿Te ayudo con la operación de hoy?</span>
+          <span className={styles.nudgeAvatar} aria-hidden="true"><img src="/olivia-avatar.png" alt="" /></span>
+          <span className={styles.nudgeCopy}>
+            <b>Hola, soy <OliviaWordmark /></b>
+            <span>¿Te ayudo con la operación de hoy?</span>
+          </span>
         </button>
       ) : null}
 
