@@ -12,6 +12,7 @@ const netPayment=row=>validPayment(row)?Math.max(0,Number(row?.monto||0)-Number(
 const payerLabels={guest:"Huésped",company:"Empresa",agency:"Agencia",group:"Grupo",other:"Otro"}
 const typeLabels={lodging:"Alojamiento",parking:"Cochera",pet:"Mascotas",service:"Servicio",extra:"Extra",discount:"Descuento",adjustment:"Ajuste",fee:"Cargo"}
 const escapeHtml=value=>String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"})[char])
+const blankInvoiceLine=()=>({folio_item_id:null,description:"",quantity:1,unit_price:0,tax_rate:21})
 
 export default function ReservationFolioBilling({reservation,propertyId,property,onNavigate}){
   const[folios,setFolios]=useState([])
@@ -31,6 +32,12 @@ export default function ReservationFolioBilling({reservation,propertyId,property
   const[invoicePaymentId,setInvoicePaymentId]=useState("")
   const[billingName,setBillingName]=useState(reservation.nombre_huesped||"")
   const[billingEmail,setBillingEmail]=useState(reservation.email_huesped||"")
+  const[billingPhone,setBillingPhone]=useState(reservation.telefono_huesped||"")
+  const[billingDueAt,setBillingDueAt]=useState("")
+  const[billingCurrency,setBillingCurrency]=useState(reservation.moneda||"ARS")
+  const[billingStatus,setBillingStatus]=useState("draft")
+  const[billingNotes,setBillingNotes]=useState("")
+  const[invoiceLines,setInvoiceLines]=useState([])
 
   const load=useCallback(async(silent=false)=>{
     if(!propertyId||!reservation?.id)return
@@ -59,7 +66,13 @@ export default function ReservationFolioBilling({reservation,propertyId,property
   },[propertyId,reservation?.id])
 
   useEffect(()=>{load()},[load])
-  useEffect(()=>{setBillingName(reservation.nombre_huesped||"");setBillingEmail(reservation.email_huesped||"");setSelectedItems(new Set())},[reservation.id,reservation.nombre_huesped,reservation.email_huesped])
+  useEffect(()=>{
+    setBillingName(reservation.nombre_huesped||"")
+    setBillingEmail(reservation.email_huesped||"")
+    setBillingPhone(reservation.telefono_huesped||"")
+    setBillingCurrency(reservation.moneda||"ARS")
+    setSelectedItems(new Set())
+  },[reservation.id,reservation.nombre_huesped,reservation.email_huesped,reservation.telefono_huesped,reservation.moneda])
   useEffect(()=>{
     if(typeof window==="undefined")return
     let timer=null
@@ -100,8 +113,70 @@ export default function ReservationFolioBilling({reservation,propertyId,property
   const checkedInvoiceItems=invoiceableItems.filter(row=>selectedItems.has(row.id))
   const unallocatedPayments=payments.map(row=>({...row,remaining:Math.max(0,netPayment(row)-(allocationByPayment.get(Number(row.id))||0))})).filter(row=>row.remaining>.009)
   const balance=selectedStats.charges-selectedStats.paid
+  const invoiceCalc=useMemo(()=>{
+    let subtotal=0,tax=0
+    for(const line of invoiceLines){
+      const quantity=Math.max(0,Number(line.quantity||0))
+      const unitPrice=Number(line.unit_price||0)
+      const rate=Math.max(0,Number(line.tax_rate||0))
+      const base=quantity*unitPrice
+      subtotal+=base
+      tax+=base*rate/100
+    }
+    return{subtotal,tax,total:subtotal+tax}
+  },[invoiceLines])
 
   function toggleItem(id){setSelectedItems(current=>{const next=new Set(current);next.has(id)?next.delete(id):next.add(id);return next})}
+
+  function linesFromFolio(){
+    const source=checkedInvoiceItems.length?checkedInvoiceItems:invoiceableItems
+    return source.map(row=>{
+      const quantity=Math.max(.0001,Number(row.quantity||1))
+      const taxRate=Math.max(0,Number(row.tax_rate||0))
+      const storedSubtotal=Number(row.subtotal)
+      let unitPrice=Number(row.unit_price||0)
+      if(Number.isFinite(storedSubtotal)&&storedSubtotal!==0)unitPrice=storedSubtotal/quantity
+      else if(!unitPrice&&Number(row.total||0)!==0)unitPrice=Number(row.total||0)/(1+taxRate/100)/quantity
+      return{folio_item_id:row.id,description:row.description||typeLabels[row.source_type]||"Cargo",detail:row.detail||null,source_type:row.source_type,quantity,unit_price:unitPrice,tax_rate:taxRate}
+    })
+  }
+
+  function openInvoice(mode="folio"){
+    if(!selected)return
+    setInvoiceMode(mode)
+    setInvoicePaymentId("")
+    setBillingName(selected.payer_name||reservation.nombre_huesped||"")
+    setBillingEmail(reservation.email_huesped||"")
+    setBillingPhone(reservation.telefono_huesped||"")
+    setBillingDueAt("")
+    setBillingCurrency(selected.currency||reservation.moneda||"ARS")
+    setBillingStatus("draft")
+    setBillingNotes("")
+    setInvoiceLines(mode==="folio"?linesFromFolio():[])
+    setInvoiceOpen(true)
+  }
+
+  function changeInvoiceMode(mode){
+    setInvoiceMode(mode)
+    setInvoicePaymentId("")
+    setInvoiceLines(mode==="folio"?linesFromFolio():[])
+  }
+
+  function chooseInvoicePayment(value){
+    setInvoicePaymentId(value)
+    const paymentId=Number(value)||null
+    if(!paymentId){setInvoiceLines([]);return}
+    const allocation=folioAllocations.find(row=>Number(row.payment_id)===paymentId)
+    const payment=payments.find(row=>Number(row.id)===paymentId)
+    if(!allocation||!payment){setInvoiceLines([]);return}
+    const amount=Number(allocation.amount||0)
+    setInvoiceLines([{folio_item_id:null,description:`Pago registrado · ${payment.metodo||"Pago"}`,detail:null,source_type:"payment",quantity:1,unit_price:amount,tax_rate:0}])
+    setBillingCurrency(payment.moneda||selected?.currency||reservation.moneda||"ARS")
+  }
+
+  function updateInvoiceLine(index,key,value){
+    setInvoiceLines(current=>current.map((line,i)=>i===index?{...line,[key]:value}:line))
+  }
 
   async function moveItem(item,target){
     if(!target||target===item.folio_id)return
@@ -146,31 +221,62 @@ export default function ReservationFolioBilling({reservation,propertyId,property
     if(!selected||saving)return
     setSaving(true);setError("")
     try{
-      const userRes=await supabase.auth.getUser();if(userRes.error)throw userRes.error
-      let payloadItems=[],itemIds=[],paymentId=null,total=0,billingMode=invoiceMode
+      if(!billingName.trim())throw new Error("Ingresá el nombre o razón social del cliente.")
+      if(!invoiceLines.length||invoiceCalc.total<=0)throw new Error("Agregá al menos un concepto con importe.")
+      if(invoiceLines.some(line=>!String(line.description||"").trim()))throw new Error("Completá la descripción de todos los conceptos.")
+      let itemIds=[],paymentId=null,billingMode="folio"
       if(invoiceMode==="payment"){
         paymentId=Number(invoicePaymentId)||null
         const allocation=folioAllocations.find(row=>Number(row.payment_id)===paymentId)
         const payment=payments.find(row=>Number(row.id)===paymentId)
         if(!allocation||!payment)throw new Error("Elegí un pago asignado a este folio.")
-        total=Number(allocation.amount||0)
-        if(total<=0)throw new Error("Ese pago no tiene importe disponible.")
-        payloadItems=[{description:`Pago registrado · ${payment.metodo||"Pago"}`,quantity:1,unit_price:total,tax_rate:0,subtotal:total,total}]
+        billingMode="payment"
       }else{
         const source=checkedInvoiceItems.length?checkedInvoiceItems:invoiceableItems
-        if(!source.length)throw new Error("No hay consumos pendientes para preparar la factura.")
         itemIds=source.map(row=>row.id)
-        total=source.reduce((sum,row)=>sum+Number(row.total||0),0)
-        if(total<=0)throw new Error("El total seleccionado no puede ser cero o negativo.")
         billingMode=checkedInvoiceItems.length?"partial_items":"folio"
-        payloadItems=source.map(row=>({folio_item_id:row.id,description:row.description,detail:row.detail||null,quantity:Number(row.quantity||1),unit_price:Number(row.unit_price||0),tax_rate:Number(row.tax_rate||0),tax:Number(row.tax||0),subtotal:Number(row.subtotal||row.total||0),total:Number(row.total||0)}))
       }
-      const payload={property_id:propertyId,reservation_id:Number(reservation.id),folio_id:selected.id,payment_id:paymentId,document_type:"invoice",number:null,status:"draft",currency:selected.currency||reservation.moneda||"ARS",subtotal:total,tax:0,total,balance:total,billing_to:{name:billingName.trim()||selected.payer_name||reservation.nombre_huesped,email:billingEmail.trim()||null,payer_type:selected.payer_type,folio_label:selected.label},items:payloadItems,folio_item_ids:itemIds,billing_mode:billingMode,issued_at:null,due_at:null,external_ref:null,notes:`Preparada desde ${selected.label}`,created_by:userRes.data?.user?.id||null}
-      const res=await supabase.from("hotel_finance_documents").insert(payload)
+      const userRes=await supabase.auth.getUser();if(userRes.error)throw userRes.error
+      const payloadItems=invoiceLines.map(line=>{
+        const quantity=Math.max(0,Number(line.quantity||0))
+        const unitPrice=Number(line.unit_price||0)
+        const taxRate=Math.max(0,Number(line.tax_rate||0))
+        const subtotal=quantity*unitPrice
+        const tax=subtotal*taxRate/100
+        return{folio_item_id:line.folio_item_id||null,description:String(line.description||"").trim(),detail:line.detail||null,quantity,unit_price:unitPrice,tax_rate:taxRate,tax,subtotal,total:subtotal+tax}
+      })
+      const payload={
+        property_id:propertyId,
+        reservation_id:Number(reservation.id),
+        folio_id:selected.id,
+        payment_id:paymentId,
+        document_type:"invoice",
+        number:null,
+        status:billingStatus,
+        currency:billingCurrency||selected.currency||reservation.moneda||"ARS",
+        subtotal:invoiceCalc.subtotal,
+        tax:invoiceCalc.tax,
+        total:invoiceCalc.total,
+        balance:invoiceCalc.total,
+        billing_to:{name:billingName.trim(),email:billingEmail.trim()||null,phone:billingPhone.trim()||null,payer_type:selected.payer_type,folio_label:selected.label},
+        items:payloadItems,
+        folio_item_ids:itemIds,
+        billing_mode:billingMode,
+        issued_at:billingStatus==="issued"?new Date().toISOString():null,
+        due_at:billingDueAt||null,
+        external_ref:null,
+        notes:billingNotes.trim()||`Preparada desde ${selected.label}`,
+        created_by:userRes.data?.user?.id||null
+      }
+      const res=await supabase.from("hotel_finance_documents").insert(payload).select("id").single()
       if(res.error)throw res.error
-      setInvoiceOpen(false);setSelectedItems(new Set());setInvoicePaymentId("");await load(true)
-      window.dispatchEvent(new CustomEvent("hl:pms-data-updated",{detail:{propertyId,tables:["hotel_finance_documents"]}}))
-    }catch(err){setError(err?.message||"No se pudo preparar la factura.")}
+      if(billingStatus==="issued"&&itemIds.length&&res.data?.id){
+        const mark=await supabase.from("hotel_folio_items").update({invoice_document_id:res.data.id}).eq("property_id",propertyId).eq("reservation_id",Number(reservation.id)).in("id",itemIds)
+        if(mark.error)throw mark.error
+      }
+      setInvoiceOpen(false);setSelectedItems(new Set());setInvoicePaymentId("");setInvoiceLines([]);await load(true)
+      window.dispatchEvent(new CustomEvent("hl:pms-data-updated",{detail:{propertyId,tables:["hotel_finance_documents","hotel_folio_items"]}}))
+    }catch(err){setError(err?.message||"No se pudo crear el documento.")}
     finally{setSaving(false)}
   }
 
@@ -192,7 +298,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
       <div className={s.headerActions}>
         <button type="button" onClick={()=>setNewOpen(true)}>＋ Folio</button>
         <button type="button" onClick={printFolio} disabled={!selected}>Imprimir</button>
-        <button type="button" className={s.primary} onClick={()=>{setInvoiceOpen(true);setInvoiceMode("folio");setBillingName(selected?.payer_name||reservation.nombre_huesped||"")}} disabled={!selected}>＋ Factura</button>
+        <button type="button" className={s.primary} onClick={()=>openInvoice("folio")} disabled={!selected}>＋ Factura</button>
       </div>
     </header>
     {error?<div className={s.error}>{error}</div>:null}
@@ -242,7 +348,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
       </div>:null}
 
       <div className={s.docs}>
-        <header><b>Facturas vinculadas</b><button type="button" onClick={()=>onNavigate?.("finance")}>Abrir facturación</button></header>
+        <header><b>Facturas vinculadas</b><button type="button" onClick={()=>openInvoice("folio")}>Abrir facturación</button></header>
         {folioDocs.length?folioDocs.slice(0,4).map(doc=><div key={doc.id}><span><b>{doc.number||"Borrador sin numerar"}</b><small>{doc.billing_mode==="payment"?"Sobre pago":doc.billing_mode==="partial_items"?"Parcial":"Sobre folio"} · {fmtDateTime(doc.issued_at||doc.created_at)}</small></span><strong>{money(doc.total,doc.currency)}</strong><em data-status={doc.status}>{doc.status==="draft"?"Borrador":doc.status==="issued"?"Emitida":doc.status}</em></div>):<div className={s.emptySmall}>Todavía no hay facturas para este folio.</div>}
       </div>
     </>:<div className={s.empty}>No hay folios disponibles.</div>}
@@ -256,15 +362,48 @@ export default function ReservationFolioBilling({reservation,propertyId,property
     </div></div>:null}
 
     {invoiceOpen&&selected?<div className={s.overlay} onMouseDown={event=>event.target===event.currentTarget&&setInvoiceOpen(false)}><div className={`${s.modal} ${s.invoiceModal}`}>
-      <button className={s.close} onClick={()=>setInvoiceOpen(false)}>×</button><small>FACTURA DESDE FOLIO</small><h2>Preparar comprobante</h2><p>El borrador queda vinculado al folio. Si seleccionaste consumos, se prepara sólo por esos ítems.</p>
-      <div className={s.modeCards}>
-        <label className={invoiceMode==="folio"?s.modeActive:""}><input type="radio" name="invoiceMode" checked={invoiceMode==="folio"} onChange={()=>setInvoiceMode("folio")}/><b>{checkedInvoiceItems.length?"Consumos seleccionados":"Folio pendiente"}</b><small>{checkedInvoiceItems.length?`${checkedInvoiceItems.length} ítems · ${money(checkedInvoiceItems.reduce((sum,row)=>sum+Number(row.total||0),0),selected.currency)}`:`${invoiceableItems.length} ítems pendientes · ${money(invoiceableItems.reduce((sum,row)=>sum+Number(row.total||0),0),selected.currency)}`}</small></label>
-        <label className={invoiceMode==="payment"?s.modeActive:""}><input type="radio" name="invoiceMode" checked={invoiceMode==="payment"} onChange={()=>setInvoiceMode("payment")}/><b>Un pago registrado</b><small>Útil para facturación parcial por un abono.</small></label>
+      <button className={s.close} onClick={()=>setInvoiceOpen(false)}>×</button>
+      <small>NUEVO DOCUMENTO</small>
+      <h2>Crear factura / documento</h2>
+
+      <div className={s.formGrid}>
+        <label className={s.full}><span>Vincular reserva</span><input value={`${reservation.numero_reserva||`#${reservation.id}`} · ${reservation.nombre_huesped||"Huésped"} · ${selected.label}`} readOnly/></label>
       </div>
-      {invoiceMode==="payment"?<label>Pago a facturar<select value={invoicePaymentId} onChange={event=>setInvoicePaymentId(event.target.value)}><option value="">Elegir pago…</option>{folioPayments.map(payment=>{const alloc=folioAllocations.find(row=>Number(row.payment_id)===Number(payment.id));return <option key={payment.id} value={payment.id}>{payment.metodo} · {money(alloc?.amount||0,payment.moneda||selected.currency)} · {fmtDateTime(payment.created_at)}</option>})}</select></label>:null}
-      <div className={s.formGrid}><label>Cliente / razón social<input value={billingName} onChange={event=>setBillingName(event.target.value)}/></label><label>Email<input type="email" value={billingEmail} onChange={event=>setBillingEmail(event.target.value)}/></label></div>
-      <div className={s.invoiceHint}><b>{selected.label}</b><span>Primero se guarda como borrador. La emisión fiscal/ARCA se completa desde Facturación.</span></div>
-      <footer><button onClick={()=>setInvoiceOpen(false)}>Cancelar</button><button className={s.primary} onClick={prepareInvoice} disabled={saving||(invoiceMode==="payment"&&!invoicePaymentId)}>{saving?"Preparando…":"Guardar borrador"}</button></footer>
+
+      <div className={s.invoiceScope}>
+        <div><span>Qué facturar</span><small>El comprobante queda vinculado a esta reserva y a {selected.label}.</small></div>
+        <div className={s.scopeButtons}>
+          <button type="button" className={invoiceMode==="folio"?s.scopeActive:""} onClick={()=>changeInvoiceMode("folio")}>Cargos del folio</button>
+          <button type="button" className={invoiceMode==="payment"?s.scopeActive:""} onClick={()=>changeInvoiceMode("payment")}>Pago registrado</button>
+        </div>
+        <p>{invoiceMode==="folio"?(checkedInvoiceItems.length?`${checkedInvoiceItems.length} cargo${checkedInvoiceItems.length===1?"":"s"} seleccionado${checkedInvoiceItems.length===1?"":"s"} · facturación parcial.`:invoiceableItems.length?`Se cargarán los ${invoiceableItems.length} cargos pendientes del folio.`:"Este folio no tiene cargos pendientes; podés agregar un concepto manualmente."):"Elegí uno de los pagos asignados al folio para preparar el comprobante sobre ese importe."}</p>
+      </div>
+
+      {invoiceMode==="payment"?<label className={s.paymentPicker}><span>Pago a facturar</span><select value={invoicePaymentId} onChange={event=>chooseInvoicePayment(event.target.value)}><option value="">Elegir pago…</option>{folioPayments.map(payment=>{const alloc=folioAllocations.find(row=>Number(row.payment_id)===Number(payment.id));return <option key={payment.id} value={payment.id}>{payment.metodo||"Pago"} · {money(alloc?.amount||0,payment.moneda||selected.currency)} · {fmtDateTime(payment.created_at)}</option>})}</select></label>:null}
+
+      <div className={s.formGrid}>
+        <label><span>Cliente</span><input value={billingName} onChange={event=>setBillingName(event.target.value)}/></label>
+        <label><span>Email</span><input type="email" value={billingEmail} onChange={event=>setBillingEmail(event.target.value)}/></label>
+        <label><span>Teléfono</span><input value={billingPhone} onChange={event=>setBillingPhone(event.target.value)}/></label>
+        <label><span>Vencimiento</span><input type="date" value={billingDueAt} onChange={event=>setBillingDueAt(event.target.value)}/></label>
+        <label><span>Moneda</span><select value={billingCurrency} onChange={event=>setBillingCurrency(event.target.value)}><option value="ARS">ARS</option><option value="USD">USD</option></select></label>
+        <label><span>Estado inicial</span><select value={billingStatus} onChange={event=>setBillingStatus(event.target.value)}><option value="draft">Borrador</option><option value="issued">Emitido</option></select></label>
+      </div>
+
+      <div className={s.invoiceLines}>
+        <header><h3>Conceptos</h3><button type="button" onClick={()=>setInvoiceLines(current=>[...current,blankInvoiceLine()])}>＋ Agregar línea</button></header>
+        {invoiceLines.length?invoiceLines.map((line,index)=><div className={s.invoiceLine} key={`${line.folio_item_id||"manual"}-${index}`} data-discount={line.source_type==="discount"?"true":"false"}>
+          <input aria-label="Descripción" placeholder="Descripción" value={line.description} onChange={event=>updateInvoiceLine(index,"description",event.target.value)}/>
+          <input aria-label="Cantidad" type="number" min="0" step="1" value={line.quantity} onChange={event=>updateInvoiceLine(index,"quantity",event.target.value)}/>
+          <input aria-label="Precio unitario" type="number" step="0.01" value={line.unit_price} onChange={event=>updateInvoiceLine(index,"unit_price",event.target.value)}/>
+          <label><span>IVA %</span><input type="number" min="0" max="100" step="0.01" value={line.tax_rate} onChange={event=>updateInvoiceLine(index,"tax_rate",event.target.value)}/></label>
+          <button type="button" aria-label="Quitar línea" onClick={()=>setInvoiceLines(current=>current.filter((_,i)=>i!==index))}>×</button>
+        </div>):<div className={s.invoiceEmpty}>No hay conceptos cargados todavía.</div>}
+      </div>
+
+      <label className={s.notes}><span>Nota interna</span><textarea value={billingNotes} onChange={event=>setBillingNotes(event.target.value)} placeholder={`Factura vinculada a ${selected.label}`}/></label>
+      <div className={s.invoiceTotals}><span>Subtotal <b>{money(invoiceCalc.subtotal,billingCurrency)}</b></span><span>Impuestos <b>{money(invoiceCalc.tax,billingCurrency)}</b></span><strong>Total {money(invoiceCalc.total,billingCurrency)}</strong></div>
+      <div className={s.documentActions}><button className={s.primary} type="button" onClick={prepareInvoice} disabled={saving||(invoiceMode==="payment"&&!invoicePaymentId)}>{saving?"Guardando…":"Crear documento"}</button></div>
     </div></div>:null}
   </section>
 }
