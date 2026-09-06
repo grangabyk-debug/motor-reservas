@@ -2,6 +2,7 @@
 
 import{useCallback,useEffect,useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
+import usePmsAutoRefresh from"../../core/usePmsAutoRefresh"
 import DailyCashActions from"./DailyCashActions"
 import s from"./dailyCash.module.css"
 
@@ -59,6 +60,7 @@ export default function DailyCashWorkspace({propertyId,property,onNavigate,focus
     finally{setLoading(false)}
   },[propertyId,day])
   useEffect(()=>{load()},[load])
+  usePmsAutoRefresh(propertyId,load,["reservas","pagos","hotel_cash_movements","hotel_finance_documents","hotel_cash_sessions"])
 
   const validPayments=useMemo(()=>payments.filter(row=>!isVoid(row)),[payments])
   const manualOnly=useMemo(()=>manual.filter(row=>!isPaymentMirror(row)),[manual])
