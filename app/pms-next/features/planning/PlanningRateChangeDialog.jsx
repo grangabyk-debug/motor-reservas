@@ -1,0 +1,40 @@
+"use client"
+
+const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:0}).format(Number(value)||0)
+const date=value=>{if(!value)return"—";const[y,m,d]=String(value).split("-").map(Number);return new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short",year:"numeric"}).format(new Date(y,m-1,d,12)).replace(".","")}
+
+export default function PlanningRateChangeDialog({change,onKeep,onReprice,onCancel,saving=false}){
+  if(!change)return null
+  const duration=change.kind==="duration"
+  const{sourceRoom,targetRoom,currentRate,targetRate,currency="ARS"}=change
+  const diff=Number(targetRate||0)-Number(currentRate||0)
+  const direction=duration?(change.newNights>change.oldNights?"extend":"shorten"):diff>0?"upgrade":diff<0?"downgrade":"cambio"
+  const title=duration?(direction==="extend"?"Alargar estadía":"Acortar estadía"):direction==="upgrade"?"Upgrade de categoría":direction==="downgrade"?"Downgrade de categoría":"Cambio de categoría"
+  const detail=duration?`La reserva pasará de ${change.oldNights} a ${change.newNights} noche${change.newNights===1?"":"s"}. Revisá el cambio antes de aplicarlo.`:direction==="upgrade"?`La habitación destino tiene una tarifa ${money(Math.abs(diff),currency)} mayor por noche.`:direction==="downgrade"?`La habitación destino tiene una tarifa ${money(Math.abs(diff),currency)} menor por noche.`:"La habitación destino tiene la misma tarifa configurada."
+  const overlay={position:"fixed",inset:0,zIndex:260,display:"grid",placeItems:"center",padding:18,background:"rgba(10,18,34,.24)",backdropFilter:"blur(8px) saturate(1.12)",WebkitBackdropFilter:"blur(8px) saturate(1.12)"}
+  const shell={width:"min(460px,calc(100vw - 28px))",padding:18,border:"1px solid color-mix(in srgb,#fff 32%,var(--line))",borderRadius:20,background:"color-mix(in srgb,var(--panelSolid) 76%,transparent)",backdropFilter:"blur(30px) saturate(1.55)",WebkitBackdropFilter:"blur(30px) saturate(1.55)",color:"var(--text)",boxShadow:"inset 0 1px color-mix(in srgb,#fff 58%,transparent),0 28px 80px rgba(14,26,48,.28)"}
+  const eyebrow={fontSize:10,fontWeight:900,letterSpacing:".09em",textTransform:"uppercase",color:direction==="upgrade"||direction==="extend"?"#3a9b62":direction==="downgrade"||direction==="shorten"?"#c3832e":"var(--accent)"}
+  const route={display:"grid",gridTemplateColumns:"1fr auto 1fr",gap:10,alignItems:"center",marginTop:14,padding:12,borderRadius:13,background:"color-mix(in srgb,var(--panelSolid) 58%,transparent)",border:"1px solid color-mix(in srgb,#fff 28%,var(--line))",boxShadow:"inset 0 1px color-mix(in srgb,#fff 42%,transparent)"}
+  const roomBox={minWidth:0}
+  const roomName={display:"block",fontSize:13,fontWeight:900,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}
+  const roomType={display:"block",marginTop:2,fontSize:10,color:"var(--muted)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}
+  const rates={display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:10}
+  const rateCard={padding:"10px 11px",border:"1px solid color-mix(in srgb,#fff 26%,var(--line))",borderRadius:11,background:"color-mix(in srgb,var(--panelSolid) 58%,transparent)",boxShadow:"inset 0 1px color-mix(in srgb,#fff 40%,transparent)"}
+  const buttonBase={width:"100%",minHeight:44,borderRadius:11,font:"inherit",fontSize:12,fontWeight:850,cursor:saving?"wait":"pointer"}
+  return <div style={overlay} role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget&&!saving)onCancel?.()}}>
+    <section style={shell} role="dialog" aria-modal="true" aria-labelledby="planning-rate-title">
+      <div style={eyebrow}>{duration?(direction==="extend"?"↔ Estadía ampliada":"↔ Estadía reducida"):direction==="upgrade"?"↑ Upgrade":direction==="downgrade"?"↓ Downgrade":"Cambio de habitación"}</div>
+      <h3 id="planning-rate-title" style={{margin:"4px 0 0",fontSize:18,lineHeight:1.2}}>{title}</h3>
+      <p style={{margin:"7px 0 0",fontSize:12,lineHeight:1.5,color:"var(--muted)"}}>{detail}{duration?"":" Elegí qué querés hacer con la tarifa antes de mover la reserva."}</p>
+      {duration?<>
+        <div style={route}><div style={roomBox}><span style={roomName}>{date(change.oldStart)} → {date(change.oldEnd)}</span><span style={roomType}>{change.oldNights} noche{change.oldNights===1?"":"s"}</span></div><b style={{fontSize:18,color:"var(--muted)"}}>→</b><div style={{...roomBox,textAlign:"right"}}><span style={roomName}>{date(change.start)} → {date(change.end)}</span><span style={roomType}>{change.newNights} noche{change.newNights===1?"":"s"}</span></div></div>
+        <div style={rates}><div style={rateCard}><small style={{display:"block",fontSize:10,color:"var(--muted)"}}>Tarifa por noche</small><b style={{display:"block",marginTop:3,fontSize:15}}>{money(currentRate,currency)}</b><small style={{fontSize:10,color:"var(--muted)"}}>se mantiene</small></div><div style={rateCard}><small style={{display:"block",fontSize:10,color:"var(--muted)"}}>Total estimado de habitación</small><b style={{display:"block",marginTop:3,fontSize:15,color:"var(--accent)"}}>{money(Number(currentRate||0)*Number(change.newNights||1),currency)}</b><small style={{fontSize:10,color:"var(--muted)"}}>{change.newNights} noche{change.newNights===1?"":"s"}</small></div></div>
+        <div style={{display:"grid",gap:8,marginTop:14}}><button type="button" disabled={saving} onClick={onKeep} style={{...buttonBase,border:"0",background:"linear-gradient(145deg,var(--accent),var(--accent2))",color:"#fff",boxShadow:"0 9px 22px color-mix(in srgb,var(--accent) 24%,transparent)"}}>{saving?"Guardando…":direction==="extend"?`Confirmar ${change.newNights} noches`:`Confirmar reducción a ${change.newNights} noche${change.newNights===1?"":"s"}`}</button><button type="button" disabled={saving} onClick={onCancel} style={{...buttonBase,minHeight:36,border:"0",background:"transparent",color:"var(--muted)"}}>Cancelar cambio</button></div>
+      </>:<>
+        <div style={route}><div style={roomBox}><span style={roomName}>Hab. {sourceRoom?.nombre||"—"}</span><span style={roomType}>{sourceRoom?.tipo||"Sin categoría"}</span></div><b style={{fontSize:18,color:"var(--muted)"}}>→</b><div style={{...roomBox,textAlign:"right"}}><span style={roomName}>Hab. {targetRoom?.nombre||"—"}</span><span style={roomType}>{targetRoom?.tipo||"Sin categoría"}</span></div></div>
+        <div style={rates}><div style={rateCard}><small style={{display:"block",fontSize:10,color:"var(--muted)"}}>Tarifa actual</small><b style={{display:"block",marginTop:3,fontSize:15}}>{money(currentRate,currency)}</b><small style={{fontSize:10,color:"var(--muted)"}}>por noche</small></div><div style={rateCard}><small style={{display:"block",fontSize:10,color:"var(--muted)"}}>Tarifa habitación destino</small><b style={{display:"block",marginTop:3,fontSize:15,color:"var(--accent)"}}>{money(targetRate,currency)}</b><small style={{fontSize:10,color:"var(--muted)"}}>por noche</small></div></div>
+        <div style={{display:"grid",gap:8,marginTop:14}}><button type="button" disabled={saving} onClick={onReprice} style={{...buttonBase,border:"0",background:"linear-gradient(145deg,var(--accent),var(--accent2))",color:"#fff",boxShadow:"0 9px 22px color-mix(in srgb,var(--accent) 24%,transparent)"}}>{saving?"Guardando…":`Mover y actualizar a ${money(targetRate,currency)}`}</button><button type="button" disabled={saving} onClick={onKeep} style={{...buttonBase,border:"1px solid var(--line)",background:"color-mix(in srgb,var(--panelSolid) 60%,transparent)",color:"var(--text)"}}>Mover y mantener {money(currentRate,currency)}</button><button type="button" disabled={saving} onClick={onCancel} style={{...buttonBase,minHeight:36,border:"0",background:"transparent",color:"var(--muted)"}}>Cancelar movimiento</button></div>
+      </>}
+    </section>
+  </div>
+}

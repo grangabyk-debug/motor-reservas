@@ -1,0 +1,162 @@
+"use client"
+
+import{useEffect,useMemo,useRef,useState}from"react"
+import{supabase}from"../../../../lib/supabase"
+import usePlanningData from"./usePlanningData"
+import{PlanningSettingsMenu}from"./PlanningPieces"
+import PlanningCalendar from"./PlanningCalendar"
+import ReservationPreview from"./ReservationPreview"
+import PlanningRateChangeDialog from"./PlanningRateChangeDialog"
+import{CreateReservationDrawer,ReservationDetailDrawer}from"./PlanningDrawers"
+import{planningStage}from"./planningLifecycle"
+import PmsIcon from"../../components/shell/PmsIcons"
+import s from"./planning.module.css"
+import controls from"./planningControls.module.css"
+
+const DAY=86400000
+const pad=value=>String(value).padStart(2,"0")
+const keyFromDate=date=>`${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`
+const fromKey=value=>{const[y,m,d]=String(value).split("-").map(Number);return new Date(y,m-1,d,12)}
+const addDays=(value,amount)=>keyFromDate(new Date(fromKey(value).getTime()+amount*DAY))
+const diffDays=(a,b)=>Math.round((fromKey(b)-fromKey(a))/DAY)
+const shortDate=value=>new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short"}).format(fromKey(value)).replace(".","")
+const DEFAULT_SETTINGS={zoom:38,expanded:true,showAvailability:true,showOccupancy:false,showPrice:false,showId:false,showFilters:true,shadeWeekends:true,blockDiagonal:false}
+const roomHas=(item,roomId)=>Number(item.habitacion_id)===Number(roomId)||(item.habitaciones_ids||[]).map(Number).includes(Number(roomId))
+const overlaps=(item,start,end)=>item.fecha_entrada<end&&item.fecha_salida>start
+const uniqueIds=values=>[...new Set((values||[]).filter(Boolean).map(value=>String(value)))]
+
+export default function PlanningWorkspace({propertyId,property,onNavigate,newReservationRequest=0}){
+  const today=keyFromDate(new Date())
+  const[anchor,setAnchor]=useState(today),[query,setQuery]=useState(""),[roomQuery,setRoomQuery]=useState(""),[typeFilter,setTypeFilter]=useState("all"),[channelFilter,setChannelFilter]=useState("all"),[statusFilter,setStatusFilter]=useState("all")
+  const[selected,setSelected]=useState(null),[preview,setPreview]=useState(null),[dragging,setDragging]=useState(null),[dropCell,setDropCell]=useState(""),[saving,setSaving]=useState(false),[rateMove,setRateMove]=useState(null)
+  const[formOpen,setFormOpen]=useState(false),[drawerStep,setDrawerStep]=useState(0),[draft,setDraft]=useState(null),[draftState,setDraftState]=useState(""),[,setHasSavedDraft]=useState(false),[formError,setFormError]=useState("")
+  const[settings,setSettings]=useState(DEFAULT_SETTINGS),[settingsOpen,setSettingsOpen]=useState(false),[selecting,setSelecting]=useState(false),[rangeSelection,setRangeSelection]=useState(null)
+  const lastNewReservationRequest=useRef(0),formErrorTimer=useRef(null)
+
+  const days=useMemo(()=>Array.from({length:31},(_,index)=>addDays(anchor,index-2)),[anchor]),windowStart=days[0],windowEndExclusive=addDays(days.at(-1),1)
+  const data=usePlanningData(propertyId,windowStart,windowEndExclusive),dayWidth=Math.max(28,Math.min(62,Number(settings.zoom)||38))
+  const roomById=useMemo(()=>new Map(data.rooms.map(room=>[Number(room.id),room])),[data.rooms])
+  const defaultPolicyId=useMemo(()=>data.cancellationPolicies?.find(policy=>policy.is_default)?.id||data.cancellationPolicies?.[0]?.id||"",[data.cancellationPolicies])
+  const draftKey=propertyId?`hl:pms-next:reservation-draft:${propertyId}`:"",settingsKey=propertyId?`hl:pms-next:planning-settings:${propertyId}`:"",quoteSeedKey=propertyId?`hl:pms-next:quote-reservation-seed:${propertyId}`:""
+  const roomTypes=useMemo(()=>[...new Set(data.rooms.map(room=>room.tipo||"Sin tipo"))].sort(),[data.rooms]),channels=useMemo(()=>[...new Set(data.reservations.map(item=>item.canal_reserva||"Walk-in"))].sort(),[data.reservations])
+  const availabilityReservations=useMemo(()=>data.reservations.filter(item=>!item.no_show),[data.reservations])
+
+  const visibleRooms=useMemo(()=>{
+    const term=roomQuery.trim().toLowerCase()
+    return data.rooms.filter(room=>(typeFilter==="all"||(room.tipo||"Sin tipo")===typeFilter)&&(!term||`${room.nombre} ${room.tipo||""} ${room.floor_name||""}`.toLowerCase().includes(term)))
+  },[data.rooms,typeFilter,roomQuery])
+
+  const visibleReservations=useMemo(()=>data.reservations.filter(item=>{
+    if(statusFilter!=="all"&&planningStage(item,today)!==statusFilter)return false
+    if(channelFilter!=="all"&&(item.canal_reserva||"Walk-in")!==channelFilter)return false
+    const term=query.trim().toLowerCase(),room=roomById.get(Number(item.habitacion_id))
+    return !term||`${item.numero_reserva||item.id} ${item.nombre_huesped} ${room?.nombre||""} ${item.canal_reserva||""}`.toLowerCase().includes(term)
+  }),[data.reservations,statusFilter,channelFilter,query,roomById,today])
+
+  useEffect(()=>{if(draftKey)try{setHasSavedDraft(Boolean(localStorage.getItem(draftKey)))}catch{}},[draftKey])
+  useEffect(()=>{if(settingsKey)try{const raw=localStorage.getItem(settingsKey);if(raw)setSettings({...DEFAULT_SETTINGS,...JSON.parse(raw)})}catch{}},[settingsKey])
+  useEffect(()=>{if(settingsKey)try{localStorage.setItem(settingsKey,JSON.stringify(settings))}catch{}},[settings,settingsKey])
+  useEffect(()=>{if(!draftKey||!draft)return;const timer=setTimeout(()=>{try{localStorage.setItem(draftKey,JSON.stringify({...draft,savedAt:new Date().toISOString()}));setHasSavedDraft(true);setDraftState("Borrador guardado automáticamente")}catch{setDraftState("No se pudo guardar el borrador")}},220);return()=>clearTimeout(timer)},[draft,draftKey])
+  useEffect(()=>()=>{if(formErrorTimer.current)clearTimeout(formErrorTimer.current)},[])
+  useEffect(()=>{if(!selected)return;const fresh=data.reservations.find(item=>Number(item.id)===Number(selected.id));if(fresh&&fresh!==selected)setSelected(fresh)},[data.reservations,selected?.id])
+  useEffect(()=>{if(draft&&!draft.cancellationPolicyId&&defaultPolicyId)setDraft(current=>({...current,cancellationPolicyId:defaultPolicyId}))},[defaultPolicyId,draft?.cancellationPolicyId])
+
+  function showFormError(message){setFormError(message);if(formErrorTimer.current)clearTimeout(formErrorTimer.current);formErrorTimer.current=setTimeout(()=>setFormError(""),4200)}
+  function changeSetting(name,value){setSettings(current=>({...current,[name]:value}))}
+  function roomRate(roomIds){return uniqueIds(roomIds).reduce((sum,id)=>sum+(Number(data.rooms.find(room=>String(room.id)===id)?.precio)||0),0)}
+  function makeDraft(roomId=data.rooms[0]?.id,start=today,end=addDays(start,1),roomIds=[roomId]){
+    const ids=uniqueIds(roomIds.length?roomIds:[roomId])
+    return{firstName:"",lastName:"",email:"",phone:"",country:"",roomId:ids[0]||"",roomIds:ids,start,end,status:"confirmada",guests:1,rate:roomRate(ids),currency:"ARS",channel:"Walk-in",voucher:"",discountType:"none",discountValue:0,discountReason:"",discountReasonDetail:"",notes:"",cancellationPolicyId:defaultPolicyId}
+  }
+  function openFreshForm(roomId=data.rooms[0]?.id,start=today,end=addDays(start,1),roomIds=[roomId]){
+    if(!roomId)return data.setError("Primero configurá una habitación activa.")
+    setPreview(null);setSelected(null);setRateMove(null);setRangeSelection(null);setSelecting(false);setDraft(makeDraft(roomId,start,end,roomIds));setDrawerStep(0);setDraftState("Los cambios se guardan automáticamente en este dispositivo");setFormError("");data.setError("");setFormOpen(true)
+  }
+  function consumeQuoteSeed(){
+    if(!quoteSeedKey||!data.rooms.length||typeof window==="undefined")return
+    let seed=null
+    try{const raw=window.localStorage.getItem(quoteSeedKey);if(!raw)return;seed=JSON.parse(raw);window.localStorage.removeItem(quoteSeedKey)}catch{return}
+    const ids=uniqueIds(seed?.roomIds||[]).filter(id=>roomById.has(Number(id)))
+    if(!ids.length)return data.setError("Las habitaciones del presupuesto ya no están disponibles para preparar la reserva.")
+    const start=seed.start||today,end=seed.end&&seed.end>start?seed.end:addDays(start,1),base=makeDraft(ids[0],start,end,ids)
+    setAnchor(start);setPreview(null);setSelected(null);setRateMove(null);setRangeSelection(null);setSelecting(false);setDraft({...base,...seed,roomId:ids[0],roomIds:ids,start,end,roomSelectionManual:true,cancellationPolicyId:seed?.cancellationPolicyId||base.cancellationPolicyId});setDrawerStep(0);setDraftState(`Datos precargados desde ${seed.quoteNumber||"presupuesto"}`);setFormError("");data.setError("");setFormOpen(true)
+  }
+  function openNewReservation(){if(!data.rooms[0]?.id)return data.setError("Primero configurá una habitación activa.");if(draftKey)try{localStorage.removeItem(draftKey)}catch{}setHasSavedDraft(false);openFreshForm()}
+  useEffect(()=>{if(!newReservationRequest||!data.rooms.length||lastNewReservationRequest.current===newReservationRequest)return;lastNewReservationRequest.current=newReservationRequest;openNewReservation()},[newReservationRequest,data.rooms.length])
+  useEffect(()=>{if(!quoteSeedKey||!data.rooms.length||typeof window==="undefined")return;const handler=()=>consumeQuoteSeed();handler();window.addEventListener("hl:pms-start-reservation-from-quote",handler);return()=>window.removeEventListener("hl:pms-start-reservation-from-quote",handler)},[quoteSeedKey,data.rooms.length])
+  function clearDraft(){if(draftKey)try{localStorage.removeItem(draftKey)}catch{}setHasSavedDraft(false);setDraft(null);setDraftState("");setFormError("")}
+  function discardDraft(){clearDraft();setFormOpen(false);setDrawerStep(0);data.setError("")}
+  function nextStep(){if(drawerStep===0&&draft.end<=draft.start)return showFormError("La salida debe ser posterior a la entrada.");if(drawerStep===1&&!uniqueIds(draft.roomIds).length)return showFormError("Elegí al menos una habitación.");if(drawerStep===2&&(!String(draft.firstName||"").trim()||!String(draft.lastName||"").trim()))return showFormError("Completá nombre y apellido para continuar.");setFormError("");data.setError("");setDrawerStep(step=>Math.min(3,step+1))}
+  async function saveReservation(){
+    if(saving)return
+    const guest=`${draft?.firstName||""} ${draft?.lastName||""}`.trim();if(!String(draft?.firstName||"").trim()||!String(draft?.lastName||"").trim())return showFormError("Completá nombre y apellido para crear la reserva.");if(!draft?.cancellationPolicyId)return showFormError("Seleccioná una política de cancelación para esta reserva.")
+    const discountType=draft?.discountType||"none",discountValue=Math.max(0,Number(draft?.discountValue)||0),hasDiscount=discountType!=="none"&&discountValue>0
+    if(hasDiscount&&!String(draft?.discountReason||"").trim())return showFormError("Indicá el motivo del descuento. El sistema no aplica descuentos sin una causa explícita.")
+    if(hasDiscount&&draft?.discountReason==="other"&&!String(draft?.discountReasonDetail||"").trim())return showFormError("Especificá el motivo del descuento.")
+    setSaving(true);setFormError("")
+    try{
+      const quoteId=draft?.quoteId,created=await data.createReservation({...draft,guest})
+      if(quoteId){const{error:quoteError}=await supabase.rpc("hl_group_mark_quote_atomic",{p_property_id:propertyId,p_quote_id:quoteId,p_status:"accepted"});if(quoteError&&typeof window!=="undefined")window.dispatchEvent(new CustomEvent("hl:pms-toast",{detail:{tone:"warning",title:"Reserva creada",message:"La reserva quedó creada, pero el presupuesto no pudo marcarse como aceptado automáticamente."}}))}
+      clearDraft();setFormOpen(false);setDrawerStep(0);onNavigate?.("reservations",{reservationId:created.id,restoreScroll:false})
+    }catch(err){showFormError(err?.message||"No se pudo crear la reserva.")}
+    finally{setSaving(false)}
+  }
+
+  function showPreview(item,rect){if(!item||!rect){setPreview(null);return}setPreview({item,rect})}
+  function selectReservation(item){setPreview(null);setRateMove(null);setFormOpen(false);setFormError("");setRangeSelection(null);setSelected(item)}
+  function isGroup(item){return uniqueIds([item.habitacion_id,...(item.habitaciones_ids||[])]).length>1}
+  function beginDrag(event,item){if(isGroup(item)){event.preventDefault();data.setError("Las reservas grupales se modifican desde su ficha para conservar todas las habitaciones asignadas.");return}event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("text/plain",String(item.id));setPreview(null);setRateMove(null);setDragging({item,mode:"move"});setSelected(null);setRangeSelection(null)}
+  function beginResize(item,end){
+    if(isGroup(item)){data.setError("Las reservas grupales se modifican desde su ficha para conservar todas las habitaciones asignadas.");return}
+    if(!end||end===item.fecha_salida)return
+    if(end<=item.fecha_entrada){data.setError("La salida tiene que quedar después de la entrada.");return}
+    const room=roomById.get(Number(item.habitacion_id)),oldNights=Math.max(1,diffDays(item.fecha_entrada,item.fecha_salida)),newNights=Math.max(1,diffDays(item.fecha_entrada,end)),currentRate=Number(item.tarifa_noche)||Number(room?.precio)||0
+    setPreview(null);setSelected(null);setDragging(null);setDropCell("");setRangeSelection(null)
+    setRateMove({kind:"duration",reservationId:item.id,roomId:item.habitacion_id,start:item.fecha_entrada,end,oldStart:item.fecha_entrada,oldEnd:item.fecha_salida,oldNights,newNights,sourceRoom:room,targetRoom:room,currentRate,targetRate:currentRate,currency:item.moneda||"ARS"})
+  }
+  async function commitMove(change,reprice=false){
+    if(!change||saving)return
+    setSaving(true);data.setError("")
+    try{await data.moveReservation({reservationId:change.reservationId,roomId:change.roomId,start:change.start,end:change.end,reprice});setRateMove(null)}
+    catch(err){data.setError(err?.message||"No se pudo mover la reserva.")}
+    finally{setSaving(false)}
+  }
+  async function dropReservation(event,roomId,day){
+    event.preventDefault();if(!dragging)return
+    const source=dragging.item,start=day,roomChanged=Number(source.habitacion_id)!==Number(roomId),dateChanged=source.fecha_entrada!==day
+    if(settings.blockDiagonal&&roomChanged&&dateChanged){data.setError("El movimiento diagonal está bloqueado. Cambiá primero fecha o habitación.");setDragging(null);setDropCell("");return}
+    const end=addDays(day,Math.max(1,diffDays(source.fecha_entrada,source.fecha_salida)))
+    if(roomChanged){
+      const sourceRoom=roomById.get(Number(source.habitacion_id)),targetRoom=roomById.get(Number(roomId))
+      const currentRate=Number(source.tarifa_noche)||Number(sourceRoom?.precio)||0,targetRate=Number(targetRoom?.precio)||0
+      if(targetRoom&&currentRate!==targetRate){setRateMove({reservationId:source.id,roomId,start,end,sourceRoom,targetRoom,currentRate,targetRate,currency:source.moneda||"ARS"});setDragging(null);setDropCell("");return}
+    }
+    setDragging(null);setDropCell("")
+    await commitMove({reservationId:source.id,roomId,start,end},false)
+  }
+  function roomsBetween(anchorRoomId,currentRoomId){
+    const a=visibleRooms.findIndex(room=>String(room.id)===String(anchorRoomId)),b=visibleRooms.findIndex(room=>String(room.id)===String(currentRoomId))
+    if(a<0||b<0)return[String(anchorRoomId)]
+    return visibleRooms.slice(Math.min(a,b),Math.max(a,b)+1).map(room=>String(room.id))
+  }
+  function beginRange(event,roomId,day){if(event.button!==0||dragging||event.detail>1)return;event.preventDefault();setPreview(null);setSelected(null);setRateMove(null);setRangeSelection({anchorRoomId:String(roomId),roomIds:[String(roomId)],anchorDay:day,start:day,end:addDays(day,1)});setSelecting(true)}
+  function extendRange(roomId,day){if(!selecting)return;setRangeSelection(current=>{if(!current)return current;const roomIds=roomsBetween(current.anchorRoomId,roomId);if(day===current.anchorDay)return{...current,roomIds,start:current.anchorDay,end:addDays(current.anchorDay,1)};return day>current.anchorDay?{...current,roomIds,start:current.anchorDay,end:day}:{...current,roomIds,start:day,end:current.anchorDay}})}
+  function finishRange(event){if(!selecting)return;event.stopPropagation();setSelecting(false)}
+  function confirmRange(){if(!rangeSelection)return;const ids=uniqueIds(rangeSelection.roomIds);openFreshForm(ids[0],rangeSelection.start,rangeSelection.end,ids)}
+  function cancelRange(){setSelecting(false);setRangeSelection(null)}
+
+  const availableRooms=useMemo(()=>draft?data.rooms.map(room=>({...room,available:!availabilityReservations.some(item=>roomHas(item,room.id)&&overlaps(item,draft.start,draft.end))})):data.rooms,[data.rooms,availabilityReservations,draft])
+  const selectedRooms=useMemo(()=>selected?uniqueIds([selected.habitacion_id,...(selected.habitaciones_ids||[])]).map(id=>roomById.get(Number(id))).filter(Boolean):[],[selected,roomById])
+  const nights=draft?Math.max(1,diffDays(draft.start,draft.end)):1,total=draft?(Number(draft.rate)||0)*nights:0,visibleLabel=`${shortDate(days[0])} — ${shortDate(days.at(-1))}`
+
+  return <section className={s.page} style={{"--day-width":`${dayWidth}px`,"--room-width":settings.expanded?"190px":"160px"}}>
+    <div className={s.toolbar}><div className={s.navCluster}><button type="button" className={s.navArrow} onClick={()=>setAnchor(value=>addDays(value,-7))}>‹</button><button type="button" className={s.todayButton} onClick={()=>setAnchor(today)}>Hoy</button><button type="button" className={s.navArrow} onClick={()=>setAnchor(value=>addDays(value,7))}>›</button><label className={s.datePicker} title="Ir a una fecha"><span>{visibleLabel}</span><span style={{marginLeft:"auto",display:"grid",placeItems:"center",color:"var(--accent)"}}><PmsIcon name="calendar" size={16}/></span><input type="date" aria-label="Ir a una fecha del Planning" value={anchor} onChange={event=>setAnchor(event.target.value||today)}/></label></div><div className={s.toolbarActions}><label className={s.quickSearch}>⌕<input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Huésped o Nº de reserva"/></label><div className={controls.planningToolGroup} aria-label="Herramientas del Planning"><button type="button" className={`${s.toolButton} ${controls.tool} ${settings.showFilters?controls.toolActive:""}`} data-kind="filter" data-tooltip={settings.showFilters?"Ocultar filtros":"Filtrar Planning"} onClick={()=>changeSetting("showFilters",!settings.showFilters)} title={settings.showFilters?"Ocultar filtros":"Filtrar Planning"} aria-label={settings.showFilters?"Ocultar filtros del Planning":"Mostrar filtros del Planning"}><PmsIcon name="filter"/></button><button type="button" className={`${s.toolButton} ${controls.tool}`} data-kind="refresh" data-tooltip="Actualizar ocupación" onClick={data.load} title="Actualizar ocupación y reservas" aria-label="Actualizar Planning"><PmsIcon name="refresh"/></button><div className={`${s.settingsWrap} ${controls.settingsHost}`}><button type="button" className={`${s.toolButton} ${controls.tool} ${settingsOpen?controls.toolActive:""}`} data-kind="view" data-tooltip="Vista del Planning" onClick={()=>setSettingsOpen(value=>!value)} title="Configurar vista del Planning" aria-label="Configurar vista del Planning" aria-expanded={settingsOpen}><PmsIcon name="sliders"/></button>{settingsOpen?<PlanningSettingsMenu settings={settings} onChange={changeSetting} onClose={()=>setSettingsOpen(false)}/>:null}</div></div></div></div>
+    {settings.showFilters?<div className={s.filters}><label><span>Habitación</span><input value={roomQuery} onChange={event=>setRoomQuery(event.target.value)} placeholder="Nombre o número"/></label><label><span>Tipo</span><select value={typeFilter} onChange={event=>setTypeFilter(event.target.value)}><option value="all">Todos los tipos</option>{roomTypes.map(type=><option key={type}>{type}</option>)}</select></label><label><span>Canal</span><select value={channelFilter} onChange={event=>setChannelFilter(event.target.value)}><option value="all">Todos los canales</option>{channels.map(channel=><option key={channel}>{channel}</option>)}</select></label><label><span>Estado en Planning</span><select value={statusFilter} onChange={event=>setStatusFilter(event.target.value)}><option value="all">Todos</option><option value="preventa">Preventa</option><option value="venta">Venta</option><option value="checkin">Check-in</option><option value="inhouse">In-house</option><option value="checkout">Check-out</option><option value="postventa">Postventa</option><option value="noshow">No-show</option></select></label></div>:null}
+    {data.error&&!formOpen?<div className={s.error}>{data.error}</div>:null}{saving&&!formOpen&&!rateMove?<div className={s.savingBar}>Guardando cambios…</div>:null}
+    {data.loading?<div className={s.error}>Cargando Planning…</div>:!data.rooms.length?<div className={s.error}>No hay habitaciones activas.</div>:<PlanningCalendar property={property} days={days} today={today} settings={settings} rooms={visibleRooms} availabilityReservations={availabilityReservations} visibleReservations={visibleReservations} selected={selected} dragging={dragging} dropCell={dropCell} rangeSelection={rangeSelection} onRoom={openFreshForm} onBeginRange={beginRange} onExtendRange={extendRange} onFinishRange={finishRange} onDropCell={setDropCell} onDrop={dropReservation} onSelect={selectReservation} onDrag={beginDrag} onResize={beginResize} onPreview={showPreview} onConfirmRange={confirmRange} onCancelRange={cancelRange}/>} 
+    <ReservationPreview preview={preview}/>
+    <PlanningRateChangeDialog change={rateMove} saving={saving} onKeep={()=>commitMove(rateMove,false)} onReprice={()=>commitMove(rateMove,true)} onCancel={()=>{if(!saving)setRateMove(null)}}/>
+    {selected&&!formOpen?<ReservationDetailDrawer selected={selected} room={roomById.get(Number(selected.habitacion_id))} rooms={selectedRooms} onClose={()=>setSelected(null)} onOpen={()=>onNavigate?.("reservations",{reservationId:selected.id})}/>:null}
+    {formOpen&&draft?<CreateReservationDrawer draft={draft} setDraft={setDraft} drawerStep={drawerStep} setDrawerStep={setDrawerStep} draftState={draftState} externalError={formError} availableRooms={availableRooms} roomById={roomById} cancellationPolicies={data.cancellationPolicies||[]} nights={nights} total={total} saving={saving} onClose={()=>{setFormOpen(false);setFormError("")}} onDiscard={discardDraft} onNext={nextStep} onSave={saveReservation}/>:null}
+  </section>
+}

@@ -6,8 +6,8 @@ const cleanEmail=value=>{const v=String(value||"").trim();return/^[^\s@]+@[^\s@]
 
 async function reservationContext(client,propertyId,reservationId){
   const{data:reservation,error}=await client.from("reservas").select("id,property_id,numero_reserva,nombre_huesped,email_huesped,telefono_huesped,precio_total,moneda").eq("id",Number(reservationId)).eq("property_id",propertyId).single();if(error||!reservation)throw Object.assign(new Error("Reserva no encontrada en esta propiedad."),{status:404})
-  const{data:payments,error:payError}=await client.from("pagos").select("monto,estado").eq("property_id",propertyId).eq("reserva_id",Number(reservationId));if(payError)throw payError
-  const paid=(payments||[]).filter(p=>!["anulado","cancelado","reembolsado"].includes(String(p.estado||"").toLowerCase())).reduce((sum,p)=>sum+num(p.monto),0)
+  const{data:payments,error:payError}=await client.from("pagos").select("monto,refunded_amount,estado").eq("property_id",propertyId).eq("reserva_id",Number(reservationId));if(payError)throw payError
+  const paid=(payments||[]).filter(p=>!["anulado","cancelado","reembolsado","void","cancelled"].includes(String(p.estado||"").toLowerCase())).reduce((sum,p)=>sum+Math.max(0,num(p.monto)-num(p.refunded_amount)),0)
   return{reservation,paid,balance:Math.max(0,num(reservation.precio_total)-paid)}
 }
 

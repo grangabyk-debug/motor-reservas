@@ -7,7 +7,7 @@
     "check:hotel-db-migrations": "node scripts/check-hotel-db-migrations.mjs",
     "check:feature-data-boundaries": "node scripts/check-feature-data-boundaries.mjs",
     "check:hotel-architecture": "node scripts/check-hotel-os-architecture.mjs && npm run check:feature-data-boundaries && npm run check:hotel-db-migrations",
-    "prebuild": "npm run check:hotel-architecture",
+    "prebuild": "node scripts/prebuild-architecture.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start"
