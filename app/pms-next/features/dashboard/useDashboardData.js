@@ -2,6 +2,7 @@
 
 import{useCallback,useEffect,useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
+import usePmsAutoRefresh from"../../core/usePmsAutoRefresh"
 
 const dateKey=offset=>{const date=new Date();date.setHours(12,0,0,0);date.setDate(date.getDate()+offset);return date.toLocaleDateString("en-CA")}
 const validPayment=payment=>!["void","cancelado","anulado","cancelled"].includes(String(payment.estado||"").toLowerCase())
@@ -34,6 +35,7 @@ export default function useDashboardData(propertyId){
   },[propertyId])
 
   useEffect(()=>{load()},[load])
+  usePmsAutoRefresh(propertyId,load,["reservas","pagos","habitaciones","hotel_housekeeping_tasks","hotel_maintenance_tickets","hotel_guest_profiles"])
 
   const paymentByReservation=useMemo(()=>{const map=new Map();for(const payment of reservationPayments){if(!validPayment(payment))continue;const id=Number(payment.reserva_id),net=Math.max(0,Number(payment.monto||0)-Number(payment.refunded_amount||0));map.set(id,(map.get(id)||0)+net)}return map},[reservationPayments])
   const roomById=useMemo(()=>new Map(rooms.map(room=>[Number(room.id),room])),[rooms]),profileById=useMemo(()=>new Map(guestProfiles.map(profile=>[String(profile.id),profile])),[guestProfiles])
