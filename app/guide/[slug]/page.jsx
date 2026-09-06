@@ -1,0 +1,13 @@
+import{createClient}from"@supabase/supabase-js"
+import{notFound}from"next/navigation"
+import s from"./guide.module.css"
+
+function client(){const url=process.env.NEXT_PUBLIC_SUPABASE_URL,key=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY||process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;if(!url||!key)return null;return createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}})}
+export const revalidate=60
+
+export default async function GuestGuidePage({params}){
+  const{slug}=await params,db=client();if(!db)notFound()
+  const{data,error}=await db.rpc("hl_public_guest_guide",{p_slug:slug});if(error||!data?.guide)notFound()
+  const{guide,property}=data,sections=Array.isArray(guide.sections)?guide.sections:[],rules=Array.isArray(guide.house_rules)?guide.house_rules:[],links=Array.isArray(guide.useful_links)?guide.useful_links:[]
+  return <main className={s.shell} style={{"--guide":guide.accent_color||"#5B5CEB"}}><article className={s.card}><header className={s.hero}>{guide.cover_url?<img src={guide.cover_url} alt=""/>:null}<div className={s.overlay}/><div className={s.heroContent}><small>GUÍA DE ESTADÍA</small><h1>{guide.title||property?.name}</h1><p>{guide.subtitle||property?.city||""}</p></div></header><section className={s.welcome}><p>{guide.welcome_message||`Bienvenido a ${property?.name||"nuestro alojamiento"}.`}</p></section><section className={s.quick}>{guide.wifi_name?<article><span>Wi‑Fi</span><b>{guide.wifi_name}</b>{guide.wifi_password?<small>Clave: {guide.wifi_password}</small>:null}</article>:null}<article><span>Check-in</span><b>{guide.checkin_time||"Consultar"}</b></article><article><span>Check-out</span><b>{guide.checkout_time||"Consultar"}</b></article></section>{sections.map((section,index)=><section className={s.section} key={`${section.title}-${index}`}><span>{String(index+1).padStart(2,"0")}</span><div><h2>{section.title}</h2><p>{section.body}</p></div></section>)}{rules.length?<section className={s.list}><h2>Reglas de la casa</h2>{rules.map((rule,index)=><p key={index}>✓ {typeof rule==="string"?rule:rule.text}</p>)}</section>:null}{links.length?<section className={s.links}><h2>Links útiles</h2>{links.map((link,index)=><a key={index} href={link.url} target="_blank" rel="noreferrer">{link.label||link.url} ↗</a>)}</section>:null}{guide.contact_whatsapp||guide.contact_phone?<section className={s.contact}><div><small>¿NECESITÁS AYUDA?</small><h2>Estamos a un mensaje</h2></div>{guide.contact_whatsapp?<a href={`https://wa.me/${String(guide.contact_whatsapp).replace(/\D/g,"")}`} target="_blank" rel="noreferrer">WhatsApp</a>:<a href={`tel:${guide.contact_phone}`}>Llamar</a>}</section>:null}<footer>{property?.name||"Hotel"}<span>Guía digital · Habitación Llena</span></footer></article></main>
+}
