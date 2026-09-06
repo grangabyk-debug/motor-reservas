@@ -2,6 +2,7 @@
 
 import{useCallback,useEffect,useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
+import usePmsAutoRefresh from"../../core/usePmsAutoRefresh"
 import s from"./housekeeping.module.css"
 
 const labels={sucia:"Sucia",limpia:"Limpia",inspeccionada:"Inspeccionada",libre:"Lista",mantenimiento:"Mantenimiento"}
@@ -45,6 +46,7 @@ export default function HousekeepingWorkspace({propertyId}){
   },[propertyId])
 
   useEffect(()=>{load()},[load])
+  usePmsAutoRefresh(propertyId,load,["reservas","habitaciones","hotel_housekeeping_tasks"])
 
   const reservationByRoom=useMemo(()=>{
     const map=new Map()
