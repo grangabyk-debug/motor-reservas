@@ -3,6 +3,7 @@
 import{useCallback,useEffect,useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 import DailyReportSettings from"./DailyReportSettings"
+import OperationalReportsPanel from"./OperationalReportsPanel"
 import s from"./reports.module.css"
 
 const DAY=86400000
@@ -76,6 +77,7 @@ export default function ReportsWorkspace({propertyId,property}){
     <DailyReportSettings propertyId={propertyId} property={property}/>
     <div className={s.metrics}><Metric label="Ocupación" value={`${clamp(report.occupancy,0,999).toFixed(1)}%`} note={`${report.soldNights} noches vendidas`}/><Metric label="ADR" value={fmtMoney(report.adr,currency)} note="Promedio por noche vendida"/><Metric label="RevPAR" value={fmtMoney(report.revpar,currency)} note="Ingreso por habitación disponible"/><Metric label="Ingresos alojamiento" value={fmtMoney(report.roomRevenue,currency)} note={`${report.days} días seleccionados`}/><Metric label="Cobrado" value={fmtMoney(report.collected,currency)} note="Pagos registrados en el período"/><Metric label="Reservas" value={report.bookings} note={`${report.arrivals} entradas · ${report.departures} salidas`}/></div>
     <div className={s.columns}><article className={s.panel}><header><div><small>ORIGEN</small><h2>Reservas por canal</h2></div></header>{report.channelRows.length?<div className={s.channels}>{report.channelRows.map(row=><div key={row.name}><span><b>{row.name}</b><em>{row.count}</em></span><div><i style={{width:`${clamp(row.pct,0,100)}%`}}/></div></div>)}</div>:<p className={s.empty}>No hay reservas en el período.</p>}</article><article className={s.panel}><header><div><small>OPERACIÓN</small><h2>Resumen del período</h2></div></header><div className={s.snapshot}><div><span>Habitaciones activas</span><b>{rooms.length}</b></div><div><span>Noches disponibles</span><b>{report.available}</b></div><div><span>Huéspedes en reservas</span><b>{report.guests}</b></div><div><span>Entradas</span><b>{report.arrivals}</b></div><div><span>Salidas</span><b>{report.departures}</b></div></div></article></div>
+    <OperationalReportsPanel propertyId={propertyId} from={from} to={to} currency={currency}/>
     <div className={s.panel}><header><div><small>DETALLE</small><h2>Reservas del período</h2></div></header><div className={s.table}><div className={s.head}><span>Reserva</span><span>Huésped</span><span>Estadía</span><span>Canal</span><span>Noches</span><span>Ingreso</span></div>{report.rows.slice(0,100).map(row=><div className={s.row} key={row.id}><span>#{row.numero_reserva||row.id}</span><b>{row.nombre_huesped}</b><span>{row.fecha_entrada} → {row.fecha_salida}</span><span>{row.canal_reserva||"Directo"}</span><span>{row.nights}</span><strong>{fmtMoney(row.revenue,currency)}</strong></div>)}</div></div>
   </section>
 }
