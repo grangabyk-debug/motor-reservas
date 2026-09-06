@@ -27,7 +27,7 @@ export function ReservationBlock({item,days,selected,onSelect,onDragStart,onResi
   const rawEnd=noShow?rawStart+.76:dayUse?entryOffset+.92:diffDays(first,effectiveEnd)+.5
   const start=Math.max(0,rawStart),end=Math.min(days.length,rawEnd)
   if(end<=0||start>=days.length||end<=start)return null
-  const span=Math.max(noShow?.76:.5,end-start),nights=Math.max(1,diffDays(item.fecha_entrada,effectiveEnd)),kind=planningStage(item),stageLabel=planningStageLabel(item),payment=paymentState(item)
+  const span=Math.max(noShow ? 0.76 : 0.5,end-start),nights=Math.max(1,diffDays(item.fecha_entrada,effectiveEnd)),kind=planningStage(item),stageLabel=planningStageLabel(item),payment=paymentState(item)
   const showPreview=event=>{if(!resizing)onPreview?.(item,event.currentTarget.getBoundingClientRect())}
   const stayLabel=noShow?`${item.nombre_huesped}, No Show, estadía original ${item.fecha_entrada} a ${item.fecha_salida}`:dayUse?`${item.nombre_huesped}, ${pax} pasajeros, ${channel.label}, ${stageLabel}, ${payment.label}, day use`:group?`${item.nombre_huesped}, ${pax} pasajeros, ${channel.label}, ${stageLabel}, ${payment.label}, ${rooms} habitaciones, ${nights} noches`:`${item.nombre_huesped}, ${pax} pasajeros, ${channel.label}, ${stageLabel}, ${payment.label}, ${nights} noches`
   const paxStyle={height:20,minWidth:26,padding:"0 5px",flex:"0 0 auto",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:2,borderRadius:5,background:"color-mix(in srgb,currentColor 14%,transparent)",fontSize:9,fontWeight:900,lineHeight:1}
