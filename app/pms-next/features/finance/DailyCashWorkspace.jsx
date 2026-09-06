@@ -2,6 +2,7 @@
 
 import{useCallback,useEffect,useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
+import DailyCashActions from"./DailyCashActions"
 import s from"./dailyCash.module.css"
 
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:2}).format(Number(value)||0)
@@ -10,11 +11,12 @@ const fmtTime=value=>value?new Intl.DateTimeFormat("es-AR",{hour:"2-digit",minut
 const fmtDateTime=value=>value?new Intl.DateTimeFormat("es-AR",{dateStyle:"short",timeStyle:"short"}).format(new Date(value)):"—"
 const normalize=value=>String(value||"").trim().toLowerCase()
 const isVoid=row=>["anulado","cancelado","void","rechazado"].includes(normalize(row?.estado))
+const isPaymentMirror=row=>normalize(row?.reference).startsWith("pago:")
 function methodGroup(value){const key=normalize(value);if(key.includes("efect")||key==="cash")return"cash";if(key.includes("transfer"))return"transfer";if(key.includes("mercado")||key==="mp")return"mp";if(key.includes("tarjet")||key.includes("card")||key.includes("debito")||key.includes("débito")||key.includes("credito")||key.includes("crédito"))return"card";return"other"}
 const methodLabel=value=>{const group=methodGroup(value);return group==="cash"?"Efectivo":group==="transfer"?"Transferencias":group==="mp"?"Mercado Pago":group==="card"?"Tarjetas":String(value||"Otros")}
 function dateBounds(value){const start=new Date(`${value}T00:00:00`),end=new Date(start);end.setDate(end.getDate()+1);return[start.toISOString(),end.toISOString()]}
 
-export default function DailyCashWorkspace({propertyId,property,onNavigate}){
+export default function DailyCashWorkspace({propertyId,property,onNavigate,focusReservationId,onFocusHandled}){
   const[day,setDay]=useState(()=>dateKey(new Date()))
   const[payments,setPayments]=useState([]),[manual,setManual]=useState([]),[documents,setDocuments]=useState([]),[reservations,setReservations]=useState(new Map()),[profiles,setProfiles]=useState(new Map()),[session,setSession]=useState(null),[sessionLedger,setSessionLedger]=useState({payments:[],movements:[]})
   const[loading,setLoading]=useState(true),[error,setError]=useState(""),[tab,setTab]=useState("movements")
@@ -38,7 +40,7 @@ export default function DailyCashWorkspace({propertyId,property,onNavigate}){
       if(active){
         const[ledgerPaymentRes,ledgerMovementRes]=await Promise.all([
           supabase.from("pagos").select("id,monto,metodo,estado,refunded_amount,created_at").eq("property_id",propertyId).gte("created_at",active.opened_at),
-          supabase.from("hotel_cash_movements").select("id,movement_type,method,amount,created_at").eq("property_id",propertyId).eq("session_id",active.id),
+          supabase.from("hotel_cash_movements").select("id,movement_type,method,amount,reference,created_at").eq("property_id",propertyId).eq("session_id",active.id),
         ])
         if(ledgerPaymentRes.error)throw ledgerPaymentRes.error;if(ledgerMovementRes.error)throw ledgerMovementRes.error
         ledgerPayments=ledgerPaymentRes.data||[];ledgerMovements=ledgerMovementRes.data||[]
@@ -59,31 +61,32 @@ export default function DailyCashWorkspace({propertyId,property,onNavigate}){
   useEffect(()=>{load()},[load])
 
   const validPayments=useMemo(()=>payments.filter(row=>!isVoid(row)),[payments])
+  const manualOnly=useMemo(()=>manual.filter(row=>!isPaymentMirror(row)),[manual])
   const totals=useMemo(()=>{
     const byMethod={cash:0,transfer:0,mp:0,card:0,other:0};let paymentIncome=0,manualIncome=0,manualExpense=0
     for(const row of validPayments){const net=Math.max(0,Number(row.monto||0)-Number(row.refunded_amount||0));paymentIncome+=net;byMethod[methodGroup(row.metodo)]+=net}
-    for(const row of manual){const amount=Number(row.amount||0),out=["expense","refund"].includes(normalize(row.movement_type));if(out)manualExpense+=amount;else manualIncome+=amount;byMethod[methodGroup(row.method)]+=out?-amount:amount}
+    for(const row of manualOnly){const amount=Number(row.amount||0),out=["expense","refund"].includes(normalize(row.movement_type));if(out)manualExpense+=amount;else manualIncome+=amount;byMethod[methodGroup(row.method)]+=out?-amount:amount}
     return{byMethod,income:paymentIncome+manualIncome,expense:manualExpense,net:paymentIncome+manualIncome-manualExpense}
-  },[validPayments,manual])
+  },[validPayments,manualOnly])
   const sessionCash=useMemo(()=>{
     if(!session)return null
     let income=0,expense=0
     for(const row of sessionLedger.payments){if(isVoid(row)||methodGroup(row.metodo)!=="cash")continue;income+=Math.max(0,Number(row.monto||0)-Number(row.refunded_amount||0))}
-    for(const row of sessionLedger.movements){if(methodGroup(row.method)!=="cash")continue;const amount=Number(row.amount||0);if(["expense","refund"].includes(normalize(row.movement_type)))expense+=amount;else income+=amount}
+    for(const row of sessionLedger.movements){if(isPaymentMirror(row)||methodGroup(row.method)!=="cash")continue;const amount=Number(row.amount||0);if(["expense","refund"].includes(normalize(row.movement_type)))expense+=amount;else income+=amount}
     return{income,expense,expected:Number(session.opening_amount||0)+income-expense}
   },[session,sessionLedger])
   const movements=useMemo(()=>{
     const paymentRows=validPayments.map(row=>({key:`p-${row.id}`,created_at:row.created_at,reservation_id:row.reserva_id,concept:row.nota||"Pago de reserva",method:row.metodo,amount:Math.max(0,Number(row.monto||0)-Number(row.refunded_amount||0)),currency:row.moneda||"ARS",direction:"in",created_by:row.created_by,reference:row.referencia||row.external_ref||"",source:"Reserva"}))
-    const manualRows=manual.map(row=>({key:`m-${row.id}`,created_at:row.created_at,reservation_id:row.reservation_id,concept:row.concept||"Movimiento de caja",method:row.method,amount:Number(row.amount||0),currency:row.currency||"ARS",direction:["expense","refund"].includes(normalize(row.movement_type))?"out":"in",created_by:row.created_by,reference:row.reference||"",source:"Caja"}))
+    const manualRows=manualOnly.map(row=>({key:`m-${row.id}`,created_at:row.created_at,reservation_id:row.reservation_id,concept:row.concept||"Movimiento de caja",method:row.method,amount:Number(row.amount||0),currency:row.currency||"ARS",direction:["expense","refund"].includes(normalize(row.movement_type))?"out":"in",created_by:row.created_by,reference:row.reference||"",source:"Caja"}))
     return[...paymentRows,...manualRows].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))
-  },[validPayments,manual])
+  },[validPayments,manualOnly])
   const isToday=day===dateKey(new Date())
 
   function openReservation(id){if(!id)return;onNavigate?.("reservations",{reservationId:Number(id),restoreScroll:false})}
-  function goCashControl(){if(typeof window!=="undefined"){const url=new URL(window.location.href);url.searchParams.set("finance_tab","cash");window.history.replaceState({},"",url)}onNavigate?.("finance");if(typeof window!=="undefined")requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent("hl:pms-finance-tab",{detail:"cash"})))}
+  function handleCashChanged(){const today=dateKey(new Date());if(day!==today)setDay(today);else load()}
 
   return <section className={s.page}>
-    <header className={s.header}><div><small>OPERACIÓN · RECEPCIÓN</small><h1>Caja diaria</h1><p>{property?.name||"Propiedad activa"} · cobros, movimientos, efectivo y comprobantes del día.</p></div><div className={s.headerActions}><input type="date" value={day} onChange={event=>setDay(event.target.value)}/>{!isToday?<button type="button" onClick={()=>setDay(dateKey(new Date()))}>Hoy</button>:null}<button type="button" onClick={load}>↻ Actualizar</button><button type="button" className={s.primary} onClick={goCashControl}>{session?"Arqueo / cerrar caja":"Abrir caja"}</button></div></header>
+    <header className={s.header}><div><small>OPERACIÓN · RECEPCIÓN</small><h1>Caja diaria</h1><p>{property?.name||"Propiedad activa"} · cobros, movimientos, efectivo y comprobantes del día.</p></div><div className={s.headerActions}><input type="date" value={day} onChange={event=>setDay(event.target.value)}/>{!isToday?<button type="button" onClick={()=>setDay(dateKey(new Date()))}>Hoy</button>:null}<button type="button" onClick={load}>↻ Actualizar</button><DailyCashActions propertyId={propertyId} session={session} expected={sessionCash?.expected||0} focusReservationId={focusReservationId} onFocusHandled={onFocusHandled} onChanged={handleCashChanged}/></div></header>
     {error?<div className={s.alert}>{error}</div>:null}
     <div className={s.summary}>
       <article><span>Ingresos</span><b>{money(totals.income)}</b><small>{validPayments.length} pago{validPayments.length===1?"":"s"} de reservas</small></article>
