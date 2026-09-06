@@ -36,6 +36,7 @@ export default function PlanningWorkspace({propertyId,property,onNavigate,newRes
   const days=useMemo(()=>Array.from({length:31},(_,index)=>addDays(anchor,index-2)),[anchor]),windowStart=days[0],windowEndExclusive=addDays(days.at(-1),1)
   const data=usePlanningData(propertyId,windowStart,windowEndExclusive),dayWidth=Math.max(28,Math.min(62,Number(settings.zoom)||38))
   const roomById=useMemo(()=>new Map(data.rooms.map(room=>[Number(room.id),room])),[data.rooms])
+  const defaultPolicyId=useMemo(()=>data.cancellationPolicies?.find(policy=>policy.is_default)?.id||data.cancellationPolicies?.[0]?.id||"",[data.cancellationPolicies])
   const draftKey=propertyId?`hl:pms-next:reservation-draft:${propertyId}`:"",settingsKey=propertyId?`hl:pms-next:planning-settings:${propertyId}`:"",quoteSeedKey=propertyId?`hl:pms-next:quote-reservation-seed:${propertyId}`:""
   const roomTypes=useMemo(()=>[...new Set(data.rooms.map(room=>room.tipo||"Sin tipo"))].sort(),[data.rooms]),channels=useMemo(()=>[...new Set(data.reservations.map(item=>item.canal_reserva||"Walk-in"))].sort(),[data.reservations])
   const availabilityReservations=useMemo(()=>data.reservations.filter(item=>!item.no_show),[data.reservations])
@@ -58,13 +59,14 @@ export default function PlanningWorkspace({propertyId,property,onNavigate,newRes
   useEffect(()=>{if(!draftKey||!draft)return;const timer=setTimeout(()=>{try{localStorage.setItem(draftKey,JSON.stringify({...draft,savedAt:new Date().toISOString()}));setHasSavedDraft(true);setDraftState("Borrador guardado automáticamente")}catch{setDraftState("No se pudo guardar el borrador")}},220);return()=>clearTimeout(timer)},[draft,draftKey])
   useEffect(()=>()=>{if(formErrorTimer.current)clearTimeout(formErrorTimer.current)},[])
   useEffect(()=>{if(!selected)return;const fresh=data.reservations.find(item=>Number(item.id)===Number(selected.id));if(fresh&&fresh!==selected)setSelected(fresh)},[data.reservations,selected?.id])
+  useEffect(()=>{if(draft&&!draft.cancellationPolicyId&&defaultPolicyId)setDraft(current=>({...current,cancellationPolicyId:defaultPolicyId}))},[defaultPolicyId,draft?.cancellationPolicyId])
 
   function showFormError(message){setFormError(message);if(formErrorTimer.current)clearTimeout(formErrorTimer.current);formErrorTimer.current=setTimeout(()=>setFormError(""),4200)}
   function changeSetting(name,value){setSettings(current=>({...current,[name]:value}))}
   function roomRate(roomIds){return uniqueIds(roomIds).reduce((sum,id)=>sum+(Number(data.rooms.find(room=>String(room.id)===id)?.precio)||0),0)}
   function makeDraft(roomId=data.rooms[0]?.id,start=today,end=addDays(start,1),roomIds=[roomId]){
     const ids=uniqueIds(roomIds.length?roomIds:[roomId])
-    return{firstName:"",lastName:"",email:"",phone:"",country:"",roomId:ids[0]||"",roomIds:ids,start,end,status:"confirmada",guests:1,rate:roomRate(ids),currency:"ARS",channel:"Walk-in",voucher:"",discountType:"none",discountValue:0,notes:""}
+    return{firstName:"",lastName:"",email:"",phone:"",country:"",roomId:ids[0]||"",roomIds:ids,start,end,status:"confirmada",guests:1,rate:roomRate(ids),currency:"ARS",channel:"Walk-in",voucher:"",discountType:"none",discountValue:0,notes:"",cancellationPolicyId:defaultPolicyId}
   }
   function openFreshForm(roomId=data.rooms[0]?.id,start=today,end=addDays(start,1),roomIds=[roomId]){
     if(!roomId)return data.setError("Primero configurá una habitación activa.")
@@ -77,7 +79,7 @@ export default function PlanningWorkspace({propertyId,property,onNavigate,newRes
     const ids=uniqueIds(seed?.roomIds||[]).filter(id=>roomById.has(Number(id)))
     if(!ids.length)return data.setError("Las habitaciones del presupuesto ya no están disponibles para preparar la reserva.")
     const start=seed.start||today,end=seed.end&&seed.end>start?seed.end:addDays(start,1),base=makeDraft(ids[0],start,end,ids)
-    setAnchor(start);setPreview(null);setSelected(null);setRateMove(null);setRangeSelection(null);setSelecting(false);setDraft({...base,...seed,roomId:ids[0],roomIds:ids,start,end,roomSelectionManual:true});setDrawerStep(0);setDraftState(`Datos precargados desde ${seed.quoteNumber||"presupuesto"}`);setFormError("");data.setError("");setFormOpen(true)
+    setAnchor(start);setPreview(null);setSelected(null);setRateMove(null);setRangeSelection(null);setSelecting(false);setDraft({...base,...seed,roomId:ids[0],roomIds:ids,start,end,roomSelectionManual:true,cancellationPolicyId:seed?.cancellationPolicyId||base.cancellationPolicyId});setDrawerStep(0);setDraftState(`Datos precargados desde ${seed.quoteNumber||"presupuesto"}`);setFormError("");data.setError("");setFormOpen(true)
   }
   function openNewReservation(){if(!data.rooms[0]?.id)return data.setError("Primero configurá una habitación activa.");if(draftKey)try{localStorage.removeItem(draftKey)}catch{}setHasSavedDraft(false);openFreshForm()}
   useEffect(()=>{if(!newReservationRequest||!data.rooms.length||lastNewReservationRequest.current===newReservationRequest)return;lastNewReservationRequest.current=newReservationRequest;openNewReservation()},[newReservationRequest,data.rooms.length])
@@ -87,7 +89,7 @@ export default function PlanningWorkspace({propertyId,property,onNavigate,newRes
   function nextStep(){if(drawerStep===0&&draft.end<=draft.start)return showFormError("La salida debe ser posterior a la entrada.");if(drawerStep===1&&!uniqueIds(draft.roomIds).length)return showFormError("Elegí al menos una habitación.");if(drawerStep===2&&(!String(draft.firstName||"").trim()||!String(draft.lastName||"").trim()))return showFormError("Completá nombre y apellido para continuar.");setFormError("");data.setError("");setDrawerStep(step=>Math.min(3,step+1))}
   async function saveReservation(){
     if(saving)return
-    const guest=`${draft?.firstName||""} ${draft?.lastName||""}`.trim();if(!String(draft?.firstName||"").trim()||!String(draft?.lastName||"").trim())return showFormError("Completá nombre y apellido para crear la reserva.")
+    const guest=`${draft?.firstName||""} ${draft?.lastName||""}`.trim();if(!String(draft?.firstName||"").trim()||!String(draft?.lastName||"").trim())return showFormError("Completá nombre y apellido para crear la reserva.");if(!draft?.cancellationPolicyId)return showFormError("Seleccioná una política de cancelación para esta reserva.")
     setSaving(true);setFormError("")
     try{
       const quoteId=draft?.quoteId,created=await data.createReservation({...draft,guest})
@@ -152,6 +154,6 @@ export default function PlanningWorkspace({propertyId,property,onNavigate,newRes
     <ReservationPreview preview={preview}/>
     <PlanningRateChangeDialog change={rateMove} saving={saving} onKeep={()=>commitMove(rateMove,false)} onReprice={()=>commitMove(rateMove,true)} onCancel={()=>{if(!saving)setRateMove(null)}}/>
     {selected&&!formOpen?<ReservationDetailDrawer selected={selected} room={roomById.get(Number(selected.habitacion_id))} rooms={selectedRooms} onClose={()=>setSelected(null)} onOpen={()=>onNavigate?.("reservations",{reservationId:selected.id})}/>:null}
-    {formOpen&&draft?<CreateReservationDrawer draft={draft} setDraft={setDraft} drawerStep={drawerStep} setDrawerStep={setDrawerStep} draftState={draftState} externalError={formError} availableRooms={availableRooms} roomById={roomById} nights={nights} total={total} saving={saving} onClose={()=>{setFormOpen(false);setFormError("")}} onDiscard={discardDraft} onNext={nextStep} onSave={saveReservation}/>:null}
+    {formOpen&&draft?<CreateReservationDrawer draft={draft} setDraft={setDraft} drawerStep={drawerStep} setDrawerStep={setDrawerStep} draftState={draftState} externalError={formError} availableRooms={availableRooms} roomById={roomById} cancellationPolicies={data.cancellationPolicies||[]} nights={nights} total={total} saving={saving} onClose={()=>{setFormOpen(false);setFormError("")}} onDiscard={discardDraft} onNext={nextStep} onSave={saveReservation}/>:null}
   </section>
 }
