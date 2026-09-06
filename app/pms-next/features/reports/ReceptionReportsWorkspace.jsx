@@ -2,6 +2,7 @@
 
 import{useCallback,useEffect,useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
+import usePmsAutoRefresh from"../../core/usePmsAutoRefresh"
 import s from"./receptionReports.module.css"
 
 const dateKey=date=>date.toLocaleDateString("en-CA")
@@ -37,6 +38,7 @@ export default function ReceptionReportsWorkspace({propertyId,property}){
     finally{setLoading(false)}
   },[propertyId,day])
   useEffect(()=>{load()},[load])
+  usePmsAutoRefresh(propertyId,load,["reservas","habitaciones","hotel_housekeeping_tasks"])
 
   const roomMap=useMemo(()=>new Map(rooms.map(room=>[Number(room.id),room])),[rooms])
   const activeReservations=useMemo(()=>reservations.filter(row=>!cancelled(row)),[reservations])
