@@ -1,8 +1,9 @@
 "use client"
 
-import{useEffect,useMemo,useState}from"react"
+import{useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 import ReservationGuestPanel from"./ReservationGuestPanel"
+import ReservationGuaranteePanel from"./ReservationGuaranteePanel"
 
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:0}).format(Number(value)||0)
 const fmt=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"2-digit",year:"numeric"}).format(new Date(`${String(value).slice(0,10)}T12:00:00`)):"—"
@@ -14,39 +15,112 @@ function Icon({name}){
   if(name==="group")return <svg {...common}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
   if(name==="key")return <svg {...common}><circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 8-8M15 8l2 2M17 6l2 2"/></svg>
   if(name==="guest")return <svg {...common}><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/><path d="M17.5 4.5 20 7"/></svg>
+  if(name==="card")return <svg {...common}><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 9h19M6 15h4"/></svg>
   if(name==="email")return <svg {...common}><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
   if(name==="whatsapp")return <svg {...common}><path d="M20.5 11.7a8.5 8.5 0 0 1-12.6 7.4L3 20.5l1.4-4.7A8.5 8.5 0 1 1 20.5 11.7Z"/><path d="M8.5 8.5c.5 2.5 2.5 4.5 5 5l1.4-1.4 2.1 1.2c-.4 1.8-1.6 2.7-3.3 2.5-3.8-.5-6.6-3.2-7.1-7-.2-1.7.7-2.9 2.5-3.3l1.2 2.1-1.8.9Z"/></svg>
   if(name==="phone")return <svg {...common}><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M10 5h4M11 18h2"/></svg>
   return <svg {...common}><path d="M6 3h9l3 3v15H6z"/><path d="M15 3v4h4M9 11h6M9 15h6"/></svg>
 }
 
-function Modal({title,subtitle,onClose,children}){return <div style={{position:"fixed",inset:0,zIndex:270,display:"grid",placeItems:"center",padding:16,background:"rgba(12,20,38,.26)",backdropFilter:"blur(9px)",WebkitBackdropFilter:"blur(9px)"}} onMouseDown={event=>event.target===event.currentTarget&&onClose?.()}><section style={{width:"min(560px,calc(100vw - 28px))",maxHeight:"86vh",overflow:"auto",padding:16,border:"1px solid color-mix(in srgb,#fff 36%,var(--line))",borderRadius:20,background:"color-mix(in srgb,var(--panelSolid) 86%,transparent)",boxShadow:"0 28px 80px rgba(20,30,55,.26)",backdropFilter:"blur(30px) saturate(1.45)",WebkitBackdropFilter:"blur(30px) saturate(1.45)"}}><header style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"flex-start"}}><div><small style={{fontSize:9.5,fontWeight:900,letterSpacing:".1em",color:"var(--accent)"}}>RESERVA</small><h3 style={{margin:"3px 0 0",fontSize:18}}>{title}</h3>{subtitle?<p style={{margin:"5px 0 0",fontSize:10.5,lineHeight:1.45,color:"var(--muted)"}}>{subtitle}</p>:null}</div><button type="button" onClick={onClose} style={{width:36,height:36,border:"1px solid var(--line)",borderRadius:10,background:"var(--panel)",color:"var(--text)",fontSize:18}}>×</button></header><div style={{marginTop:13}}>{children}</div></section></div>}
+function Modal({title,subtitle,onClose,children}){
+  return <div style={{position:"fixed",inset:0,zIndex:270,display:"grid",placeItems:"center",padding:16,background:"rgba(12,20,38,.26)",backdropFilter:"blur(9px)",WebkitBackdropFilter:"blur(9px)"}} onMouseDown={event=>event.target===event.currentTarget&&onClose?.()}><section style={{width:"min(560px,calc(100vw - 28px))",maxHeight:"86vh",overflow:"auto",padding:16,border:"1px solid color-mix(in srgb,#fff 36%,var(--line))",borderRadius:20,background:"color-mix(in srgb,var(--panelSolid) 86%,transparent)",boxShadow:"0 28px 80px rgba(20,30,55,.26)",backdropFilter:"blur(30px) saturate(1.45)",WebkitBackdropFilter:"blur(30px) saturate(1.45)"}}><header style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"flex-start"}}><div><small style={{fontSize:9.5,fontWeight:900,letterSpacing:".1em",color:"var(--accent)"}}>RESERVA</small><h3 style={{margin:"3px 0 0",fontSize:18}}>{title}</h3>{subtitle?<p style={{margin:"5px 0 0",fontSize:10.5,lineHeight:1.45,color:"var(--muted)"}}>{subtitle}</p>:null}</div><button type="button" onClick={onClose} style={{width:36,height:36,border:"1px solid var(--line)",borderRadius:10,background:"var(--panel)",color:"var(--text)",fontSize:18}}>×</button></header><div style={{marginTop:13}}>{children}</div></section></div>
+}
 
 export default function ReservationActionBar({item,rooms=[],propertyId,onRefresh}){
   const[panel,setPanel]=useState(""),[notice,setNotice]=useState(""),[error,setError]=useState(""),[busy,setBusy]=useState(""),[guestRows,setGuestRows]=useState([]),[access,setAccess]=useState({points:[],grants:[]})
   const isGroup=(rooms||[]).length>1||((item.habitaciones_ids||[]).length>1)
-  const styles={group:"#7257d9",key:"#b47a18",guest:"#3d72d9",email:"#4e6b86",whatsapp:"#1c9b60",phone:"#3b95c8",police:"#a34c58"}
+  const styles={group:"#7257d9",key:"#b47a18",guest:"#3d72d9",card:"#59677f",email:"#4e6b86",whatsapp:"#1c9b60",phone:"#3b95c8",police:"#a34c58"}
   const actions=[
-    ["group","Gestionar grupo","group"],["key","Control de accesos","key"],["guest","Huéspedes y acompañantes","guest"],["email","Enviar por email","email"],["whatsapp","Enviar por WhatsApp","whatsapp"],["phone","Web app del huésped","phone"],["police","Libro de policía","police"],
+    ["group","Gestionar grupo","group"],
+    ["key","Control de accesos","key"],
+    ["guest","Huéspedes y acompañantes","guest"],
+    ["card","Tarjeta / garantía","card"],
+    ["email","Enviar por email","email"],
+    ["whatsapp","Enviar por WhatsApp","whatsapp"],
+    ["phone","Web app del huésped","phone"],
+    ["police","Libro de policía","police"],
   ]
   const summary=`Reserva ${item.numero_reserva||item.id}\nHuésped: ${item.nombre_huesped}\nHabitación: ${roomNames(rooms)}\nEntrada: ${fmt(item.fecha_entrada)}\nSalida: ${fmt(item.fecha_salida)}\nTotal: ${money(item.precio_total,item.moneda)}`
-  const policeRequired=useMemo(()=>["full_name","document_number","birth_date","sex","nationality","address","city","province","country"],[ ])
+  const policeRequired=useMemo(()=>["full_name","document_number","birth_date","sex","nationality","address","city","province","country"],[])
   const primary=guestRows.find(row=>row.role==="primary")||guestRows[0]
   const policeMissing=primary?policeRequired.filter(key=>!String(primary[key]||"").trim()):policeRequired
 
-  async function loadGuests(){const{data,error:guestError}=await supabase.from("hotel_reservation_guests").select("*").eq("property_id",propertyId).eq("reservation_id",item.id).order("role",{ascending:false}).order("sort_order",{ascending:true});if(guestError)throw guestError;setGuestRows(data||[]);return data||[]}
-  async function openPanel(next){setNotice("");setError("");setPanel(next);try{if(next==="police")await loadGuests();if(next==="key"){const roomIds=(rooms||[]).map(room=>Number(room.id));const[pointsRes,grantsRes]=await Promise.all([roomIds.length?supabase.from("hotel_access_points").select("id,room_id,name,kind,provider,connection_status,pin_enabled,active").eq("property_id",propertyId).in("room_id",roomIds):Promise.resolve({data:[],error:null}),supabase.from("hotel_access_grants").select("id,primary_point_id,pin_code,status,valid_from,valid_until,created_at").eq("property_id",propertyId).eq("reservation_id",item.id).order("created_at",{ascending:false})]);if(pointsRes.error)throw pointsRes.error;if(grantsRes.error)throw grantsRes.error;setAccess({points:pointsRes.data||[],grants:grantsRes.data||[]})}}catch(err){setError(err?.message||"No se pudo cargar la información.")}}
-  async function sendEmail(){if(busy)return;setBusy("email");setError("");setNotice("");try{const{data:{session}}=await supabase.auth.getSession();if(!session?.access_token)throw new Error("La sesión no está disponible.");const response=await fetch("/api/hotel/email",{method:"POST",headers:{Authorization:`Bearer ${session.access_token}`,"Content-Type":"application/json"},body:JSON.stringify({reservation_id:item.id})}),result=await response.json().catch(()=>({}));if(!response.ok&&result?.error)throw new Error(result.error);if(result.mode==="mailto"&&result.mailto){window.location.href=result.mailto;setNotice("Abrí tu aplicación de correo con la reserva preparada.")}else setNotice("Confirmación enviada por email.")}catch(err){setError(err?.message||"No se pudo preparar el email.")}finally{setBusy("")}}
-  function sendWhatsApp(){const phone=cleanPhone(item.telefono_huesped);if(!phone){setError("La reserva no tiene teléfono cargado.");return}const international=phone.startsWith("54")?phone:`54${phone}`;window.open(`https://wa.me/${international}?text=${encodeURIComponent(summary)}`,"_blank","noopener,noreferrer");setNotice("Abrí WhatsApp con el resumen de la reserva preparado.")}
-  async function openPortal(){if(busy)return;setBusy("portal");setError("");setNotice("");try{const{data,error:rpcError}=await supabase.rpc("hl_reservation_guest_portal_link",{p_reservation_id:Number(item.id)});if(rpcError)throw rpcError;const path=`/book/${encodeURIComponent(data.slug)}/manage/${encodeURIComponent(data.token)}`,url=`${window.location.origin}${path}`;await navigator.clipboard?.writeText(url).catch(()=>{});window.open(path,"_blank","noopener,noreferrer");setNotice("Abrí la Web App del huésped y copié el enlace al portapapeles.")}catch(err){setError(err?.message||"No se pudo abrir la Web App del huésped.")}finally{setBusy("")}}
-  function actionClick(key){setError("");setNotice("");if(key==="guest")return setPanel("guest");if(key==="email")return sendEmail();if(key==="whatsapp")return sendWhatsApp();if(key==="phone")return openPortal();return openPanel(key)}
+  async function loadGuests(){
+    const{data,error:guestError}=await supabase.from("hotel_reservation_guests").select("*").eq("property_id",propertyId).eq("reservation_id",item.id).order("role",{ascending:false}).order("sort_order",{ascending:true})
+    if(guestError)throw guestError
+    setGuestRows(data||[])
+    return data||[]
+  }
+  async function openPanel(next){
+    setNotice("");setError("");setPanel(next)
+    try{
+      if(next==="police")await loadGuests()
+      if(next==="key"){
+        const roomIds=(rooms||[]).map(room=>Number(room.id))
+        const[pointsRes,grantsRes]=await Promise.all([
+          roomIds.length?supabase.from("hotel_access_points").select("id,room_id,name,kind,provider,connection_status,pin_enabled,active").eq("property_id",propertyId).in("room_id",roomIds):Promise.resolve({data:[],error:null}),
+          supabase.from("hotel_access_grants").select("id,primary_point_id,pin_code,status,valid_from,valid_until,created_at").eq("property_id",propertyId).eq("reservation_id",item.id).order("created_at",{ascending:false}),
+        ])
+        if(pointsRes.error)throw pointsRes.error
+        if(grantsRes.error)throw grantsRes.error
+        setAccess({points:pointsRes.data||[],grants:grantsRes.data||[]})
+      }
+    }catch(err){setError(err?.message||"No se pudo cargar la información.")}
+  }
+  async function sendEmail(){
+    if(busy)return
+    setBusy("email");setError("");setNotice("")
+    try{
+      const{data:{session}}=await supabase.auth.getSession()
+      if(!session?.access_token)throw new Error("La sesión no está disponible.")
+      const response=await fetch("/api/hotel/email",{method:"POST",headers:{Authorization:`Bearer ${session.access_token}`,"Content-Type":"application/json"},body:JSON.stringify({reservation_id:item.id})})
+      const result=await response.json().catch(()=>({}))
+      if(!response.ok&&result?.error)throw new Error(result.error)
+      if(result.mode==="mailto"&&result.mailto){window.location.href=result.mailto;setNotice("Abrí tu aplicación de correo con la reserva preparada.")}else setNotice("Confirmación enviada por email.")
+    }catch(err){setError(err?.message||"No se pudo preparar el email.")}
+    finally{setBusy("")}
+  }
+  function sendWhatsApp(){
+    const phone=cleanPhone(item.telefono_huesped)
+    if(!phone){setError("La reserva no tiene teléfono cargado.");return}
+    const international=phone.startsWith("54")?phone:`54${phone}`
+    window.open(`https://wa.me/${international}?text=${encodeURIComponent(summary)}`,"_blank","noopener,noreferrer")
+    setNotice("Abrí WhatsApp con el resumen de la reserva preparado.")
+  }
+  async function openPortal(){
+    if(busy)return
+    setBusy("portal");setError("");setNotice("")
+    try{
+      const{data,error:rpcError}=await supabase.rpc("hl_reservation_guest_portal_link",{p_reservation_id:Number(item.id)})
+      if(rpcError)throw rpcError
+      const path=`/book/${encodeURIComponent(data.slug)}/manage/${encodeURIComponent(data.token)}`,url=`${window.location.origin}${path}`
+      await navigator.clipboard?.writeText(url).catch(()=>{})
+      window.open(path,"_blank","noopener,noreferrer")
+      setNotice("Abrí la Web App del huésped y copié el enlace al portapapeles.")
+    }catch(err){setError(err?.message||"No se pudo abrir la Web App del huésped.")}
+    finally{setBusy("")}
+  }
+  function actionClick(key){
+    setError("");setNotice("")
+    if(key==="guest")return setPanel("guest")
+    if(key==="card")return setPanel("card")
+    if(key==="email")return sendEmail()
+    if(key==="whatsapp")return sendWhatsApp()
+    if(key==="phone")return openPortal()
+    return openPanel(key)
+  }
 
   return <>
     <div aria-label="Acciones rápidas de la reserva" style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",padding:"8px 10px",border:"1px solid color-mix(in srgb,#fff 36%,var(--line))",borderRadius:14,background:"color-mix(in srgb,var(--panelSolid) 68%,transparent)",boxShadow:"inset 0 1px color-mix(in srgb,#fff 55%,transparent),0 8px 26px rgba(24,37,68,.06)",backdropFilter:"blur(22px) saturate(1.35)",WebkitBackdropFilter:"blur(22px) saturate(1.35)"}}>{actions.map(([key,label,icon])=><button key={key} type="button" onClick={()=>actionClick(key)} title={label} aria-label={label} style={{width:35,height:35,display:"grid",placeItems:"center",border:"1px solid color-mix(in srgb,#fff 32%,var(--line))",borderRadius:10,background:`color-mix(in srgb,${styles[key]} 9%,var(--panelSolid))`,color:styles[key],boxShadow:"inset 0 1px color-mix(in srgb,#fff 55%,transparent)",cursor:"pointer"}}><Icon name={icon}/></button>)}</div>
     {(notice||error)&&!panel?<div style={{marginTop:6,padding:"7px 9px",borderRadius:9,fontSize:9.8,fontWeight:780,border:`1px solid ${error?"color-mix(in srgb,var(--red) 28%,var(--line))":"color-mix(in srgb,#2c9a60 25%,var(--line))"}`,background:error?"color-mix(in srgb,var(--red) 6%,var(--panelSolid))":"color-mix(in srgb,#36a66a 6%,var(--panelSolid))",color:error?"var(--red)":"#277a4d"}}>{error||notice}</div>:null}
+
     {panel==="guest"?<ReservationGuestPanel item={item} rooms={rooms} propertyId={propertyId} onClose={()=>setPanel("")} onSaved={()=>{onRefresh?.();loadGuests().catch(()=>{})}}/>:null}
+    {panel==="card"?<ReservationGuaranteePanel item={item} propertyId={propertyId} onClose={()=>setPanel("")} onChanged={onRefresh}/>:null}
+
     {panel==="group"?<Modal title="Gestionar grupo" subtitle="Resumen operativo del conjunto de habitaciones y huéspedes vinculados a esta reserva." onClose={()=>setPanel("")}><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>{[["Habitaciones",rooms.length||1],["Huéspedes",item.cantidad_huespedes||1],["Tipo",isGroup?"Reserva grupal":"Reserva individual"]].map(([label,value])=><div key={label} style={{padding:11,border:"1px solid var(--line)",borderRadius:11,background:"var(--panelSolid)"}}><small style={{display:"block",fontSize:9,color:"var(--muted)"}}>{label}</small><b style={{display:"block",marginTop:4,fontSize:12}}>{value}</b></div>)}</div><p style={{margin:"11px 0 0",fontSize:10.5,lineHeight:1.5,color:"var(--muted)"}}>{isGroup?`Habitaciones vinculadas: ${roomNames(rooms)}. La edición detallada del grupo la dejamos para el siguiente paso, sin tocar ahora la ficha.`:"Esta reserva no pertenece a un grupo. El botón queda disponible para cuando armemos la gestión grupal completa."}</p></Modal>:null}
+
     {panel==="key"?<Modal title="Control de accesos" subtitle="Estado de llaves/PIN asociados a las habitaciones de la reserva." onClose={()=>setPanel("")}>{error?<div style={{padding:9,borderRadius:9,background:"color-mix(in srgb,var(--red) 7%,var(--panelSolid))",color:"var(--red)",fontSize:10.5,fontWeight:800}}>{error}</div>:null}<div style={{display:"grid",gap:8}}>{rooms.map(room=>{const point=access.points.find(p=>Number(p.room_id)===Number(room.id));return <div key={room.id} style={{padding:11,border:"1px solid var(--line)",borderRadius:11,background:"var(--panelSolid)",display:"flex",justifyContent:"space-between",gap:12}}><span><b style={{fontSize:11.5}}>Hab. {room.nombre}</b><small style={{display:"block",marginTop:3,fontSize:9.5,color:"var(--muted)"}}>{point?`${point.name||"Acceso"} · ${point.provider||"manual"}`:"Sin punto de acceso configurado"}</small></span><strong style={{fontSize:10,color:point?.active!==false?"#278452":"var(--muted)"}}>{point?.active!==false&&point?"Disponible":"Pendiente"}</strong></div>})}</div>{access.grants.length?<div style={{marginTop:10,padding:10,border:"1px solid var(--line)",borderRadius:11}}><b style={{fontSize:11}}>Llaves/PIN emitidos</b>{access.grants.map(grant=><div key={grant.id} style={{display:"flex",justifyContent:"space-between",gap:10,marginTop:7,fontSize:10}}><span>{grant.pin_code?`PIN ${grant.pin_code}`:"Acceso digital"}</span><span style={{color:"var(--muted)"}}>{grant.status}</span></div>)}</div>:<p style={{margin:"10px 0 0",fontSize:10.5,color:"var(--muted)"}}>Todavía no hay una llave o PIN emitido. La emisión completa la hacemos cuando terminemos este bloque de reservas.</p>}</Modal>:null}
+
     {panel==="police"?<Modal title="Libro de policía" subtitle="Control rápido de los datos necesarios antes de registrar o exportar la estadía." onClose={()=>setPanel("")}>{!primary?<div style={{fontSize:10.5,color:"var(--muted)"}}>Todavía no hay titular cargado.</div>:<><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,padding:11,border:"1px solid var(--line)",borderRadius:11,background:"var(--panelSolid)"}}><span><b style={{fontSize:12}}>{primary.full_name}</b><small style={{display:"block",marginTop:3,fontSize:9.5,color:"var(--muted)"}}>Estado documental de la persona titular</small></span><strong style={{fontSize:10,color:policeMissing.length?"#b36b18":"#278452"}}>{policeMissing.length?`${policeMissing.length} dato${policeMissing.length===1?"":"s"} pendiente${policeMissing.length===1?"":"s"}`:"Completo"}</strong></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7,marginTop:9}}>{[["Nombre",primary.full_name],["Documento",primary.document_number],["Nacimiento",primary.birth_date],["Sexo",primary.sex],["Nacionalidad",primary.nationality],["Domicilio",primary.address],["Localidad",primary.city],["Provincia",primary.province],["País",primary.country]].map(([label,value])=><div key={label} style={{padding:9,border:"1px solid var(--line)",borderRadius:9,background:"color-mix(in srgb,var(--bg) 30%,var(--panelSolid))"}}><small style={{display:"block",fontSize:9,color:"var(--muted)"}}>{label}</small><b style={{display:"block",marginTop:3,fontSize:10.5,color:value?"var(--text)":"var(--red)"}}>{value||"Falta completar"}</b></div>)}</div><button type="button" onClick={()=>setPanel("guest")} style={{marginTop:10,height:36,padding:"0 12px",border:0,borderRadius:9,background:"linear-gradient(145deg,var(--accent),var(--accent2))",color:"#fff",font:"inherit",fontSize:10.5,fontWeight:850}}>Completar datos del huésped</button></>}</Modal>:null}
   </>
 }
