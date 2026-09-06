@@ -5,7 +5,7 @@ import{supabase}from"../../../../lib/supabase"
 
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:0}).format(Number(value)||0)
 const emit=detail=>window.dispatchEvent(new CustomEvent("hl:pms-toast",{detail}))
-const LIVE_TABLES=["reservas","pagos","habitaciones","bloqueos","hotel_housekeeping_tasks","hotel_maintenance_tickets","hotel_guest_requests","hotel_guest_profiles","hotel_no_show_history","hotel_cancellation_policies","hotel_guarantees","hotel_reservation_events"]
+const LIVE_TABLES=["reservas","pagos","habitaciones","bloqueos","hotel_housekeeping_tasks","hotel_housekeeping_history","hotel_maintenance_tickets","hotel_guest_requests","hotel_guest_profiles","hotel_no_show_history","hotel_cancellation_policies","hotel_guarantees","hotel_reservation_events","hotel_cash_movements","hotel_finance_documents","hotel_cash_sessions"]
 
 export default function PaymentAlertWatcher({propertyId}){
   const known=useRef(new Set()),primed=useRef(false),syncTimer=useRef(null),pendingTables=useRef(new Set())
