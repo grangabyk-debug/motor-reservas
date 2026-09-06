@@ -10,9 +10,33 @@ const STARTERS = [
   "¿Qué puedo mejorar para vender más?",
 ]
 
-// Embedded source pixels for OlivIA. We decode them directly into a canvas so the
-// avatar does not depend on a public asset URL, browser cache or img-src CSP rules.
-const OLIVIA_AVATAR_BASE64 = "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"
+import { OLIVIA_SIZE, OLIVIA_PALETTE_B64, OLIVIA_INDEX_B64 } from "./oliviaAvatarData"
+
+let oliviaPixelCache = null
+
+function decodeBase64Bytes(value) {
+  const binary = atob(value)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i)
+  return bytes
+}
+
+function getOliviaPixels() {
+  if (oliviaPixelCache) return oliviaPixelCache
+  const palette = decodeBase64Bytes(OLIVIA_PALETTE_B64)
+  const indexes = decodeBase64Bytes(OLIVIA_INDEX_B64)
+  const rgba = new Uint8ClampedArray(OLIVIA_SIZE * OLIVIA_SIZE * 4)
+  for (let i = 0; i < indexes.length; i += 1) {
+    const paletteOffset = indexes[i] * 4
+    const pixelOffset = i * 4
+    rgba[pixelOffset] = palette[paletteOffset]
+    rgba[pixelOffset + 1] = palette[paletteOffset + 1]
+    rgba[pixelOffset + 2] = palette[paletteOffset + 2]
+    rgba[pixelOffset + 3] = palette[paletteOffset + 3]
+  }
+  oliviaPixelCache = rgba
+  return rgba
+}
 
 function greeting(propertyName) {
   const property = String(propertyName || "tu alojamiento").trim()
@@ -26,80 +50,37 @@ function OliviaWordmark() {
 function paintFallback(canvas) {
   const ctx = canvas?.getContext?.("2d")
   if (!ctx) return
-  canvas.width = 160
-  canvas.height = 160
-  ctx.clearRect(0, 0, 160, 160)
+  canvas.width = OLIVIA_SIZE
+  canvas.height = OLIVIA_SIZE
+  ctx.clearRect(0, 0, OLIVIA_SIZE, OLIVIA_SIZE)
   ctx.fillStyle = "#f2e8f8"
   ctx.beginPath()
-  ctx.arc(80, 80, 78, 0, Math.PI * 2)
+  ctx.arc(48, 48, 46, 0, Math.PI * 2)
   ctx.fill()
   ctx.fillStyle = "#7c3aed"
-  ctx.font = "700 48px system-ui, sans-serif"
+  ctx.font = "700 28px system-ui, sans-serif"
   ctx.textAlign = "center"
   ctx.textBaseline = "middle"
-  ctx.fillText("IA", 80, 82)
+  ctx.fillText("IA", 48, 49)
 }
 
 function OliviaPhoto({ className = "", alt = "" }) {
   const canvasRef = useRef(null)
 
   useEffect(() => {
-    let cancelled = false
-    let bitmap = null
+    const canvas = canvasRef.current
+    const ctx = canvas?.getContext?.("2d")
+    if (!canvas || !ctx) return
 
-    async function paint() {
-      const canvas = canvasRef.current
-      if (!canvas) return
-
-      try {
-        const binary = atob(OLIVIA_AVATAR_BASE64)
-        const bytes = new Uint8Array(binary.length)
-        for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i)
-
-        bitmap = await createImageBitmap(new Blob([bytes], { type: "image/jpeg" }))
-        if (cancelled || !canvasRef.current) {
-          bitmap?.close?.()
-          return
-        }
-
-        const source = document.createElement("canvas")
-        source.width = bitmap.width
-        source.height = bitmap.height
-        const sourceCtx = source.getContext("2d", { willReadFrequently: true })
-        sourceCtx.drawImage(bitmap, 0, 0)
-
-        // The tiny JPEG was created from the transparent portrait and its empty
-        // pixels became black. Make only near-pure black pixels transparent again.
-        const pixels = sourceCtx.getImageData(0, 0, source.width, source.height)
-        for (let i = 0; i < pixels.data.length; i += 4) {
-          const r = pixels.data[i]
-          const g = pixels.data[i + 1]
-          const b = pixels.data[i + 2]
-          const max = Math.max(r, g, b)
-          const min = Math.min(r, g, b)
-          if (max < 28 && max - min < 9) pixels.data[i + 3] = 0
-        }
-        sourceCtx.putImageData(pixels, 0, 0)
-
-        canvas.width = 160
-        canvas.height = 160
-        const ctx = canvas.getContext("2d")
-        ctx.clearRect(0, 0, 160, 160)
-        ctx.imageSmoothingEnabled = true
-        ctx.imageSmoothingQuality = "high"
-        ctx.drawImage(source, 0, 0, 160, 160)
-      } catch (error) {
-        console.error("OlivIA avatar render failed", error)
-        paintFallback(canvas)
-      } finally {
-        bitmap?.close?.()
-      }
-    }
-
-    paint()
-    return () => {
-      cancelled = true
-      bitmap?.close?.()
+    try {
+      canvas.width = OLIVIA_SIZE
+      canvas.height = OLIVIA_SIZE
+      const pixels = getOliviaPixels()
+      ctx.clearRect(0, 0, OLIVIA_SIZE, OLIVIA_SIZE)
+      ctx.putImageData(new ImageData(new Uint8ClampedArray(pixels), OLIVIA_SIZE, OLIVIA_SIZE), 0, 0)
+    } catch (error) {
+      console.error("OlivIA avatar render failed", error)
+      paintFallback(canvas)
     }
   }, [])
 
