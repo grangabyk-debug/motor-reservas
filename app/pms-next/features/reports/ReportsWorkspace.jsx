@@ -2,6 +2,7 @@
 
 import{useCallback,useEffect,useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
+import usePmsAutoRefresh from"../../core/usePmsAutoRefresh"
 import DailyReportSettings from"./DailyReportSettings"
 import OperationalReportsPanel from"./OperationalReportsPanel"
 import s from"./reports.module.css"
@@ -42,6 +43,7 @@ export default function ReportsWorkspace({propertyId,property}){
   },[propertyId,from,to])
 
   useEffect(()=>{load()},[load])
+  usePmsAutoRefresh(propertyId,load,["reservas","pagos","habitaciones"])
 
   const currency=settings?.preferences?.currency||"ARS"
   const report=useMemo(()=>{
