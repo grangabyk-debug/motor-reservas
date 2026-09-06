@@ -2,6 +2,7 @@
 
 import{useCallback,useEffect,useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
+import usePmsAutoRefresh from"../../core/usePmsAutoRefresh"
 
 function canonicalKey(draft){
   const email=draft.email?.trim().toLowerCase();if(email)return`email:${email}`
@@ -30,6 +31,7 @@ export default function useGuestsData(propertyId){
   },[propertyId])
 
   useEffect(()=>{load()},[load])
+  usePmsAutoRefresh(propertyId,load,["reservas","hotel_guest_profiles"])
 
   const statsByProfile=useMemo(()=>{
     const map=new Map()
