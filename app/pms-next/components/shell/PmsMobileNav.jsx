@@ -1,12 +1,12 @@
 "use client"
 
 import{useMemo,useState}from"react"
-import{MANAGEMENT_NAV,OPERATIONS_NAV,PRIMARY_NAV}from"../../core/navigation"
+import{HOUSEKEEPING_NAV,MANAGEMENT_NAV,OPERATIONS_NAV,PRIMARY_NAV,RECEPTION_NAV}from"../../core/navigation"
 import PmsIcon from"./PmsIcons"
 import glass from"./pmsGlassShell.module.css"
 
-const COLORS={dashboard:"#5b6cf3",planning:"#2797ff",reservations:"#8a63e8",quotes:"#d79a31",guests:"#ed6b8f",messages:"#20ad7a",tasks:"#ea7a37",requests:"#e65d68",housekeeping:"#21a8a0",maintenance:"#e09533",inventory:"#597fda",services:"#b268dc",rates:"#4b9c72",finance:"#2a9b64",onboarding:"#6181dc",website:"#5d8ee7",growth:"#45a16f",reports:"#7c68d8",audit:"#596f9d",staff:"#dd718f",integrations:"#557ed1",settings:"#7a8497",support:"#20a18f"}
-const ALL=[...PRIMARY_NAV,...OPERATIONS_NAV,...MANAGEMENT_NAV]
+const COLORS={dashboard:"#5b6cf3",planning:"#2797ff",reservations:"#8a63e8",quotes:"#d79a31",guests:"#ed6b8f",messages:"#20ad7a",tasks:"#ea7a37",requests:"#e65d68",housekeeping:"#21a8a0",maintenance:"#e09533",inventory:"#597fda",services:"#b268dc",dailycash:"#2a9b64",receptionreports:"#7c68d8",rates:"#4b9c72",finance:"#2a9b64",onboarding:"#6181dc",website:"#5d8ee7",growth:"#45a16f",reports:"#7c68d8",audit:"#596f9d",staff:"#dd718f",integrations:"#557ed1",settings:"#7a8497",support:"#20a18f"}
+const ALL=[...PRIMARY_NAV,...RECEPTION_NAV,...HOUSEKEEPING_NAV,...OPERATIONS_NAV,...MANAGEMENT_NAV]
 const DOCK_IDS=["dashboard","planning","reservations","guests"]
 
 function NavButton({item,active,onClick,compact=false}){
