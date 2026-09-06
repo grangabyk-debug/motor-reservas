@@ -7,6 +7,7 @@ import s from"./finance.module.css"
 function iso(date){return new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,10)}
 function money(value,currency="ARS"){return new Intl.NumberFormat("es-AR",{style:"currency",currency,maximumFractionDigits:0}).format(Number(value||0))}
 function startFor(period){const now=new Date();now.setHours(0,0,0,0);if(period==="today")return now;if(period==="7")return new Date(now.getTime()-6*86400000);if(period==="month")return new Date(now.getFullYear(),now.getMonth(),1);return new Date(now.getTime()-29*86400000)}
+const RECENT_STEP=5
 
 export default function FinanceDashboard({propertyId}){
   const[period,setPeriod]=useState("30")
@@ -15,6 +16,7 @@ export default function FinanceDashboard({propertyId}){
   const[payments,setPayments]=useState([])
   const[loading,setLoading]=useState(true)
   const[error,setError]=useState("")
+  const[recentLimit,setRecentLimit]=useState(RECENT_STEP)
 
   const load=useCallback(async()=>{
     if(!propertyId)return
@@ -32,6 +34,7 @@ export default function FinanceDashboard({propertyId}){
     finally{setLoading(false)}
   },[propertyId,period])
   useEffect(()=>{load()},[load])
+  useEffect(()=>{setRecentLimit(RECENT_STEP)},[period,propertyId])
 
   const metrics=useMemo(()=>{
     const today=iso(new Date());const from=startFor(period);const days=Math.max(1,Math.round((new Date(`${today}T12:00:00`)-from)/86400000)+1)
@@ -48,13 +51,13 @@ export default function FinanceDashboard({propertyId}){
     return{occupied,arrivals,departures,bookings,roomNights,bookedValue,collected,occupancy,adr,revpar}
   },[rooms,reservations,payments,period])
 
-  const recent=reservations.slice(0,8)
+  const recent=reservations.slice(0,recentLimit),hasMoreRecent=recentLimit<reservations.length,showingExpanded=recentLimit>RECENT_STEP
   if(loading)return <div className={s.empty}>Cargando indicadores financieros…</div>
   return <div className={s.financeBody}>
     <div className={s.periods}>{[["today","Hoy"],["7","7 días"],["30","30 días"],["month","Este mes"]].map(([id,label])=><button key={id} className={period===id?s.active:""} onClick={()=>setPeriod(id)}>{label}</button>)}</div>
     {error&&<div className={s.alert}>{error}</div>}
     <div className={s.heroMetrics}><article><span>Ocupación</span><b>{metrics.occupancy}%</b><small>{metrics.occupied} habitaciones ocupadas ahora</small></article><article><span>Cobrado</span><b>{money(metrics.collected)}</b><small>Pagos confirmados del período</small></article><article><span>Valor de reservas</span><b>{money(metrics.bookedValue)}</b><small>Reservas no canceladas del período</small></article><article><span>Reservas</span><b>{metrics.bookings}</b><small>{metrics.arrivals} llegadas · {metrics.departures} salidas hoy</small></article></div>
     <div className={s.analyticsGrid}><article className={s.glass}><header><div><small>REVENUE</small><h2>Indicadores hoteleros</h2></div></header><div className={s.kpis}><div><span>ADR</span><b>{money(metrics.adr)}</b></div><div><span>RevPAR</span><b>{money(metrics.revpar)}</b></div><div><span>Noches vendidas</span><b>{metrics.roomNights}</b></div><div><span>Habitaciones</span><b>{rooms.length}</b></div></div><div className={s.glowChart}><i style={{height:`${Math.max(8,metrics.occupancy)}%`}}/><i style={{height:`${Math.max(12,Math.min(92,metrics.occupancy+18))}%`}}/><i style={{height:`${Math.max(10,Math.min(86,metrics.occupancy+9))}%`}}/><i style={{height:`${Math.max(15,Math.min(96,metrics.occupancy+26))}%`}}/><i style={{height:`${Math.max(8,Math.min(90,metrics.occupancy+4))}%`}}/><i style={{height:`${Math.max(10,Math.min(98,metrics.occupancy+31))}%`}}/></div></article><article className={s.glass}><header><div><small>HOY</small><h2>Snapshot operativo</h2></div></header><div className={s.snapshot}><div><span>→ Llegadas</span><b>{metrics.arrivals}</b></div><div><span>← Salidas</span><b>{metrics.departures}</b></div><div><span>● Alojados</span><b>{metrics.occupied}</b></div></div></article></div>
-    <article className={s.glass}><header><div><small>ÚLTIMAS</small><h2>Reservas recientes</h2></div></header>{!recent.length?<div className={s.empty}>No hay reservas en el período seleccionado.</div>:<div className={s.table}><div className={s.tableHead}><span>Huésped</span><span>Entrada</span><span>Noches</span><span>Canal</span><span>Total</span><span>Estado</span></div>{recent.map(row=><div className={s.tableRow} key={row.id}><b>{row.nombre_huesped}</b><span>{row.fecha_entrada}</span><span>{row.noches||0}</span><span>{row.canal_reserva||"Directa"}</span><span>{money(row.precio_total,row.moneda||"ARS")}</span><span className={s.status}>{row.estado}</span></div>)}</div>}</article>
+    <article className={s.glass}><header><div><small>ÚLTIMAS</small><h2>Reservas recientes</h2></div></header>{!recent.length?<div className={s.empty}>No hay reservas en el período seleccionado.</div>:<><div className={s.table}><div className={s.tableHead}><span>Huésped</span><span>Entrada</span><span>Noches</span><span>Canal</span><span>Total</span><span>Estado</span></div>{recent.map(row=><div className={s.tableRow} key={row.id}><b>{row.nombre_huesped}</b><span>{row.fecha_entrada}</span><span>{row.noches||0}</span><span>{row.canal_reserva||"Directa"}</span><span>{money(row.precio_total,row.moneda||"ARS")}</span><span className={s.status}>{row.estado}</span></div>)}</div>{reservations.length>RECENT_STEP?<div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:8,padding:"11px 12px 13px",borderTop:"1px solid var(--line)"}}>{hasMoreRecent?<button type="button" onClick={()=>setRecentLimit(value=>Math.min(reservations.length,value+RECENT_STEP))} style={{height:34,padding:"0 13px",border:"1px solid var(--line)",borderRadius:10,background:"var(--panelSolid)",color:"var(--text)",font:"inherit",fontSize:10.5,fontWeight:850,cursor:"pointer"}}>↓ Ver {Math.min(RECENT_STEP,reservations.length-recentLimit)} más</button>:null}{showingExpanded?<button type="button" onClick={()=>setRecentLimit(RECENT_STEP)} style={{height:34,padding:"0 13px",border:"1px solid var(--line)",borderRadius:10,background:"var(--panelSolid)",color:"var(--muted)",font:"inherit",fontSize:10.5,fontWeight:850,cursor:"pointer"}}>↑ Mostrar menos</button>:null}</div>:null}</>}</article>
   </div>
 }
