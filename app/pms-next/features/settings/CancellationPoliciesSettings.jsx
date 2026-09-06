@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { supabase } from "../../../../lib/supabase"
+import ui from "./cancellation-policies.module.css"
 
 const TYPES = {
   flexible: "Flexible",
@@ -38,32 +39,31 @@ const blank = currency => ({
 
 const num = value => Math.max(0, Number(value) || 0)
 
-function ChargeEditor({ title, value, onChange, currency, disabled }) {
+function chargeHelp(rule, currency) {
+  if (rule.charge_type === "fixed") return `Importe expresado en ${currency}.`
+  if (rule.charge_type === "percent") return "Porcentaje sobre el total de la reserva."
+  if (rule.charge_type === "nights") return "Cantidad de noches a tarifa de la reserva."
+  return "No se cobra penalidad."
+}
+
+function ChargeEditor({ title, icon, value, onChange, currency, disabled }) {
   const rule = value || { charge_type: "none", value: 0 }
   return (
-    <div style={{ padding: 12, border: "1px solid var(--line)", borderRadius: 11, background: "color-mix(in srgb,var(--bg) 45%,var(--panelSolid))" }}>
-      <b style={{ fontSize: 11.5 }}>{title}</b>
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(170px,1fr) minmax(120px,.55fr)", gap: 8, marginTop: 8 }}>
-        <label style={{ display: "grid", gap: 5, fontSize: 10, color: "var(--muted)" }}>
+    <div className={ui.chargeCard}>
+      <div><span className={ui.chargeIcon}>{icon}</span><span className={ui.chargeTitle}>{title}</span></div>
+      <div className={ui.chargeFields}>
+        <label className={ui.field}>
           Tipo
           <select disabled={disabled} value={rule.charge_type || "none"} onChange={e => onChange({ ...rule, charge_type: e.target.value, value: e.target.value === "none" ? 0 : rule.value || 0 })}>
             {Object.entries(CHARGES).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
           </select>
         </label>
-        <label style={{ display: "grid", gap: 5, fontSize: 10, color: "var(--muted)" }}>
+        <label className={ui.field}>
           Valor
           <input disabled={disabled || rule.charge_type === "none"} type="number" min="0" step={rule.charge_type === "fixed" ? "1" : "0.01"} value={rule.value || 0} onChange={e => onChange({ ...rule, value: num(e.target.value) })} />
         </label>
       </div>
-      <small style={{ display: "block", marginTop: 6, color: "var(--muted)", fontSize: 9.5 }}>
-        {rule.charge_type === "fixed"
-          ? `Importe expresado en ${currency}.`
-          : rule.charge_type === "percent"
-            ? "Porcentaje sobre el total de la reserva."
-            : rule.charge_type === "nights"
-              ? "Cantidad de noches a tarifa de la reserva."
-              : "No se cobra penalidad."}
-      </small>
+      <small className={ui.chargeHelp}>{chargeHelp(rule, currency)}</small>
     </div>
   )
 }
@@ -227,150 +227,100 @@ export default function CancellationPoliciesSettings({ propertyId, currency = "A
     }
   }
 
-  const box = { padding: 14, border: "1px solid var(--line)", borderRadius: 14, background: "var(--panelSolid)" }
-  const inputStyle = { width: "100%", boxSizing: "border-box" }
-
-  if (loading) return <div style={box}>Cargando políticas de cancelación…</div>
+  if (loading) return <div className={ui.editorPanel}>Cargando políticas de cancelación…</div>
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(220px,.7fr) minmax(420px,1.5fr)", gap: 12, alignItems: "start" }}>
-      <aside style={box}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-          <div>
-            <small style={{ fontSize: 9, fontWeight: 900, letterSpacing: ".1em", color: "var(--accent)" }}>POLÍTICAS</small>
-            <h2 style={{ margin: "3px 0 0", fontSize: 17 }}>Cancelación</h2>
-          </div>
-          {canEdit ? <button type="button" onClick={newPolicy}>+ Nueva</button> : null}
+    <div className={ui.layout}>
+      <aside className={ui.sidePanel}>
+        <div className={ui.sideHeader}>
+          <div><small className={ui.eyebrow}>POLÍTICAS</small><h2>Cancelación</h2></div>
+          {canEdit ? <button type="button" className={ui.newButton} onClick={newPolicy}>+ Nueva</button> : null}
         </div>
-        <p style={{ fontSize: 10.5, lineHeight: 1.5, color: "var(--muted)" }}>
-          Flexible queda predeterminada. Podés definir políticas públicas para el motor o sólo internas para el PMS.
-        </p>
-        <div style={{ display: "grid", gap: 7 }}>
+        <p className={ui.sideIntro}>Flexible queda predeterminada. Podés definir políticas públicas para el motor o sólo internas para el PMS.</p>
+        <div className={ui.policyList}>
           {policies.map(row => (
-            <button
-              type="button"
-              key={row.id}
-              onClick={() => choose(row)}
-              style={{
-                textAlign: "left",
-                padding: "10px 11px",
-                border: `1px solid ${String(row.id) === String(selectedId) ? "color-mix(in srgb,var(--accent) 48%,var(--line))" : "var(--line)"}`,
-                borderRadius: 10,
-                background: String(row.id) === String(selectedId) ? "color-mix(in srgb,var(--accent) 7%,var(--panelSolid))" : "var(--panelSolid)",
-                color: "var(--text)",
-              }}
-            >
-              <b style={{ display: "block", fontSize: 11.5 }}>{row.name}{row.is_default ? " · Predeterminada" : ""}</b>
-              <small style={{ display: "block", marginTop: 3, color: "var(--muted)" }}>
-                {TYPES[row.policy_type] || "Personalizada"} · {row.active ? "Activa" : "Inactiva"} · {row.visible_in_booking_engine === false ? "Sólo PMS" : "Motor público"}
-              </small>
+            <button type="button" key={row.id} onClick={() => choose(row)} className={`${ui.policyButton} ${String(row.id) === String(selectedId) ? ui.policySelected : ""}`}>
+              <span className={ui.policyName}>{row.name}</span>
+              <span className={ui.policyMeta}>
+                {row.is_default ? <span className={`${ui.chip} ${ui.chipAccent}`}>Predeterminada</span> : null}
+                <span className={`${ui.chip} ${row.active ? ui.chipGreen : ""}`}>{row.active ? "Activa" : "Inactiva"}</span>
+                <span className={`${ui.chip} ${row.visible_in_booking_engine === false ? ui.chipGold : ""}`}>{row.visible_in_booking_engine === false ? "Sólo PMS" : "Motor público"}</span>
+              </span>
             </button>
           ))}
         </div>
-        {!canEdit ? (
-          <div style={{ marginTop: 10, padding: 9, borderRadius: 9, background: "color-mix(in srgb,var(--accent) 6%,var(--panelSolid))", fontSize: 10, color: "var(--muted)" }}>
-            Modo lectura: la edición está protegida para el propietario.
-          </div>
-        ) : null}
+        {!canEdit ? <div className={ui.readOnly}>Modo lectura: la edición está protegida para el propietario.</div> : null}
       </aside>
 
-      <section style={box}>
-        {!form ? (
-          <div style={{ color: "var(--muted)", fontSize: 11 }}>Elegí una política para verla.</div>
-        ) : (
-          <>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
-              <div>
-                <small style={{ fontSize: 9, color: "var(--muted)" }}>CONFIGURACIÓN COMERCIAL</small>
-                <h2 style={{ margin: "3px 0 0", fontSize: 18 }}>{form.name}</h2>
-              </div>
-              <label style={{ fontSize: 10, fontWeight: 800, display: "flex", gap: 6, alignItems: "center" }}>
-                <input
-                  type="checkbox"
-                  disabled={!canEdit || form.visible_in_booking_engine === false}
-                  checked={Boolean(form.is_default) && form.visible_in_booking_engine !== false}
-                  onChange={e => setForm({ ...form, is_default: e.target.checked })}
-                />
-                Predeterminada
-              </label>
+      <section className={ui.editorPanel}>
+        {!form ? <div className={ui.empty}>Elegí una política para verla.</div> : <>
+          <div className={ui.editorHeader}>
+            <div><small className={ui.eyebrow}>CONFIGURACIÓN COMERCIAL</small><h2>{form.name}</h2></div>
+            <label className={ui.defaultToggle}>
+              <input type="checkbox" disabled={!canEdit || form.visible_in_booking_engine === false} checked={Boolean(form.is_default) && form.visible_in_booking_engine !== false} onChange={e => setForm({ ...form, is_default: e.target.checked })} />
+              Predeterminada
+            </label>
+          </div>
+
+          {error ? <div className={`${ui.message} ${ui.error}`}>{error}</div> : null}
+          {notice ? <div className={`${ui.message} ${ui.notice}`}>{notice}</div> : null}
+
+          <div className={ui.formGrid}>
+            <label className={ui.field}>Nombre visible<input disabled={!canEdit} value={form.name || ""} onChange={e => setForm({ ...form, name: e.target.value })} /></label>
+            <label className={ui.field}>Código<input disabled={!canEdit} value={form.code || ""} onChange={e => setForm({ ...form, code: e.target.value.toUpperCase() })} /></label>
+            <label className={ui.field}>Tipo<select disabled={!canEdit} value={form.policy_type || "custom"} onChange={e => setForm({ ...form, policy_type: e.target.value })}>{Object.entries(TYPES).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+            <label className={ui.field}>Moneda<select disabled={!canEdit} value={form.currency || currency} onChange={e => setForm({ ...form, currency: e.target.value })}>{["ARS", "USD", "EUR", "BRL", "CLP", "UYU"].map(v => <option key={v}>{v}</option>)}</select></label>
+            <label className={`${ui.field} ${ui.wide}`}>Descripción visible para el huésped<textarea disabled={!canEdit} rows="3" value={form.description || ""} onChange={e => setForm({ ...form, description: e.target.value })} /></label>
+          </div>
+
+          <div className={ui.softCard}>
+            <label className={ui.toggleRow}>
+              <input type="checkbox" disabled={!canEdit} checked={form.visible_in_booking_engine !== false} onChange={e => setForm({ ...form, visible_in_booking_engine: e.target.checked, is_default: e.target.checked ? form.is_default : false })} />
+              Visible en motor de reservas
+            </label>
+            <small>Si la ocultás, seguirá disponible para el equipo dentro del PMS. Las políticas sólo internas no pueden ser predeterminadas del motor.</small>
+          </div>
+
+          <div className={ui.rulesSection}>
+            <div className={ui.sectionHeader}>
+              <div><b>Cancelaciones antes de la llegada</b><small>Podés crear varios tramos según los días previos al check-in.</small></div>
+              {canEdit ? <button type="button" className={ui.ghostButton} onClick={() => setForm(current => ({ ...current, cancellation_rules: [...(current.cancellation_rules || []), { ...EMPTY_RULE }] }))}>+ Agregar regla</button> : null}
             </div>
-
-            {error ? <div style={{ marginTop: 10, padding: 9, borderRadius: 9, background: "color-mix(in srgb,var(--red) 7%,var(--panelSolid))", color: "var(--red)", fontSize: 10.5 }}>{error}</div> : null}
-            {notice ? <div style={{ marginTop: 10, padding: 9, borderRadius: 9, background: "color-mix(in srgb,#27a566 7%,var(--panelSolid))", color: "#247a50", fontSize: 10.5 }}>{notice}</div> : null}
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9, marginTop: 12 }}>
-              <label style={{ display: "grid", gap: 5, fontSize: 10, color: "var(--muted)" }}>Nombre visible<input disabled={!canEdit} style={inputStyle} value={form.name || ""} onChange={e => setForm({ ...form, name: e.target.value })} /></label>
-              <label style={{ display: "grid", gap: 5, fontSize: 10, color: "var(--muted)" }}>Código<input disabled={!canEdit} style={inputStyle} value={form.code || ""} onChange={e => setForm({ ...form, code: e.target.value.toUpperCase() })} /></label>
-              <label style={{ display: "grid", gap: 5, fontSize: 10, color: "var(--muted)" }}>Tipo<select disabled={!canEdit} value={form.policy_type || "custom"} onChange={e => setForm({ ...form, policy_type: e.target.value })}>{Object.entries(TYPES).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
-              <label style={{ display: "grid", gap: 5, fontSize: 10, color: "var(--muted)" }}>Moneda<select disabled={!canEdit} value={form.currency || currency} onChange={e => setForm({ ...form, currency: e.target.value })}>{["ARS", "USD", "EUR", "BRL", "CLP", "UYU"].map(v => <option key={v}>{v}</option>)}</select></label>
-              <label style={{ gridColumn: "1 / -1", display: "grid", gap: 5, fontSize: 10, color: "var(--muted)" }}>Descripción visible para el huésped<textarea disabled={!canEdit} rows="3" value={form.description || ""} onChange={e => setForm({ ...form, description: e.target.value })} /></label>
-            </div>
-
-            <div style={{ ...box, marginTop: 12, padding: 12 }}>
-              <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 11, fontWeight: 800 }}>
-                <input
-                  type="checkbox"
-                  disabled={!canEdit}
-                  checked={form.visible_in_booking_engine !== false}
-                  onChange={e => setForm({ ...form, visible_in_booking_engine: e.target.checked, is_default: e.target.checked ? form.is_default : false })}
-                />
-                Visible en motor de reservas
-              </label>
-              <small style={{ display: "block", marginTop: 5, color: "var(--muted)", fontSize: 9.5 }}>
-                Si la ocultás, seguirá disponible para el equipo dentro del PMS. Las políticas sólo internas no pueden ser predeterminadas del motor.
-              </small>
-            </div>
-
-            <div style={{ marginTop: 14 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-                <div>
-                  <b style={{ fontSize: 12 }}>Cancelaciones antes de la llegada</b>
-                  <small style={{ display: "block", marginTop: 2, color: "var(--muted)", fontSize: 9.5 }}>Podés crear varios tramos según los días previos al check-in.</small>
+            <div className={ui.rulesList}>
+              {(form.cancellation_rules || []).map((rule, index) => (
+                <div key={index} className={ui.ruleCard}>
+                  <label className={ui.ruleField}>Desde días antes<input disabled={!canEdit} type="number" min="0" value={rule.min_days_before || 0} onChange={e => updateRule(index, { min_days_before: num(e.target.value) })} /></label>
+                  <label className={ui.ruleField}>Cargo<select disabled={!canEdit} value={rule.charge_type || "none"} onChange={e => updateRule(index, { charge_type: e.target.value, value: e.target.value === "none" ? 0 : rule.value || 0 })}>{Object.entries(CHARGES).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+                  <label className={ui.ruleField}>Valor<input disabled={!canEdit || rule.charge_type === "none"} type="number" min="0" value={rule.value || 0} onChange={e => updateRule(index, { value: num(e.target.value) })} /></label>
+                  {canEdit && form.cancellation_rules.length > 1 ? <button type="button" className={ui.removeRule} onClick={() => setForm(current => ({ ...current, cancellation_rules: current.cancellation_rules.filter((_, i) => i !== index) }))} aria-label="Eliminar regla">×</button> : <span />}
                 </div>
-                {canEdit ? <button type="button" onClick={() => setForm(current => ({ ...current, cancellation_rules: [...(current.cancellation_rules || []), { ...EMPTY_RULE }] }))}>+ Agregar regla</button> : null}
-              </div>
-              <div style={{ display: "grid", gap: 7, marginTop: 8 }}>
-                {(form.cancellation_rules || []).map((rule, index) => (
-                  <div key={index} style={{ display: "grid", gridTemplateColumns: "120px 1fr 120px auto", gap: 7, alignItems: "end", padding: 10, border: "1px solid var(--line)", borderRadius: 10 }}>
-                    <label style={{ display: "grid", gap: 4, fontSize: 9.5, color: "var(--muted)" }}>Desde días antes<input disabled={!canEdit} type="number" min="0" value={rule.min_days_before || 0} onChange={e => updateRule(index, { min_days_before: num(e.target.value) })} /></label>
-                    <label style={{ display: "grid", gap: 4, fontSize: 9.5, color: "var(--muted)" }}>Cargo<select disabled={!canEdit} value={rule.charge_type || "none"} onChange={e => updateRule(index, { charge_type: e.target.value, value: e.target.value === "none" ? 0 : rule.value || 0 })}>{Object.entries(CHARGES).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
-                    <label style={{ display: "grid", gap: 4, fontSize: 9.5, color: "var(--muted)" }}>Valor<input disabled={!canEdit || rule.charge_type === "none"} type="number" min="0" value={rule.value || 0} onChange={e => updateRule(index, { value: num(e.target.value) })} /></label>
-                    {canEdit && form.cancellation_rules.length > 1 ? <button type="button" onClick={() => setForm(current => ({ ...current, cancellation_rules: current.cancellation_rules.filter((_, i) => i !== index) }))}>×</button> : <span />}
-                  </div>
-                ))}
-              </div>
+              ))}
             </div>
+          </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9, marginTop: 12 }}>
-              <ChargeEditor title="Penalidad por No Show" value={form.no_show_rule} onChange={value => setForm({ ...form, no_show_rule: value })} currency={form.currency} disabled={!canEdit} />
-              <ChargeEditor title="Checkout anticipado" value={form.early_checkout_rule} onChange={value => setForm({ ...form, early_checkout_rule: value })} currency={form.currency} disabled={!canEdit} />
-            </div>
+          <div className={ui.chargeGrid}>
+            <ChargeEditor title="Penalidad por No Show" icon="⊘" value={form.no_show_rule} onChange={value => setForm({ ...form, no_show_rule: value })} currency={form.currency} disabled={!canEdit} />
+            <ChargeEditor title="Checkout anticipado" icon="↪" value={form.early_checkout_rule} onChange={value => setForm({ ...form, early_checkout_rule: value })} currency={form.currency} disabled={!canEdit} />
+          </div>
 
-            <div style={{ ...box, marginTop: 12, padding: 12 }}>
-              <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 11, fontWeight: 800 }}>
+          <div className={ui.prepayCard}>
+            <div className={ui.prepayInline}>
+              <label className={ui.toggleRow}>
                 <input type="checkbox" disabled={!canEdit} checked={Boolean(form.prepayment_required)} onChange={e => setForm({ ...form, prepayment_required: e.target.checked })} />
                 Requiere pago anticipado / seña
               </label>
-              {form.prepayment_required ? (
-                <label style={{ display: "grid", gap: 5, maxWidth: 210, marginTop: 9, fontSize: 10, color: "var(--muted)" }}>
-                  Porcentaje anticipado
-                  <input disabled={!canEdit} type="number" min="0" max="100" value={form.prepayment_percent || 0} onChange={e => setForm({ ...form, prepayment_percent: Math.min(100, num(e.target.value)) })} />
-                </label>
-              ) : null}
-              <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 9, fontSize: 10.5 }}>
-                <input type="checkbox" disabled={!canEdit} checked={form.active !== false} onChange={e => setForm({ ...form, active: e.target.checked })} />
-                Política activa
-              </label>
             </div>
+            {form.prepayment_required ? <label className={ui.prepayField}>Porcentaje anticipado<input disabled={!canEdit} type="number" min="0" max="100" value={form.prepayment_percent || 0} onChange={e => setForm({ ...form, prepayment_percent: Math.min(100, num(e.target.value)) })} /></label> : null}
+            <div className={ui.activeRow}>
+              <label className={ui.toggleRow}><input type="checkbox" disabled={!canEdit} checked={form.active !== false} onChange={e => setForm({ ...form, active: e.target.checked })} />Política activa</label>
+            </div>
+          </div>
 
-            {canEdit ? (
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
-                {form.id && !form.is_default ? <button type="button" onClick={remove} disabled={saving}>Eliminar</button> : null}
-                <button type="button" onClick={save} disabled={saving} style={{ background: "var(--accent)", color: "#fff", borderColor: "var(--accent)" }}>{saving ? "Guardando…" : "Guardar política"}</button>
-              </div>
-            ) : null}
-          </>
-        )}
+          {canEdit ? <div className={ui.actions}>
+            {form.id && !form.is_default ? <button type="button" className={ui.deleteButton} onClick={remove} disabled={saving}>Eliminar</button> : null}
+            <button type="button" className={ui.saveButton} onClick={save} disabled={saving}>{saving ? "Guardando…" : "Guardar política"}</button>
+          </div> : null}
+        </>}
       </section>
     </div>
   )
