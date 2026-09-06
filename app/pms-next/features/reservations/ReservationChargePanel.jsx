@@ -27,7 +27,7 @@ export default function ReservationChargePanel({reservation,propertyId,onClose,o
 
   useEffect(()=>{if(!selected)return;const defaultQty=selected.charge_mode==="per_person"||selected.charge_mode==="per_person_night"?Math.max(1,Number(reservation.cantidad_huespedes)||1):1;setQuantity(defaultQty);setWholeStay(true);setFrom(stayStart);setTo(stayEnd);setNote("")},[selectedId])
   function toggleWholeStay(checked){setWholeStay(checked);if(checked){setFrom(stayStart);setTo(stayEnd)}}
-  function changeFrom(value){const next=value<stayStart?stayStart:value>=stayEnd?stayStart:value;setFrom(next);if(to<=next)setTo(nextDayWithin(next,stayEnd)) ;setWholeStay(next===stayStart&&to===stayEnd)}
+  function changeFrom(value){const next=value<stayStart?stayStart:value>=stayEnd?stayStart:value;setFrom(next);if(to<=next)setTo(nextDayWithin(next,stayEnd));setWholeStay(next===stayStart&&to===stayEnd)}
   function changeTo(value){const next=value>stayEnd?stayEnd:value<=from?nextDayWithin(from,stayEnd):value;setTo(next);setWholeStay(from===stayStart&&next===stayEnd)}
 
   async function addCharge(){
@@ -53,10 +53,10 @@ export default function ReservationChargePanel({reservation,propertyId,onClose,o
   }
 
   return <div className={s.backdrop} onMouseDown={event=>event.target===event.currentTarget&&onClose?.()}><section className={s.modal} role="dialog" aria-modal="true" aria-label="Agregar cargo a la reserva">
-    <button type="button" className={s.close} onClick={onClose}>×</button><small className={s.eyebrow}>ARTÍCULOS · NUEVO CARGO</small><h2>Agregar extra a {reservation.nombre_huesped}</h2><p className={s.intro}>Seleccioná un ítem del catálogo y definí cuánto corresponde cargar en esta estadía.</p>
+    <button type="button" className={s.close} onClick={onClose}>×</button><small className={s.eyebrow}>ARTÍCULOS · NUEVO CARGO</small><h2>Agregar extra a {reservation.nombre_huesped}</h2><p className={s.intro}>Elegí el extra y definí cuánto corresponde cargar en esta estadía.</p>
     {error?<div className={s.error}>{error}</div>:null}
     {loading?<div className={s.empty}>Cargando extras disponibles…</div>:!catalog.length?<div className={s.empty}>No hay servicios o extras activos. Primero cargalos desde Servicios y extras.</div>:<>
-      <div className={s.catalog}>{catalog.map(row=><button type="button" key={row.id} className={String(row.id)===String(selectedId)?s.selected:""} onClick={()=>setSelectedId(row.id)}><span><b>{row.name}</b><small>{CATEGORY_LABEL[row.category]||row.category} · {MODE_LABEL[row.charge_mode]||row.charge_mode}</small></span><strong>{money(row.amount,currency)}</strong></button>)}</div>
+      <label className={s.picker}><span>Extra</span><div className={s.selectShell}><select value={selectedId} onChange={event=>setSelectedId(event.target.value)}>{catalog.map(row=><option key={row.id} value={row.id}>{row.name} · {money(row.amount,currency)} · {MODE_LABEL[row.charge_mode]||row.charge_mode}</option>)}</select></div>{selected?<small>{CATEGORY_LABEL[selected.category]||selected.category} · {MODE_LABEL[selected.charge_mode]||selected.charge_mode} · {money(selected.amount,currency)}</small>:null}</label>
       {selected?<div className={s.form}>
         <label>{unitLabel}<input type="number" min="1" max="99" value={quantity} onChange={event=>setQuantity(Math.max(1,Number(event.target.value)||1))}/></label>
         {timed?<><label className={s.check}><input type="checkbox" checked={wholeStay} onChange={event=>toggleWholeStay(event.target.checked)}/><span>Toda la estadía ({stayNights} noche{stayNights===1?"":"s"})</span></label><label>Desde<input type="date" min={stayStart} max={stayEnd} value={from} disabled={wholeStay} onChange={event=>changeFrom(event.target.value)}/></label><label>Hasta<input type="date" min={stayStart} max={stayEnd} value={to} disabled={wholeStay} onChange={event=>changeTo(event.target.value)}/></label></>:null}
