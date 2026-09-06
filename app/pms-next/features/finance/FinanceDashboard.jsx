@@ -2,6 +2,7 @@
 
 import{useCallback,useEffect,useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
+import usePmsAutoRefresh from"../../core/usePmsAutoRefresh"
 import s from"./finance.module.css"
 
 function iso(date){return new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,10)}
@@ -34,6 +35,7 @@ export default function FinanceDashboard({propertyId}){
     finally{setLoading(false)}
   },[propertyId,period])
   useEffect(()=>{load()},[load])
+  usePmsAutoRefresh(propertyId,load,["reservas","pagos","habitaciones"])
   useEffect(()=>{setRecentLimit(RECENT_STEP)},[period,propertyId])
 
   const metrics=useMemo(()=>{
