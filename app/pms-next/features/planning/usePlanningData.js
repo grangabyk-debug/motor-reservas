@@ -10,10 +10,12 @@ const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"curren
 function toast(detail){if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("hl:pms-toast",{detail}))}
 const uniqueNumeric=values=>[...new Set((values||[]).map(Number).filter(Number.isFinite))]
 const reservationRooms=item=>uniqueNumeric([item.habitacion_id,...(item.habitaciones_ids||[])])
+const policySnapshot=policy=>policy?{id:policy.id,code:policy.code,name:policy.name,description:policy.description,policy_type:policy.policy_type,language:policy.language,currency:policy.currency,cancellation_rules:policy.cancellation_rules||[],no_show_rule:policy.no_show_rule||{charge_type:"none",value:0},early_checkout_rule:policy.early_checkout_rule||{charge_type:"none",value:0},prepayment_required:Boolean(policy.prepayment_required),prepayment_percent:Number(policy.prepayment_percent)||0,captured_at:new Date().toISOString()}:{}
 
 export default function usePlanningData(propertyId,windowStart,windowEndExclusive){
   const[rooms,setRooms]=useState([])
   const[reservations,setReservations]=useState([])
+  const[cancellationPolicies,setCancellationPolicies]=useState([])
   const[loading,setLoading]=useState(true)
   const[error,setError]=useState("")
 
@@ -22,30 +24,32 @@ export default function usePlanningData(propertyId,windowStart,windowEndExclusiv
     if(!silent)setLoading(true)
     setError("")
     try{
-      const[roomRes,resRes,floorRes,paymentRes]=await Promise.all([
+      const[roomRes,resRes,floorRes,paymentRes,policyRes]=await Promise.all([
         supabase.from("habitaciones").select("id,nombre,tipo,capacidad,precio,estado,activa,sort_order,housekeeping_zone,floor_id").eq("property_id",propertyId).eq("activa",true),
-        supabase.from("reservas").select("id,numero_reserva,nombre_huesped,email_huesped,telefono_huesped,habitacion_id,habitaciones_ids,habitaciones_detalle,fecha_entrada,fecha_salida,estado,tarifa_noche,precio_total,moneda,canal_reserva,cantidad_huespedes,no_show,tipo_estadia,notas").eq("property_id",propertyId).neq("estado","cancelada").lt("fecha_entrada",windowEndExclusive).gte("fecha_salida",windowStart).order("fecha_entrada"),
+        supabase.from("reservas").select("id,numero_reserva,nombre_huesped,email_huesped,telefono_huesped,habitacion_id,habitaciones_ids,habitaciones_detalle,fecha_entrada,fecha_salida,estado,tarifa_noche,precio_total,moneda,canal_reserva,cantidad_huespedes,no_show,tipo_estadia,notas,cancellation_policy_id,cancellation_policy_snapshot").eq("property_id",propertyId).neq("estado","cancelada").lt("fecha_entrada",windowEndExclusive).gte("fecha_salida",windowStart).order("fecha_entrada"),
         supabase.from("hotel_floors").select("id,name,sort_order,active").eq("property_id",propertyId).eq("active",true).order("sort_order"),
         supabase.from("pagos").select("id,reserva_id,monto,moneda,estado,created_at").eq("property_id",propertyId).eq("estado","confirmado"),
+        supabase.from("hotel_cancellation_policies").select("id,code,name,description,policy_type,language,currency,cancellation_rules,no_show_rule,early_checkout_rule,prepayment_required,prepayment_percent,active,is_default").eq("property_id",propertyId).eq("active",true).order("is_default",{ascending:false}).order("name"),
       ])
       if(roomRes.error)throw roomRes.error
       if(resRes.error)throw resRes.error
       if(floorRes.error)throw floorRes.error
+      if(policyRes.error)throw policyRes.error
       const floorById=new Map((floorRes.data||[]).map(floor=>[String(floor.id),floor]))
       const roomRows=(roomRes.data||[]).map(room=>{const floor=floorById.get(String(room.floor_id||""));return{...room,floor_name:floor?.name||"Sin piso",floor_sort:Number(floor?.sort_order??999)}}).sort((a,b)=>a.floor_sort-b.floor_sort||Number(a.sort_order||0)-Number(b.sort_order||0)||String(a.nombre).localeCompare(String(b.nombre),"es",{numeric:true}))
       const enriched=attachPayments(resRes.data||[],paymentRes.error?[]:paymentRes.data||[])
-      setRooms(roomRows);setReservations(enriched)
+      setRooms(roomRows);setReservations(enriched);setCancellationPolicies(policyRes.data||[])
     }catch(err){setError(err?.message||"No se pudo cargar el Planning.")}
     finally{if(!silent)setLoading(false)}
   },[propertyId,windowStart,windowEndExclusive])
 
   useEffect(()=>{load()},[load])
-  useEffect(()=>{if(typeof window==="undefined")return;const refresh=()=>load(true);window.addEventListener("hl:pms-payment-updated",refresh);window.addEventListener("hl:pms-reservation-updated",refresh);return()=>{window.removeEventListener("hl:pms-payment-updated",refresh);window.removeEventListener("hl:pms-reservation-updated",refresh)}},[load])
+  useEffect(()=>{if(typeof window==="undefined")return;const refresh=()=>load(true);window.addEventListener("hl:pms-payment-updated",refresh);window.addEventListener("hl:pms-reservation-updated",refresh);window.addEventListener("hl:pms-cancellation-policies-updated",refresh);return()=>{window.removeEventListener("hl:pms-payment-updated",refresh);window.removeEventListener("hl:pms-reservation-updated",refresh);window.removeEventListener("hl:pms-cancellation-policies-updated",refresh)}},[load])
   useEffect(()=>{
     if(!propertyId)return
     let timer=null
     const refresh=()=>{if(timer)clearTimeout(timer);timer=setTimeout(()=>load(true),70)}
-    const channel=supabase.channel(`hl-planning-live-${propertyId}`).on("postgres_changes",{event:"*",schema:"public",table:"reservas",filter:`property_id=eq.${propertyId}`},refresh).on("postgres_changes",{event:"*",schema:"public",table:"pagos",filter:`property_id=eq.${propertyId}`},refresh).subscribe()
+    const channel=supabase.channel(`hl-planning-live-${propertyId}`).on("postgres_changes",{event:"*",schema:"public",table:"reservas",filter:`property_id=eq.${propertyId}`},refresh).on("postgres_changes",{event:"*",schema:"public",table:"pagos",filter:`property_id=eq.${propertyId}`},refresh).on("postgres_changes",{event:"*",schema:"public",table:"hotel_cancellation_policies",filter:`property_id=eq.${propertyId}`},refresh).subscribe()
     return()=>{if(timer)clearTimeout(timer);supabase.removeChannel(channel)}
   },[propertyId,load])
 
@@ -87,6 +91,8 @@ export default function usePlanningData(propertyId,windowStart,windowEndExclusiv
     if(!roomIds.length)throw new Error("Elegí al menos una habitación.")
     const selectedRooms=roomIds.map(id=>rooms.find(room=>Number(room.id)===id)).filter(Boolean)
     if(selectedRooms.length!==roomIds.length)throw new Error("Hay una habitación seleccionada que ya no está disponible en esta propiedad.")
+    const policy=cancellationPolicies.find(row=>String(row.id)===String(draft.cancellationPolicyId))||cancellationPolicies.find(row=>row.is_default)||cancellationPolicies[0]
+    if(!policy)throw new Error("Configurá una política de cancelación antes de crear la reserva.")
 
     const{data:conflicts,error:conflictError}=await supabase.from("reservas").select("id,numero_reserva,habitacion_id,habitaciones_ids,fecha_entrada,fecha_salida,estado,no_show").eq("property_id",propertyId).neq("estado","cancelada").eq("no_show",false).lt("fecha_entrada",draft.end).gt("fecha_salida",draft.start)
     if(conflictError)throw conflictError
@@ -105,6 +111,7 @@ export default function usePlanningData(propertyId,windowStart,windowEndExclusiv
       habitaciones_detalle:details,
       fecha_entrada:draft.start,fecha_salida:draft.end,tipo_estadia:"overnight",nombre_huesped:draft.guest.trim(),email_huesped:draft.email?.trim()||null,telefono_huesped:draft.phone?.trim()||null,pais_huesped:draft.country?.trim()||null,
       cantidad_huespedes:totalGuests,canal_reserva:draft.channel||"Walk-in",codigo_canal:draft.voucher?.trim()||null,tarifa_noche:rate,noches:nights,subtotal,descuento_tipo:discountType==="none"?null:discountType,descuento_valor:discountType==="none"?0:discountValue,descuento_importe:discountAmount,precio_total:total,moneda:draft.currency||"ARS",notas:draft.notes?.trim()||null,
+      cancellation_policy_id:policy.id,cancellation_policy_snapshot:policySnapshot(policy),
       mascotas:[],mascotas_total:0,servicios:[],pasajeros:[],vehiculos:0,cochera_total:0,estado:draft.status||"confirmada",no_show:false,
     }
     const{data,error:rpcError}=await supabase.rpc("hl_create_reservation_atomic",{p_reservation:payload,p_payments:[]})
@@ -112,10 +119,10 @@ export default function usePlanningData(propertyId,windowStart,windowEndExclusiv
     const created={...data,payment_paid:0,payment_foreign_count:0,payment_last_id:null,payment_last_at:null}
     if(data.fecha_entrada<windowEndExclusive&&data.fecha_salida>=windowStart)setReservations(list=>[...list,created])
     const names=selectedRooms.map(room=>room.nombre).join(", ")
-    toast({title:roomIds.length>1?"Reserva grupal creada":"Reserva creada",message:`${draft.guest.trim()} · ${roomIds.length>1?`${roomIds.length} habitaciones (${names})`:`Habitación ${names}`} · ${nights} noche${nights===1?"":"s"}.`})
+    toast({title:roomIds.length>1?"Reserva grupal creada":"Reserva creada",message:`${draft.guest.trim()} · ${roomIds.length>1?`${roomIds.length} habitaciones (${names})`:`Habitación ${names}`} · ${nights} noche${nights===1?"":"s"} · ${policy.name}.`})
     if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("hl:pms-reservation-updated",{detail:{reservationId:data.id}}))
     return created
-  },[propertyId,rooms,windowStart,windowEndExclusive])
+  },[propertyId,rooms,cancellationPolicies,windowStart,windowEndExclusive])
 
-  return{rooms,reservations,loading,error,setError,load,moveReservation,createReservation}
+  return{rooms,reservations,cancellationPolicies,loading,error,setError,load,moveReservation,createReservation}
 }
