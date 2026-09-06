@@ -2,6 +2,7 @@
 
 import{useCallback,useEffect,useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
+import usePmsAutoRefresh from"../../core/usePmsAutoRefresh"
 
 export default function useOperationsData(propertyId){
   const[tickets,setTickets]=useState([]),[guestRequests,setGuestRequests]=useState([]),[reservations,setReservations]=useState([])
@@ -31,6 +32,7 @@ export default function useOperationsData(propertyId){
   },[propertyId])
 
   useEffect(()=>{load()},[load])
+  usePmsAutoRefresh(propertyId,load,["reservas","habitaciones","hotel_housekeeping_tasks","hotel_maintenance_tickets","hotel_guest_requests"])
 
   const roomById=useMemo(()=>new Map(rooms.map(room=>[Number(room.id),room])),[rooms]),profileById=useMemo(()=>new Map(profiles.map(profile=>[profile.id,profile])),[profiles]),reservationById=useMemo(()=>new Map(reservations.map(item=>[Number(item.id),item])),[reservations])
 
