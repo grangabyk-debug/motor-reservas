@@ -6,6 +6,7 @@ import s from"./cashActions.module.css"
 
 const RESERVATION_SELECT="id,numero_reserva,nombre_huesped,fecha_entrada,fecha_salida,precio_total,subtotal,moneda,estado,servicios,cochera_total,mascotas_total,early_checkin_importe,late_checkout_importe,extra,extra_descripcion"
 const PAYMENT_METHODS=["Efectivo","Transferencia bancaria","Tarjeta de débito","Tarjeta de crédito","Billetera virtual / QR","Cuenta corriente","Voucher / Agencia","Cheque","Otro"]
+const CASH_PREFILL_KEY="hl:pms:cash-prefill"
 const normalize=value=>String(value||"").trim().toLowerCase()
 const validPayment=row=>!["anulado","cancelado","void","rechazado"].includes(normalize(row?.estado))
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:2}).format(Number(value)||0)
@@ -56,7 +57,16 @@ export default function ReservationPaymentPanel({propertyId,reservationId,sessio
       ])
       if(reservationRes.error)throw reservationRes.error;if(paymentRes.error)throw paymentRes.error
       const row=reservationRes.data,pays=paymentRes.data||[],pending=Math.max(0,Number(row.precio_total||0)-paidTotal(pays))
-      setReservation(row);setPayments(pays);setAmount(pending?String(pending):"");setReference("");setNote("");setPaymentParts([]);setCashReceived("")
+      let requested=pending,prefillReason=""
+      if(typeof window!=="undefined")try{
+        const raw=window.sessionStorage.getItem(CASH_PREFILL_KEY)
+        if(raw){
+          const parsed=JSON.parse(raw),createdAt=Number(parsed?.createdAt||0),fresh=createdAt>0&&Date.now()-createdAt<5*60*1000,matches=Number(parsed?.reservationId)===Number(row.id),desired=roundMoney(amountNumber(parsed?.amount))
+          if(matches&&fresh&&desired>0){requested=Math.min(pending,desired);prefillReason=String(parsed?.reason||"")}
+          if(matches||!fresh)window.sessionStorage.removeItem(CASH_PREFILL_KEY)
+        }
+      }catch{try{window.sessionStorage.removeItem(CASH_PREFILL_KEY)}catch{}}
+      setReservation(row);setPayments(pays);setAmount(requested?String(requested):"");setReference("");setNote(prefillReason==="no_show_penalty"?"Penalidad por No Show":"");setPaymentParts([]);setCashReceived("")
     }catch(err){setError(err?.message||"No se pudo cargar la reserva para cobrar.")}
     finally{setLoading(false)}
   },[propertyId])
