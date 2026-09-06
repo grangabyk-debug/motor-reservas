@@ -66,7 +66,7 @@ export default function PlanningWorkspace({propertyId,property,onNavigate,newRes
   function roomRate(roomIds){return uniqueIds(roomIds).reduce((sum,id)=>sum+(Number(data.rooms.find(room=>String(room.id)===id)?.precio)||0),0)}
   function makeDraft(roomId=data.rooms[0]?.id,start=today,end=addDays(start,1),roomIds=[roomId]){
     const ids=uniqueIds(roomIds.length?roomIds:[roomId])
-    return{firstName:"",lastName:"",email:"",phone:"",country:"",roomId:ids[0]||"",roomIds:ids,start,end,status:"confirmada",guests:1,rate:roomRate(ids),currency:"ARS",channel:"Walk-in",voucher:"",discountType:"none",discountValue:0,notes:"",cancellationPolicyId:defaultPolicyId}
+    return{firstName:"",lastName:"",email:"",phone:"",country:"",roomId:ids[0]||"",roomIds:ids,start,end,status:"confirmada",guests:1,rate:roomRate(ids),currency:"ARS",channel:"Walk-in",voucher:"",discountType:"none",discountValue:0,discountReason:"",discountReasonDetail:"",notes:"",cancellationPolicyId:defaultPolicyId}
   }
   function openFreshForm(roomId=data.rooms[0]?.id,start=today,end=addDays(start,1),roomIds=[roomId]){
     if(!roomId)return data.setError("Primero configurá una habitación activa.")
@@ -90,6 +90,9 @@ export default function PlanningWorkspace({propertyId,property,onNavigate,newRes
   async function saveReservation(){
     if(saving)return
     const guest=`${draft?.firstName||""} ${draft?.lastName||""}`.trim();if(!String(draft?.firstName||"").trim()||!String(draft?.lastName||"").trim())return showFormError("Completá nombre y apellido para crear la reserva.");if(!draft?.cancellationPolicyId)return showFormError("Seleccioná una política de cancelación para esta reserva.")
+    const discountType=draft?.discountType||"none",discountValue=Math.max(0,Number(draft?.discountValue)||0),hasDiscount=discountType!=="none"&&discountValue>0
+    if(hasDiscount&&!String(draft?.discountReason||"").trim())return showFormError("Indicá el motivo del descuento. El sistema no aplica descuentos sin una causa explícita.")
+    if(hasDiscount&&draft?.discountReason==="other"&&!String(draft?.discountReasonDetail||"").trim())return showFormError("Especificá el motivo del descuento.")
     setSaving(true);setFormError("")
     try{
       const quoteId=draft?.quoteId,created=await data.createReservation({...draft,guest})
