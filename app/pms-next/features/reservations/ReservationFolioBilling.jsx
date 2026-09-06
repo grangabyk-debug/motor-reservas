@@ -3,6 +3,8 @@
 import{useCallback,useEffect,useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 import s from"./reservationFolioBilling.module.css"
+import ReservationInvoiceDialog from"./ReservationInvoiceDialog"
+import{printReservationFolio}from"./reservationFolioPrint"
 
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:2}).format(Number(value)||0)
 const fmtDate=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short"}).format(new Date(`${String(value).slice(0,10)}T12:00:00`)).replace(".",""):"—"
@@ -12,7 +14,6 @@ const netPayment=row=>validPayment(row)?Math.max(0,Number(row?.monto||0)-Number(
 const payerLabels={guest:"Huésped",company:"Empresa",agency:"Agencia",group:"Grupo",other:"Otro"}
 const typeLabels={lodging:"Alojamiento",parking:"Cochera",pet:"Mascotas",service:"Servicio",extra:"Extra",discount:"Descuento",adjustment:"Ajuste",fee:"Cargo"}
 const escapeHtml=value=>String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"})[char])
-const blankInvoiceLine=()=>({folio_item_id:null,description:"",quantity:1,unit_price:0,tax_rate:21})
 
 export default function ReservationFolioBilling({reservation,propertyId,property,onNavigate}){
   const[folios,setFolios]=useState([])
@@ -280,15 +281,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
     finally{setSaving(false)}
   }
 
-  function printFolio(){
-    if(!selected)return
-    const popup=window.open("","_blank","width=900,height=760")
-    if(!popup){setError("El navegador bloqueó la ventana de impresión.");return}
-    const lines=folioItems.map(row=>`<tr><td>${escapeHtml(fmtDate(row.service_date))}</td><td><b>${escapeHtml(row.description)}</b><small>${escapeHtml(row.detail||typeLabels[row.source_type]||row.source_type)}</small></td><td>${escapeHtml(row.quantity)}</td><td>${escapeHtml(money(row.total,row.currency))}</td></tr>`).join("")
-    const payLines=folioPayments.map(payment=>{const allocation=folioAllocations.find(row=>Number(row.payment_id)===Number(payment.id));return `<tr><td>${escapeHtml(fmtDateTime(payment.created_at))}</td><td>${escapeHtml(payment.metodo||"Pago")}</td><td></td><td>-${escapeHtml(money(allocation?.amount||0,payment.moneda||selected.currency))}</td></tr>`}).join("")
-    popup.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(selected.label)}</title><style>body{font-family:Arial,sans-serif;color:#202332;padding:34px}header{display:flex;justify-content:space-between;border-bottom:2px solid #6d5ce8;padding-bottom:16px;margin-bottom:20px}h1{font-size:24px;margin:0}p{margin:4px 0;color:#666}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{padding:10px;border-bottom:1px solid #ddd;text-align:left;font-size:12px}td:last-child,th:last-child{text-align:right}small{display:block;color:#777;margin-top:3px}.totals{margin:22px 0 0 auto;width:300px}.totals div{display:flex;justify-content:space-between;padding:7px 0}.totals .balance{font-size:18px;font-weight:700;border-top:2px solid #222}@media print{button{display:none}}</style></head><body><header><div><h1>${escapeHtml(property?.name||"Habitación Llena")}</h1><p>${escapeHtml(selected.label)} · Reserva ${escapeHtml(reservation.numero_reserva||reservation.id)}</p><p>${escapeHtml(reservation.nombre_huesped)} · ${escapeHtml(reservation.fecha_entrada)} → ${escapeHtml(reservation.fecha_salida)}</p></div><div><b>FOLIO</b><p>${escapeHtml(payerLabels[selected.payer_type]||selected.payer_type)}${selected.payer_name?` · ${escapeHtml(selected.payer_name)}`:""}</p></div></header><table><thead><tr><th>Fecha</th><th>Concepto</th><th>Cant.</th><th>Importe</th></tr></thead><tbody>${lines}${payLines}</tbody></table><div class="totals"><div><span>Cargos</span><b>${escapeHtml(money(selectedStats.charges,selected.currency))}</b></div><div><span>Pagos</span><b>-${escapeHtml(money(selectedStats.paid,selected.currency))}</b></div><div class="balance"><span>Saldo</span><b>${escapeHtml(money(balance,selected.currency))}</b></div></div><script>window.onload=()=>window.print()</script></body></html>`)
-    popup.document.close()
-  }
+  function printFolio(){printReservationFolio({selected,folioItems,folioPayments,folioAllocations,selectedStats,balance,reservation,property,setError})}
 
   if(loading)return <section className={s.card}><div className={s.empty}>Armando folios de la reserva…</div></section>
 
@@ -361,49 +354,39 @@ export default function ReservationFolioBilling({reservation,propertyId,property
       <footer><button onClick={()=>setNewOpen(false)}>Cancelar</button><button className={s.primary} onClick={createFolio} disabled={saving||!newDraft.label.trim()}>{saving?"Creando…":"Crear folio"}</button></footer>
     </div></div>:null}
 
-    {invoiceOpen&&selected?<div className={s.overlay} onMouseDown={event=>event.target===event.currentTarget&&setInvoiceOpen(false)}><div className={`${s.modal} ${s.invoiceModal}`}>
-      <button className={s.close} onClick={()=>setInvoiceOpen(false)}>×</button>
-      <small>NUEVO DOCUMENTO</small>
-      <h2>Crear factura / documento</h2>
-
-      <div className={s.formGrid}>
-        <label className={s.full}><span>Vincular reserva</span><input value={`${reservation.numero_reserva||`#${reservation.id}`} · ${reservation.nombre_huesped||"Huésped"} · ${selected.label}`} readOnly/></label>
-      </div>
-
-      <div className={s.invoiceScope}>
-        <div><span>Qué facturar</span><small>El comprobante queda vinculado a esta reserva y a {selected.label}.</small></div>
-        <div className={s.scopeButtons}>
-          <button type="button" className={invoiceMode==="folio"?s.scopeActive:""} onClick={()=>changeInvoiceMode("folio")}>Cargos del folio</button>
-          <button type="button" className={invoiceMode==="payment"?s.scopeActive:""} onClick={()=>changeInvoiceMode("payment")}>Pago registrado</button>
-        </div>
-        <p>{invoiceMode==="folio"?(checkedInvoiceItems.length?`${checkedInvoiceItems.length} cargo${checkedInvoiceItems.length===1?"":"s"} seleccionado${checkedInvoiceItems.length===1?"":"s"} · facturación parcial.`:invoiceableItems.length?`Se cargarán los ${invoiceableItems.length} cargos pendientes del folio.`:"Este folio no tiene cargos pendientes; podés agregar un concepto manualmente."):"Elegí uno de los pagos asignados al folio para preparar el comprobante sobre ese importe."}</p>
-      </div>
-
-      {invoiceMode==="payment"?<label className={s.paymentPicker}><span>Pago a facturar</span><select value={invoicePaymentId} onChange={event=>chooseInvoicePayment(event.target.value)}><option value="">Elegir pago…</option>{folioPayments.map(payment=>{const alloc=folioAllocations.find(row=>Number(row.payment_id)===Number(payment.id));return <option key={payment.id} value={payment.id}>{payment.metodo||"Pago"} · {money(alloc?.amount||0,payment.moneda||selected.currency)} · {fmtDateTime(payment.created_at)}</option>})}</select></label>:null}
-
-      <div className={s.formGrid}>
-        <label><span>Cliente</span><input value={billingName} onChange={event=>setBillingName(event.target.value)}/></label>
-        <label><span>Email</span><input type="email" value={billingEmail} onChange={event=>setBillingEmail(event.target.value)}/></label>
-        <label><span>Teléfono</span><input value={billingPhone} onChange={event=>setBillingPhone(event.target.value)}/></label>
-        <label><span>Vencimiento</span><input type="date" value={billingDueAt} onChange={event=>setBillingDueAt(event.target.value)}/></label>
-        <label><span>Moneda</span><select value={billingCurrency} onChange={event=>setBillingCurrency(event.target.value)}><option value="ARS">ARS</option><option value="USD">USD</option></select></label>
-        <label><span>Estado inicial</span><select value={billingStatus} onChange={event=>setBillingStatus(event.target.value)}><option value="draft">Borrador</option><option value="issued">Emitido</option></select></label>
-      </div>
-
-      <div className={s.invoiceLines}>
-        <header><h3>Conceptos</h3><button type="button" onClick={()=>setInvoiceLines(current=>[...current,blankInvoiceLine()])}>＋ Agregar línea</button></header>
-        {invoiceLines.length?invoiceLines.map((line,index)=><div className={s.invoiceLine} key={`${line.folio_item_id||"manual"}-${index}`} data-discount={line.source_type==="discount"?"true":"false"}>
-          <input aria-label="Descripción" placeholder="Descripción" value={line.description} onChange={event=>updateInvoiceLine(index,"description",event.target.value)}/>
-          <input aria-label="Cantidad" type="number" min="0" step="1" value={line.quantity} onChange={event=>updateInvoiceLine(index,"quantity",event.target.value)}/>
-          <input aria-label="Precio unitario" type="number" step="0.01" value={line.unit_price} onChange={event=>updateInvoiceLine(index,"unit_price",event.target.value)}/>
-          <label><span>IVA %</span><input type="number" min="0" max="100" step="0.01" value={line.tax_rate} onChange={event=>updateInvoiceLine(index,"tax_rate",event.target.value)}/></label>
-          <button type="button" aria-label="Quitar línea" onClick={()=>setInvoiceLines(current=>current.filter((_,i)=>i!==index))}>×</button>
-        </div>):<div className={s.invoiceEmpty}>No hay conceptos cargados todavía.</div>}
-      </div>
-
-      <label className={s.notes}><span>Nota interna</span><textarea value={billingNotes} onChange={event=>setBillingNotes(event.target.value)} placeholder={`Factura vinculada a ${selected.label}`}/></label>
-      <div className={s.invoiceTotals}><span>Subtotal <b>{money(invoiceCalc.subtotal,billingCurrency)}</b></span><span>Impuestos <b>{money(invoiceCalc.tax,billingCurrency)}</b></span><strong>Total {money(invoiceCalc.total,billingCurrency)}</strong></div>
-      <div className={s.documentActions}><button className={s.primary} type="button" onClick={prepareInvoice} disabled={saving||(invoiceMode==="payment"&&!invoicePaymentId)}>{saving?"Guardando…":"Crear documento"}</button></div>
-    </div></div>:null}
+    <ReservationInvoiceDialog
+      open={invoiceOpen}
+      selected={selected}
+      reservation={reservation}
+      invoiceMode={invoiceMode}
+      changeInvoiceMode={changeInvoiceMode}
+      checkedInvoiceItems={checkedInvoiceItems}
+      invoiceableItems={invoiceableItems}
+      invoicePaymentId={invoicePaymentId}
+      chooseInvoicePayment={chooseInvoicePayment}
+      folioPayments={folioPayments}
+      folioAllocations={folioAllocations}
+      billingName={billingName}
+      setBillingName={setBillingName}
+      billingEmail={billingEmail}
+      setBillingEmail={setBillingEmail}
+      billingPhone={billingPhone}
+      setBillingPhone={setBillingPhone}
+      billingDueAt={billingDueAt}
+      setBillingDueAt={setBillingDueAt}
+      billingCurrency={billingCurrency}
+      setBillingCurrency={setBillingCurrency}
+      billingStatus={billingStatus}
+      setBillingStatus={setBillingStatus}
+      invoiceLines={invoiceLines}
+      setInvoiceLines={setInvoiceLines}
+      updateInvoiceLine={updateInvoiceLine}
+      billingNotes={billingNotes}
+      setBillingNotes={setBillingNotes}
+      invoiceCalc={invoiceCalc}
+      saving={saving}
+      prepareInvoice={prepareInvoice}
+      onClose={()=>setInvoiceOpen(false)}
+    />
   </section>
 }
