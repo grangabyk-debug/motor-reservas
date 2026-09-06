@@ -11,6 +11,7 @@ function toast(detail){if(typeof window!=="undefined")window.dispatchEvent(new C
 const uniqueNumeric=values=>[...new Set((values||[]).map(Number).filter(Number.isFinite))]
 const reservationRooms=item=>uniqueNumeric([item.habitacion_id,...(item.habitaciones_ids||[])])
 const policySnapshot=policy=>policy?{id:policy.id,code:policy.code,name:policy.name,description:policy.description,policy_type:policy.policy_type,language:policy.language,currency:policy.currency,cancellation_rules:policy.cancellation_rules||[],no_show_rule:policy.no_show_rule||{charge_type:"none",value:0},early_checkout_rule:policy.early_checkout_rule||{charge_type:"none",value:0},prepayment_required:Boolean(policy.prepayment_required),prepayment_percent:Number(policy.prepayment_percent)||0,captured_at:new Date().toISOString()}:{}
+const DISCOUNT_REASON_LABELS={group:"Grupo / varias habitaciones",long_stay:"Estadía prolongada",promotion:"Promoción comercial",commercial:"Acuerdo comercial",loyalty:"Fidelización",courtesy:"Cortesía",other:"Otro"}
 
 export default function usePlanningData(propertyId,windowStart,windowEndExclusive){
   const[rooms,setRooms]=useState([])
@@ -106,11 +107,15 @@ export default function usePlanningData(propertyId,windowStart,windowEndExclusiv
     const totalGuests=requestedGuests,defaultRate=details.reduce((sum,item)=>sum+item.tarifa_noche,0),nights=nightsBetween(draft.start,draft.end),rate=Number(draft.rate||defaultRate||0),subtotal=rate*nights
     const discountType=draft.discountType||"none",discountValue=Math.max(0,Number(draft.discountValue)||0)
     const discountAmount=discountType==="percent"?Math.min(subtotal,subtotal*Math.min(100,discountValue)/100):discountType==="amount"?Math.min(subtotal,discountValue):0,total=Math.max(0,subtotal-discountAmount)
+    const reasonKey=String(draft.discountReason||"").trim(),reasonDetail=String(draft.discountReasonDetail||"").trim()
+    if(discountAmount>0&&!reasonKey)throw new Error("Indicá el motivo del descuento antes de crear la reserva.")
+    if(discountAmount>0&&reasonKey==="other"&&!reasonDetail)throw new Error("Especificá el motivo del descuento.")
+    const reasonLabel=DISCOUNT_REASON_LABELS[reasonKey]||reasonKey,discountReason=discountAmount>0?`${reasonLabel}${reasonDetail?` · ${reasonDetail}`:""}`:null
     const payload={
       property_id:propertyId,user_id:userData?.user?.id||null,habitacion_id:roomIds[0],habitaciones_ids:roomIds,
       habitaciones_detalle:details,
       fecha_entrada:draft.start,fecha_salida:draft.end,tipo_estadia:"overnight",nombre_huesped:draft.guest.trim(),email_huesped:draft.email?.trim()||null,telefono_huesped:draft.phone?.trim()||null,pais_huesped:draft.country?.trim()||null,
-      cantidad_huespedes:totalGuests,canal_reserva:draft.channel||"Walk-in",codigo_canal:draft.voucher?.trim()||null,tarifa_noche:rate,noches:nights,subtotal,descuento_tipo:discountType==="none"?null:discountType,descuento_valor:discountType==="none"?0:discountValue,descuento_importe:discountAmount,precio_total:total,moneda:draft.currency||"ARS",notas:draft.notes?.trim()||null,
+      cantidad_huespedes:totalGuests,canal_reserva:draft.channel||"Walk-in",codigo_canal:draft.voucher?.trim()||null,tarifa_noche:rate,noches:nights,subtotal,descuento_tipo:discountAmount>0?discountType:"none",descuento_valor:discountAmount>0?discountValue:0,descuento_importe:discountAmount,descuento_motivo:discountReason,descuento_origen:discountAmount>0?"manual":null,precio_total:total,moneda:draft.currency||"ARS",notas:draft.notes?.trim()||null,
       cancellation_policy_id:policy.id,cancellation_policy_snapshot:policySnapshot(policy),
       mascotas:[],mascotas_total:0,servicios:[],pasajeros:[],vehiculos:0,cochera_total:0,estado:draft.status||"confirmada",no_show:false,
     }
@@ -119,7 +124,7 @@ export default function usePlanningData(propertyId,windowStart,windowEndExclusiv
     const created={...data,payment_paid:0,payment_foreign_count:0,payment_last_id:null,payment_last_at:null}
     if(data.fecha_entrada<windowEndExclusive&&data.fecha_salida>=windowStart)setReservations(list=>[...list,created])
     const names=selectedRooms.map(room=>room.nombre).join(", ")
-    toast({title:roomIds.length>1?"Reserva grupal creada":"Reserva creada",message:`${draft.guest.trim()} · ${roomIds.length>1?`${roomIds.length} habitaciones (${names})`:`Habitación ${names}`} · ${nights} noche${nights===1?"":"s"} · ${policy.name}.`})
+    toast({title:roomIds.length>1?"Reserva grupal creada":"Reserva creada",message:`${draft.guest.trim()} · ${roomIds.length>1?`${roomIds.length} habitaciones (${names})`:`Habitación ${names}`} · ${nights} noche${nights===1?"":"s"}${discountAmount>0?` · descuento ${discountType==="percent"?`${discountValue}%`:money(discountAmount,draft.currency)} (${reasonLabel})`:""} · ${policy.name}.`})
     if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("hl:pms-reservation-updated",{detail:{reservationId:data.id}}))
     return created
   },[propertyId,rooms,cancellationPolicies,windowStart,windowEndExclusive])
