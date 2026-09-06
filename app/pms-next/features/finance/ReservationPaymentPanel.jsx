@@ -5,7 +5,7 @@ import{supabase}from"../../../../lib/supabase"
 import s from"./cashActions.module.css"
 
 const RESERVATION_SELECT="id,numero_reserva,nombre_huesped,fecha_entrada,fecha_salida,precio_total,subtotal,moneda,estado,servicios,cochera_total,mascotas_total,early_checkin_importe,late_checkout_importe,extra,extra_descripcion"
-const PAYMENT_METHODS=["Efectivo","Transferencia","Mercado Pago","Tarjeta","Otro"]
+const PAYMENT_METHODS=["Efectivo","Transferencia bancaria","Tarjeta de débito","Tarjeta de crédito","Billetera virtual / QR","Cuenta corriente","Voucher / Agencia","Cheque","Otro"]
 const normalize=value=>String(value||"").trim().toLowerCase()
 const validPayment=row=>!["anulado","cancelado","void","rechazado"].includes(normalize(row?.estado))
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:2}).format(Number(value)||0)
@@ -96,7 +96,7 @@ export default function ReservationPaymentPanel({propertyId,reservationId,sessio
 
   function startSplit(){
     if(pending<=0)return
-    const first=method||"Efectivo",second=first==="Mercado Pago"?"Efectivo":"Mercado Pago",half=roundMoney(pending/2)
+    const first=method||"Efectivo",second=PAYMENT_METHODS.find(item=>item!==first)||"Billetera virtual / QR",half=roundMoney(pending/2)
     setPaymentParts([{method:first,amount:half},{method:second,amount:roundMoney(pending-half)}]);setCashReceived("");setError("")
   }
   function stopSplit(){setMethod(paymentParts[0]?.method||method||"Efectivo");setAmount(String(pending));setPaymentParts([]);setCashReceived("");setError("")}
@@ -180,12 +180,12 @@ export default function ReservationPaymentPanel({propertyId,reservationId,sessio
             {!splitActive?<div className={s.formGrid}>
               <label className={s.field}><span>Medio de pago</span><select value={method} onChange={event=>{setMethod(event.target.value);setCashReceived("")}}>{PAYMENT_METHODS.map(item=><option key={item}>{item}</option>)}</select></label>
               <label className={s.field}><span>Importe</span><input type="number" min="0.01" max={pending} step="0.01" value={amount} onChange={event=>setAmount(event.target.value)}/><div className={s.quickAmount}><button type="button" onClick={()=>setAmount(String(pending))}>Cobrar saldo completo</button></div></label>
-              <label className={s.field}><span>Referencia</span><input value={reference} onChange={event=>setReference(event.target.value)} placeholder="Transferencia, cupón, comprobante…"/></label><label className={s.field}><span>Nota</span><input value={note} onChange={event=>setNote(event.target.value)} placeholder="Opcional"/></label>
+              <label className={s.field}><span>Referencia</span><input value={reference} onChange={event=>setReference(event.target.value)} placeholder="Banco, billetera, cupón, agencia, comprobante…"/></label><label className={s.field}><span>Nota</span><input value={note} onChange={event=>setNote(event.target.value)} placeholder="Opcional"/></label>
             </div>:<div className={s.splitPanel}>
               <div className={s.splitRows}>{paymentParts.map((part,index)=>{const auto=index===paymentParts.length-1;return <div className={s.splitRow} key={`${index}-${part.method}`}><span className={s.splitNumber}>{index+1}</span><select value={part.method} onChange={event=>changePartMethod(index,event.target.value)}>{PAYMENT_METHODS.map(item=><option key={item} disabled={item!==part.method&&paymentParts.some(other=>other.method===item)}>{item}</option>)}</select>{auto?<div className={s.splitRemainder}><small>Resto automático</small><strong>{money(part.amount,reservation.moneda)}</strong></div>:<input type="number" min="0" step="0.01" value={part.amount||""} onChange={event=>changePartAmount(index,event.target.value)}/>} {paymentParts.length>2?<button type="button" className={s.splitRemove} onClick={()=>removePart(index)} aria-label={`Quitar medio ${index+1}`}>×</button>:null}</div>})}</div>
               <div className={s.splitTools}>{paymentParts.length<PAYMENT_METHODS.length?<button type="button" onClick={addPart}>+ Agregar otro medio</button>:<span>Ya usaste todos los medios disponibles.</span>}</div>
               <div className={`${s.splitCheck} ${splitValid?s.splitCheckOk:s.splitCheckBad}`}><span>{splitValid?"Pago completo":splitOver>0?`Excede ${money(splitOver,reservation.moneda)}`:`Faltan ${money(splitRemaining,reservation.moneda)}`}</span><b>{paymentParts.map(part=>`${part.method} ${money(part.amount,reservation.moneda)}`).join(" + ")}</b></div>
-              <div className={s.formGrid}><label className={s.field}><span>Referencia</span><input value={reference} onChange={event=>setReference(event.target.value)} placeholder="Transferencia, cupón, comprobante…"/></label><label className={s.field}><span>Nota</span><input value={note} onChange={event=>setNote(event.target.value)} placeholder="Opcional"/></label></div>
+              <div className={s.formGrid}><label className={s.field}><span>Referencia</span><input value={reference} onChange={event=>setReference(event.target.value)} placeholder="Banco, billetera, cupón, agencia, comprobante…"/></label><label className={s.field}><span>Nota</span><input value={note} onChange={event=>setNote(event.target.value)} placeholder="Opcional"/></label></div>
             </div>}
             {hasCash?<div className={s.cashReceivedBox}><label><span>Efectivo recibido</span><input type="number" min="0" step="0.01" value={cashReceived} onChange={event=>setCashReceived(event.target.value)} placeholder={String(cashTarget)}/></label><div className={`${s.changeBox} ${cashReceived&&cashShort>0?s.changeShort:""}`}><span>{cashReceived&&cashShort>0?"Falta":"Vuelto"}</span><strong>{!cashReceived?"—":cashShort>0?money(cashShort,reservation.moneda):money(change,reservation.moneda)}</strong><small>Parte en efectivo: {money(cashTarget,reservation.moneda)}</small></div></div>:null}
           </>:<p className={s.hint}>La cuenta está saldada. No hace falta registrar otro pago.</p>}
