@@ -15,29 +15,12 @@ function greeting(propertyName) {
   return `Hola, soy OlivIA. Estoy para ayudarte con ${property}: puedo leer la operación de hoy, explicarte cómo usar Habitación Llena y sugerirte próximos pasos.`
 }
 
-const photoStyle = { width: "100%", height: "100%", display: "block", objectFit: "contain", borderRadius: "inherit" }
-const launcherStyle = {
-  width: 58,
-  height: 58,
-  padding: 0,
-  border: 0,
-  borderRadius: "50%",
-  background: "transparent",
-  boxShadow: "none",
-  overflow: "visible",
-}
-const launcherPhotoStyle = {
-  width: 58,
-  height: 58,
-  display: "block",
-  objectFit: "contain",
-  borderRadius: "50%",
-  background: "transparent",
-  filter: "drop-shadow(0 8px 14px rgba(20, 35, 55, .24))",
-}
-
 function OliviaWordmark() {
   return <><span>Oliv</span><span className={styles.aiAccent}>IA</span></>
+}
+
+function OliviaPhoto({ className = "", alt = "" }) {
+  return <img className={className} src="/olivia-avatar.jpg" alt={alt} draggable="false" />
 }
 
 export default function OliviaAssistant({ propertyId, propertyName, context, onHide }) {
@@ -69,8 +52,8 @@ export default function OliviaAssistant({ propertyId, propertyName, context, onH
       .filter((message) => !message.error)
       .slice(-8)
       .map((message) => ({ role: message.role, text: message.text }))
-    const userMessage = { id: `user-${Date.now()}`, role: "user", text: question }
-    setMessages((current) => [...current, userMessage])
+
+    setMessages((current) => [...current, { id: `user-${Date.now()}`, role: "user", text: question }])
     setInput("")
     setSending(true)
 
@@ -122,8 +105,8 @@ export default function OliviaAssistant({ propertyId, propertyName, context, onH
         <section className={styles.panel} aria-label="OlivIA, asistente de Habitación Llena">
           <header className={styles.header}>
             <div className={styles.identity}>
-              <span className={styles.avatar} aria-hidden="true" style={{ background: "transparent", overflow: "hidden" }}>
-                <img src="/olivia-avatar.png" alt="" style={photoStyle}/>
+              <span className={styles.avatar} aria-hidden="true">
+                <OliviaPhoto className={styles.avatarImage} />
               </span>
               <span>
                 <small>ASISTENTE DEL PMS</small>
@@ -144,7 +127,11 @@ export default function OliviaAssistant({ propertyId, propertyName, context, onH
           <div className={styles.messages} aria-live="polite">
             {messages.map((message) => (
               <div key={message.id} className={`${styles.messageRow} ${styles[message.role]}`}>
-                {message.role === "assistant" ? <span className={styles.miniAvatar} style={{ background: "transparent", overflow: "hidden" }}><img src="/olivia-avatar.png" alt="" style={photoStyle}/></span> : null}
+                {message.role === "assistant" ? (
+                  <span className={styles.miniAvatar} aria-hidden="true">
+                    <OliviaPhoto className={styles.miniAvatarImage} />
+                  </span>
+                ) : null}
                 <div className={`${styles.bubble} ${message.error ? styles.errorBubble : ""}`}>{message.text}</div>
               </div>
             ))}
@@ -161,7 +148,9 @@ export default function OliviaAssistant({ propertyId, propertyName, context, onH
 
             {sending ? (
               <div className={`${styles.messageRow} ${styles.assistant}`}>
-                <span className={styles.miniAvatar} style={{ background: "transparent", overflow: "hidden" }}><img src="/olivia-avatar.png" alt="" style={photoStyle}/></span>
+                <span className={styles.miniAvatar} aria-hidden="true">
+                  <OliviaPhoto className={styles.miniAvatarImage} />
+                </span>
                 <div className={`${styles.bubble} ${styles.typing}`} aria-label="OlivIA está escribiendo">
                   <i /> <i /> <i />
                 </div>
@@ -184,35 +173,33 @@ export default function OliviaAssistant({ propertyId, propertyName, context, onH
               placeholder="Preguntale algo sobre tu hotel…"
               aria-label="Pregunta para OlivIA"
             />
-            <button type="submit" disabled={!input.trim() || sending} aria-label="Enviar pregunta">
-              ↑
-            </button>
+            <button type="submit" disabled={!input.trim() || sending} aria-label="Enviar pregunta">↑</button>
           </form>
           <footer>Lee el contexto operativo disponible en tu PMS. Las recomendaciones no ejecutan cambios por sí solas.</footer>
         </section>
       ) : null}
 
       {!open && nudge ? (
-        <button type="button" className={styles.nudge} onClick={openAssistant}>
-          <span className={styles.nudgeAvatar} aria-hidden="true"><img src="/olivia-avatar.png" alt="" /></span>
-          <span className={styles.nudgeCopy}>
-            <b>Hola, soy <OliviaWordmark /></b>
-            <span>¿Te ayudo con la operación de hoy?</span>
-          </span>
-        </button>
+        <div className={styles.nudge} role="status">
+          <button type="button" className={styles.nudgeOpen} onClick={openAssistant} aria-label="Abrir OlivIA">
+            <span>Hola, soy <OliviaWordmark /></span>
+            <small>¿En qué puedo ayudarte?</small>
+          </button>
+          <button type="button" className={styles.nudgeClose} onClick={() => setNudge(false)} aria-label="Cerrar saludo de OlivIA">×</button>
+        </div>
       ) : null}
 
       {!open ? (
         <button
           type="button"
           className={styles.launcher}
-          style={launcherStyle}
           onClick={openAssistant}
           aria-label="Abrir OlivIA"
           aria-expanded={open}
           title="OlivIA · Asistente hotelero"
         >
-          <img src="/olivia-avatar.png" alt="" style={launcherPhotoStyle}/>
+          <OliviaPhoto className={styles.launcherImage} />
+          <span className={styles.onlineDot} aria-hidden="true" />
         </button>
       ) : null}
     </div>
