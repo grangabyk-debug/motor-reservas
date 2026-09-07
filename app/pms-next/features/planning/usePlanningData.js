@@ -27,7 +27,7 @@ export default function usePlanningData(propertyId,windowStart,windowEndExclusiv
     try{
       const[roomRes,resRes,floorRes,paymentRes,policyRes]=await Promise.all([
         supabase.from("habitaciones").select("id,nombre,tipo,capacidad,precio,estado,activa,sort_order,housekeeping_zone,floor_id").eq("property_id",propertyId).eq("activa",true),
-        supabase.from("reservas").select("id,numero_reserva,nombre_huesped,email_huesped,telefono_huesped,habitacion_id,habitaciones_ids,habitaciones_detalle,fecha_entrada,fecha_salida,estado,tarifa_noche,precio_total,moneda,canal_reserva,cantidad_huespedes,no_show,tipo_estadia,notas,cancellation_policy_id,cancellation_policy_snapshot").eq("property_id",propertyId).neq("estado","cancelada").lt("fecha_entrada",windowEndExclusive).gte("fecha_salida",windowStart).order("fecha_entrada"),
+        supabase.from("reservas").select("id,numero_reserva,nombre_huesped,email_huesped,telefono_huesped,habitacion_id,habitaciones_ids,habitaciones_detalle,fecha_entrada,fecha_salida,estado,tarifa_noche,precio_total,precio_sin_impuestos_nacionales,iva_porcentaje,iva_importe,impuestos_desglosados,condicion_iva_huesped,moneda,canal_reserva,cantidad_huespedes,no_show,tipo_estadia,notas,cancellation_policy_id,cancellation_policy_snapshot").eq("property_id",propertyId).neq("estado","cancelada").lt("fecha_entrada",windowEndExclusive).gte("fecha_salida",windowStart).order("fecha_entrada"),
         supabase.from("hotel_floors").select("id,name,sort_order,active").eq("property_id",propertyId).eq("active",true).order("sort_order"),
         supabase.from("pagos").select("id,reserva_id,monto,moneda,estado,created_at").eq("property_id",propertyId).eq("estado","confirmado"),
         supabase.from("hotel_cancellation_policies").select("id,code,name,description,policy_type,language,currency,cancellation_rules,no_show_rule,early_checkout_rule,prepayment_required,prepayment_percent,active,is_default").eq("property_id",propertyId).eq("active",true).order("is_default",{ascending:false}).order("name"),
@@ -111,11 +111,14 @@ export default function usePlanningData(propertyId,windowStart,windowEndExclusiv
     if(discountAmount>0&&!reasonKey)throw new Error("Indicá el motivo del descuento antes de crear la reserva.")
     if(discountAmount>0&&reasonKey==="other"&&!reasonDetail)throw new Error("Especificá el motivo del descuento.")
     const reasonLabel=DISCOUNT_REASON_LABELS[reasonKey]||reasonKey,discountReason=discountAmount>0?`${reasonLabel}${reasonDetail?` · ${reasonDetail}`:""}`:null
+    const hasTaxChoice=typeof draft.impuestosDesglosados==="boolean",vatRate=hasTaxChoice&&draft.impuestosDesglosados?Math.max(0,Number(draft.ivaPorcentaje)||0):0,vatAmount=hasTaxChoice&&draft.impuestosDesglosados?Math.round(total*vatRate)/100:0
+    const taxPayload=hasTaxChoice?{impuestos_desglosados:draft.impuestosDesglosados,iva_porcentaje:vatRate,precio_sin_impuestos_nacionales:total,iva_importe:vatAmount,condicion_iva_huesped:draft.ivaCondition||"consumidor_final"}:draft.ivaCondition?{condicion_iva_huesped:draft.ivaCondition}:{}
     const payload={
       property_id:propertyId,user_id:userData?.user?.id||null,habitacion_id:roomIds[0],habitaciones_ids:roomIds,
       habitaciones_detalle:details,
       fecha_entrada:draft.start,fecha_salida:draft.end,tipo_estadia:"overnight",nombre_huesped:draft.guest.trim(),email_huesped:draft.email?.trim()||null,telefono_huesped:draft.phone?.trim()||null,pais_huesped:draft.country?.trim()||null,
       cantidad_huespedes:totalGuests,canal_reserva:draft.channel||"Walk-in",codigo_canal:draft.voucher?.trim()||null,tarifa_noche:rate,noches:nights,subtotal,descuento_tipo:discountAmount>0?discountType:"none",descuento_valor:discountAmount>0?discountValue:0,descuento_importe:discountAmount,descuento_motivo:discountReason,descuento_origen:discountAmount>0?"manual":null,precio_total:total,moneda:draft.currency||"ARS",notas:draft.notes?.trim()||null,
+      ...taxPayload,
       cancellation_policy_id:policy.id,cancellation_policy_snapshot:policySnapshot(policy),
       mascotas:[],mascotas_total:0,servicios:[],pasajeros:[],vehiculos:0,cochera_total:0,estado:draft.status||"confirmada",no_show:false,
     }
