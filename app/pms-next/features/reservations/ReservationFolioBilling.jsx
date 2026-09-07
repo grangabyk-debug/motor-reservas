@@ -29,6 +29,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
   const[newOpen,setNewOpen]=useState(false)
   const[newDraft,setNewDraft]=useState({label:"",payer_type:"guest",payer_name:""})
   const[invoiceOpen,setInvoiceOpen]=useState(false)
+  const[showAllDocs,setShowAllDocs]=useState(false)
   const[invoiceMode,setInvoiceMode]=useState("folio")
   const[invoicePaymentId,setInvoicePaymentId]=useState("")
   const[billingName,setBillingName]=useState(reservation.nombre_huesped||"")
@@ -73,6 +74,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
     setBillingPhone(reservation.telefono_huesped||"")
     setBillingCurrency(reservation.moneda||"ARS")
     setSelectedItems(new Set())
+    setShowAllDocs(false)
   },[reservation.id,reservation.nombre_huesped,reservation.email_huesped,reservation.telefono_huesped,reservation.moneda])
   useEffect(()=>{
     if(typeof window==="undefined")return
@@ -299,7 +301,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
     <nav className={s.folioTabs}>
       {folios.map(folio=>{
         const stats=statsByFolio.get(folio.id)||{charges:0,paid:0}
-        return <button type="button" key={folio.id} className={folio.id===selected?.id?s.active:""} onClick={()=>{setSelectedId(folio.id);setSelectedItems(new Set())}}>
+        return <button type="button" key={folio.id} className={folio.id===selected?.id?s.active:""} onClick={()=>{setSelectedId(folio.id);setSelectedItems(new Set());setShowAllDocs(false)}}>
           <span>{folio.folio_type==="master"?"◇":"▣"} {folio.label}</span>
           <small>{payerLabels[folio.payer_type]||folio.payer_type} · saldo {money(stats.charges-stats.paid,folio.currency)}</small>
         </button>
@@ -341,8 +343,8 @@ export default function ReservationFolioBilling({reservation,propertyId,property
       </div>:null}
 
       <div className={s.docs}>
-        <header><b>Facturas vinculadas</b><button type="button" onClick={()=>openInvoice("folio")}>Abrir facturación</button></header>
-        {folioDocs.length?folioDocs.slice(0,4).map(doc=><div key={doc.id}><span><b>{doc.number||"Borrador sin numerar"}</b><small>{doc.billing_mode==="payment"?"Sobre pago":doc.billing_mode==="partial_items"?"Parcial":"Sobre folio"} · {fmtDateTime(doc.issued_at||doc.created_at)}</small></span><strong>{money(doc.total,doc.currency)}</strong><em data-status={doc.status}>{doc.status==="draft"?"Borrador":doc.status==="issued"?"Emitida":doc.status}</em></div>):<div className={s.emptySmall}>Todavía no hay facturas para este folio.</div>}
+        <header><b>Facturas vinculadas</b>{folioDocs.length>4?<button type="button" onClick={()=>setShowAllDocs(value=>!value)}>{showAllDocs?"Ver menos":`Ver todas (${folioDocs.length})`}</button>:null}</header>
+        {folioDocs.length?(showAllDocs?folioDocs:folioDocs.slice(0,4)).map(doc=><div key={doc.id}><span><b>{doc.number||"Borrador sin numerar"}</b><small>{doc.billing_mode==="payment"?"Sobre pago":doc.billing_mode==="partial_items"?"Parcial":"Sobre folio"} · {fmtDateTime(doc.issued_at||doc.created_at)}</small></span><strong>{money(doc.total,doc.currency)}</strong><em data-status={doc.status}>{doc.status==="draft"?"Borrador":doc.status==="issued"?"Emitida":doc.status}</em></div>):<div className={s.emptySmall}>Todavía no hay facturas para este folio.</div>}
       </div>
     </>:<div className={s.empty}>No hay folios disponibles.</div>}
 
