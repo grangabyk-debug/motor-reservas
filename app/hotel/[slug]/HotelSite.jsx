@@ -11,6 +11,7 @@ export default function HotelSite({slug}){
   const gallery=useMemo(()=>Array.isArray(data?.gallery)?data.gallery.map(imageUrl).filter(Boolean).slice(0,8):[],[data?.gallery])
   if(error)return <main className={s.missing}><b>Sitio temporalmente no disponible</b><span>{error}</span></main>
   if(!data)return <main className={s.missing}>Cargando hotel…</main>
+  if(data.website_mode==="external"||data.website_enabled===false)return <main className={s.missing}><b>Este hotel usa su propio sitio web</b><span>El motor de reservas de Habitación Llena sigue disponible.</span><a href={`/book/${slug}`} style={{marginTop:12,display:"inline-flex",minHeight:42,padding:"0 16px",alignItems:"center",justifyContent:"center",borderRadius:12,background:"#111827",color:"#fff",textDecoration:"none",fontWeight:800}}>Reservar ahora</a></main>
   const template=["classic","boutique","minimal"].includes(data.template)?data.template:"classic",style={"--site-primary":data.primary_color||"#5B5CEB","--site-accent":data.accent_color||"#7C5CFC"}
   return <main className={s.site} data-template={template} style={style}>
     <header className={s.nav}><a className={s.brand} href="#inicio">{data.logo_url?<img src={data.logo_url} alt=""/>:<span>{String(data.name||"H").slice(0,1)}</span>}<b>{data.name}</b></a><nav><a href="#hotel">El hotel</a>{gallery.length?<a href="#galeria">Galería</a>:null}<a href="#reservar">Reservar</a></nav><a className={s.bookTop} href="#reservar">Reservar</a></header>
