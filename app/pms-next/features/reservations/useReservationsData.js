@@ -5,8 +5,12 @@ import{supabase}from"../../../../lib/supabase"
 
 const PAGE_SIZE=200
 const roomIds=item=>[...new Set([item?.habitacion_id,...(item?.habitaciones_ids||[])].filter(Boolean).map(Number))]
-const roomCheckoutDate=(item,roomId)=>{const value=item?.room_checkout_dates?.[String(roomId)];return /^\d{4}-\d{2}-\d{2}$/.test(String(value||""))?String(value):""}
-const effectiveRoomEnd=(item,roomId)=>{const release=roomCheckoutDate(item,roomId);return release&&release<String(item?.fecha_salida||"")?release:item?.fecha_salida}
+const validDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(String(value||""))
+const roomDetail=(item,roomId)=>(Array.isArray(item?.habitaciones_detalle)?item.habitaciones_detalle:[]).find(row=>Number(row?.habitacion_id)===Number(roomId))||{}
+const roomStart=(item,roomId)=>{const value=roomDetail(item,roomId)?.fecha_entrada;return validDate(value)?value:item?.fecha_entrada}
+const roomPlannedEnd=(item,roomId)=>{const value=roomDetail(item,roomId)?.fecha_salida;return validDate(value)?value:item?.fecha_salida}
+const roomCheckoutDate=(item,roomId)=>{const value=item?.room_checkout_dates?.[String(roomId)];return validDate(value)?String(value):""}
+const effectiveRoomEnd=(item,roomId)=>{const planned=roomPlannedEnd(item,roomId),release=roomCheckoutDate(item,roomId);return release&&release<planned?release:planned}
 
 export default function useReservationsData(propertyId){
   const[reservations,setReservations]=useState([])
@@ -45,16 +49,17 @@ export default function useReservationsData(propertyId){
     if(["mantenimiento","fuera_servicio"].includes(String(target.estado||"").toLowerCase()))return{ok:false,message:`La habitación ${target.nombre} está fuera de servicio.`}
     if(!start||!end||end<=start)return{ok:false,message:"La fecha de salida tiene que ser posterior a la entrada."}
     const[resRes,blockRes]=await Promise.all([
-      supabase.from("reservas").select("id,numero_reserva,nombre_huesped,habitacion_id,habitaciones_ids,room_checkout_dates,fecha_entrada,fecha_salida,estado,no_show").eq("property_id",propertyId).neq("id",Number(reservationId)).neq("estado","cancelada").eq("no_show",false).lt("fecha_entrada",end).gt("fecha_salida",start),
+      supabase.from("reservas").select("id,numero_reserva,nombre_huesped,habitacion_id,habitaciones_ids,habitaciones_detalle,room_checkout_dates,fecha_entrada,fecha_salida,estado,no_show").eq("property_id",propertyId).neq("id",Number(reservationId)).neq("estado","cancelada").eq("no_show",false).lt("fecha_entrada",end).gt("fecha_salida",start),
       supabase.from("bloqueos").select("id,habitacion_id,fecha_desde,fecha_hasta,motivo").eq("property_id",propertyId).eq("habitacion_id",Number(roomId)).lt("fecha_desde",end).gt("fecha_hasta",start),
     ])
     if(resRes.error)throw resRes.error;if(blockRes.error)throw blockRes.error
-    const numericRoom=Number(roomId),conflict=(resRes.data||[]).find(row=>roomIds(row).includes(numericRoom)&&row.fecha_entrada<end&&effectiveRoomEnd(row,numericRoom)>start)
-    if(conflict)return{ok:false,message:`No se puede aplicar el cambio: la habitación ${target.nombre} está ocupada por ${conflict.nombre_huesped||conflict.numero_reserva||"otra reserva"} entre ${conflict.fecha_entrada} y ${effectiveRoomEnd(conflict,numericRoom)}.`}
+    const numericRoom=Number(roomId),conflict=(resRes.data||[]).find(row=>roomIds(row).includes(numericRoom)&&roomStart(row,numericRoom)<end&&effectiveRoomEnd(row,numericRoom)>start)
+    if(conflict)return{ok:false,message:`No se puede aplicar el cambio: la habitación ${target.nombre} está ocupada por ${conflict.nombre_huesped||conflict.numero_reserva||"otra reserva"} entre ${roomStart(conflict,numericRoom)} y ${effectiveRoomEnd(conflict,numericRoom)}.`}
     const block=(blockRes.data||[])[0]
     if(block)return{ok:false,message:`No se puede aplicar el cambio: la habitación ${target.nombre} tiene un bloqueo${block.motivo?` (${block.motivo})`:""} durante esas fechas.`}
     return{ok:true,targetRoom:target}
   },[propertyId,rooms])
+  const addRoomToReservation=useCallback(async payload=>{const{data,error:rpcError}=await supabase.rpc("hl_add_room_to_reservation_atomic",{p_reservation_id:Number(payload.reservationId),p_room:payload});if(rpcError)throw rpcError;setReservations(list=>list.map(item=>Number(item.id)===Number(data.id)?{...item,...data}:item));notifyUpdate(data.id);if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("hl:pms-toast",{detail:{title:"Habitación añadida",message:`La nueva estadía quedó dentro de la reserva ${data.numero_reserva||data.id} y ya impacta en el Planning.`}}));return data},[])
   const moveReservation=useCallback(async({reservationId,roomId,start,end,reprice=false})=>{const{data,error:rpcError}=await supabase.rpc("hl_planning_move_reservation_priced_atomic",{p_reserva_id:Number(reservationId),p_habitacion_id:Number(roomId),p_fecha_entrada:start,p_fecha_salida:end,p_reprice:Boolean(reprice)});if(rpcError)throw rpcError;setReservations(list=>list.map(item=>Number(item.id)===Number(data.id)?{...item,...data}:item));notifyUpdate(data.id);return data},[])
   const checkin=useCallback(async id=>{const{data,error:rpcError}=await supabase.rpc("hl_checkin_reservation_atomic",{p_reserva_id:Number(id)});if(rpcError)throw rpcError;setReservations(list=>list.map(item=>item.id===data.id?{...item,...data}:item));notifyUpdate(id);return data},[])
   const checkout=useCallback(async id=>{const{data,error:rpcError}=await supabase.rpc("hl_checkout_reservation_atomic",{p_reserva_id:Number(id)});if(rpcError)throw rpcError;setReservations(list=>list.map(item=>item.id===data.id?{...item,...data}:item));notifyUpdate(id);return data},[])
@@ -62,5 +67,5 @@ export default function useReservationsData(propertyId){
   const restoreNoShow=useCallback(async(id,note="")=>{const{data,error:rpcError}=await supabase.rpc("hl_restore_no_show_atomic",{p_reserva_id:Number(id),p_note:note||null});if(rpcError)throw rpcError;setReservations(list=>list.map(item=>Number(item.id)===Number(data.id)?{...item,...data}:item));notifyUpdate(id);return data},[])
   const cancelReservation=useCallback(async(id,{penaltyStatus="none",note=""}={})=>{const{data,error:rpcError}=await supabase.rpc("hl_cancel_reservation_policy_atomic",{p_reserva_id:Number(id),p_penalty_status:penaltyStatus||"none",p_note:note||null});if(rpcError)throw rpcError;setReservations(list=>list.map(item=>Number(item.id)===Number(data.id)?{...item,...data}:item));notifyUpdate(id);return data},[])
 
-  return{reservations,rooms,payments,paymentByReservation,loading,loadingMore,hasMore,error,setError,load,loadMore,updateReservation,previewMove,moveReservation,checkin,checkout,markNoShow,restoreNoShow,cancelReservation}
+  return{reservations,rooms,payments,paymentByReservation,loading,loadingMore,hasMore,error,setError,load,loadMore,updateReservation,previewMove,addRoomToReservation,moveReservation,checkin,checkout,markNoShow,restoreNoShow,cancelReservation}
 }
