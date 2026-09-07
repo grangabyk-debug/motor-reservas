@@ -42,7 +42,7 @@ export async function POST(request){
     const body=await request.json().catch(()=>null)
     const reservationId=Number(body?.reservation_id)
     if(!reservationId)return NextResponse.json({error:"Falta la reserva."},{status:400})
-    const {data:r,error}=await client.from("reservas").select("id,property_id,numero_reserva,nombre_huesped,email_huesped,fecha_entrada,fecha_salida,habitacion_id,habitaciones_ids,habitaciones_detalle,precio_total,tarifa_noche,noches,moneda,cantidad_huespedes,regimen,notas,cancellation_policy_id,cancellation_policy_snapshot").eq("id",reservationId).single()
+    const {data:r,error}=await client.from("reservas").select("id,property_id,numero_reserva,nombre_huesped,email_huesped,fecha_entrada,fecha_salida,habitacion_id,habitaciones_ids,habitaciones_detalle,precio_total,tarifa_noche,noches,moneda,cantidad_huespedes,regimen,notas,cancellation_policy_id,cancellation_policy_snapshot,impuestos_desglosados,iva_porcentaje,iva_importe,precio_sin_impuestos_nacionales,condicion_iva_huesped").eq("id",reservationId).single()
     if(error||!r)return NextResponse.json({error:error?.message||"Reserva no encontrada."},{status:404})
     if(!r.email_huesped)return NextResponse.json({error:"La reserva no tiene email cargado."},{status:400})
     const [{data:settings},{data:requests}]=await Promise.all([
@@ -68,9 +68,17 @@ export async function POST(request){
       `Habitación: ${roomTypes} · ${roomNames}`,
       `Camas / rooming: ${roomingText(details)}`,
       `Régimen: ${r.regimen||"Alojamiento"}`,
-      `Tarifa por noche: ${money(r.tarifa_noche,r.moneda)}`,
-      `Total de la reserva: ${money(r.precio_total,r.moneda)}`,
     ]
+    if(r.impuestos_desglosados){
+      textLines.push(
+        `Tarifa por noche (sin impuestos): ${money(r.tarifa_noche,r.moneda)}`,
+        `Precio sin impuestos nacionales: ${money(r.precio_sin_impuestos_nacionales,r.moneda)}`,
+        `IVA ${Number(r.iva_porcentaje||0)}%: ${money(r.iva_importe,r.moneda)}`,
+        `Total de la reserva: ${money(r.precio_total,r.moneda)}`,
+      )
+    }else{
+      textLines.push(`Tarifa por noche: ${money(r.tarifa_noche,r.moneda)}`,`Total de la reserva: ${money(r.precio_total,r.moneda)}`)
+    }
     if(requestLines.length)textLines.push("","Solicitudes del huésped:",...requestLines)
     textLines.push("",...cancellationLines(policy,r.moneda))
     if(settings?.motto)textLines.push("",settings.motto)
