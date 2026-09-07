@@ -4,7 +4,8 @@ import s from"./reservationFolioBilling.module.css"
 
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:2}).format(Number(value)||0)
 const fmtDateTime=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}).format(new Date(value)).replace(".",""):"—"
-const blankLine=()=>({folio_item_id:null,description:"",quantity:1,unit_price:0,tax_rate:21})
+const today=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"America/Argentina/Buenos_Aires",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date())
+const blankLine=reservation=>({folio_item_id:null,service_date:today(),description:"",quantity:1,unit_price:0,tax_rate:reservation?.impuestos_desglosados?Number(reservation.iva_porcentaje||21):0})
 
 export default function ReservationInvoiceDialog({
   open,selected,reservation,invoiceMode,changeInvoiceMode,checkedInvoiceItems,invoiceableItems,
@@ -45,18 +46,22 @@ export default function ReservationInvoiceDialog({
       </div>
 
       <div className={s.invoiceLines}>
-        <header><h3>Conceptos</h3><button type="button" onClick={()=>setInvoiceLines(current=>[...current,blankLine()])}>＋ Agregar línea</button></header>
-        {invoiceLines.length?invoiceLines.map((line,index)=><div className={s.invoiceLine} key={`${line.folio_item_id||"manual"}-${index}`} data-discount={line.source_type==="discount"?"true":"false"}>
+        <header><div><h3>Conceptos</h3><small style={{display:"block",marginTop:3,color:"var(--muted)",fontSize:10}}>Cada línea conserva fecha, precio neto, alícuota, IVA y total.</small></div><button type="button" onClick={()=>setInvoiceLines(current=>[...current,blankLine(reservation)])}>＋ Agregar línea</button></header>
+        {invoiceLines.length?<div style={{overflowX:"auto",paddingBottom:2}}><div style={{minWidth:930}}><div style={{display:"grid",gridTemplateColumns:"105px minmax(180px,2fr) 70px 105px 105px 88px 105px 105px 38px",gap:7,alignItems:"end",padding:"10px 0 2px",fontSize:9.5,fontWeight:850,color:"var(--muted)"}}><span>Fecha</span><span>Descripción</span><span style={{textAlign:"right"}}>Unidades</span><span style={{textAlign:"right"}}>Precio</span><span style={{textAlign:"right"}}>Subtotal</span><span style={{textAlign:"right"}}>Impuestos</span><span style={{textAlign:"right"}}>IVA</span><span style={{textAlign:"right"}}>Total</span><span></span></div>{invoiceLines.map((line,index)=>{const quantity=Math.max(0,Number(line.quantity||0)),unit=Number(line.unit_price||0),subtotal=quantity*unit,rate=Math.max(0,Number(line.tax_rate||0)),tax=subtotal*rate/100,total=subtotal+tax;return <div key={`${line.folio_item_id||"manual"}-${index}`} data-discount={line.source_type==="discount"?"true":"false"} style={{display:"grid",gridTemplateColumns:"105px minmax(180px,2fr) 70px 105px 105px 88px 105px 105px 38px",gap:7,alignItems:"center",marginTop:7}}>
+          <input aria-label="Fecha" type="date" value={line.service_date||reservation.fecha_entrada||today()} onChange={event=>updateInvoiceLine(index,"service_date",event.target.value)}/>
           <input aria-label="Descripción" placeholder="Descripción" value={line.description} onChange={event=>updateInvoiceLine(index,"description",event.target.value)}/>
           <input aria-label="Cantidad" type="number" min="0" step="1" value={line.quantity} onChange={event=>updateInvoiceLine(index,"quantity",event.target.value)}/>
           <input aria-label="Precio unitario" type="number" step="0.01" value={line.unit_price} onChange={event=>updateInvoiceLine(index,"unit_price",event.target.value)}/>
-          <label><span>IVA %</span><input type="number" min="0" max="100" step="0.01" value={line.tax_rate} onChange={event=>updateInvoiceLine(index,"tax_rate",event.target.value)}/></label>
-          <button type="button" aria-label="Quitar línea" onClick={()=>setInvoiceLines(current=>current.filter((_,i)=>i!==index))}>×</button>
-        </div>):<div className={s.invoiceEmpty}>No hay conceptos cargados todavía.</div>}
+          <div style={{height:42,display:"flex",alignItems:"center",justifyContent:"flex-end",padding:"0 8px",border:"1px solid var(--line)",borderRadius:10,background:"color-mix(in srgb,var(--panelSolid) 72%,transparent)",fontSize:10,fontWeight:800}}>{money(subtotal,billingCurrency)}</div>
+          <input aria-label="IVA porcentaje" title="Alícuota IVA" type="number" min="0" max="100" step="0.01" value={line.tax_rate} onChange={event=>updateInvoiceLine(index,"tax_rate",event.target.value)}/>
+          <div style={{height:42,display:"flex",alignItems:"center",justifyContent:"flex-end",padding:"0 8px",border:"1px solid var(--line)",borderRadius:10,background:"color-mix(in srgb,var(--panelSolid) 72%,transparent)",fontSize:10,fontWeight:800}}>{money(tax,billingCurrency)}</div>
+          <div style={{height:42,display:"flex",alignItems:"center",justifyContent:"flex-end",padding:"0 8px",border:"1px solid color-mix(in srgb,var(--accent) 18%,var(--line))",borderRadius:10,background:"color-mix(in srgb,var(--accent) 4%,var(--panelSolid))",fontSize:10,fontWeight:900}}>{money(total,billingCurrency)}</div>
+          <button type="button" aria-label="Quitar línea" style={{height:42,padding:0}} onClick={()=>setInvoiceLines(current=>current.filter((_,i)=>i!==index))}>×</button>
+        </div>})}</div></div>:<div className={s.invoiceEmpty}>No hay conceptos cargados todavía.</div>}
       </div>
 
       <label className={s.notes}><span>Nota interna</span><textarea value={billingNotes} onChange={event=>setBillingNotes(event.target.value)} placeholder={`Factura vinculada a ${selected.label}`}/></label>
-      <div className={s.invoiceTotals}><span>Subtotal <b>{money(invoiceCalc.subtotal,billingCurrency)}</b></span><span>Impuestos <b>{money(invoiceCalc.tax,billingCurrency)}</b></span><strong>Total {money(invoiceCalc.total,billingCurrency)}</strong></div>
+      <div className={s.invoiceTotals}><span>Precio sin impuestos nacionales <b>{money(invoiceCalc.subtotal,billingCurrency)}</b></span><span>IVA / impuestos <b>{money(invoiceCalc.tax,billingCurrency)}</b></span><strong>Total {money(invoiceCalc.total,billingCurrency)}</strong></div>
       <div className={s.documentActions}><button className={s.primary} type="button" onClick={prepareInvoice} disabled={saving||(invoiceMode==="payment"&&!invoicePaymentId)}>{saving?"Guardando…":"Crear documento"}</button></div>
     </div>
   </div>
