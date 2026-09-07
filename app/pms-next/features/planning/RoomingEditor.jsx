@@ -10,11 +10,12 @@ const clean=value=>String(value||"").trim()
 const bedPlaces=assignment=>Math.max(0,Number(assignment?.matrimonial)||0)*2+Math.max(0,Number(assignment?.individual)||0)
 
 function defaultBeds(room,guests){
-  const type=clean(room?.tipo).toLowerCase(),capacity=roomCapacity(room),g=clamp(guests,0,capacity)
+  const capacity=roomCapacity(room),g=clamp(guests,0,capacity)
   if(g===0)return{matrimonial:0,individual:0}
-  if(type.includes("twin")||type.includes("individual")||type.includes("single"))return{matrimonial:0,individual:g}
-  if(g===1)return{matrimonial:0,individual:1}
-  return{matrimonial:1,individual:Math.max(0,g-2)}
+  if(capacity<2)return{matrimonial:0,individual:1}
+  if(g===1)return{matrimonial:1,individual:0}
+  const matrimonial=Math.min(Math.floor(g/2),Math.floor(capacity/2))
+  return{matrimonial,individual:Math.max(0,g-matrimonial*2)}
 }
 function fitBeds(room,guests,matrimonial,individual,changed=""){
   const capacity=roomCapacity(room),g=clamp(guests,0,capacity)
