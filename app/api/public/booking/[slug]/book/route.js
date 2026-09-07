@@ -30,9 +30,11 @@ export async function POST(request,{params}){
     const{slug}=await params,raw=await request.json().catch(()=>null);if(!raw)return Response.json({error:"Solicitud inválida."},{status:400})
     const payload={check_in:text(raw.check_in,10),check_out:text(raw.check_out,10),guests:Math.min(20,Math.max(1,Number(raw.guests)||1)),name:text(raw.name,160),email:text(raw.email,180),phone:text(raw.phone,80),rooming:cleanRooming(raw.rooming),room_type:text(raw.room_type,120),request_id:text(raw.request_id,120),voucher_slug:text(raw.voucher_slug,120).toLowerCase()}
     if(!payload.name||!payload.room_type||!payload.email)return Response.json({error:"Faltan datos para confirmar la reserva."},{status:400})
-    const client=publicClient(),limit=await client.rpc("hl_public_booking_rate_limit",{p_slug:slug,p_client_key:`book:${clientKey(request)}`,p_limit:12,p_window_minutes:15});if(limit.error)throw limit.error
+    const client=publicClient(),session=clientKey(request),limit=await client.rpc("hl_public_booking_rate_limit",{p_slug:slug,p_client_key:`book:${session}`,p_limit:12,p_window_minutes:15});if(limit.error)throw limit.error
     if(limit.data!==true)return Response.json({error:"Se realizaron demasiados intentos de reserva. Esperá unos minutos y volvé a intentar."},{status:429,headers:{"Retry-After":"300","Cache-Control":"no-store"}})
+    await client.rpc("hl_public_web_event",{p_slug:slug,p_event:"booking_start",p_source:"engine",p_session:session,p_metadata:{room_type:payload.room_type}})
     const{data,error}=await client.rpc("hl_public_booking_create",{p_slug:slug,p_payload:payload});if(error)throw error
+    if(!data?.idempotent_replay)await client.rpc("hl_public_web_event",{p_slug:slug,p_event:"booking_confirmed",p_source:"engine",p_session:session,p_metadata:{room_type:payload.room_type}})
     const email_sent=await sendConfirmation(client,slug,payload,data,new URL(request.url).origin)
     return Response.json({...data,email_sent},{status:data?.idempotent_replay?200:201,headers:{"Cache-Control":"no-store"}})
   }catch(error){

@@ -2,7 +2,15 @@
 
 import s from"./bookingEngineStudio.module.css"
 
-export const templates=[{id:"classic",name:"Lumen",help:"Luminoso, limpio y directo",tag:"Hoteles y hosterías"},{id:"boutique",name:"Aura",help:"Editorial, cálido y elegante",tag:"Boutique y premium"},{id:"minimal",name:"Nómada",help:"Minimal, visual y contemporáneo",tag:"Apart y urbano"}]
+export const templates=[
+  {id:"classic",name:"Lumen",help:"Luminoso, limpio y directo",tag:"Hoteles y hosterías"},
+  {id:"boutique",name:"Aura",help:"Editorial, cálido y elegante",tag:"Boutique y premium"},
+  {id:"minimal",name:"Nómada",help:"Minimal, visual y contemporáneo",tag:"Apart y urbano"},
+  {id:"coast",name:"Brisa",help:"Aireado, relajado y fotográfico",tag:"Resort y costa"},
+  {id:"urban",name:"Distrito",help:"Nítido, práctico y sofisticado",tag:"Urbano y business"},
+  {id:"lodge",name:"Sierra",help:"Natural, cálido y con carácter",tag:"Hosterías y cabañas"},
+  {id:"premium",name:"Noir",help:"Oscuro, refinado y de alto impacto",tag:"Luxury y autor"}
+]
 export const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency,maximumFractionDigits:0}).format(Number(value)||0)
 export const galleryUrls=gallery=>(Array.isArray(gallery)?gallery:[]).map(item=>typeof item==="string"?item:item?.url||item?.src||"").filter(Boolean)
 export const originLines=value=>Array.isArray(value)?value.join("\n"):String(value||"")
