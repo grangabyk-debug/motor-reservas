@@ -1,6 +1,7 @@
 "use client"
 
-import{useMemo,useRef,useState}from"react"
+import{useEffect,useMemo,useRef,useState}from"react"
+import{supabase}from"../../../../lib/supabase"
 import RoomingEditor from"../planning/RoomingEditor"
 import PlanningRateChangeDialog from"../planning/PlanningRateChangeDialog"
 
@@ -13,15 +14,17 @@ const diffDays=(a,b)=>Math.max(1,Math.round((fromKey(b)-fromKey(a))/DAY))
 const unique=values=>[...new Set((values||[]).filter(Boolean).map(value=>String(value)))]
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:0}).format(Number(value)||0)
 const capacity=room=>Math.max(1,Number(room?.capacidad)||1)
+const roundMoney=value=>Math.round((Number(value)||0)*100)/100
 
 function initialDraft(item,assigned){
   const ids=unique([item.habitacion_id,...(item.habitaciones_ids||[])]),details=Array.isArray(item.habitaciones_detalle)?item.habitaciones_detalle:[],roomAssignments={}
   for(const id of ids){const room=assigned.find(value=>String(value.id)===id),detail=details.find(value=>String(value?.habitacion_id)===id)||{},beds=detail.rooming||{};roomAssignments[id]={soldAs:detail.categoria_vendida||room?.tipo||"Habitación",guests:Math.max(0,Number(detail.huespedes)||0),matrimonial:Math.max(0,Number(beds.matrimonial)||0),individual:Math.max(0,Number(beds.individual)||0),rate:Number(detail.tarifa_noche)||Number(room?.precio)||Number(item.tarifa_noche)||0}}
-  return{start:item.fecha_entrada,end:item.fecha_salida,guests:Math.max(1,Number(item.cantidad_huespedes)||1),phone:item.telefono_huesped||"",regimen:item.regimen||"Alojamiento",roomId:ids[0]||"",roomIds:ids,roomAssignments,rate:Number(item.tarifa_noche)||0,currency:item.moneda||"ARS"}
+  const earlyAmount=Math.max(0,Number(item.early_checkin_importe)||0),lateAmount=Math.max(0,Number(item.late_checkout_importe)||0)
+  return{start:item.fecha_entrada,end:item.fecha_salida,guests:Math.max(1,Number(item.cantidad_huespedes)||1),phone:item.telefono_huesped||"",regimen:item.regimen||"Alojamiento",roomId:ids[0]||"",roomIds:ids,roomAssignments,rate:Number(item.tarifa_noche)||0,currency:item.moneda||"ARS",earlyCheckin:earlyAmount>0,lateCheckout:lateAmount>0,originalEarlyAmount:earlyAmount,originalLateAmount:lateAmount}
 }
 
 export default function ReservationEditPanel({item,assignedRooms=[],allRooms=[],saving=false,onCancel,onPreviewMove,onMove,onUpdate,onSaved}){
-  const[draft,setDraft]=useState(()=>initialDraft(item,assignedRooms)),[error,setError]=useState(""),[availabilityError,setAvailabilityError]=useState(""),[availabilityOk,setAvailabilityOk]=useState(""),[checkingAvailability,setCheckingAvailability]=useState(false),[pending,setPending]=useState(null),[working,setWorking]=useState(false)
+  const[draft,setDraft]=useState(()=>initialDraft(item,assignedRooms)),[error,setError]=useState(""),[availabilityError,setAvailabilityError]=useState(""),[availabilityOk,setAvailabilityOk]=useState(""),[checkingAvailability,setCheckingAvailability]=useState(false),[pending,setPending]=useState(null),[working,setWorking]=useState(false),[stayFees,setStayFees]=useState({early_checkin_percent:35,late_checkout_percent:35})
   const validationSeq=useRef(0)
   const ids=unique(draft.roomIds?.length?draft.roomIds:[draft.roomId]),isGroup=ids.length>1,currentIds=unique([item.habitacion_id,...(item.habitaciones_ids||[])])
   const selectedRooms=ids.map(id=>allRooms.find(room=>String(room.id)===id)||assignedRooms.find(room=>String(room.id)===id)).filter(Boolean)
@@ -32,7 +35,25 @@ export default function ReservationEditPanel({item,assignedRooms=[],allRooms=[],
   const totalCapacity=selectedRooms.reduce((sum,room)=>sum+capacity(room),0)
   const nightlyStayRate=ids.reduce((sum,id)=>sum+(Number(draft.roomAssignments?.[id]?.rate)||0),0)||Number(item.tarifa_noche)||0
   const previousStayTotal=nightlyStayRate*oldNights,newStayTotal=nightlyStayRate*newNights,stayDelta=newStayTotal-previousStayTotal
+  const earlyPercent=Math.max(0,Math.min(100,Number(stayFees.early_checkin_percent)||35)),latePercent=Math.max(0,Math.min(100,Number(stayFees.late_checkout_percent)||35))
+  const earlyAmount=draft.earlyCheckin?(draft.originalEarlyAmount>0?draft.originalEarlyAmount:roundMoney(nightlyStayRate*earlyPercent/100)):0
+  const lateAmount=draft.lateCheckout?(draft.originalLateAmount>0?draft.originalLateAmount:roundMoney(nightlyStayRate*latePercent/100)):0
   const busy=working||saving||checkingAvailability
+  const serviceLocked=item.estado==="finalizada"||item.estado==="cancelada"||item.no_show
+
+  useEffect(()=>{
+    let cancelled=false
+    async function loadFees(){
+      const propertyId=item.property_id
+      if(!propertyId)return
+      const{data}=await supabase.from("property_settings").select("settings").eq("property_id",propertyId).maybeSingle()
+      if(cancelled)return
+      const prefs=data?.settings?.preferences||{}
+      setStayFees({early_checkin_percent:prefs.early_checkin_percent??35,late_checkout_percent:prefs.late_checkout_percent??35})
+    }
+    loadFees().catch(()=>{})
+    return()=>{cancelled=true}
+  },[item.property_id])
 
   async function validateCandidate({start,end,roomId,apply}){
     if(!start||!end||end<=start){setAvailabilityOk("");setAvailabilityError("La salida debe ser posterior a la entrada.");return false}
@@ -73,7 +94,16 @@ export default function ReservationEditPanel({item,assignedRooms=[],allRooms=[],
   function changeGuests(value){const guests=Math.max(1,Number(value)||1);setDraft(current=>({...current,guests}))}
   function detailsFor(rateOverride=null){return selectedRooms.map(room=>{const id=String(room.id),assignment=draft.roomAssignments?.[id]||{},rooming={matrimonial:Math.max(0,Number(assignment.matrimonial)||0),individual:Math.max(0,Number(assignment.individual)||0)};return{habitacion_id:Number(room.id),nombre:room.nombre,categoria_asignada:room.tipo||"Habitación",categoria_vendida:assignment.soldAs||room.tipo||"Habitación",huespedes:Math.max(0,Number(assignment.guests)||0),tarifa_noche:rateOverride!=null&&selectedRooms.length===1?Number(rateOverride):Math.max(0,Number(assignment.rate)||Number(room.precio)||0),rooming}})}
   async function saveMetadata(baseItem=item,rateOverride=null){
-    const details=detailsFor(rateOverride),patch={telefono_huesped:draft.phone.trim()||null,regimen:draft.regimen.trim()||null,cantidad_huespedes:Math.max(1,Number(draft.guests)||1),habitaciones_detalle:details}
+    const details=detailsFor(rateOverride),effectiveNightly=details.reduce((sum,detail)=>sum+Math.max(0,Number(detail.tarifa_noche)||0),0)||Number(rateOverride)||Number(baseItem.tarifa_noche)||nightlyStayRate
+    const oldEarly=Math.max(0,Number(baseItem.early_checkin_importe)||0),oldLate=Math.max(0,Number(baseItem.late_checkout_importe)||0)
+    const nextEarly=draft.earlyCheckin?(draft.originalEarlyAmount>0?draft.originalEarlyAmount:roundMoney(effectiveNightly*earlyPercent/100)):0
+    const nextLate=draft.lateCheckout?(draft.originalLateAmount>0?draft.originalLateAmount:roundMoney(effectiveNightly*latePercent/100)):0
+    const taxEnabled=Boolean(baseItem.impuestos_desglosados),vatRate=taxEnabled?Math.max(0,Number(baseItem.iva_porcentaje)||0):0
+    const totalNow=Math.max(0,Number(baseItem.precio_total)||0),vatNow=Math.max(0,Number(baseItem.iva_importe)||0)
+    const storedNet=Math.max(0,Number(baseItem.precio_sin_impuestos_nacionales)||Number(baseItem.subtotal)||0)
+    const currentNet=storedNet>0?storedNet:taxEnabled?Math.max(0,totalNow-vatNow):totalNow
+    const baseNet=Math.max(0,currentNet-oldEarly-oldLate),nextNet=roundMoney(baseNet+nextEarly+nextLate),nextVat=taxEnabled?roundMoney(nextNet*vatRate/100):0,nextTotal=roundMoney(nextNet+nextVat)
+    const patch={telefono_huesped:draft.phone.trim()||null,regimen:draft.regimen.trim()||null,cantidad_huespedes:Math.max(1,Number(draft.guests)||1),habitaciones_detalle:details,early_checkin:Boolean(draft.earlyCheckin),early_checkin_importe:nextEarly,late_checkout:Boolean(draft.lateCheckout),late_checkout_importe:nextLate,subtotal:nextNet,precio_sin_impuestos_nacionales:nextNet,iva_importe:nextVat,precio_total:nextTotal}
     const updated=await onUpdate(baseItem.id,patch);onSaved?.({...baseItem,...updated});return updated
   }
   async function preflight(){
@@ -104,6 +134,7 @@ export default function ReservationEditPanel({item,assignedRooms=[],allRooms=[],
   const label={display:"grid",gap:5,fontSize:10,fontWeight:850,color:"var(--muted)"}
   const control={height:39,width:"100%",border:"1px solid var(--line)",borderRadius:10,padding:"0 10px",background:"color-mix(in srgb,var(--panelSolid) 82%,transparent)",color:"var(--text)",font:"inherit",fontSize:11,fontWeight:760,outline:"none"}
   const availabilityStyle=availabilityError?{border:"1px solid color-mix(in srgb,var(--red) 30%,var(--line))",background:"color-mix(in srgb,var(--red) 7%,var(--panelSolid))",color:"var(--red)"}:checkingAvailability?{border:"1px solid color-mix(in srgb,#c68b24 28%,var(--line))",background:"color-mix(in srgb,#e4a52f 8%,var(--panelSolid))",color:"#956718"}:{border:"1px solid color-mix(in srgb,#2f9b61 26%,var(--line))",background:"color-mix(in srgb,#37a96a 7%,var(--panelSolid))",color:"#26794d"}
+  const serviceButton=active=>({display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,padding:"12px 13px",border:`1px solid ${active?"color-mix(in srgb,var(--accent) 38%,var(--line))":"var(--line)"}`,borderRadius:12,background:active?"color-mix(in srgb,var(--accent) 7%,var(--panelSolid))":"var(--panelSolid)",color:"var(--text)",font:"inherit",textAlign:"left",cursor:serviceLocked||busy?"not-allowed":"pointer",opacity:serviceLocked?.58:1})
   return <>
     <div style={overlay} onMouseDown={event=>event.target===event.currentTarget&&!busy&&onCancel?.()}>
       <section style={shell} role="dialog" aria-modal="true" aria-label="Editar reserva">
@@ -119,7 +150,8 @@ export default function ReservationEditPanel({item,assignedRooms=[],allRooms=[],
           <label style={label}>Régimen<select style={control} value={draft.regimen} onChange={event=>setDraft(current=>({...current,regimen:event.target.value}))}><option>Alojamiento</option><option>Solo alojamiento</option><option>Desayuno incluido</option><option>Media pensión</option><option>Pensión completa</option><option>Todo incluido</option></select></label>
         </div>
         {(checkingAvailability||availabilityError||availabilityOk)?<div style={{...availabilityStyle,marginTop:10,padding:"9px 11px",borderRadius:10,fontSize:10.5,fontWeight:800}}>{checkingAvailability?"Comprobando disponibilidad en el Planning…":availabilityError||`✓ ${availabilityOk}`}</div>:null}
-        <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:14,alignItems:"center",marginTop:11,padding:"11px 12px",border:"1px solid color-mix(in srgb,var(--accent) 16%,var(--line))",borderRadius:12,background:"color-mix(in srgb,var(--accent) 5%,var(--panelSolid))"}}><div><small style={{display:"block",fontSize:9.5,color:"var(--muted)",fontWeight:800}}>ALOJAMIENTO ACTUALIZADO</small><b style={{display:"block",marginTop:3,fontSize:13}}>{newNights} noche{newNights===1?"":"s"} × {money(nightlyStayRate,item.moneda)}/noche</b><small style={{display:"block",marginTop:3,fontSize:10,color:"var(--muted)"}}>{stayDelta===0?"Sin cambio en el valor del alojamiento":`${stayDelta>0?"+":"−"}${money(Math.abs(stayDelta),item.moneda)} respecto de la estadía actual`}</small></div><strong style={{fontSize:20,color:"var(--accent)",whiteSpace:"nowrap"}}>{money(newStayTotal,item.moneda)}</strong></div>
+        <div style={{marginTop:12,padding:"12px",border:"1px solid var(--line)",borderRadius:13,background:"color-mix(in srgb,var(--bg) 34%,var(--panelSolid))"}}><div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:10,marginBottom:9}}><div><b style={{fontSize:12}}>Horarios especiales</b><small style={{display:"block",marginTop:3,fontSize:9.8,color:"var(--muted)"}}>El recargo se calcula sobre la tarifa de una noche.</small></div><small style={{fontSize:9.5,color:"var(--muted)"}}>Configuración del hotel</small></div><div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:8}}><button type="button" disabled={serviceLocked||busy} onClick={()=>setDraft(current=>({...current,earlyCheckin:!current.earlyCheckin}))} style={serviceButton(draft.earlyCheckin)}><span><b style={{display:"block",fontSize:11.5}}>{draft.earlyCheckin?"✓ ":""}Early check-in</b><small style={{display:"block",marginTop:3,color:"var(--muted)"}}>{earlyPercent}% de la tarifa</small></span><strong style={{fontSize:12,color:draft.earlyCheckin?"var(--accent)":"var(--muted)"}}>{draft.earlyCheckin?`+ ${money(earlyAmount,item.moneda)}`:"Agregar"}</strong></button><button type="button" disabled={serviceLocked||busy} onClick={()=>setDraft(current=>({...current,lateCheckout:!current.lateCheckout}))} style={serviceButton(draft.lateCheckout)}><span><b style={{display:"block",fontSize:11.5}}>{draft.lateCheckout?"✓ ":""}Late check-out</b><small style={{display:"block",marginTop:3,color:"var(--muted)"}}>{latePercent}% de la tarifa</small></span><strong style={{fontSize:12,color:draft.lateCheckout?"var(--accent)":"var(--muted)"}}>{draft.lateCheckout?`+ ${money(lateAmount,item.moneda)}`:"Agregar"}</strong></button></div></div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:14,alignItems:"center",marginTop:11,padding:"11px 12px",border:"1px solid color-mix(in srgb,var(--accent) 16%,var(--line))",borderRadius:12,background:"color-mix(in srgb,var(--accent) 5%,var(--panelSolid))"}}><div><small style={{display:"block",fontSize:9.5,color:"var(--muted)",fontWeight:800}}>ALOJAMIENTO ACTUALIZADO</small><b style={{display:"block",marginTop:3,fontSize:13}}>{newNights} noche{newNights===1?"":"s"} × {money(nightlyStayRate,item.moneda)}/noche</b><small style={{display:"block",marginTop:3,fontSize:10,color:"var(--muted)"}}>{stayDelta===0?"Sin cambio en el valor del alojamiento":`${stayDelta>0?"+":"−"}${money(Math.abs(stayDelta),item.moneda)} respecto de la estadía actual`}{earlyAmount||lateAmount?` · Servicios horarios +${money(earlyAmount+lateAmount,item.moneda)}`:""}</small></div><strong style={{fontSize:20,color:"var(--accent)",whiteSpace:"nowrap"}}>{money(newStayTotal+earlyAmount+lateAmount,item.moneda)}</strong></div>
         {isGroup?<p style={{margin:"9px 0 0",fontSize:10,color:"var(--muted)"}}>Reserva grupal: podés editar el Rooming de cada habitación desde acá. La reasignación física grupal se mantiene protegida para no romper el conjunto.</p>:null}
         <RoomingEditor draft={draft} setDraft={setDraft} rooms={selectedRooms} categories={commercialCategories} currency={item.moneda||"ARS"} editableRate={false}/>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,marginTop:14,paddingTop:13,borderTop:"1px solid var(--line)"}}><span style={{fontSize:10,color:"var(--muted)"}}>Tarifa actual: <b style={{color:"var(--text)"}}>{money(item.tarifa_noche,item.moneda)}/noche</b>{durationChanged?` · ${oldNights} → ${newNights} noches`:""}</span><div style={{display:"flex",gap:8}}><button type="button" disabled={busy} onClick={onCancel} style={{height:40,padding:"0 14px",border:"1px solid var(--line)",borderRadius:10,background:"var(--panel)",color:"var(--text)",font:"inherit",fontWeight:800}}>Cancelar</button><button type="button" disabled={busy||Boolean(availabilityError)} onClick={requestSave} style={{height:40,padding:"0 16px",border:0,borderRadius:10,background:"linear-gradient(145deg,var(--accent),var(--accent2))",color:"#fff",font:"inherit",fontWeight:850,boxShadow:"0 9px 22px color-mix(in srgb,var(--accent) 22%,transparent)",opacity:busy||availabilityError?.length?0.62:1}}>{busy?"Validando…":"Guardar cambios"}</button></div></div>
