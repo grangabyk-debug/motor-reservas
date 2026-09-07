@@ -20,11 +20,11 @@ function initialDraft(item,assigned){
   const ids=unique([item.habitacion_id,...(item.habitaciones_ids||[])]),details=Array.isArray(item.habitaciones_detalle)?item.habitaciones_detalle:[],roomAssignments={}
   for(const id of ids){const room=assigned.find(value=>String(value.id)===id),detail=details.find(value=>String(value?.habitacion_id)===id)||{},beds=detail.rooming||{};roomAssignments[id]={soldAs:detail.categoria_vendida||room?.tipo||"Habitación",guests:Math.max(0,Number(detail.huespedes)||0),matrimonial:Math.max(0,Number(beds.matrimonial)||0),individual:Math.max(0,Number(beds.individual)||0),rate:Number(detail.tarifa_noche)||Number(room?.precio)||Number(item.tarifa_noche)||0}}
   const earlyAmount=Math.max(0,Number(item.early_checkin_importe)||0),lateAmount=Math.max(0,Number(item.late_checkout_importe)||0)
-  return{start:item.fecha_entrada,end:item.fecha_salida,guests:Math.max(1,Number(item.cantidad_huespedes)||1),phone:item.telefono_huesped||"",regimen:item.regimen||"Alojamiento",roomId:ids[0]||"",roomIds:ids,roomAssignments,rate:Number(item.tarifa_noche)||0,currency:item.moneda||"ARS",earlyCheckin:earlyAmount>0,lateCheckout:lateAmount>0,originalEarlyAmount:earlyAmount,originalLateAmount:lateAmount}
+  return{start:item.fecha_entrada,end:item.fecha_salida,guests:Math.max(1,Number(item.cantidad_huespedes)||1),phone:item.telefono_huesped||"",regimen:item.regimen||"Alojamiento",roomId:ids[0]||"",roomIds:ids,roomAssignments,rate:Number(item.tarifa_noche)||0,currency:item.moneda||"ARS",earlyCheckin:Boolean(item.early_checkin)||earlyAmount>0,lateCheckout:Boolean(item.late_checkout)||lateAmount>0,originalEarlyAmount:earlyAmount,originalLateAmount:lateAmount}
 }
 
 export default function ReservationEditPanel({item,assignedRooms=[],allRooms=[],saving=false,onCancel,onPreviewMove,onMove,onUpdate,onSaved}){
-  const[draft,setDraft]=useState(()=>initialDraft(item,assignedRooms)),[error,setError]=useState(""),[availabilityError,setAvailabilityError]=useState(""),[availabilityOk,setAvailabilityOk]=useState(""),[checkingAvailability,setCheckingAvailability]=useState(false),[pending,setPending]=useState(null),[working,setWorking]=useState(false),[stayFees,setStayFees]=useState({early_checkin_percent:35,late_checkout_percent:35})
+  const[draft,setDraft]=useState(()=>initialDraft(item,assignedRooms)),[error,setError]=useState(""),[availabilityError,setAvailabilityError]=useState(""),[availabilityOk,setAvailabilityOk]=useState(""),[checkingAvailability,setCheckingAvailability]=useState(false),[pending,setPending]=useState(null),[working,setWorking]=useState(false),[stayFees,setStayFees]=useState({early_checkin_percent:35,late_checkout_percent:35,early_checkin_time:"08:00",late_checkout_time:"18:00"})
   const validationSeq=useRef(0)
   const ids=unique(draft.roomIds?.length?draft.roomIds:[draft.roomId]),isGroup=ids.length>1,currentIds=unique([item.habitacion_id,...(item.habitaciones_ids||[])])
   const selectedRooms=ids.map(id=>allRooms.find(room=>String(room.id)===id)||assignedRooms.find(room=>String(room.id)===id)).filter(Boolean)
@@ -35,11 +35,12 @@ export default function ReservationEditPanel({item,assignedRooms=[],allRooms=[],
   const totalCapacity=selectedRooms.reduce((sum,room)=>sum+capacity(room),0)
   const nightlyStayRate=ids.reduce((sum,id)=>sum+(Number(draft.roomAssignments?.[id]?.rate)||0),0)||Number(item.tarifa_noche)||0
   const previousStayTotal=nightlyStayRate*oldNights,newStayTotal=nightlyStayRate*newNights,stayDelta=newStayTotal-previousStayTotal
-  const earlyPercent=Math.max(0,Math.min(100,Number(stayFees.early_checkin_percent)||35)),latePercent=Math.max(0,Math.min(100,Number(stayFees.late_checkout_percent)||35))
+  const earlyPercent=Math.max(0,Math.min(100,Number(stayFees.early_checkin_percent)||35)),latePercent=Math.max(0,Math.min(100,Number(stayFees.late_checkout_percent)||35)),earlyTime=stayFees.early_checkin_time||"08:00",lateTime=stayFees.late_checkout_time||"18:00"
   const earlyAmount=draft.earlyCheckin?(draft.originalEarlyAmount>0?draft.originalEarlyAmount:roundMoney(nightlyStayRate*earlyPercent/100)):0
   const lateAmount=draft.lateCheckout?(draft.originalLateAmount>0?draft.originalLateAmount:roundMoney(nightlyStayRate*latePercent/100)):0
   const busy=working||saving||checkingAvailability
   const serviceLocked=item.estado==="finalizada"||item.estado==="cancelada"||item.no_show
+  const originalEarly=Boolean(item.early_checkin)||Number(item.early_checkin_importe)>0,originalLate=Boolean(item.late_checkout)||Number(item.late_checkout_importe)>0
 
   useEffect(()=>{
     let cancelled=false
@@ -49,7 +50,7 @@ export default function ReservationEditPanel({item,assignedRooms=[],allRooms=[],
       const{data}=await supabase.from("property_settings").select("settings").eq("property_id",propertyId).maybeSingle()
       if(cancelled)return
       const prefs=data?.settings?.preferences||{}
-      setStayFees({early_checkin_percent:prefs.early_checkin_percent??35,late_checkout_percent:prefs.late_checkout_percent??35})
+      setStayFees({early_checkin_percent:prefs.early_checkin_percent??35,late_checkout_percent:prefs.late_checkout_percent??35,early_checkin_time:prefs.early_checkin_time||"08:00",late_checkout_time:prefs.late_checkout_time||"18:00"})
     }
     loadFees().catch(()=>{})
     return()=>{cancelled=true}
@@ -70,6 +71,17 @@ export default function ReservationEditPanel({item,assignedRooms=[],allRooms=[],
       return true
     }catch(err){if(seq===validationSeq.current)setAvailabilityError(err?.message||"No se pudo comprobar la disponibilidad.");return false}
     finally{if(seq===validationSeq.current)setCheckingAvailability(false)}
+  }
+  async function specialAvailability(nextEarly,nextLate){
+    const start=nextEarly?addDays(draft.start,-1):draft.start,end=nextLate?addDays(draft.end,1):draft.end
+    for(const id of ids){const preview=await onPreviewMove({reservationId:item.id,roomId:Number(id),start,end});if(!preview?.ok)return{ok:false,message:String(preview?.message||"La habitación no está disponible.").replace(/^No se puede aplicar el cambio:\s*/,"")}}
+    return{ok:true}
+  }
+  async function toggleSpecial(kind){
+    const key=kind==="early"?"earlyCheckin":"lateCheckout",label=kind==="early"?"Early check-in":"Late check-out",next=!draft[key]
+    if(!next){setDraft(current=>({...current,[key]:false}));setAvailabilityError("");setAvailabilityOk("");return}
+    const seq=++validationSeq.current;setCheckingAvailability(true);setAvailabilityError("");setAvailabilityOk("")
+    try{const result=await specialAvailability(kind==="early"?true:draft.earlyCheckin,kind==="late"?true:draft.lateCheckout);if(seq!==validationSeq.current)return;if(!result.ok){setAvailabilityError(`No se puede habilitar ${label}: ${result.message}`);return}setDraft(current=>({...current,[key]:true}));setAvailabilityOk(`${label} disponible · se protege el turno de la habitación en el Planning.`)}catch(err){if(seq===validationSeq.current)setAvailabilityError(`No se puede habilitar ${label}: ${err?.message||"no se pudo comprobar la disponibilidad."}`)}finally{if(seq===validationSeq.current)setCheckingAvailability(false)}
   }
 
   async function changeStart(nextStart){
@@ -113,6 +125,7 @@ export default function ReservationEditPanel({item,assignedRooms=[],allRooms=[],
     if(assignedGuests!==Number(draft.guests))throw new Error(`Distribuí los ${draft.guests} huésped${Number(draft.guests)===1?"":"es"} en el Rooming antes de guardar.`)
     if(isGroup&&(datesChanged||currentIds.join("|")!==ids.join("|")))throw new Error("Las fechas y la reasignación física de una reserva grupal todavía requieren edición por habitación. El Rooming, huéspedes, teléfono y régimen sí se pueden editar desde esta ficha.")
     if(datesChanged||roomChanged){const preview=await onPreviewMove({reservationId:item.id,roomId:Number(draft.roomId),start:draft.start,end:draft.end});if(!preview?.ok)throw new Error(preview?.message||"La habitación no está disponible para ese cambio.")}
+    if(draft.earlyCheckin!==originalEarly||draft.lateCheckout!==originalLate){const special=await specialAvailability(draft.earlyCheckin,draft.lateCheckout);if(!special.ok)throw new Error(`No se pueden guardar los horarios especiales: ${special.message}`)}
   }
   async function commitMove(reprice=false){
     setWorking(true);setError("")
@@ -150,7 +163,7 @@ export default function ReservationEditPanel({item,assignedRooms=[],allRooms=[],
           <label style={label}>Régimen<select style={control} value={draft.regimen} onChange={event=>setDraft(current=>({...current,regimen:event.target.value}))}><option>Alojamiento</option><option>Solo alojamiento</option><option>Desayuno incluido</option><option>Media pensión</option><option>Pensión completa</option><option>Todo incluido</option></select></label>
         </div>
         {(checkingAvailability||availabilityError||availabilityOk)?<div style={{...availabilityStyle,marginTop:10,padding:"9px 11px",borderRadius:10,fontSize:10.5,fontWeight:800}}>{checkingAvailability?"Comprobando disponibilidad en el Planning…":availabilityError||`✓ ${availabilityOk}`}</div>:null}
-        <div style={{marginTop:12,padding:"12px",border:"1px solid var(--line)",borderRadius:13,background:"color-mix(in srgb,var(--bg) 34%,var(--panelSolid))"}}><div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:10,marginBottom:9}}><div><b style={{fontSize:12}}>Horarios especiales</b><small style={{display:"block",marginTop:3,fontSize:9.8,color:"var(--muted)"}}>El recargo se calcula sobre la tarifa de una noche.</small></div><small style={{fontSize:9.5,color:"var(--muted)"}}>Configuración del hotel</small></div><div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:8}}><button type="button" disabled={serviceLocked||busy} onClick={()=>setDraft(current=>({...current,earlyCheckin:!current.earlyCheckin}))} style={serviceButton(draft.earlyCheckin)}><span><b style={{display:"block",fontSize:11.5}}>{draft.earlyCheckin?"✓ ":""}Early check-in</b><small style={{display:"block",marginTop:3,color:"var(--muted)"}}>{earlyPercent}% de la tarifa</small></span><strong style={{fontSize:12,color:draft.earlyCheckin?"var(--accent)":"var(--muted)"}}>{draft.earlyCheckin?`+ ${money(earlyAmount,item.moneda)}`:"Agregar"}</strong></button><button type="button" disabled={serviceLocked||busy} onClick={()=>setDraft(current=>({...current,lateCheckout:!current.lateCheckout}))} style={serviceButton(draft.lateCheckout)}><span><b style={{display:"block",fontSize:11.5}}>{draft.lateCheckout?"✓ ":""}Late check-out</b><small style={{display:"block",marginTop:3,color:"var(--muted)"}}>{latePercent}% de la tarifa</small></span><strong style={{fontSize:12,color:draft.lateCheckout?"var(--accent)":"var(--muted)"}}>{draft.lateCheckout?`+ ${money(lateAmount,item.moneda)}`:"Agregar"}</strong></button></div></div>
+        <div style={{marginTop:12,padding:"12px",border:"1px solid var(--line)",borderRadius:13,background:"color-mix(in srgb,var(--bg) 34%,var(--panelSolid))"}}><div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:10,marginBottom:9}}><div><b style={{fontSize:12}}>Horarios especiales</b><small style={{display:"block",marginTop:3,fontSize:9.8,color:"var(--muted)"}}>El recargo se calcula sobre la tarifa de una noche y bloquea el turno operativo en el Planning.</small></div><small style={{fontSize:9.5,color:"var(--muted)"}}>Configuración del hotel</small></div><div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:8}}><button type="button" disabled={serviceLocked||busy} onClick={()=>toggleSpecial("early")} style={serviceButton(draft.earlyCheckin)}><span><b style={{display:"block",fontSize:11.5}}>{draft.earlyCheckin?"✓ ":""}Early check-in</b><small style={{display:"block",marginTop:3,color:"var(--muted)"}}>{earlyPercent}% de la tarifa · desde {earlyTime}</small></span><strong style={{fontSize:12,color:draft.earlyCheckin?"var(--accent)":"var(--muted)"}}>{draft.earlyCheckin?`+ ${money(earlyAmount,item.moneda)}`:"Agregar"}</strong></button><button type="button" disabled={serviceLocked||busy} onClick={()=>toggleSpecial("late")} style={serviceButton(draft.lateCheckout)}><span><b style={{display:"block",fontSize:11.5}}>{draft.lateCheckout?"✓ ":""}Late check-out</b><small style={{display:"block",marginTop:3,color:"var(--muted)"}}>{latePercent}% de la tarifa · hasta {lateTime}</small></span><strong style={{fontSize:12,color:draft.lateCheckout?"var(--accent)":"var(--muted)"}}>{draft.lateCheckout?`+ ${money(lateAmount,item.moneda)}`:"Agregar"}</strong></button></div></div>
         <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:14,alignItems:"center",marginTop:11,padding:"11px 12px",border:"1px solid color-mix(in srgb,var(--accent) 16%,var(--line))",borderRadius:12,background:"color-mix(in srgb,var(--accent) 5%,var(--panelSolid))"}}><div><small style={{display:"block",fontSize:9.5,color:"var(--muted)",fontWeight:800}}>ALOJAMIENTO ACTUALIZADO</small><b style={{display:"block",marginTop:3,fontSize:13}}>{newNights} noche{newNights===1?"":"s"} × {money(nightlyStayRate,item.moneda)}/noche</b><small style={{display:"block",marginTop:3,fontSize:10,color:"var(--muted)"}}>{stayDelta===0?"Sin cambio en el valor del alojamiento":`${stayDelta>0?"+":"−"}${money(Math.abs(stayDelta),item.moneda)} respecto de la estadía actual`}{earlyAmount||lateAmount?` · Servicios horarios +${money(earlyAmount+lateAmount,item.moneda)}`:""}</small></div><strong style={{fontSize:20,color:"var(--accent)",whiteSpace:"nowrap"}}>{money(newStayTotal+earlyAmount+lateAmount,item.moneda)}</strong></div>
         {isGroup?<p style={{margin:"9px 0 0",fontSize:10,color:"var(--muted)"}}>Reserva grupal: podés editar el Rooming de cada habitación desde acá. La reasignación física grupal se mantiene protegida para no romper el conjunto.</p>:null}
         <RoomingEditor draft={draft} setDraft={setDraft} rooms={selectedRooms} categories={commercialCategories} currency={item.moneda||"ARS"} editableRate={false}/>
