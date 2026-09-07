@@ -5,6 +5,8 @@ import{supabase}from"../../../../lib/supabase"
 
 const PAGE_SIZE=200
 const roomIds=item=>[...new Set([item?.habitacion_id,...(item?.habitaciones_ids||[])].filter(Boolean).map(Number))]
+const roomCheckoutDate=(item,roomId)=>{const value=item?.room_checkout_dates?.[String(roomId)];return /^\d{4}-\d{2}-\d{2}$/.test(String(value||""))?String(value):""}
+const effectiveRoomEnd=(item,roomId)=>{const release=roomCheckoutDate(item,roomId);return release&&release<String(item?.fecha_salida||"")?release:item?.fecha_salida}
 
 export default function useReservationsData(propertyId){
   const[reservations,setReservations]=useState([])
@@ -19,11 +21,10 @@ export default function useReservationsData(propertyId){
   const fetchPage=useCallback(async(page,{replace=false}={})=>{
     if(!propertyId)return
     const from=page*PAGE_SIZE,to=from+PAGE_SIZE-1
-    const resQuery=supabase.from("reservas").select("id,numero_reserva,nombre_huesped,email_huesped,telefono_huesped,habitacion_id,habitaciones_ids,habitaciones_detalle,fecha_entrada,fecha_salida,estado,no_show,no_show_at,no_show_release_date,no_show_penalty_amount,no_show_penalty_status,no_show_note,garantia_tipo,garantia_marca,garantia_ultimos4,canal_reserva,codigo_canal,precio_total,precio_sin_impuestos_nacionales,iva_porcentaje,iva_importe,impuestos_desglosados,condicion_iva_huesped,subtotal,descuento_tipo,descuento_valor,descuento_importe,descuento_motivo,descuento_origen,tarifa_noche,noches,moneda,cantidad_huespedes,guest_profile_id,notas,created_at,tipo_estadia,servicios,mascotas_total,cochera_total,extra,extra_descripcion,early_checkin_importe,late_checkout_importe,regimen,hora_llegada_estimada,hora_salida_estimada,pais_huesped,nacionalidad_huesped,tipo_documento_huesped,dni_huesped,cancellation_policy_id,cancellation_policy_snapshot,cancelled_at,cancellation_penalty_amount,cancellation_penalty_status,cancellation_note").eq("property_id",propertyId).order("created_at",{ascending:false}).range(from,to)
+    const resQuery=supabase.from("reservas").select("id,numero_reserva,nombre_huesped,email_huesped,telefono_huesped,habitacion_id,habitaciones_ids,habitaciones_detalle,room_checkout_dates,fecha_entrada,fecha_salida,estado,no_show,no_show_at,no_show_release_date,no_show_penalty_amount,no_show_penalty_status,no_show_note,garantia_tipo,garantia_marca,garantia_ultimos4,canal_reserva,codigo_canal,precio_total,precio_sin_impuestos_nacionales,iva_porcentaje,iva_importe,impuestos_desglosados,condicion_iva_huesped,subtotal,descuento_tipo,descuento_valor,descuento_importe,descuento_motivo,descuento_origen,tarifa_noche,noches,moneda,cantidad_huespedes,guest_profile_id,notas,created_at,tipo_estadia,servicios,mascotas_total,cochera_total,extra,extra_descripcion,early_checkin_importe,late_checkout_importe,regimen,hora_llegada_estimada,hora_salida_estimada,pais_huesped,nacionalidad_huesped,tipo_documento_huesped,dni_huesped,cancellation_policy_id,cancellation_policy_snapshot,cancelled_at,cancellation_penalty_amount,cancellation_penalty_status,cancellation_note").eq("property_id",propertyId).order("created_at",{ascending:false}).range(from,to)
     const roomQuery=replace?supabase.from("habitaciones").select("id,nombre,tipo,capacidad,precio,estado,activa").eq("property_id",propertyId).order("nombre"):Promise.resolve({data:null,error:null})
     const[resRes,roomRes]=await Promise.all([resQuery,roomQuery])
-    if(resRes.error)throw resRes.error
-    if(roomRes.error)throw roomRes.error
+    if(resRes.error)throw resRes.error;if(roomRes.error)throw roomRes.error
     const pageReservations=resRes.data||[],ids=pageReservations.map(item=>item.id)
     let pagePayments=[]
     if(ids.length){const payRes=await supabase.from("pagos").select("id,reserva_id,monto,estado,refunded_amount,moneda,metodo,nota,source,referencia,created_at").eq("property_id",propertyId).in("reserva_id",ids).order("created_at",{ascending:false});if(payRes.error)throw payRes.error;pagePayments=payRes.data||[]}
@@ -44,12 +45,12 @@ export default function useReservationsData(propertyId){
     if(["mantenimiento","fuera_servicio"].includes(String(target.estado||"").toLowerCase()))return{ok:false,message:`La habitación ${target.nombre} está fuera de servicio.`}
     if(!start||!end||end<=start)return{ok:false,message:"La fecha de salida tiene que ser posterior a la entrada."}
     const[resRes,blockRes]=await Promise.all([
-      supabase.from("reservas").select("id,numero_reserva,nombre_huesped,habitacion_id,habitaciones_ids,fecha_entrada,fecha_salida,estado,no_show").eq("property_id",propertyId).neq("id",Number(reservationId)).neq("estado","cancelada").eq("no_show",false).lt("fecha_entrada",end).gt("fecha_salida",start),
+      supabase.from("reservas").select("id,numero_reserva,nombre_huesped,habitacion_id,habitaciones_ids,room_checkout_dates,fecha_entrada,fecha_salida,estado,no_show").eq("property_id",propertyId).neq("id",Number(reservationId)).neq("estado","cancelada").eq("no_show",false).lt("fecha_entrada",end).gt("fecha_salida",start),
       supabase.from("bloqueos").select("id,habitacion_id,fecha_desde,fecha_hasta,motivo").eq("property_id",propertyId).eq("habitacion_id",Number(roomId)).lt("fecha_desde",end).gt("fecha_hasta",start),
     ])
     if(resRes.error)throw resRes.error;if(blockRes.error)throw blockRes.error
-    const conflict=(resRes.data||[]).find(row=>roomIds(row).includes(Number(roomId)))
-    if(conflict)return{ok:false,message:`No se puede aplicar el cambio: la habitación ${target.nombre} está ocupada por ${conflict.nombre_huesped||conflict.numero_reserva||"otra reserva"} entre ${conflict.fecha_entrada} y ${conflict.fecha_salida}.`}
+    const numericRoom=Number(roomId),conflict=(resRes.data||[]).find(row=>roomIds(row).includes(numericRoom)&&row.fecha_entrada<end&&effectiveRoomEnd(row,numericRoom)>start)
+    if(conflict)return{ok:false,message:`No se puede aplicar el cambio: la habitación ${target.nombre} está ocupada por ${conflict.nombre_huesped||conflict.numero_reserva||"otra reserva"} entre ${conflict.fecha_entrada} y ${effectiveRoomEnd(conflict,numericRoom)}.`}
     const block=(blockRes.data||[])[0]
     if(block)return{ok:false,message:`No se puede aplicar el cambio: la habitación ${target.nombre} tiene un bloqueo${block.motivo?` (${block.motivo})`:""} durante esas fechas.`}
     return{ok:true,targetRoom:target}
