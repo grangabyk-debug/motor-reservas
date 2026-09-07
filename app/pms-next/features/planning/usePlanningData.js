@@ -16,6 +16,7 @@ const DISCOUNT_REASON_LABELS={group:"Grupo / varias habitaciones",long_stay:"Est
 export default function usePlanningData(propertyId,windowStart,windowEndExclusive){
   const[rooms,setRooms]=useState([])
   const[reservations,setReservations]=useState([])
+  const[blocks,setBlocks]=useState([])
   const[cancellationPolicies,setCancellationPolicies]=useState([])
   const[loading,setLoading]=useState(true)
   const[error,setError]=useState("")
@@ -25,21 +26,23 @@ export default function usePlanningData(propertyId,windowStart,windowEndExclusiv
     if(!silent)setLoading(true)
     setError("")
     try{
-      const[roomRes,resRes,floorRes,paymentRes,policyRes]=await Promise.all([
+      const[roomRes,resRes,floorRes,paymentRes,policyRes,blockRes]=await Promise.all([
         supabase.from("habitaciones").select("id,nombre,tipo,capacidad,precio,estado,activa,sort_order,housekeeping_zone,floor_id").eq("property_id",propertyId).eq("activa",true),
         supabase.from("reservas").select("id,numero_reserva,nombre_huesped,email_huesped,telefono_huesped,habitacion_id,habitaciones_ids,habitaciones_detalle,fecha_entrada,fecha_salida,estado,tarifa_noche,precio_total,precio_sin_impuestos_nacionales,iva_porcentaje,iva_importe,impuestos_desglosados,condicion_iva_huesped,moneda,canal_reserva,cantidad_huespedes,no_show,tipo_estadia,notas,cancellation_policy_id,cancellation_policy_snapshot").eq("property_id",propertyId).neq("estado","cancelada").lt("fecha_entrada",windowEndExclusive).gte("fecha_salida",windowStart).order("fecha_entrada"),
         supabase.from("hotel_floors").select("id,name,sort_order,active").eq("property_id",propertyId).eq("active",true).order("sort_order"),
         supabase.from("pagos").select("id,reserva_id,monto,moneda,estado,created_at").eq("property_id",propertyId).eq("estado","confirmado"),
         supabase.from("hotel_cancellation_policies").select("id,code,name,description,policy_type,language,currency,cancellation_rules,no_show_rule,early_checkout_rule,prepayment_required,prepayment_percent,active,is_default").eq("property_id",propertyId).eq("active",true).order("is_default",{ascending:false}).order("name"),
+        supabase.from("bloqueos").select("id,habitacion_id,fecha_desde,fecha_hasta,motivo,detalle").eq("property_id",propertyId).lt("fecha_desde",windowEndExclusive).gt("fecha_hasta",windowStart).order("fecha_desde"),
       ])
       if(roomRes.error)throw roomRes.error
       if(resRes.error)throw resRes.error
       if(floorRes.error)throw floorRes.error
       if(policyRes.error)throw policyRes.error
+      if(blockRes.error)throw blockRes.error
       const floorById=new Map((floorRes.data||[]).map(floor=>[String(floor.id),floor]))
       const roomRows=(roomRes.data||[]).map(room=>{const floor=floorById.get(String(room.floor_id||""));return{...room,floor_name:floor?.name||"Sin piso",floor_sort:Number(floor?.sort_order??999)}}).sort((a,b)=>a.floor_sort-b.floor_sort||Number(a.sort_order||0)-Number(b.sort_order||0)||String(a.nombre).localeCompare(String(b.nombre),"es",{numeric:true}))
       const enriched=attachPayments(resRes.data||[],paymentRes.error?[]:paymentRes.data||[])
-      setRooms(roomRows);setReservations(enriched);setCancellationPolicies(policyRes.data||[])
+      setRooms(roomRows);setReservations(enriched);setBlocks(blockRes.data||[]);setCancellationPolicies(policyRes.data||[])
     }catch(err){setError(err?.message||"No se pudo cargar el Planning.")}
     finally{if(!silent)setLoading(false)}
   },[propertyId,windowStart,windowEndExclusive])
@@ -50,7 +53,7 @@ export default function usePlanningData(propertyId,windowStart,windowEndExclusiv
     if(!propertyId)return
     let timer=null
     const refresh=()=>{if(timer)clearTimeout(timer);timer=setTimeout(()=>load(true),70)}
-    const channel=supabase.channel(`hl-planning-live-${propertyId}`).on("postgres_changes",{event:"*",schema:"public",table:"reservas",filter:`property_id=eq.${propertyId}`},refresh).on("postgres_changes",{event:"*",schema:"public",table:"pagos",filter:`property_id=eq.${propertyId}`},refresh).on("postgres_changes",{event:"*",schema:"public",table:"hotel_cancellation_policies",filter:`property_id=eq.${propertyId}`},refresh).subscribe()
+    const channel=supabase.channel(`hl-planning-live-${propertyId}`).on("postgres_changes",{event:"*",schema:"public",table:"reservas",filter:`property_id=eq.${propertyId}`},refresh).on("postgres_changes",{event:"*",schema:"public",table:"pagos",filter:`property_id=eq.${propertyId}`},refresh).on("postgres_changes",{event:"*",schema:"public",table:"hotel_cancellation_policies",filter:`property_id=eq.${propertyId}`},refresh).on("postgres_changes",{event:"*",schema:"public",table:"bloqueos",filter:`property_id=eq.${propertyId}`},refresh).subscribe()
     return()=>{if(timer)clearTimeout(timer);supabase.removeChannel(channel)}
   },[propertyId,load])
 
@@ -95,10 +98,16 @@ export default function usePlanningData(propertyId,windowStart,windowEndExclusiv
     const policy=cancellationPolicies.find(row=>String(row.id)===String(draft.cancellationPolicyId))||cancellationPolicies.find(row=>row.is_default)||cancellationPolicies[0]
     if(!policy)throw new Error("Configurá una política de cancelación antes de crear la reserva.")
 
-    const{data:conflicts,error:conflictError}=await supabase.from("reservas").select("id,numero_reserva,habitacion_id,habitaciones_ids,fecha_entrada,fecha_salida,estado,no_show").eq("property_id",propertyId).neq("estado","cancelada").eq("no_show",false).lt("fecha_entrada",draft.end).gt("fecha_salida",draft.start)
-    if(conflictError)throw conflictError
-    const conflict=(conflicts||[]).find(item=>reservationRooms(item).some(id=>roomIds.includes(id)))
+    const[conflictRes,blockRes]=await Promise.all([
+      supabase.from("reservas").select("id,numero_reserva,habitacion_id,habitaciones_ids,fecha_entrada,fecha_salida,estado,no_show").eq("property_id",propertyId).neq("estado","cancelada").eq("no_show",false).lt("fecha_entrada",draft.end).gt("fecha_salida",draft.start),
+      supabase.from("bloqueos").select("id,habitacion_id,fecha_desde,fecha_hasta,motivo").eq("property_id",propertyId).in("habitacion_id",roomIds).lt("fecha_desde",draft.end).gt("fecha_hasta",draft.start),
+    ])
+    if(conflictRes.error)throw conflictRes.error
+    if(blockRes.error)throw blockRes.error
+    const conflict=(conflictRes.data||[]).find(item=>reservationRooms(item).some(id=>roomIds.includes(id)))
     if(conflict){const conflictRoom=selectedRooms.find(room=>reservationRooms(conflict).includes(Number(room.id)));throw new Error(`La habitación ${conflictRoom?.nombre||"seleccionada"} ya tiene una reserva que se superpone con esas fechas.`)}
+    const block=(blockRes.data||[])[0]
+    if(block){const blockedRoom=selectedRooms.find(room=>Number(room.id)===Number(block.habitacion_id));throw new Error(`La habitación ${blockedRoom?.nombre||block.habitacion_id} tiene un bloqueo operativo${block.motivo?` (${block.motivo})`:""} durante esas fechas. Elegí otra habitación o liberá el bloqueo.`)}
 
     const roomAssignments=draft.roomAssignments||{},requestedGuests=Math.max(1,Number(draft.guests)||1)
     const details=selectedRooms.map(room=>{const assignment=roomAssignments[String(room.id)]||{};return{habitacion_id:Number(room.id),nombre:room.nombre,categoria_asignada:room.tipo||"Habitación",categoria_vendida:assignment.soldAs||room.tipo||"Habitación",huespedes:Math.max(0,Number(assignment.guests)||0),tarifa_noche:Math.max(0,Number(assignment.rate??room.precio)||0),rooming:{matrimonial:Math.max(0,Number(assignment.matrimonial)||0),individual:Math.max(0,Number(assignment.individual)||0)}}})
@@ -112,7 +121,7 @@ export default function usePlanningData(propertyId,windowStart,windowEndExclusiv
     if(discountAmount>0&&reasonKey==="other"&&!reasonDetail)throw new Error("Especificá el motivo del descuento.")
     const reasonLabel=DISCOUNT_REASON_LABELS[reasonKey]||reasonKey,discountReason=discountAmount>0?`${reasonLabel}${reasonDetail?` · ${reasonDetail}`:""}`:null
     const hasTaxChoice=typeof draft.impuestosDesglosados==="boolean",vatRate=hasTaxChoice&&draft.impuestosDesglosados?Math.max(0,Number(draft.ivaPorcentaje)||0):0,vatAmount=hasTaxChoice&&draft.impuestosDesglosados?Math.round(total*vatRate)/100:0
-    const taxPayload=hasTaxChoice?{impuestos_desglosados:draft.impuestosDesglosados,iva_porcentaje:vatRate,precio_sin_impuestos_nacionales:total,iva_importe:vatAmount,condicion_iva_huesped:draft.ivaCondition||"consumidor_final"}:draft.ivaCondition?{condicion_iva_huesped:draft.ivaCondition}:{}
+    const taxPayload=hasTaxChoice?{impuestos_desglosados:draft.impuestosDesglosados,iva_porcentaje:vatRate,precio_sin_impuestos_nacionales:total,iva_importe:vatAmount}:{}
     const payload={
       property_id:propertyId,user_id:userData?.user?.id||null,habitacion_id:roomIds[0],habitaciones_ids:roomIds,
       habitaciones_detalle:details,
@@ -132,5 +141,5 @@ export default function usePlanningData(propertyId,windowStart,windowEndExclusiv
     return created
   },[propertyId,rooms,cancellationPolicies,windowStart,windowEndExclusive])
 
-  return{rooms,reservations,cancellationPolicies,loading,error,setError,load,moveReservation,createReservation}
+  return{rooms,reservations,blocks,cancellationPolicies,loading,error,setError,load,moveReservation,createReservation}
 }
