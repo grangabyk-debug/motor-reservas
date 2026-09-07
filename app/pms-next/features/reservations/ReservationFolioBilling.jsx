@@ -4,6 +4,7 @@ import{useCallback,useEffect,useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 import s from"./reservationFolioBilling.module.css"
 import ReservationInvoiceDialog from"./ReservationInvoiceDialog"
+import ReservationDocumentHistory from"./ReservationDocumentHistory"
 import{printReservationFolio}from"./reservationFolioPrint"
 
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:2}).format(Number(value)||0)
@@ -13,7 +14,6 @@ const validPayment=row=>!["anulado","cancelado","void","rechazado","cancelled"].
 const netPayment=row=>validPayment(row)?Math.max(0,Number(row?.monto||0)-Number(row?.refunded_amount||0)):0
 const payerLabels={guest:"Huésped",company:"Empresa",agency:"Agencia",group:"Grupo",other:"Otro"}
 const typeLabels={lodging:"Alojamiento",parking:"Cochera",pet:"Mascotas",service:"Servicio",extra:"Extra",discount:"Descuento",adjustment:"Ajuste",fee:"Cargo"}
-const escapeHtml=value=>String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"})[char])
 
 export default function ReservationFolioBilling({reservation,propertyId,property,onNavigate}){
   const[folios,setFolios]=useState([])
@@ -29,7 +29,6 @@ export default function ReservationFolioBilling({reservation,propertyId,property
   const[newOpen,setNewOpen]=useState(false)
   const[newDraft,setNewDraft]=useState({label:"",payer_type:"guest",payer_name:""})
   const[invoiceOpen,setInvoiceOpen]=useState(false)
-  const[showAllDocs,setShowAllDocs]=useState(false)
   const[invoiceMode,setInvoiceMode]=useState("folio")
   const[invoicePaymentId,setInvoicePaymentId]=useState("")
   const[billingName,setBillingName]=useState(reservation.nombre_huesped||"")
@@ -53,7 +52,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
         supabase.from("hotel_folio_items").select("id,folio_id,room_id,source_type,source_key,description,detail,service_date,quantity,unit_price,discount,tax_rate,tax,subtotal,total,currency,status,invoice_document_id,created_at").eq("property_id",propertyId).eq("reservation_id",Number(reservation.id)).order("service_date").order("created_at"),
         supabase.from("hotel_folio_payment_allocations").select("id,folio_id,payment_id,amount,currency,source,created_at").eq("property_id",propertyId).eq("reservation_id",Number(reservation.id)),
         supabase.from("pagos").select("id,folio_id,monto,refunded_amount,moneda,metodo,estado,referencia,nota,created_at").eq("property_id",propertyId).eq("reserva_id",Number(reservation.id)).order("created_at",{ascending:false}),
-        supabase.from("hotel_finance_documents").select("id,folio_id,payment_id,document_type,number,status,currency,total,balance,billing_to,items,folio_item_ids,billing_mode,issued_at,created_at").eq("property_id",propertyId).eq("reservation_id",Number(reservation.id)).order("created_at",{ascending:false}),
+        supabase.from("hotel_finance_documents").select("id,folio_id,payment_id,document_type,number,status,currency,subtotal,tax,total,balance,billing_to,items,folio_item_ids,billing_mode,issued_at,created_at,related_document_id,adjustment_reason").eq("property_id",propertyId).eq("reservation_id",Number(reservation.id)).order("created_at",{ascending:false}),
       ])
       for(const result of[folioRes,itemRes,allocationRes,paymentRes,docRes])if(result.error)throw result.error
       const nextFolios=folioRes.data||[]
@@ -74,7 +73,6 @@ export default function ReservationFolioBilling({reservation,propertyId,property
     setBillingPhone(reservation.telefono_huesped||"")
     setBillingCurrency(reservation.moneda||"ARS")
     setSelectedItems(new Set())
-    setShowAllDocs(false)
   },[reservation.id,reservation.nombre_huesped,reservation.email_huesped,reservation.telefono_huesped,reservation.moneda])
   useEffect(()=>{
     if(typeof window==="undefined")return
@@ -101,17 +99,22 @@ export default function ReservationFolioBilling({reservation,propertyId,property
   },[allocations])
   const statsByFolio=useMemo(()=>{
     const map=new Map(folios.map(folio=>[folio.id,{charges:0,paid:0,invoiced:0}]))
-    for(const item of activeItems){const stat=map.get(item.folio_id);if(stat){stat.charges+=Number(item.total||0);if(item.invoice_document_id)stat.invoiced+=Number(item.total||0)}}
+    for(const item of activeItems){const stat=map.get(item.folio_id);if(stat)stat.charges+=Number(item.total||0)}
     for(const row of allocations){const stat=map.get(row.folio_id);if(stat)stat.paid+=Number(row.amount||0)}
+    for(const doc of documents){
+      if(doc.status==="draft"||doc.status==="void")continue
+      const stat=map.get(doc.folio_id);if(!stat)continue
+      if(doc.document_type==="invoice"||doc.document_type==="debit_note")stat.invoiced+=Number(doc.total||0)
+      else if(doc.document_type==="credit_note")stat.invoiced-=Number(doc.total||0)
+    }
     return map
-  },[folios,activeItems,allocations])
+  },[folios,activeItems,allocations,documents])
   const selectedStats=selected?statsByFolio.get(selected.id)||{charges:0,paid:0,invoiced:0}:{charges:0,paid:0,invoiced:0}
   const folioItems=selected?activeItems.filter(row=>row.folio_id===selected.id):[]
   const folioAllocations=selected?allocations.filter(row=>row.folio_id===selected.id):[]
   const folioPaymentIds=new Set(folioAllocations.map(row=>Number(row.payment_id)))
   const folioPayments=payments.filter(row=>folioPaymentIds.has(Number(row.id)))
-  const folioDocs=selected?documents.filter(row=>row.folio_id===selected.id):[]
-  const draftReservedIds=useMemo(()=>new Set(documents.filter(doc=>doc.status==="draft").flatMap(doc=>Array.isArray(doc.folio_item_ids)?doc.folio_item_ids:[])),[documents])
+  const draftReservedIds=useMemo(()=>new Set(documents.filter(doc=>doc.status==="draft"&&doc.document_type==="invoice").flatMap(doc=>Array.isArray(doc.folio_item_ids)?doc.folio_item_ids:[])),[documents])
   const invoiceableItems=folioItems.filter(row=>!row.invoice_document_id&&!draftReservedIds.has(row.id))
   const checkedInvoiceItems=invoiceableItems.filter(row=>selectedItems.has(row.id))
   const unallocatedPayments=payments.map(row=>({...row,remaining:Math.max(0,netPayment(row)-(allocationByPayment.get(Number(row.id))||0))})).filter(row=>row.remaining>.009)
@@ -269,7 +272,9 @@ export default function ReservationFolioBilling({reservation,propertyId,property
         due_at:billingDueAt||null,
         external_ref:null,
         notes:billingNotes.trim()||`Preparada desde ${selected.label}`,
-        created_by:userRes.data?.user?.id||null
+        created_by:userRes.data?.user?.id||null,
+        related_document_id:null,
+        adjustment_reason:null
       }
       const res=await supabase.from("hotel_finance_documents").insert(payload).select("id").single()
       if(res.error)throw res.error
@@ -301,7 +306,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
     <nav className={s.folioTabs}>
       {folios.map(folio=>{
         const stats=statsByFolio.get(folio.id)||{charges:0,paid:0}
-        return <button type="button" key={folio.id} className={folio.id===selected?.id?s.active:""} onClick={()=>{setSelectedId(folio.id);setSelectedItems(new Set());setShowAllDocs(false)}}>
+        return <button type="button" key={folio.id} className={folio.id===selected?.id?s.active:""} onClick={()=>{setSelectedId(folio.id);setSelectedItems(new Set())}}>
           <span>{folio.folio_type==="master"?"◇":"▣"} {folio.label}</span>
           <small>{payerLabels[folio.payer_type]||folio.payer_type} · saldo {money(stats.charges-stats.paid,folio.currency)}</small>
         </button>
@@ -342,10 +347,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
         {unallocatedPayments.map(payment=><div key={payment.id}><span><b>{payment.metodo||"Pago"}</b><small>{fmtDateTime(payment.created_at)} · disponible {money(payment.remaining,payment.moneda)}</small></span><button type="button" onClick={()=>allocate(payment)} disabled={saving}>Asignar a {selected.label}</button></div>)}
       </div>:null}
 
-      <div className={s.docs}>
-        <header><b>Facturas vinculadas</b>{folioDocs.length>4?<button type="button" onClick={()=>setShowAllDocs(value=>!value)}>{showAllDocs?"Ver menos":`Ver todas (${folioDocs.length})`}</button>:null}</header>
-        {folioDocs.length?(showAllDocs?folioDocs:folioDocs.slice(0,4)).map(doc=><div key={doc.id}><span><b>{doc.number||"Borrador sin numerar"}</b><small>{doc.billing_mode==="payment"?"Sobre pago":doc.billing_mode==="partial_items"?"Parcial":"Sobre folio"} · {fmtDateTime(doc.issued_at||doc.created_at)}</small></span><strong>{money(doc.total,doc.currency)}</strong><em data-status={doc.status}>{doc.status==="draft"?"Borrador":doc.status==="issued"?"Emitida":doc.status}</em></div>):<div className={s.emptySmall}>Todavía no hay facturas para este folio.</div>}
-      </div>
+      <ReservationDocumentHistory documents={documents} selected={selected} reservation={reservation} propertyId={propertyId} onRefresh={load} setError={setError}/>
     </>:<div className={s.empty}>No hay folios disponibles.</div>}
 
     {newOpen?<div className={s.overlay} onMouseDown={event=>event.target===event.currentTarget&&setNewOpen(false)}><div className={s.modal}>
