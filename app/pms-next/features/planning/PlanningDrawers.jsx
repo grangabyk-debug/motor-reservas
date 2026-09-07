@@ -1,12 +1,12 @@
 "use client"
 
 import{useEffect,useRef,useState}from"react"
-import{supabase}from"../../../../lib/supabase"
 import s from"./planning.module.css"
 import g from"./planningGroup.module.css"
 import l from"./planningLifecycle.module.css"
 import{planningStage,planningStageLabel}from"./planningLifecycle"
 import RoomingEditor,{reservationRoomingSummary}from"./RoomingEditor"
+import useReservationTaxConfig from"./useReservationTaxConfig"
 
 const DAY=86400000
 const fromKey=value=>{const[y,m,d]=String(value).split("-").map(Number);return new Date(y,m-1,d,12)}
@@ -17,7 +17,6 @@ const diffDays=(a,b)=>Math.round((fromKey(b)-fromKey(a))/DAY)
 const longDate=value=>new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short",year:"numeric"}).format(fromKey(value)).replace(".","")
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:2}).format(Number(value)||0)
 const STEPS=["Fecha","Habitación","Titular","Detalles"]
-const DEFAULT_TAXES={enabled:true,country:"AR",vat_rate:21,show_breakdown:true,default_recipient_condition:"consumidor_final",additional_taxes_enabled:true}
 const uniqueIds=values=>[...new Set((values||[]).filter(Boolean).map(value=>String(value)))]
 const roomRank=room=>room.estado==="mantenimiento"?2:room.available?0:1
 const roomCapacity=room=>Math.max(1,Number(room?.capacidad)||1)
@@ -73,7 +72,7 @@ export function CreateReservationDrawer({draft,setDraft,drawerStep,setDrawerStep
   const invalidSelectedRooms=availableRooms.filter(room=>rawSelectedRoomIds.includes(String(room.id))&&(!room.available||room.estado==="mantenimiento")),hasInvalidSelection=invalidSelectedRooms.length>0
   const recommendedRoom=sortedRooms.find(room=>room.available&&room.estado!=="mantenimiento"&&roomCapacity(room)>=guests)||sortedRooms.find(room=>room.available&&room.estado!=="mantenimiento")
   const[localError,setLocalError]=useState("")
-  const[taxConfig,setTaxConfig]=useState(DEFAULT_TAXES)
+  const taxConfig=useReservationTaxConfig(selectedRoomIds[0]||rawSelectedRoomIds[0],setDraft)
   const errorTimer=useRef(null)
   const grossTotal=(Number(draft.rate)||0)*Math.max(1,nights)
   const discountType=draft.discountType||"none",discountValue=Math.max(0,Number(draft.discountValue)||0)
@@ -88,26 +87,6 @@ export function CreateReservationDrawer({draft,setDraft,drawerStep,setDrawerStep
 
   useEffect(()=>()=>{if(errorTimer.current)clearTimeout(errorTimer.current)},[])
   useEffect(()=>{if(!draft.channel||draft.channel==="Directa")setDraft(current=>({...current,channel:"Walk-in"}))},[])
-  useEffect(()=>{
-    let cancelled=false
-    async function loadTaxes(){
-      const roomId=selectedRoomIds[0]||rawSelectedRoomIds[0]
-      if(!roomId)return
-      try{
-        const roomRes=await supabase.from("habitaciones").select("property_id").eq("id",Number(roomId)).maybeSingle()
-        if(roomRes.error||!roomRes.data?.property_id)return
-        const settingsRes=await supabase.from("property_settings").select("settings").eq("property_id",roomRes.data.property_id).maybeSingle()
-        if(settingsRes.error)return
-        const raw=settingsRes.data?.settings?.taxes||{}
-        const next={...DEFAULT_TAXES,...raw,enabled:raw.enabled!==false,vat_rate:Math.max(0,Number(raw.vat_rate??21))}
-        if(cancelled)return
-        setTaxConfig(next)
-        setDraft(current=>({...current,impuestosDesglosados:next.enabled,ivaPorcentaje:next.enabled?next.vat_rate:0,ivaCondition:current.ivaCondition||next.default_recipient_condition||"consumidor_final"}))
-      }catch{}
-    }
-    loadTaxes()
-    return()=>{cancelled=true}
-  },[selectedRoomIds[0],rawSelectedRoomIds[0]])
   useEffect(()=>{
     const current=uniqueIds(draft.roomIds?.length?draft.roomIds:[draft.roomId])
     const valid=current.filter(id=>{const room=availableRooms.find(item=>String(item.id)===id);return room&&room.available&&room.estado!=="mantenimiento"})
