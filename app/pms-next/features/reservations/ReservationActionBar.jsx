@@ -5,7 +5,7 @@ import{supabase}from"../../../../lib/supabase"
 import ReservationGuestPanel from"./ReservationGuestPanel"
 import ReservationGuaranteePanel from"./ReservationGuaranteePanel"
 
-const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:0}).format(Number(value)||0)
+const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:2}).format(Number(value)||0)
 const fmt=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"2-digit",year:"numeric"}).format(new Date(`${String(value).slice(0,10)}T12:00:00`)):"—"
 const cleanPhone=value=>String(value||"").replace(/\D/g,"").replace(/^0+/,"")
 const roomNames=rooms=>(rooms||[]).map(room=>room.nombre).filter(Boolean).join(", ")||"—"
@@ -40,7 +40,8 @@ export default function ReservationActionBar({item,rooms=[],propertyId,onRefresh
     ["phone","Web app del huésped","phone"],
     ["police","Libro de policía","police"],
   ]
-  const summary=`Reserva ${item.numero_reserva||item.id}\nHuésped: ${item.nombre_huesped}\nHabitación: ${roomNames(rooms)}\nEntrada: ${fmt(item.fecha_entrada)}\nSalida: ${fmt(item.fecha_salida)}\nTotal: ${money(item.precio_total,item.moneda)}`
+  const taxLines=item.impuestos_desglosados?`\nTarifa por noche (sin impuestos): ${money(item.tarifa_noche,item.moneda)}\nPrecio sin impuestos nacionales: ${money(item.precio_sin_impuestos_nacionales,item.moneda)}\nIVA ${Number(item.iva_porcentaje||0)}%: ${money(item.iva_importe,item.moneda)}`:`\nTarifa por noche: ${money(item.tarifa_noche,item.moneda)}`
+  const summary=`Reserva ${item.numero_reserva||item.id}\nHuésped: ${item.nombre_huesped}\nHabitación: ${roomNames(rooms)}\nEntrada: ${fmt(item.fecha_entrada)}\nSalida: ${fmt(item.fecha_salida)}${taxLines}\nTotal: ${money(item.precio_total,item.moneda)}`
   const policeRequired=useMemo(()=>["full_name","document_number","birth_date","sex","nationality","address","city","province","country"],[])
   const primary=guestRows.find(row=>row.role==="primary")||guestRows[0]
   const policeMissing=primary?policeRequired.filter(key=>!String(primary[key]||"").trim()):policeRequired
