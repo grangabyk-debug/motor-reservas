@@ -218,7 +218,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
     finally{setSaving(false)}
   }
 
-  async function prepareInvoice(){
+  async function prepareInvoice({taxCondition="consumidor_final"}={}){
     if(!selected||saving)return
     setSaving(true);setError("")
     try{
@@ -259,7 +259,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
         tax:invoiceCalc.tax,
         total:invoiceCalc.total,
         balance:invoiceCalc.total,
-        billing_to:{name:billingName.trim(),email:billingEmail.trim()||null,phone:billingPhone.trim()||null,payer_type:selected.payer_type,folio_label:selected.label},
+        billing_to:{name:billingName.trim(),email:billingEmail.trim()||null,phone:billingPhone.trim()||null,payer_type:selected.payer_type,folio_label:selected.label,iva_condition:taxCondition},
         items:payloadItems,
         folio_item_ids:itemIds,
         billing_mode:billingMode,
