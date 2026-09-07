@@ -1,17 +1,20 @@
 "use client"
 
 import{useEffect,useState}from"react"
+import{supabase}from"../../../../lib/supabase"
 import s from"./reservationFolioBilling.module.css"
 
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:2}).format(Number(value)||0)
 const fmtDateTime=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}).format(new Date(value)).replace(".",""):"—"
 const today=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"America/Argentina/Buenos_Aires",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date())
 const TAX_CONDITIONS=[["consumidor_final","Consumidor final"],["responsable_inscripto","Responsable inscripto"],["monotributo","Monotributo"],["exento","Exento"],["cliente_exterior","Cliente del exterior"],["no_categorizado","No categorizado"]]
-const taxRateFor=(condition,reservation)=>{
-  const base=reservation?.impuestos_desglosados?Math.max(0,Number(reservation.iva_porcentaje||21)):0
-  return["exento","cliente_exterior"].includes(condition)?0:base
+const taxRateFor=(condition,reservation,taxConfig)=>{
+  if(["exento","cliente_exterior"].includes(condition))return 0
+  const stored=Math.max(0,Number(reservation?.iva_porcentaje)||0)
+  if(reservation?.impuestos_desglosados&&stored>0)return stored
+  return taxConfig.enabled?Math.max(0,Number(taxConfig.rate)||0):0
 }
-const blankLine=(reservation,condition)=>({folio_item_id:null,service_date:today(),description:"",quantity:1,unit_price:0,tax_rate:taxRateFor(condition,reservation)})
+const blankLine=(reservation,condition,taxConfig)=>({folio_item_id:null,service_date:today(),description:"",quantity:1,unit_price:0,tax_rate:taxRateFor(condition,reservation,taxConfig)})
 
 export default function ReservationInvoiceDialog({
   open,selected,reservation,invoiceMode,changeInvoiceMode,checkedInvoiceItems,invoiceableItems,
@@ -21,14 +24,29 @@ export default function ReservationInvoiceDialog({
   updateInvoiceLine,billingNotes,setBillingNotes,invoiceCalc,saving,prepareInvoice,onClose,
 }){
   const[taxCondition,setTaxCondition]=useState("consumidor_final")
+  const[taxConfig,setTaxConfig]=useState({enabled:true,rate:21})
   useEffect(()=>{
     if(!open)return
-    const initial=reservation?.condicion_iva_huesped||"consumidor_final",rate=taxRateFor(initial,reservation)
-    setTaxCondition(initial)
-    setInvoiceLines(current=>current.map(line=>({...line,tax_rate:rate})))
-  },[open,reservation?.id])
+    let cancelled=false
+    async function loadTax(){
+      let next={enabled:true,rate:21}
+      try{
+        const propertyId=reservation?.property_id
+        if(propertyId){
+          const{data}=await supabase.from("property_settings").select("settings").eq("property_id",propertyId).maybeSingle()
+          const taxes=data?.settings?.taxes||{}
+          next={enabled:taxes.enabled!==false,rate:Math.max(0,Number(taxes.vat_rate??21))}
+        }
+      }catch{}
+      if(cancelled)return
+      const initial=reservation?.condicion_iva_huesped||"consumidor_final",rate=taxRateFor(initial,reservation,next)
+      setTaxConfig(next);setTaxCondition(initial);setInvoiceLines(current=>current.map(line=>({...line,tax_rate:rate})))
+    }
+    loadTax()
+    return()=>{cancelled=true}
+  },[open,reservation?.id,reservation?.property_id])
   if(!open||!selected)return null
-  function changeTaxCondition(value){const rate=taxRateFor(value,reservation);setTaxCondition(value);setInvoiceLines(current=>current.map(line=>({...line,tax_rate:rate})))}
+  function changeTaxCondition(value){const rate=taxRateFor(value,reservation,taxConfig);setTaxCondition(value);setInvoiceLines(current=>current.map(line=>({...line,tax_rate:rate})))}
   return <div className={s.overlay} onMouseDown={event=>event.target===event.currentTarget&&onClose()}>
     <div className={`${s.modal} ${s.invoiceModal}`}>
       <button className={s.close} onClick={onClose}>×</button>
@@ -60,7 +78,7 @@ export default function ReservationInvoiceDialog({
       </div>
 
       <div className={s.invoiceLines}>
-        <header><h3>Conceptos</h3><button type="button" onClick={()=>setInvoiceLines(current=>[...current,blankLine(reservation,taxCondition)])}>＋ Agregar línea</button></header>
+        <header><h3>Conceptos</h3><button type="button" onClick={()=>setInvoiceLines(current=>[...current,blankLine(reservation,taxCondition,taxConfig)])}>＋ Agregar línea</button></header>
         {invoiceLines.length?<div style={{overflowX:"auto",paddingBottom:2}}><div style={{minWidth:930}}><div style={{display:"grid",gridTemplateColumns:"105px minmax(180px,2fr) 70px 105px 105px 88px 105px 105px 38px",gap:7,alignItems:"end",padding:"10px 0 2px",fontSize:9.5,fontWeight:850,color:"var(--muted)"}}><span>Fecha</span><span>Descripción</span><span style={{textAlign:"right"}}>Unidades</span><span style={{textAlign:"right"}}>Precio</span><span style={{textAlign:"right"}}>Subtotal</span><span style={{textAlign:"right"}}>Impuestos</span><span style={{textAlign:"right"}}>IVA</span><span style={{textAlign:"right"}}>Total</span><span></span></div>{invoiceLines.map((line,index)=>{const quantity=Math.max(0,Number(line.quantity||0)),unit=Number(line.unit_price||0),subtotal=quantity*unit,rate=Math.max(0,Number(line.tax_rate||0)),tax=subtotal*rate/100,total=subtotal+tax;return <div key={`${line.folio_item_id||"manual"}-${index}`} data-discount={line.source_type==="discount"?"true":"false"} style={{display:"grid",gridTemplateColumns:"105px minmax(180px,2fr) 70px 105px 105px 88px 105px 105px 38px",gap:7,alignItems:"center",marginTop:7}}>
           <input aria-label="Fecha" type="date" value={line.service_date||reservation.fecha_entrada||today()} onChange={event=>updateInvoiceLine(index,"service_date",event.target.value)}/>
           <input aria-label="Descripción" placeholder="Descripción" value={line.description} onChange={event=>updateInvoiceLine(index,"description",event.target.value)}/>
