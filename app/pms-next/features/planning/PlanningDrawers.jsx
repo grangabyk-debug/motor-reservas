@@ -7,6 +7,7 @@ import l from"./planningLifecycle.module.css"
 import{planningStage,planningStageLabel}from"./planningLifecycle"
 import RoomingEditor,{reservationRoomingSummary}from"./RoomingEditor"
 import useReservationTaxConfig from"./useReservationTaxConfig"
+import{chargeLabel,cancelRulesLabel}from"./planningPolicyLabels"
 
 const DAY=86400000
 const fromKey=value=>{const[y,m,d]=String(value).split("-").map(Number);return new Date(y,m-1,d,12)}
@@ -39,18 +40,6 @@ function compareRooms(a,b,guests){
     if(!fitsA&&capacityA!==capacityB)return capacityB-capacityA
   }
   return String(a.nombre||"").localeCompare(String(b.nombre||""),"es",{numeric:true})
-}
-function chargeLabel(rule,currency="ARS"){
-  const type=rule?.charge_type||"none",value=Math.max(0,Number(rule?.value)||0)
-  if(type==="fixed")return money(value,currency)
-  if(type==="percent")return`${value}% del total`
-  if(type==="nights")return`${value} noche${value===1?"":"s"}`
-  return"Sin cargo"
-}
-function cancelRulesLabel(policy){
-  const rules=Array.isArray(policy?.cancellation_rules)?policy.cancellation_rules:[]
-  if(!rules.length)return"Sin reglas de cancelación cargadas"
-  return[...rules].sort((a,b)=>Number(b.min_days_before||0)-Number(a.min_days_before||0)).map(rule=>Number(rule.min_days_before||0)>0?`Hasta ${rule.min_days_before} día${Number(rule.min_days_before)===1?"":"s"} antes: ${chargeLabel(rule,policy.currency)}`:`Fuera de plazo: ${chargeLabel(rule,policy.currency)}`).join(" · ")
 }
 
 export function ReservationDetailDrawer({selected,room,rooms=[],onClose,onOpen}){
