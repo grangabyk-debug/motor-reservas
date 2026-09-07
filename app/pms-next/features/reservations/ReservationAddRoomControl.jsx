@@ -1,64 +1,83 @@
 "use client"
 
-import{useMemo,useState}from"react"
-import{addDays,money,unique}from"./reservationEditUtils"
+import{useEffect,useMemo,useState}from"react"
+import{supabase}from"../../../../lib/supabase"
+import{addDays,diffDays,money,unique}from"./reservationEditUtils"
 
-export default function ReservationAddRoomControl({item,draft,setDraft,allRooms=[],currentIds=[],busy=false,serviceLocked=false,onPreviewMove,onStatus}){
-  const[open,setOpen]=useState(false),[roomId,setRoomId]=useState(""),[checking,setChecking]=useState(false),[error,setError]=useState("")
-  const ids=unique(draft.roomIds?.length?draft.roomIds:[draft.roomId]),selectionKey=ids.join("|")
-  const availableRooms=useMemo(()=>allRooms.filter(room=>room.activa!==false&&!ids.includes(String(room.id))&&!['mantenimiento','fuera_servicio'].includes(String(room.estado||'').toLowerCase())),[allRooms,selectionKey])
-  const addedIds=ids.filter(id=>!currentIds.includes(id))
-  const selectedRooms=ids.map(id=>allRooms.find(room=>String(room.id)===id)).filter(Boolean)
-  const disabled=busy||serviceLocked
-  const status=(nextError="",ok="")=>onStatus?.({error:nextError,ok})
+const validDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(String(value||""))
+const todayKey=()=>{const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`}
+const idsOf=item=>unique([item?.habitacion_id,...(item?.habitaciones_ids||[])])
+const detailFor=(item,roomId)=>(Array.isArray(item?.habitaciones_detalle)?item.habitaciones_detalle:[]).find(row=>String(row?.habitacion_id)===String(roomId))||{}
+const roomStart=(item,roomId)=>{const value=detailFor(item,roomId)?.fecha_entrada;return validDate(value)?value:item?.fecha_entrada}
+const roomEnd=(item,roomId)=>{const detail=detailFor(item,roomId),planned=validDate(detail?.fecha_salida)?detail.fecha_salida:item?.fecha_salida,release=item?.room_checkout_dates?.[String(roomId)];return validDate(release)&&release<planned?release:planned}
+const initialDraft=item=>{const today=todayKey(),start=String(item?.fecha_entrada||"")>today?String(item.fecha_entrada):today;return{start,end:addDays(start,1),guests:1,roomId:"",holderName:item?.nombre_huesped||"",phone:item?.telefono_huesped||"",email:item?.email_huesped||"",policyId:"",rate:0,soldAs:"",channel:item?.canal_reserva||"Walk-in",voucher:"",matrimonial:1,individual:0,notes:""}}
 
-  function startAdd(){
-    if(disabled)return
-    if(!availableRooms.length){status("No hay otras habitaciones activas para añadir a esta reserva.","");return}
-    setRoomId("");setError("");setOpen(true)
-  }
-  async function addRoom(){
-    if(checking||!roomId)return
-    const room=availableRooms.find(value=>String(value.id)===String(roomId))
-    if(!room){setError("Elegí una habitación válida.");return}
-    const start=draft.earlyCheckin?addDays(draft.start,-1):draft.start,end=draft.lateCheckout?addDays(draft.end,1):draft.end
+export default function ReservationAddRoomControl({item,allRooms=[],busy=false,serviceLocked=false,onPreviewMove,onAddRoom,onAdded}){
+  const[open,setOpen]=useState(false),[step,setStep]=useState(0),[draft,setDraft]=useState(()=>initialDraft(item)),[policies,setPolicies]=useState([]),[availability,setAvailability]=useState({}),[checking,setChecking]=useState(false),[saving,setSaving]=useState(false),[error,setError]=useState("")
+  const currentIds=useMemo(()=>idsOf(item),[item.id,item.habitaciones_ids,item.habitacion_id]),candidateRooms=useMemo(()=>allRooms.filter(room=>room.activa!==false&&!currentIds.includes(String(room.id))&&!['mantenimiento','fuera_servicio'].includes(String(room.estado||'').toLowerCase())),[allRooms,currentIds.join("|")])
+  const room=candidateRooms.find(value=>String(value.id)===String(draft.roomId)),nights=draft.start&&draft.end&&draft.end>draft.start?diffDays(draft.start,draft.end):0,disabled=busy||serviceLocked,soldOptions=[...new Set(allRooms.map(value=>String(value.tipo||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es"))
+  const panel={border:"1px solid var(--line)",borderRadius:12,padding:12,background:"color-mix(in srgb,var(--bg) 32%,var(--panelSolid))"},label={display:"grid",gap:5,fontSize:10,fontWeight:850,color:"var(--muted)"},control={height:39,width:"100%",boxSizing:"border-box",border:"1px solid var(--line)",borderRadius:10,padding:"0 10px",background:"color-mix(in srgb,var(--panelSolid) 88%,transparent)",color:"var(--text)",font:"inherit",fontSize:11,fontWeight:760,outline:"none"},button={height:38,padding:"0 13px",border:"1px solid var(--line)",borderRadius:10,background:"var(--panel)",color:"var(--text)",font:"inherit",fontWeight:850},primary={...button,border:0,background:"linear-gradient(145deg,var(--accent),var(--accent2))",color:"#fff"}
+
+  useEffect(()=>{
+    if(!open)return
+    let cancelled=false
+    ;(async()=>{const{data,error:loadError}=await supabase.from("hotel_cancellation_policies").select("id,name,description,is_default,prepayment_required,prepayment_percent").eq("property_id",item.property_id).eq("active",true).order("is_default",{ascending:false}).order("name");if(cancelled)return;if(loadError){setError("No se pudieron cargar las políticas de cancelación.");return}const rows=data||[];setPolicies(rows);setDraft(current=>({...current,policyId:current.policyId||rows.find(value=>value.is_default)?.id||rows[0]?.id||""}))})()
+    return()=>{cancelled=true}
+  },[open,item.property_id])
+
+  useEffect(()=>{
+    if(!open||step<1||!draft.start||!draft.end||draft.end<=draft.start)return
+    let cancelled=false
     setChecking(true);setError("")
+    ;(async()=>{
+      try{
+        const[resRes,blockRes]=await Promise.all([
+          supabase.from("reservas").select("id,nombre_huesped,numero_reserva,habitacion_id,habitaciones_ids,habitaciones_detalle,room_checkout_dates,fecha_entrada,fecha_salida,estado,no_show").eq("property_id",item.property_id).neq("id",Number(item.id)).neq("estado","cancelada").eq("no_show",false).lt("fecha_entrada",draft.end).gt("fecha_salida",draft.start),
+          supabase.from("bloqueos").select("id,habitacion_id,fecha_desde,fecha_hasta,motivo").eq("property_id",item.property_id).lt("fecha_desde",draft.end).gt("fecha_hasta",draft.start),
+        ])
+        if(resRes.error)throw resRes.error;if(blockRes.error)throw blockRes.error
+        const map={}
+        for(const target of candidateRooms){const id=String(target.id),conflict=(resRes.data||[]).find(row=>idsOf(row).includes(id)&&roomStart(row,id)<draft.end&&roomEnd(row,id)>draft.start),block=(blockRes.data||[]).find(row=>String(row.habitacion_id)===id);map[id]=conflict?{ok:false,message:`Ocupada por ${conflict.nombre_huesped||conflict.numero_reserva||"otra reserva"}`} :block?{ok:false,message:`Bloqueo${block.motivo?` · ${block.motivo}`:""}`}:{ok:true,message:"Disponible"}}
+        if(cancelled)return;setAvailability(map)
+        if(draft.roomId&&map[String(draft.roomId)]?.ok===false)setDraft(current=>({...current,roomId:"",rate:0,soldAs:""}))
+      }catch(err){if(!cancelled)setError(err?.message||"No se pudo consultar disponibilidad en el Planning.")}
+      finally{if(!cancelled)setChecking(false)}
+    })()
+    return()=>{cancelled=true}
+  },[open,step,draft.start,draft.end,item.id,item.property_id,candidateRooms.map(room=>room.id).join("|")])
+
+  function startAdd(){if(disabled)return;if(!candidateRooms.length)return setError("No hay otras habitaciones activas para añadir.");setDraft(initialDraft(item));setStep(0);setAvailability({});setError("");setOpen(true)}
+  function set(name,value){setDraft(current=>({...current,[name]:value}));setError("")}
+  function selectRoom(id){const next=candidateRooms.find(value=>String(value.id)===String(id));if(!next)return;const guests=Math.min(Math.max(1,Number(draft.guests)||1),Math.max(1,Number(next.capacidad)||1));setDraft(current=>({...current,roomId:String(next.id),guests,rate:Number(next.precio)||0,soldAs:next.tipo||"Habitación",matrimonial:guests>=2?1:0,individual:guests>=2?Math.max(0,guests-2):1}))}
+  function next(){if(step===0){if(!draft.start||!draft.end||draft.end<=draft.start)return setError("La salida debe ser posterior a la entrada.");if(Number(draft.guests)<1)return setError("Indicá al menos un huésped.")}if(step===1&&!draft.roomId)return setError("Elegí una habitación disponible.");if(step===2&&!draft.holderName.trim())return setError("Completá el nombre del titular de esta habitación.");setError("");setStep(value=>Math.min(3,value+1))}
+  async function finish(){
+    if(saving||!room||!draft.policyId)return setError(!draft.policyId?"Seleccioná una política de cancelación.":"Elegí una habitación disponible.")
+    const places=Math.max(0,Number(draft.matrimonial)||0)*2+Math.max(0,Number(draft.individual)||0),capacity=Math.max(1,Number(room.capacidad)||1)
+    if(Number(draft.guests)>capacity)return setError(`La habitación admite hasta ${capacity} huésped${capacity===1?"":"es"}.`)
+    if(places<Number(draft.guests))return setError("El Rooming no alcanza para la cantidad de huéspedes indicada.")
+    setSaving(true);setError("")
     try{
-      const preview=await onPreviewMove({reservationId:item.id,roomId:Number(room.id),start,end})
-      if(!preview?.ok){setError(String(preview?.message||"La habitación no está disponible para esas fechas.").replace(/^No se puede aplicar el cambio:\s*/,""));return}
-      setDraft(current=>{
-        const nextIds=unique([...(current.roomIds?.length?current.roomIds:[current.roomId]),String(room.id)]),assignments={...(current.roomAssignments||{})}
-        assignments[String(room.id)]={soldAs:room.tipo||"Habitación",guests:0,matrimonial:0,individual:0,rate:Math.max(0,Number(room.precio)||0)}
-        return{...current,roomId:nextIds[0]||String(room.id),roomIds:nextIds,roomAssignments:assignments}
-      })
-      status("",`Hab. ${room.nombre} añadida a la reserva · revisá huéspedes, Rooming y tarifa antes de guardar.`);setOpen(false);setRoomId("")
-    }catch(err){setError(err?.message||"No se pudo comprobar la disponibilidad de la habitación.")}
-    finally{setChecking(false)}
-  }
-  function removeAdded(roomIdToRemove){
-    const id=String(roomIdToRemove)
-    if(currentIds.includes(id)||disabled)return
-    const room=allRooms.find(value=>String(value.id)===id)
-    setDraft(current=>{
-      const nextIds=unique(current.roomIds?.length?current.roomIds:[current.roomId]).filter(value=>value!==id)
-      if(!nextIds.length)return current
-      const assignments={...(current.roomAssignments||{})};delete assignments[id]
-      return{...current,roomIds:nextIds,roomId:nextIds.includes(String(current.roomId))?String(current.roomId):nextIds[0],roomAssignments:assignments}
-    })
-    status("",room?`Hab. ${room.nombre} quitada de los cambios pendientes.`:"Habitación quitada de los cambios pendientes.")
+      const preview=await onPreviewMove?.({reservationId:item.id,roomId:Number(room.id),start:draft.start,end:draft.end});if(preview&&!preview.ok)throw new Error(preview.message||"La habitación dejó de estar disponible.")
+      const updated=await onAddRoom({reservationId:item.id,roomId:Number(room.id),start:draft.start,end:draft.end,guests:Number(draft.guests),holderName:draft.holderName.trim(),phone:draft.phone.trim(),email:draft.email.trim(),cancellationPolicyId:draft.policyId,rate:Number(draft.rate)||0,soldAs:draft.soldAs||room.tipo||"Habitación",channel:draft.channel||"Walk-in",voucher:draft.voucher.trim(),matrimonial:Number(draft.matrimonial)||0,individual:Number(draft.individual)||0,notes:draft.notes.trim()})
+      setOpen(false);onAdded?.(updated)
+    }catch(err){setError(String(err?.message||"No se pudo añadir la habitación.").replace(/^No se puede aplicar el cambio:\s*/,""))}finally{setSaving(false)}
   }
 
-  const button={height:36,padding:"0 12px",border:"1px solid color-mix(in srgb,var(--accent) 30%,var(--line))",borderRadius:10,background:"color-mix(in srgb,var(--accent) 7%,var(--panelSolid))",color:"var(--accent)",font:"inherit",fontSize:10.5,fontWeight:900,cursor:disabled?"not-allowed":"pointer"}
-  const overlay={position:"fixed",inset:0,zIndex:260,display:"grid",placeItems:"center",padding:18,background:"rgba(9,16,32,.38)",backdropFilter:"blur(9px) saturate(1.15)",WebkitBackdropFilter:"blur(9px) saturate(1.15)"}
-  const shell={width:"min(470px,calc(100vw - 28px))",padding:18,border:"1px solid color-mix(in srgb,#fff 34%,var(--line))",borderRadius:20,background:"color-mix(in srgb,var(--panelSolid) 88%,transparent)",boxShadow:"inset 0 1px color-mix(in srgb,#fff 58%,transparent),0 30px 90px rgba(18,30,58,.28)",backdropFilter:"blur(32px) saturate(1.45)",WebkitBackdropFilter:"blur(32px) saturate(1.45)"}
-  const label={display:"grid",gap:5,fontSize:10,fontWeight:850,color:"var(--muted)"}
-  const control={height:39,width:"100%",border:"1px solid var(--line)",borderRadius:10,padding:"0 10px",background:"color-mix(in srgb,var(--panelSolid) 82%,transparent)",color:"var(--text)",font:"inherit",fontSize:11,fontWeight:760,outline:"none"}
-
+  const overlay={position:"fixed",inset:0,zIndex:270,display:"grid",placeItems:"center",padding:18,background:"rgba(9,16,32,.38)",backdropFilter:"blur(10px) saturate(1.15)",WebkitBackdropFilter:"blur(10px) saturate(1.15)"},shell={width:"min(650px,calc(100vw - 28px))",maxHeight:"90vh",overflow:"auto",padding:18,border:"1px solid color-mix(in srgb,#fff 34%,var(--line))",borderRadius:20,background:"color-mix(in srgb,var(--panelSolid) 90%,transparent)",boxShadow:"0 30px 90px rgba(18,30,58,.28)",backdropFilter:"blur(30px) saturate(1.4)"}
   return <>
-    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginTop:11,flexWrap:"wrap"}}>
-      <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>{addedIds.length?<><small style={{fontSize:9.5,fontWeight:850,color:"var(--muted)"}}>POR AGREGAR</small>{addedIds.map(id=>{const room=selectedRooms.find(value=>String(value.id)===id);return <button key={id} type="button" disabled={disabled} onClick={()=>removeAdded(id)} title="Quitar esta habitación antes de guardar" style={{height:28,padding:"0 8px",border:"1px solid color-mix(in srgb,var(--accent) 22%,var(--line))",borderRadius:999,background:"color-mix(in srgb,var(--accent) 6%,var(--panelSolid))",color:"var(--text)",font:"inherit",fontSize:9.5,fontWeight:800}}>Hab. {room?.nombre||id} ×</button>})}</>:<small style={{fontSize:9.8,color:"var(--muted)"}}>¿La reserva necesita otra habitación? Se suma al mismo pasajero y a la misma cuenta.</small>}</div>
-      <button type="button" disabled={disabled||!availableRooms.length} onClick={startAdd} style={{...button,opacity:disabled||!availableRooms.length?.55:1}} title={!availableRooms.length?"No hay otras habitaciones activas para añadir":"Añadir otra habitación a esta reserva"}>＋ Añadir habitación</button>
-    </div>
-    {open?<div style={overlay} onMouseDown={event=>event.target===event.currentTarget&&!checking&&setOpen(false)}><section role="dialog" aria-modal="true" aria-label="Añadir habitación a la reserva" style={shell}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:14}}><div><small style={{fontSize:9.5,fontWeight:900,letterSpacing:".1em",color:"var(--accent)"}}>MISMA RESERVA</small><h3 style={{margin:"4px 0 0",fontSize:18}}>Añadir habitación</h3><p style={{margin:"5px 0 0",fontSize:10.5,lineHeight:1.45,color:"var(--muted)"}}>Se agregará a la reserva de <b style={{color:"var(--text)"}}>{item.nombre_huesped}</b>, con las mismas fechas {draft.start} → {draft.end}. Disponibilidad y bloqueos se validan contra el Planning.</p></div><button type="button" disabled={checking} onClick={()=>setOpen(false)} style={{width:34,height:34,border:"1px solid var(--line)",borderRadius:10,background:"var(--panel)",color:"var(--text)",fontSize:18}}>×</button></div><label style={{...label,marginTop:15}}>Habitación física<select autoFocus style={control} value={roomId} onChange={event=>{setRoomId(event.target.value);setError("")}}><option value="">Seleccionar habitación…</option>{availableRooms.map(room=><option key={room.id} value={room.id}>Hab. {room.nombre} · {room.tipo||"Sin categoría"} · {money(room.precio,item.moneda)}/noche</option>)}</select></label>{error?<div style={{marginTop:10,padding:"9px 10px",border:"1px solid color-mix(in srgb,var(--red) 30%,var(--line))",borderRadius:10,background:"color-mix(in srgb,var(--red) 7%,var(--panelSolid))",color:"var(--red)",fontSize:10.5,fontWeight:800}}>{error}</div>:null}<div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:15,paddingTop:12,borderTop:"1px solid var(--line)"}}><button type="button" disabled={checking} onClick={()=>setOpen(false)} style={{height:38,padding:"0 13px",border:"1px solid var(--line)",borderRadius:10,background:"var(--panel)",color:"var(--text)",font:"inherit",fontWeight:800}}>Cancelar</button><button type="button" disabled={checking||!roomId} onClick={addRoom} style={{height:38,padding:"0 14px",border:0,borderRadius:10,background:"linear-gradient(145deg,var(--accent),var(--accent2))",color:"#fff",font:"inherit",fontWeight:850,opacity:checking||!roomId?.6:1}}>{checking?"Comprobando…":"Añadir habitación"}</button></div></section></div>:null}
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginTop:11,flexWrap:"wrap"}}><small style={{fontSize:9.8,color:"var(--muted)"}}>¿Necesita otra habitación? Creala con sus propias fechas, titular y política; queda dentro de esta misma reserva.</small><button type="button" disabled={disabled||!candidateRooms.length} onClick={startAdd} style={{...button,color:"var(--accent)",borderColor:"color-mix(in srgb,var(--accent) 30%,var(--line))",background:"color-mix(in srgb,var(--accent) 7%,var(--panelSolid))",opacity:disabled||!candidateRooms.length?.55:1}}>＋ Añadir habitación</button></div>
+    {open?<div style={overlay} onMouseDown={event=>event.target===event.currentTarget&&!saving&&setOpen(false)}><section style={shell} role="dialog" aria-modal="true" aria-label="Añadir habitación a la reserva">
+      <header style={{display:"flex",justifyContent:"space-between",gap:14,alignItems:"flex-start"}}><div><small style={{fontSize:9.5,fontWeight:900,letterSpacing:".1em",color:"var(--accent)"}}>AÑADIR A LA MISMA RESERVA</small><h3 style={{margin:"4px 0 0",fontSize:19}}>Nueva habitación</h3><p style={{margin:"5px 0 0",fontSize:10.5,lineHeight:1.45,color:"var(--muted)"}}>Es el mismo proceso que una reserva nueva, pero el alojamiento y el saldo quedan asociados a <b style={{color:"var(--text)"}}>{item.nombre_huesped}</b>.</p></div><button type="button" disabled={saving} onClick={()=>setOpen(false)} style={{...button,width:34,padding:0,fontSize:18}}>×</button></header>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginTop:14}}>{["Fechas","Habitación","Titular","Detalles"].map((name,index)=><div key={name} style={{height:5,borderRadius:99,background:index<=step?"var(--accent)":"var(--line)"}} title={name}/>)}</div><div style={{display:"flex",justifyContent:"space-between",marginTop:5,fontSize:9.5,color:"var(--muted)"}}><span>{["Fechas","Habitación","Titular","Detalles"][step]}</span><span>Paso {step+1} de 4</span></div>
+      {error?<div style={{marginTop:11,padding:"9px 10px",border:"1px solid color-mix(in srgb,var(--red) 30%,var(--line))",borderRadius:10,background:"color-mix(in srgb,var(--red) 7%,var(--panelSolid))",color:"var(--red)",fontSize:10.5,fontWeight:800}}>{error}</div>:null}
+      <div style={{...panel,marginTop:12}}>
+        {step===0?<><b style={{fontSize:12}}>Elegí la estadía de esta habitación</b><p style={{margin:"3px 0 10px",fontSize:10,color:"var(--muted)"}}>No depende de las fechas de las otras habitaciones del grupo.</p><div style={{display:"grid",gridTemplateColumns:"1fr 1fr .65fr",gap:8}}><label style={label}>Entrada<input type="date" style={control} value={draft.start} onChange={event=>{const start=event.target.value;setDraft(current=>({...current,start,end:current.end<=start?addDays(start,1):current.end}));setError("")}}/></label><label style={label}>Salida<input type="date" min={addDays(draft.start,1)} style={control} value={draft.end} onChange={event=>set("end",event.target.value)}/></label><label style={label}>Huéspedes<input type="number" min="1" style={control} value={draft.guests} onChange={event=>set("guests",Math.max(1,Number(event.target.value)||1))}/></label></div><div style={{marginTop:9,fontSize:10,fontWeight:800,color:"var(--accent)"}}>{nights} noche{nights===1?"":"s"} · después se consulta el Planning para esas fechas.</div></>:null}
+        {step===1?<><b style={{fontSize:12}}>Habitación disponible</b><p style={{margin:"3px 0 10px",fontSize:10,color:"var(--muted)"}}>{draft.start} → {draft.end} · {checking?"Consultando ocupación y bloqueos…":"Disponibilidad actual del Planning"}</p><div style={{display:"grid",gap:7,maxHeight:300,overflow:"auto"}}>{candidateRooms.map(value=>{const state=availability[String(value.id)],ok=state?.ok!==false,selected=String(draft.roomId)===String(value.id);return <button type="button" key={value.id} disabled={checking||!ok} onClick={()=>selectRoom(value.id)} style={{display:"grid",gridTemplateColumns:"1fr auto",gap:10,textAlign:"left",padding:"10px 11px",border:`1px solid ${selected?"var(--accent)":"var(--line)"}`,borderRadius:10,background:selected?"color-mix(in srgb,var(--accent) 7%,var(--panelSolid))":"var(--panelSolid)",color:"var(--text)",font:"inherit",opacity:ok?1:.55}}><span><b style={{fontSize:11.5}}>Hab. {value.nombre} · {value.tipo||"Sin categoría"}</b><small style={{display:"block",marginTop:2,color:"var(--muted)"}}>{value.capacidad||1} pax · {money(value.precio,item.moneda)}/noche</small></span><strong style={{fontSize:10,color:ok?"#278452":"var(--red)"}}>{checking?"…":state?.message||"Disponible"}</strong></button>})}</div></>:null}
+        {step===2?<><b style={{fontSize:12}}>Titular de esta habitación</b><p style={{margin:"3px 0 10px",fontSize:10,color:"var(--muted)"}}>Puede ser el mismo pasajero principal u otra persona, por ejemplo un familiar.</p><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><label style={{...label,gridColumn:"1/-1"}}>Nombre y apellido<input style={control} value={draft.holderName} onChange={event=>set("holderName",event.target.value)}/></label><label style={label}>Teléfono<input style={control} value={draft.phone} onChange={event=>set("phone",event.target.value)}/></label><label style={label}>Email<input type="email" style={control} value={draft.email} onChange={event=>set("email",event.target.value)}/></label></div></>:null}
+        {step===3?<><b style={{fontSize:12}}>Condiciones y tarifa</b><p style={{margin:"3px 0 10px",fontSize:10,color:"var(--muted)"}}>Se suma al total de la reserva principal y aparece como una habitación más del grupo.</p><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><label style={label}>Política de cancelación<select style={control} value={draft.policyId} onChange={event=>set("policyId",event.target.value)}><option value="">Seleccionar…</option>{policies.map(value=><option key={value.id} value={value.id}>{value.name}</option>)}</select></label><label style={label}>Tarifa por noche<input type="number" min="0" style={control} value={draft.rate} onChange={event=>set("rate",Math.max(0,Number(event.target.value)||0))}/></label><label style={label}>Vendida como<select style={control} value={draft.soldAs} onChange={event=>set("soldAs",event.target.value)}>{soldOptions.map(value=><option key={value}>{value}</option>)}</select></label><label style={label}>Canal<select style={control} value={draft.channel} onChange={event=>set("channel",event.target.value)}><option>Walk-in</option><option>Directa</option><option>Telefónica</option><option>WhatsApp</option><option>Agencia</option><option>Booking</option><option>Airbnb</option><option>Despegar</option></select></label><label style={label}>Voucher / referencia<input style={control} value={draft.voucher} onChange={event=>set("voucher",event.target.value)}/></label><div style={label}><span>Rooming</span><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}><label style={{display:"flex",alignItems:"center",gap:5}}><span>🛏️</span><input aria-label="Camas matrimoniales" type="number" min="0" style={control} value={draft.matrimonial} onChange={event=>set("matrimonial",Math.max(0,Number(event.target.value)||0))}/></label><label style={{display:"flex",alignItems:"center",gap:5}}><span>▭</span><input aria-label="Camas individuales" type="number" min="0" style={control} value={draft.individual} onChange={event=>set("individual",Math.max(0,Number(event.target.value)||0))}/></label></div></div><label style={{...label,gridColumn:"1/-1"}}>Nota de esta habitación<input style={control} value={draft.notes} onChange={event=>set("notes",event.target.value)} placeholder="Opcional"/></label></div>{room?<div style={{marginTop:10,padding:"9px 10px",borderRadius:10,background:"color-mix(in srgb,var(--accent) 6%,var(--panelSolid))",fontSize:10}}><b>Hab. {room.nombre}</b> · {draft.start} → {draft.end} · {nights} noche{nights===1?"":"s"} · <strong>{money((Number(draft.rate)||0)*nights,item.moneda)}</strong> se suma a la reserva.</div>:null}</>:null}
+      </div>
+      <footer style={{display:"flex",justifyContent:"space-between",gap:8,marginTop:13,paddingTop:12,borderTop:"1px solid var(--line)"}}><button type="button" disabled={saving} onClick={()=>step?setStep(value=>value-1):setOpen(false)} style={button}>{step?"← Atrás":"Cancelar"}</button><button type="button" disabled={saving||checking} onClick={step===3?finish:next} style={{...primary,opacity:saving||checking?.6:1}}>{saving?"Añadiendo…":step===3?"Añadir a la reserva":"Continuar →"}</button></footer>
+      <style>{`@media(max-width:620px){[aria-label="Añadir habitación a la reserva"] div[style*="grid-template-columns: 1fr 1fr"]{grid-template-columns:1fr!important}}`}</style>
+    </section></div>:null}
   </>
 }
