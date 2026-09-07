@@ -21,7 +21,7 @@ export default function useReservationTaxConfig(roomId,setDraft){
         const next={...DEFAULT_TAXES,...raw,enabled:raw.enabled!==false,vat_rate:Math.max(0,Number(raw.vat_rate??21))}
         if(cancelled)return
         setTaxConfig(next)
-        setDraft(current=>({...current,impuestosDesglosados:next.enabled,ivaPorcentaje:next.enabled?next.vat_rate:0,ivaCondition:current.ivaCondition||next.default_recipient_condition||"consumidor_final"}))
+        setDraft(current=>({...current,impuestosDesglosados:next.enabled,ivaPorcentaje:next.enabled?next.vat_rate:0}))
       }catch{}
     }
     load()
