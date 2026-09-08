@@ -3,6 +3,7 @@
 import{useEffect,useState}from"react"
 import ReservationRecordBase from"./ReservationRecordBase"
 import ReservationGroupCheckoutDialog from"./ReservationGroupCheckoutDialog"
+import ReservationMidStayRoomSplitControl from"./ReservationMidStayRoomSplitControl"
 
 export default function ReservationRecord(props){
   const{item,rooms=[],propertyId,onPrimaryAction}=props
@@ -14,6 +15,7 @@ export default function ReservationRecord(props){
     onPrimaryAction?.()
   }
   return <>
+    <ReservationMidStayRoomSplitControl item={item} rooms={rooms} propertyId={propertyId}/>
     <ReservationRecordBase {...props} onPrimaryAction={primaryAction}/>
     {groupCheckoutOpen?<ReservationGroupCheckoutDialog item={item} rooms={rooms} propertyId={propertyId} onClose={()=>setGroupCheckoutOpen(false)} onCheckoutAll={()=>{setGroupCheckoutOpen(false);onPrimaryAction?.()}}/>:null}
   </>
