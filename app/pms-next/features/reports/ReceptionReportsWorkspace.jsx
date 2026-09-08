@@ -3,6 +3,7 @@
 import{useCallback,useEffect,useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 import usePmsAutoRefresh from"../../core/usePmsAutoRefresh"
+import{downloadXlsx,printSheet}from"./reportDocumentExport"
 import s from"./receptionReports.module.css"
 
 const dateKey=date=>date.toLocaleDateString("en-CA")
@@ -10,52 +11,6 @@ const nextDay=value=>{const date=new Date(`${value}T12:00:00`);date.setDate(date
 const normalize=value=>String(value||"").trim().toLowerCase()
 const cancelled=row=>["cancelada","cancelled","anulada","anulado"].includes(normalize(row?.estado))
 const roomIds=row=>[...new Set([row?.habitacion_id,...(row?.habitaciones_ids||[])].filter(Boolean).map(Number))]
-const xmlClean=value=>String(value??"").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,"")
-const xmlEscape=value=>xmlClean(value).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&apos;")
-const htmlEscape=value=>String(value??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;")
-const columnName=index=>{let n=index+1,out="";while(n){const r=(n-1)%26;out=String.fromCharCode(65+r)+out;n=Math.floor((n-1)/26)}return out}
-const textEncoder=typeof TextEncoder!=="undefined"?new TextEncoder():null
-const crcTable=(()=>{const table=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=(c&1)?0xedb88320^(c>>>1):c>>>1;table[n]=c>>>0}return table})()
-const crc32=bytes=>{let c=0xffffffff;for(const byte of bytes)c=crcTable[(c^byte)&255]^(c>>>8);return(c^0xffffffff)>>>0}
-const u16=n=>new Uint8Array([n&255,(n>>>8)&255])
-const u32=n=>new Uint8Array([n&255,(n>>>8)&255,(n>>>16)&255,(n>>>24)&255])
-const joinBytes=parts=>{const length=parts.reduce((sum,part)=>sum+part.length,0),out=new Uint8Array(length);let offset=0;for(const part of parts){out.set(part,offset);offset+=part.length}return out}
-function zipStore(entries){const locals=[],centrals=[];let offset=0;for(const entry of entries){const name=textEncoder.encode(entry.name),data=textEncoder.encode(entry.content),crc=crc32(data),local=joinBytes([u32(0x04034b50),u16(20),u16(0),u16(0),u16(0),u16(0),u32(crc),u32(data.length),u32(data.length),u16(name.length),u16(0),name,data]);locals.push(local);centrals.push(joinBytes([u32(0x02014b50),u16(20),u16(20),u16(0),u16(0),u16(0),u16(0),u32(crc),u32(data.length),u32(data.length),u16(name.length),u16(0),u16(0),u16(0),u16(0),u32(0),u32(offset),name]));offset+=local.length}const body=joinBytes(locals),directory=joinBytes(centrals),end=joinBytes([u32(0x06054b50),u16(0),u16(0),u16(entries.length),u16(entries.length),u32(directory.length),u32(body.length),u16(0)]);return joinBytes([body,directory,end])}
-function excelCell(ref,value,style=0){if(typeof value==="number"&&Number.isFinite(value))return`<c r="${ref}" t="n" s="${style}"><v>${value}</v></c>`;return`<c r="${ref}" t="inlineStr" s="${style}"><is><t xml:space="preserve">${xmlEscape(value)}</t></is></c>`}
-function downloadXlsx({fileName,title,subtitle,day,propertyName,columns,rows,totalText}){
-  if(!textEncoder)return
-  const last=columnName(Math.max(columns.length-1,0)),headerRow=5,dataStart=6,totalRow=dataStart+rows.length
-  const widths=columns.map(column=>{const values=rows.slice(0,80).map(row=>String(row[column.key]??"")),max=Math.max(column.label.length,...values.map(value=>value.length));const preferred=column.key==="note"?34:column.key==="guest"?24:column.key==="room"?20:Math.max(12,max+3);return Math.min(40,preferred)})
-  const sheetRows=[
-    `<row r="1" ht="26" customHeight="1">${excelCell("A1",title,3)}</row>`,
-    `<row r="2" ht="20" customHeight="1">${excelCell("A2",subtitle,4)}</row>`,
-    `<row r="3" ht="20" customHeight="1">${excelCell("A3",`${propertyName||"Propiedad"} · ${day}`,4)}</row>`,
-    `<row r="${headerRow}" ht="23" customHeight="1">${columns.map((column,index)=>excelCell(`${columnName(index)}${headerRow}`,column.label,1)).join("")}</row>`,
-  ]
-  rows.forEach((row,index)=>{const excelRow=dataStart+index;sheetRows.push(`<row r="${excelRow}" ht="22" customHeight="1">${columns.map((column,columnIndex)=>excelCell(`${columnName(columnIndex)}${excelRow}`,row[column.key]??"",0)).join("")}</row>`)})
-  if(totalText)sheetRows.push(`<row r="${totalRow}" ht="24" customHeight="1">${excelCell(`A${totalRow}`,"TOTAL",2)}${columns.length>1?excelCell(`B${totalRow}`,totalText,2):""}</row>`)
-  const mergeRefs=[`A1:${last}1`,`A2:${last}2`,`A3:${last}3`]
-  if(totalText&&columns.length>2)mergeRefs.push(`B${totalRow}:${last}${totalRow}`)
-  const cols=widths.map((width,index)=>`<col min="${index+1}" max="${index+1}" width="${width}" customWidth="1"/>`).join("")
-  const finalDataRow=Math.max(headerRow,dataStart+rows.length-1)
-  const worksheet=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="5" topLeftCell="A6" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>${cols}</cols><sheetData>${sheetRows.join("")}</sheetData><mergeCells count="${mergeRefs.length}">${mergeRefs.map(ref=>`<mergeCell ref="${ref}"/>`).join("")}</mergeCells><autoFilter ref="A${headerRow}:${last}${finalDataRow}"/><pageMargins left="0.3" right="0.3" top="0.5" bottom="0.5" header="0.2" footer="0.2"/><pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>`
-  const styles=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="3"><font><sz val="10"/><name val="Calibri"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="10"/><name val="Calibri"/></font><font><b/><color rgb="FF1F2A44"/><sz val="16"/><name val="Calibri"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF5B5FEF"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEFF1FF"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFDCE1EC"/></left><right style="thin"><color rgb="FFDCE1EC"/></right><top style="thin"><color rgb="FFDCE1EC"/></top><bottom style="thin"><color rgb="FFDCE1EC"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`
-  const entries=[
-    {name:"[Content_Types].xml",content:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`},
-    {name:"_rels/.rels",content:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`},
-    {name:"xl/workbook.xml",content:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Informe" sheetId="1" r:id="rId1"/></sheets></workbook>`},
-    {name:"xl/_rels/workbook.xml.rels",content:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`},
-    {name:"xl/styles.xml",content:styles},{name:"xl/worksheets/sheet1.xml",content:worksheet},
-  ]
-  const blob=new Blob([zipStore(entries)],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),url=URL.createObjectURL(blob),anchor=document.createElement("a");anchor.href=url;anchor.download=`${fileName}.xlsx`;document.body.appendChild(anchor);anchor.click();anchor.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)
-}
-function printSheet({title,subtitle,day,propertyName,columns,rows,totalText}){
-  const frame=document.createElement("iframe");frame.style.position="fixed";frame.style.width="1px";frame.style.height="1px";frame.style.right="0";frame.style.bottom="0";frame.style.opacity="0";frame.style.pointerEvents="none";document.body.appendChild(frame)
-  const documentRef=frame.contentWindow?.document;if(!documentRef){frame.remove();return}
-  const small=columns.length>7?"8px":"9.5px",bodyRows=rows.map(row=>`<tr>${columns.map(column=>`<td>${htmlEscape(row[column.key]??"")}</td>`).join("")}</tr>`).join("")
-  documentRef.open();documentRef.write(`<!doctype html><html><head><meta charset="utf-8"><title>${htmlEscape(title)}</title><style>@page{size:A4 landscape;margin:10mm}*{box-sizing:border-box}body{margin:0;color:#1f2a44;font-family:Arial,sans-serif}header{margin-bottom:14px}small{display:block;color:#5b5fef;font-weight:800;letter-spacing:.08em;font-size:9px}h1{margin:4px 0 3px;font-size:20px}p{margin:0;color:#67728a;font-size:10px}.meta{margin-top:5px;color:#4d5870;font-size:9px}table{width:100%;border-collapse:collapse;table-layout:auto;font-size:${small}}thead{display:table-header-group}th{background:#5b5fef;color:white;text-align:left;font-weight:700;padding:7px 6px;border:1px solid #dce1ec}td{padding:6px;border:1px solid #dce1ec;vertical-align:top;word-break:break-word}tbody tr:nth-child(even){background:#f7f8fc}.total{margin-top:9px;padding:8px 10px;border:1px solid #cfd5f7;background:#eff1ff;font-size:10px;font-weight:800}.footer{margin-top:8px;color:#7b8498;font-size:8px;text-align:right}</style></head><body><header><small>HABITACIÓN LLENA · INFORME DE RECEPCIÓN</small><h1>${htmlEscape(title)}</h1><p>${htmlEscape(subtitle)}</p><div class="meta">${htmlEscape(propertyName||"Propiedad")} · ${htmlEscape(day)}</div></header><table><thead><tr>${columns.map(column=>`<th>${htmlEscape(column.label)}</th>`).join("")}</tr></thead><tbody>${bodyRows||`<tr><td colspan="${columns.length}">No hay datos para esta fecha.</td></tr>`}</tbody></table>${totalText?`<div class="total">TOTAL · ${htmlEscape(totalText)}</div>`:""}<div class="footer">Generado desde Habitación Llena</div></body></html>`);documentRef.close()
-  const cleanup=()=>setTimeout(()=>frame.remove(),300);frame.contentWindow.onafterprint=cleanup;setTimeout(()=>{frame.contentWindow?.focus();frame.contentWindow?.print();setTimeout(cleanup,3000)},180)
-}
 
 const ARRIVAL_COLUMNS=[
   {key:"guest",label:"Huésped",required:true},{key:"room",label:"Habitación",required:true},{key:"pax",label:"Pax",required:true},{key:"note",label:"Notas",required:true},
@@ -155,19 +110,13 @@ function Metric({label,value,note}){return <article className={s.metric}><span>{
 
 function Sheet({reportKey,title,subtitle,day,propertyName,fileName,columns,rows,totalOptions,defaultTotals,preference,rowState,onPreferenceChange,onRowStateChange}){
   const[columnsOpen,setColumnsOpen]=useState(false),[filterOpen,setFilterOpen]=useState(false),[totalsOpen,setTotalsOpen]=useState(false),[query,setQuery]=useState(""),[noteDrafts,setNoteDrafts]=useState({})
-  const hasSavedPreference=Array.isArray(preference?.order)||Array.isArray(preference?.hidden)
-  const allKeys=columns.map(column=>column.key),savedOrder=Array.isArray(preference?.order)?preference.order.filter(key=>allKeys.includes(key)):[],order=[...savedOrder,...allKeys.filter(key=>!savedOrder.includes(key))]
-  const defaultHidden=columns.filter(column=>!column.required&&column.defaultVisible===false).map(column=>column.key),hidden=new Set(hasSavedPreference?(preference?.hidden||[]):defaultHidden)
-  const ordered=order.map(key=>columns.find(column=>column.key===key)).filter(Boolean),visibleColumns=ordered.filter(column=>column.required||!hidden.has(column.key))
+  const hasSavedPreference=Array.isArray(preference?.order)||Array.isArray(preference?.hidden),allKeys=columns.map(column=>column.key),savedOrder=Array.isArray(preference?.order)?preference.order.filter(key=>allKeys.includes(key)):[],order=[...savedOrder,...allKeys.filter(key=>!savedOrder.includes(key))]
+  const defaultHidden=columns.filter(column=>!column.required&&column.defaultVisible===false).map(column=>column.key),hidden=new Set(hasSavedPreference?(preference?.hidden||[]):defaultHidden),ordered=order.map(key=>columns.find(column=>column.key===key)).filter(Boolean),visibleColumns=ordered.filter(column=>column.required||!hidden.has(column.key))
   const totalsEnabled=preference?.totals?.enabled!==false,totalKeys=Array.isArray(preference?.totals?.keys)?preference.totals.keys:defaultTotals
   useEffect(()=>{const next={};for(const row of rows){const saved=rowState[`${reportKey}:${row.id}`];next[row.id]=saved?.note??row.note??""}setNoteDrafts(next)},[rows,rowState,reportKey])
-  const hiddenRows=rows.filter(row=>Boolean(rowState[`${reportKey}:${row.id}`]?.hidden)),shownRows=rows.filter(row=>!rowState[`${reportKey}:${row.id}`]?.hidden)
-  const normalizedQuery=normalize(query),filteredRows=normalizedQuery?shownRows.filter(row=>visibleColumns.some(column=>normalize(column.key==="note"?(noteDrafts[row.id]??row.note):row[column.key]).includes(normalizedQuery))):shownRows
-  const displayRows=filteredRows.map(row=>({...row,note:noteDrafts[row.id]??row.note??""}))
-  const gridTemplate=`repeat(${visibleColumns.length},minmax(128px,1fr)) 38px`,minWidth=Math.max(760,visibleColumns.length*138+38)
-  const totalParts=totalsEnabled?totalOptions.filter(option=>totalKeys.includes(option.key)).map(option=>`${option.label}: ${option.value(displayRows)}`):[],totalText=totalParts.join(" · ")
-  const saveSettings=patch=>onPreferenceChange(reportKey,{...(preference||{}),...patch})
-  const persistLayout=(nextOrder,nextHidden)=>saveSettings({order:nextOrder,hidden:nextHidden})
+  const hiddenRows=rows.filter(row=>Boolean(rowState[`${reportKey}:${row.id}`]?.hidden)),shownRows=rows.filter(row=>!rowState[`${reportKey}:${row.id}`]?.hidden),normalizedQuery=normalize(query),filteredRows=normalizedQuery?shownRows.filter(row=>visibleColumns.some(column=>normalize(column.key==="note"?(noteDrafts[row.id]??row.note):row[column.key]).includes(normalizedQuery))):shownRows
+  const displayRows=filteredRows.map(row=>({...row,note:noteDrafts[row.id]??row.note??""})),gridTemplate=`repeat(${visibleColumns.length},minmax(128px,1fr)) 38px`,minWidth=Math.max(760,visibleColumns.length*138+38),totalParts=totalsEnabled?totalOptions.filter(option=>totalKeys.includes(option.key)).map(option=>`${option.label}: ${option.value(displayRows)}`):[],totalText=totalParts.join(" · ")
+  const saveSettings=patch=>onPreferenceChange(reportKey,{...(preference||{}),...patch}),persistLayout=(nextOrder,nextHidden)=>saveSettings({order:nextOrder,hidden:nextHidden})
   function toggleColumn(key){const column=columns.find(item=>item.key===key);if(column?.required)return;const next=new Set(hidden);next.has(key)?next.delete(key):next.add(key);persistLayout(order,[...next])}
   function moveColumn(key,direction){const index=order.indexOf(key),target=index+direction;if(index<0||target<0||target>=order.length)return;const next=[...order],[item]=next.splice(index,1);next.splice(target,0,item);persistLayout(next,[...hidden])}
   function toggleTotal(key){const next=new Set(totalKeys);next.has(key)?next.delete(key):next.add(key);saveSettings({totals:{enabled:totalsEnabled,keys:[...next]}})}
@@ -185,12 +134,7 @@ function Sheet({reportKey,title,subtitle,day,propertyName,fileName,columns,rows,
       <span className={s.toolbarSpacer}/><button type="button" onClick={exportExcel}>↓ Excel</button><button type="button" className={s.printButton} onClick={printCurrent}>⎙ Imprimir / PDF</button>
     </div>
     {filterOpen?<div className={s.filterBar}><input autoFocus value={query} onChange={event=>setQuery(event.target.value)} placeholder="Buscar en este informe…"/><span>{filteredRows.length} de {shownRows.length} filas</span>{query?<button type="button" onClick={()=>setQuery("")}>Limpiar</button>:null}</div>:null}
-    <div className={s.tableShell}>
-      <div className={s.table} style={{"--sheet-grid":gridTemplate,"--sheet-min":`${minWidth}px`}}>
-        <div className={s.head}>{visibleColumns.map(column=><span key={column.key}>{column.label}</span>)}<span className={s.rowActionHead}/></div>
-        {filteredRows.length?filteredRows.map(row=><div className={s.row} key={row.id}>{visibleColumns.map(column=>column.key==="note"?<input key={column.key} className={s.noteInput} value={noteDrafts[row.id]??""} onChange={event=>setNoteDrafts(current=>({...current,[row.id]:event.target.value}))} onBlur={()=>saveNote(row)} placeholder="Escribir nota…"/>:<span key={column.key} title={String(row[column.key]??"")}>{row[column.key]??"—"}</span>)}<button type="button" className={s.removeRow} title="Quitar de este informe" onClick={()=>onRowStateChange(reportKey,row.id,{hidden:true,note:noteDrafts[row.id]??row.note??""})}>×</button></div>):<div className={s.empty}>No hay datos para esta fecha con los filtros actuales.</div>}
-      </div>
-    </div>
+    <div className={s.tableShell}><div className={s.table} style={{"--sheet-grid":gridTemplate,"--sheet-min":`${minWidth}px`}}><div className={s.head}>{visibleColumns.map(column=><span key={column.key}>{column.label}</span>)}<span className={s.rowActionHead}/></div>{filteredRows.length?filteredRows.map(row=><div className={s.row} key={row.id}>{visibleColumns.map(column=>column.key==="note"?<input key={column.key} className={s.noteInput} value={noteDrafts[row.id]??""} onChange={event=>setNoteDrafts(current=>({...current,[row.id]:event.target.value}))} onBlur={()=>saveNote(row)} placeholder="Escribir nota…"/>:<span key={column.key} title={String(row[column.key]??"")}>{row[column.key]??"—"}</span>)}<button type="button" className={s.removeRow} title="Quitar de este informe" onClick={()=>onRowStateChange(reportKey,row.id,{hidden:true,note:noteDrafts[row.id]??row.note??""})}>×</button></div>):<div className={s.empty}>No hay datos para esta fecha con los filtros actuales.</div>}</div></div>
     {totalsEnabled&&totalParts.length?<div className={s.totalBar}><strong>TOTAL</strong>{totalParts.map(part=><span key={part}>{part}</span>)}</div>:null}
     <footer><span>{filteredRows.length} fila{filteredRows.length===1?"":"s"} · {visibleColumns.length} columnas visibles</span><span>Las notas, columnas, filas ocultas y totales quedan guardados.</span></footer>
   </article>
