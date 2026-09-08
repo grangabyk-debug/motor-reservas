@@ -51,9 +51,10 @@ export function roomingLabel(rooming){
 export function reservationRoomingRows(item,assignedRooms=[]){
   const details=Array.isArray(item?.habitaciones_detalle)?item.habitaciones_detalle:[]
   const byId=new Map((assignedRooms||[]).map(room=>[String(room.id),room]))
+  const taxEnabled=Boolean(item?.impuestos_desglosados),storedNet=Math.max(0,Number(item?.precio_sin_impuestos_nacionales)||Number(item?.subtotal)||0),storedVat=Math.max(0,Number(item?.iva_importe)||0),vatRate=taxEnabled?Math.max(0,Number(item?.iva_porcentaje)||(storedNet>0?storedVat/storedNet*100:0)):0,rateFactor=1+vatRate/100
   return details.filter(Boolean).map((detail,index)=>{
-    const room=byId.get(String(detail.habitacion_id||"")),rooming=detail.rooming&&typeof detail.rooming==="object"?detail.rooming:{}
-    return{key:String(detail.habitacion_id||index),roomId:detail.habitacion_id||room?.id||null,name:detail.nombre||room?.nombre||`Habitación ${index+1}`,physicalCategory:detail.categoria_asignada||room?.tipo||"Habitación",soldAs:detail.categoria_vendida||"Habitación",guests:Math.max(0,Number(detail.huespedes)||0),matrimonial:Math.max(0,Number(rooming.matrimonial)||0),individual:Math.max(0,Number(rooming.individual)||0),rate:Number(detail.tarifa_noche)||Number(room?.precio)||0,configured:rooming.matrimonial!=null||rooming.individual!=null}
+    const room=byId.get(String(detail.habitacion_id||"")),rooming=detail.rooming&&typeof detail.rooming==="object"?detail.rooming:{},netRate=Number(detail.tarifa_noche)||Number(room?.precio)||0
+    return{key:String(detail.habitacion_id||index),roomId:detail.habitacion_id||room?.id||null,name:detail.nombre||room?.nombre||`Habitación ${index+1}`,physicalCategory:detail.categoria_asignada||room?.tipo||"Habitación",soldAs:detail.categoria_vendida||"Habitación",guests:Math.max(0,Number(detail.huespedes)||0),matrimonial:Math.max(0,Number(rooming.matrimonial)||0),individual:Math.max(0,Number(rooming.individual)||0),rate:Math.round(netRate*rateFactor*100)/100,configured:rooming.matrimonial!=null||rooming.individual!=null}
   })
 }
 export function reservationRoomingSummary(item,assignedRooms=[]){
