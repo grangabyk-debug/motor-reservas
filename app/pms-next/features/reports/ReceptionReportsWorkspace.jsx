@@ -11,12 +11,29 @@ const normalize=value=>String(value||"").trim().toLowerCase()
 const cancelled=row=>["cancelada","cancelled","anulada","anulado"].includes(normalize(row?.estado))
 const roomIds=row=>[...new Set([row?.habitacion_id,...(row?.habitaciones_ids||[])].filter(Boolean).map(Number))]
 const csvCell=value=>`"${String(value??"").replaceAll('"','""')}"`
-function downloadCsv(name,header,rows){const csv=[header,...rows].map(row=>row.map(csvCell).join(",")).join("\n");const blob=new Blob(["\ufeff",csv],{type:"text/csv;charset=utf-8"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=name;a.click();URL.revokeObjectURL(url)}
-function hasBreakfast(value){const key=normalize(value);return key.includes("desay")||key.includes("breakfast")||key.includes("media pens")||key.includes("pensión completa")||key.includes("pension completa")||key.includes("all inclusive")}
+function downloadCsv(name,header,rows){const csv=[header,...rows].map(row=>row.map(csvCell).join(",")).join("\n");const blob=new Blob(["\ufeff",csv],{type:"text/csv;charset=utf-8"});const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=name;a.click();URL.revokeObjectURL(url)}
+
+const ARRIVAL_COLUMNS=[
+  {key:"guest",label:"Huésped",required:true},{key:"room",label:"Habitación",required:true},{key:"pax",label:"Pax",required:true},{key:"note",label:"Notas",required:true},
+  {key:"reservation",label:"Reserva"},{key:"time",label:"Hora"},{key:"phone",label:"Teléfono",defaultVisible:false},{key:"status",label:"Estado",defaultVisible:false},{key:"regime",label:"Régimen",defaultVisible:false},{key:"arrival",label:"Llegada",defaultVisible:false},{key:"departure",label:"Salida",defaultVisible:false},
+]
+const DEPARTURE_COLUMNS=[
+  {key:"guest",label:"Huésped",required:true},{key:"room",label:"Habitación",required:true},{key:"pax",label:"Pax",required:true},{key:"note",label:"Notas",required:true},
+  {key:"reservation",label:"Reserva"},{key:"time",label:"Hora"},{key:"phone",label:"Teléfono",defaultVisible:false},{key:"status",label:"Estado",defaultVisible:false},{key:"regime",label:"Régimen",defaultVisible:false},{key:"arrival",label:"Llegada",defaultVisible:false},{key:"departure",label:"Salida",defaultVisible:false},
+]
+const BREAKFAST_COLUMNS=[
+  {key:"guest",label:"Huésped",required:true},{key:"room",label:"Habitación",required:true},{key:"pax",label:"Pax",required:true},{key:"note",label:"Notas",required:true},
+  {key:"situation",label:"Situación"},{key:"reservation",label:"Reserva",defaultVisible:false},{key:"regime",label:"Régimen"},{key:"departure",label:"Salida",defaultVisible:false},{key:"phone",label:"Teléfono",defaultVisible:false},{key:"status",label:"Estado",defaultVisible:false},
+]
+const HOUSEKEEPING_COLUMNS=[
+  {key:"room",label:"Habitación",required:true},{key:"operation",label:"Operación",required:true},{key:"note",label:"Notas",required:true},
+  {key:"type",label:"Tipo"},{key:"roomStatus",label:"Estado"},{key:"task",label:"Tarea"},{key:"taskStatus",label:"Estado tarea",defaultVisible:false},{key:"responsible",label:"Responsable",defaultVisible:false},
+]
 
 export default function ReceptionReportsWorkspace({propertyId,property}){
   const[day,setDay]=useState(()=>dateKey(new Date()))
   const[rooms,setRooms]=useState([]),[reservations,setReservations]=useState([]),[tasks,setTasks]=useState([]),[profiles,setProfiles]=useState(new Map())
+  const[sheetPrefs,setSheetPrefs]=useState({}),[sheetRows,setSheetRows]=useState({}),[printKey,setPrintKey]=useState("")
   const[loading,setLoading]=useState(true),[error,setError]=useState("")
 
   const load=useCallback(async()=>{
@@ -24,56 +41,99 @@ export default function ReceptionReportsWorkspace({propertyId,property}){
     setLoading(true);setError("")
     try{
       const tomorrow=nextDay(day)
-      const[roomRes,reservationRes,taskRes]=await Promise.all([
+      const[roomRes,reservationRes,taskRes,prefRes,rowStateRes]=await Promise.all([
         supabase.from("habitaciones").select("id,nombre,tipo,estado,sort_order").eq("property_id",propertyId).eq("activa",true).order("sort_order").order("nombre"),
         supabase.from("reservas").select("id,numero_reserva,nombre_huesped,telefono_huesped,habitacion_id,habitaciones_ids,fecha_entrada,fecha_salida,estado,no_show,cantidad_huespedes,regimen,hora_llegada_estimada,hora_salida_estimada,notas").eq("property_id",propertyId).lte("fecha_entrada",day).gte("fecha_salida",day).order("fecha_entrada"),
         supabase.from("hotel_housekeeping_tasks").select("id,room_id,task_type,status,assigned_to,scheduled_for,notes,updated_at").eq("property_id",propertyId).gte("scheduled_for",`${day}T00:00:00`).lt("scheduled_for",`${tomorrow}T00:00:00`).order("updated_at",{ascending:false}),
+        supabase.from("hotel_report_sheet_preferences").select("report_key,settings").eq("property_id",propertyId),
+        supabase.from("hotel_report_sheet_rows").select("report_key,row_key,note,hidden").eq("property_id",propertyId).eq("report_date",day),
       ])
-      for(const result of[roomRes,reservationRes,taskRes])if(result.error)throw result.error
+      for(const result of[roomRes,reservationRes,taskRes,prefRes,rowStateRes])if(result.error)throw result.error
       const taskRows=taskRes.data||[],profileIds=[...new Set(taskRows.map(row=>row.assigned_to).filter(Boolean))]
       const profileRes=profileIds.length?await supabase.from("profiles").select("id,full_name").in("id",profileIds):{data:[],error:null}
       if(profileRes.error)throw profileRes.error
       setRooms(roomRes.data||[]);setReservations(reservationRes.data||[]);setTasks(taskRows);setProfiles(new Map((profileRes.data||[]).map(row=>[row.id,row.full_name])))
+      setSheetPrefs(Object.fromEntries((prefRes.data||[]).map(row=>[row.report_key,row.settings||{}])))
+      setSheetRows(Object.fromEntries((rowStateRes.data||[]).map(row=>[`${row.report_key}:${row.row_key}`,row])))
     }catch(err){setError(err?.message||"No se pudieron cargar los reportes de recepción.")}
     finally{setLoading(false)}
   },[propertyId,day])
   useEffect(()=>{load()},[load])
   usePmsAutoRefresh(propertyId,load,["reservas","habitaciones","hotel_housekeeping_tasks"])
 
+  useEffect(()=>{if(!printKey)return;const done=()=>setPrintKey("");window.addEventListener("afterprint",done,{once:true});const timer=setTimeout(()=>window.print(),80);return()=>{clearTimeout(timer);window.removeEventListener("afterprint",done)}},[printKey])
+
+  const savePreference=useCallback((reportKey,settings)=>{
+    setSheetPrefs(current=>({...current,[reportKey]:settings}))
+    supabase.from("hotel_report_sheet_preferences").upsert({property_id:propertyId,report_key:reportKey,settings,updated_at:new Date().toISOString()},{onConflict:"property_id,report_key"}).then(({error:saveError})=>saveError&&setError(saveError.message))
+  },[propertyId])
+  const saveRowState=useCallback((reportKey,rowKey,patch)=>{
+    const key=`${reportKey}:${rowKey}`,current=sheetRows[key]||{},next={...current,...patch}
+    setSheetRows(state=>({...state,[key]:next}))
+    supabase.from("hotel_report_sheet_rows").upsert({property_id:propertyId,report_key:reportKey,report_date:day,row_key:rowKey,note:String(next.note||""),hidden:Boolean(next.hidden),updated_at:new Date().toISOString()},{onConflict:"property_id,report_key,report_date,row_key"}).then(({error:saveError})=>saveError&&setError(saveError.message))
+  },[propertyId,day,sheetRows])
+
   const roomMap=useMemo(()=>new Map(rooms.map(room=>[Number(room.id),room])),[rooms])
-  const activeReservations=useMemo(()=>reservations.filter(row=>!cancelled(row)),[reservations])
+  const activeReservations=useMemo(()=>reservations.filter(row=>!cancelled(row)&&!row.no_show),[reservations])
   const roomLabel=useCallback(row=>roomIds(row).map(id=>roomMap.get(id)?.nombre).filter(Boolean).join(", ")||"Sin asignar",[roomMap])
   const arrivals=useMemo(()=>activeReservations.filter(row=>row.fecha_entrada===day),[activeReservations,day])
   const departures=useMemo(()=>activeReservations.filter(row=>row.fecha_salida===day),[activeReservations,day])
-  const breakfasts=useMemo(()=>activeReservations.filter(row=>row.fecha_entrada<day&&row.fecha_salida>=day&&hasBreakfast(row.regimen)),[activeReservations,day])
+  const continuingInHouse=useMemo(()=>activeReservations.filter(row=>normalize(row.estado)==="alojado"&&row.fecha_entrada<day&&row.fecha_salida>day),[activeReservations,day])
+  const breakfasts=useMemo(()=>{const map=new Map();for(const row of departures)if(row.fecha_entrada<day)map.set(row.id,row);for(const row of continuingInHouse)map.set(row.id,row);return[...map.values()]},[departures,continuingInHouse,day])
   const reservationsByRoom=useMemo(()=>{const map=new Map();for(const reservation of activeReservations){for(const id of roomIds(reservation)){if(!map.has(id))map.set(id,[]);map.get(id).push(reservation)}}return map},[activeReservations])
   const taskByRoom=useMemo(()=>{const map=new Map();for(const task of tasks){const id=Number(task.room_id);if(id&&!map.has(id))map.set(id,task)}return map},[tasks])
-  const housekeeping=useMemo(()=>rooms.map(room=>{
-    const stays=reservationsByRoom.get(Number(room.id))||[],task=taskByRoom.get(Number(room.id))
-    const arrival=stays.some(row=>row.fecha_entrada===day),departure=stays.some(row=>row.fecha_salida===day),inHouse=stays.some(row=>row.fecha_entrada<day&&row.fecha_salida>day)
-    const operation=arrival&&departure?"Salida + llegada":departure?"Salida":arrival?"Llegada":inHouse?"Permanencia":"Libre"
-    return{...room,operation,task,responsible:task?.assigned_to?profiles.get(task.assigned_to)||"Asignado":"—"}
-  }),[rooms,reservationsByRoom,taskByRoom,profiles,day])
+  const housekeeping=useMemo(()=>rooms.map(room=>{const stays=reservationsByRoom.get(Number(room.id))||[],task=taskByRoom.get(Number(room.id)),arrival=stays.some(row=>row.fecha_entrada===day),departure=stays.some(row=>row.fecha_salida===day),inHouse=stays.some(row=>row.fecha_entrada<day&&row.fecha_salida>day),operation=arrival&&departure?"Salida + llegada":departure?"Salida":arrival?"Llegada":inHouse?"Permanencia":"Libre";return{...room,operation,task,responsible:task?.assigned_to?profiles.get(task.assigned_to)||"Asignado":"—"}}),[rooms,reservationsByRoom,taskByRoom,profiles,day])
 
-  const exports={
-    arrivals:()=>downloadCsv(`recepcion-llegadas-${day}.csv`,["Reserva","Huésped","Habitación","Huéspedes","Hora estimada","Teléfono","Estado","Notas"],arrivals.map(row=>[row.numero_reserva||row.id,row.nombre_huesped,roomLabel(row),row.cantidad_huespedes||1,row.hora_llegada_estimada||"",row.telefono_huesped||"",row.no_show?"No-show":row.estado||"",row.notas||""])),
-    departures:()=>downloadCsv(`recepcion-salidas-${day}.csv`,["Reserva","Huésped","Habitación","Huéspedes","Hora estimada","Estado","Notas"],departures.map(row=>[row.numero_reserva||row.id,row.nombre_huesped,roomLabel(row),row.cantidad_huespedes||1,row.hora_salida_estimada||"",row.estado||"",row.notas||""])),
-    breakfasts:()=>downloadCsv(`recepcion-desayuno-${day}.csv`,["Huésped","Habitación","Huéspedes","Régimen","Observaciones"],breakfasts.map(row=>[row.nombre_huesped,roomLabel(row),row.cantidad_huespedes||1,row.regimen||"Desayuno",row.notas||""])),
-    housekeeping:()=>downloadCsv(`recepcion-housekeeping-${day}.csv`,["Habitación","Tipo","Estado habitación","Operación","Tarea","Estado tarea","Responsable","Notas"],housekeeping.map(row=>[row.nombre,row.tipo||"",row.estado||"",row.operation,row.task?.task_type?.replaceAll("_"," ")||"",row.task?.status||"",row.responsible,row.task?.notes||""])),
-  }
+  const reservationRow=useCallback(row=>({id:`res-${row.id}`,reservation:row.numero_reserva||row.id,guest:row.nombre_huesped||"—",room:roomLabel(row),pax:Number(row.cantidad_huespedes)||1,phone:row.telefono_huesped||"—",status:row.estado||"—",regime:row.regimen||"—",arrival:row.fecha_entrada,departure:row.fecha_salida,note:row.notas||""}),[roomLabel])
+  const arrivalRows=useMemo(()=>arrivals.map(row=>({...reservationRow(row),time:row.hora_llegada_estimada||"—"})),[arrivals,reservationRow])
+  const departureRows=useMemo(()=>departures.map(row=>({...reservationRow(row),time:row.hora_salida_estimada||"—"})),[departures,reservationRow])
+  const breakfastRows=useMemo(()=>breakfasts.map(row=>({...reservationRow(row),situation:row.fecha_salida===day?"Sale hoy":"Continúa"})),[breakfasts,reservationRow,day])
+  const housekeepingRows=useMemo(()=>housekeeping.map(row=>({id:`room-${row.id}`,room:row.nombre,type:row.tipo||"—",roomStatus:row.estado||"—",operation:row.operation,task:row.task?.task_type?.replaceAll("_"," ")||"—",taskStatus:row.task?.status||"—",responsible:row.responsible,note:row.task?.notes||""})),[housekeeping])
+  const breakfastPax=breakfastRows.reduce((sum,row)=>sum+Number(row.pax||0),0),breakfastDepartures=breakfastRows.filter(row=>row.situation==="Sale hoy").length
 
-  return <section className={s.page}>
-    <header className={s.header}><div><small>RECEPCIÓN · REPORTES</small><h1>Planillas operativas</h1><p>{property?.name||"Propiedad activa"} · reportes diarios listos para revisar, imprimir o descargar.</p></div><div className={s.actions}><input type="date" value={day} onChange={event=>setDay(event.target.value)}/><button type="button" onClick={load}>↻ Actualizar</button><button type="button" className={s.primary} onClick={()=>window.print()}>Imprimir / PDF</button></div></header>
+  return <section className={s.page} data-single-print={printKey&&printKey!=="*"?"true":undefined}>
+    <header className={s.header}><div><small>RECEPCIÓN · REPORTES</small><h1>Planillas operativas</h1><p>{property?.name||"Propiedad activa"} · editá columnas, filtrá, agregá notas e imprimí sin salir del sistema.</p></div><div className={s.actions}><input type="date" value={day} onChange={event=>setDay(event.target.value)}/><button type="button" onClick={load}>↻ Actualizar</button><button type="button" className={s.primary} onClick={()=>setPrintKey("*")}>Imprimir todas</button></div></header>
     {error?<div className={s.notice}>{error}</div>:null}{loading?<div className={s.notice}>Actualizando planillas…</div>:null}
-    <div className={s.metrics}><Metric label="Llegadas" value={arrivals.length} note="Check-in previstos"/><Metric label="Salidas" value={departures.length} note="Check-out previstos"/><Metric label="Desayunos" value={breakfasts.reduce((sum,row)=>sum+(Number(row.cantidad_huespedes)||1),0)} note={`${breakfasts.length} habitación${breakfasts.length===1?"":"es"}`}/><Metric label="Housekeeping" value={housekeeping.length} note={`${tasks.length} tarea${tasks.length===1?"":"s"} programada${tasks.length===1?"":"s"}`}/></div>
+    <div className={s.metrics}><Metric label="Llegadas" value={arrivals.length} note="Check-in previstos"/><Metric label="Salidas" value={departures.length} note="Check-out previstos"/><Metric label="Desayunos" value={breakfastPax} note={`${breakfastRows.length} reservas · ${breakfastDepartures} salen hoy`}/><Metric label="Housekeeping" value={housekeeping.length} note={`${tasks.length} tarea${tasks.length===1?"":"s"} programada${tasks.length===1?"":"s"}`}/></div>
     <div className={s.grid}>
-      <Report title="Llegadas / check-in" subtitle="Quién llega, a qué habitación y a qué hora." count={arrivals.length} onDownload={exports.arrivals} columns={["Reserva","Huésped","Habitación","Pax","Hora"]} rows={arrivals.map(row=>[row.numero_reserva||row.id,row.nombre_huesped,roomLabel(row),row.cantidad_huespedes||1,row.hora_llegada_estimada||"—"])}/>
-      <Report title="Salidas / check-out" subtitle="Salidas previstas y horario estimado." count={departures.length} onDownload={exports.departures} columns={["Reserva","Huésped","Habitación","Pax","Hora"]} rows={departures.map(row=>[row.numero_reserva||row.id,row.nombre_huesped,roomLabel(row),row.cantidad_huespedes||1,row.hora_salida_estimada||"—"])}/>
-      <Report title="Planilla de desayuno" subtitle="Huéspedes alojados con desayuno incluido." count={breakfasts.length} onDownload={exports.breakfasts} columns={["Huésped","Habitación","Pax","Régimen"]} rows={breakfasts.map(row=>[row.nombre_huesped,roomLabel(row),row.cantidad_huespedes||1,row.regimen||"Desayuno"])}/>
-      <Report title="Planilla de housekeeping" subtitle="Estado de habitaciones, rotación y tareas del día." count={housekeeping.length} onDownload={exports.housekeeping} columns={["Habitación","Estado","Operación","Tarea"]} rows={housekeeping.map(row=>[row.nombre,row.estado||"—",row.operation,row.task?.task_type?.replaceAll("_"," ")||"—"])}/>
+      <Sheet reportKey="arrivals" title="Llegadas / check-in" subtitle="Quién llega, a qué habitación y a qué hora." day={day} columns={ARRIVAL_COLUMNS} rows={arrivalRows} preference={sheetPrefs.arrivals} rowState={sheetRows} onPreferenceChange={savePreference} onRowStateChange={saveRowState} onPrint={()=>setPrintKey("arrivals")} printHidden={Boolean(printKey&&printKey!=="*"&&printKey!=="arrivals")}/>
+      <Sheet reportKey="departures" title="Salidas / check-out" subtitle="Salidas previstas y horario estimado." day={day} columns={DEPARTURE_COLUMNS} rows={departureRows} preference={sheetPrefs.departures} rowState={sheetRows} onPreferenceChange={savePreference} onRowStateChange={saveRowState} onPrint={()=>setPrintKey("departures")} printHidden={Boolean(printKey&&printKey!=="*"&&printKey!=="departures")}/>
+      <Sheet reportKey="breakfasts" title="Planilla de desayuno" subtitle="Incluye los check-out del día y los huéspedes in-house que continúan su estadía." day={day} columns={BREAKFAST_COLUMNS} rows={breakfastRows} preference={sheetPrefs.breakfasts} rowState={sheetRows} onPreferenceChange={savePreference} onRowStateChange={saveRowState} onPrint={()=>setPrintKey("breakfasts")} printHidden={Boolean(printKey&&printKey!=="*"&&printKey!=="breakfasts")}/>
+      <Sheet reportKey="housekeeping" title="Planilla de housekeeping" subtitle="Estado de habitaciones, rotación y tareas del día." day={day} columns={HOUSEKEEPING_COLUMNS} rows={housekeepingRows} preference={sheetPrefs.housekeeping} rowState={sheetRows} onPreferenceChange={savePreference} onRowStateChange={saveRowState} onPrint={()=>setPrintKey("housekeeping")} printHidden={Boolean(printKey&&printKey!=="*"&&printKey!=="housekeeping")}/>
     </div>
   </section>
 }
 
 function Metric({label,value,note}){return <article className={s.metric}><span>{label}</span><b>{value}</b><small>{note}</small></article>}
-function Report({title,subtitle,count,onDownload,columns,rows}){return <article className={s.report}><header><div><small>PLANILLA</small><h2>{title}</h2><p>{subtitle}</p></div><span className={s.count}>{count}</span></header><div className={s.table}><div className={s.head}>{columns.map(column=><span key={column}>{column}</span>)}</div>{rows.length?rows.slice(0,8).map((row,index)=><div className={s.row} key={index}>{row.map((value,cell)=><span key={cell}>{value}</span>)}</div>):<div className={s.empty}>No hay datos para esta fecha.</div>}</div><footer><span>{rows.length>8?`Vista previa de 8 · ${rows.length} filas en total`: `${rows.length} fila${rows.length===1?"":"s"}`}</span><button type="button" onClick={onDownload}>↓ Descargar CSV</button></footer></article>}
+
+function Sheet({reportKey,title,subtitle,day,columns,rows,preference,rowState,onPreferenceChange,onRowStateChange,onPrint,printHidden}){
+  const[columnsOpen,setColumnsOpen]=useState(false),[filterOpen,setFilterOpen]=useState(false),[query,setQuery]=useState(""),[noteDrafts,setNoteDrafts]=useState({})
+  const hasSavedPreference=Array.isArray(preference?.order)||Array.isArray(preference?.hidden)
+  const allKeys=columns.map(column=>column.key),savedOrder=Array.isArray(preference?.order)?preference.order.filter(key=>allKeys.includes(key)):[],order=[...savedOrder,...allKeys.filter(key=>!savedOrder.includes(key))]
+  const defaultHidden=columns.filter(column=>!column.required&&column.defaultVisible===false).map(column=>column.key),hidden=new Set(hasSavedPreference?(preference?.hidden||[]):defaultHidden)
+  const ordered=order.map(key=>columns.find(column=>column.key===key)).filter(Boolean),visibleColumns=ordered.filter(column=>column.required||!hidden.has(column.key))
+  useEffect(()=>{const next={};for(const row of rows){const saved=rowState[`${reportKey}:${row.id}`];next[row.id]=saved?.note??row.note??""}setNoteDrafts(next)},[rows,rowState,reportKey])
+  const hiddenRows=rows.filter(row=>Boolean(rowState[`${reportKey}:${row.id}`]?.hidden)),shownRows=rows.filter(row=>!rowState[`${reportKey}:${row.id}`]?.hidden)
+  const normalizedQuery=normalize(query),filteredRows=normalizedQuery?shownRows.filter(row=>visibleColumns.some(column=>normalize(column.key==="note"?(noteDrafts[row.id]??row.note):row[column.key]).includes(normalizedQuery))):shownRows
+  const gridTemplate=`repeat(${visibleColumns.length},minmax(118px,1fr)) 34px`,minWidth=Math.max(650,visibleColumns.length*128+34)
+  const persistLayout=(nextOrder,nextHidden)=>onPreferenceChange(reportKey,{order:nextOrder,hidden:nextHidden})
+  function toggleColumn(key){const column=columns.find(item=>item.key===key);if(column?.required)return;const next=new Set(hidden);next.has(key)?next.delete(key):next.add(key);persistLayout(order,[...next])}
+  function moveColumn(key,direction){const index=order.indexOf(key),target=index+direction;if(index<0||target<0||target>=order.length)return;const next=[...order],[item]=next.splice(index,1);next.splice(target,0,item);persistLayout(next,[...hidden])}
+  function exportView(){downloadCsv(`${reportKey}-${day}.csv`,visibleColumns.map(column=>column.label),filteredRows.map(row=>visibleColumns.map(column=>column.key==="note"?(noteDrafts[row.id]??row.note??""):row[column.key]??"")))}
+  function saveNote(row){const note=noteDrafts[row.id]??"";onRowStateChange(reportKey,row.id,{note,hidden:Boolean(rowState[`${reportKey}:${row.id}`]?.hidden)})}
+  return <article className={s.report} data-print-hidden={printHidden?"true":undefined}>
+    <header><div><small>PLANILLA EDITABLE</small><h2>{title}</h2><p>{subtitle}</p></div><span className={s.count}>{filteredRows.length}</span></header>
+    <div className={s.sheetToolbar}>
+      <button type="button" onClick={()=>setFilterOpen(value=>!value)} className={filterOpen?s.activeTool:undefined}>⌕ Filtrar</button>
+      <div className={s.columnWrap}><button type="button" onClick={()=>setColumnsOpen(value=>!value)} className={columnsOpen?s.activeTool:undefined}>▦ Columnas</button>{columnsOpen?<div className={s.columnPanel}><strong>Columnas de la planilla</strong>{ordered.map((column,index)=><div className={s.columnOption} key={column.key}><label><input type="checkbox" checked={column.required||!hidden.has(column.key)} disabled={column.required} onChange={()=>toggleColumn(column.key)}/><span>{column.label}</span>{column.required?<small>Fija</small>:null}</label><div><button type="button" disabled={!index} onClick={()=>moveColumn(column.key,-1)}>←</button><button type="button" disabled={index===ordered.length-1} onClick={()=>moveColumn(column.key,1)}>→</button></div></div>)}</div>:null}</div>
+      {hiddenRows.length?<button type="button" onClick={()=>hiddenRows.forEach(row=>onRowStateChange(reportKey,row.id,{hidden:false,note:noteDrafts[row.id]??row.note??""}))}>↶ Restaurar {hiddenRows.length}</button>:null}
+      <span className={s.toolbarSpacer}/><button type="button" onClick={exportView}>↓ CSV</button><button type="button" onClick={onPrint}>⎙ Imprimir</button>
+    </div>
+    {filterOpen?<div className={s.filterBar}><input autoFocus value={query} onChange={event=>setQuery(event.target.value)} placeholder="Buscar en esta planilla…"/><span>{filteredRows.length} de {shownRows.length} filas</span>{query?<button type="button" onClick={()=>setQuery("")}>Limpiar</button>:null}</div>:null}
+    <div className={s.table} style={{"--sheet-grid":gridTemplate,"--sheet-min":`${minWidth}px`}}>
+      <div className={s.head}>{visibleColumns.map(column=><span key={column.key}>{column.label}</span>)}<span className={s.rowActionHead}/></div>
+      {filteredRows.length?filteredRows.map(row=><div className={s.row} key={row.id}>{visibleColumns.map(column=>column.key==="note"?<input key={column.key} className={s.noteInput} value={noteDrafts[row.id]??""} onChange={event=>setNoteDrafts(current=>({...current,[row.id]:event.target.value}))} onBlur={()=>saveNote(row)} placeholder="Escribir nota…"/>:<span key={column.key} title={String(row[column.key]??"")}>{row[column.key]??"—"}</span>)}<button type="button" className={s.removeRow} title="Quitar de esta planilla" onClick={()=>onRowStateChange(reportKey,row.id,{hidden:true,note:noteDrafts[row.id]??row.note??""})}>×</button></div>):<div className={s.empty}>No hay datos para esta fecha con los filtros actuales.</div>}
+    </div>
+    <footer><span>{filteredRows.length} fila{filteredRows.length===1?"":"s"} · cambios de columnas y notas guardados en el sistema</span><span>{visibleColumns.length} columnas visibles</span></footer>
+  </article>
+}
