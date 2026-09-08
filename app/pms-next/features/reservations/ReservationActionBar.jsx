@@ -4,6 +4,7 @@ import{useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 import ReservationGuestPanel from"./ReservationGuestPanel"
 import ReservationGuaranteePanel from"./ReservationGuaranteePanel"
+import ReservationEmailDialog from"./ReservationEmailDialog"
 
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:2}).format(Number(value)||0)
 const fmt=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"2-digit",year:"numeric"}).format(new Date(`${String(value).slice(0,10)}T12:00:00`)):"—"
@@ -68,19 +69,6 @@ export default function ReservationActionBar({item,rooms=[],propertyId,onRefresh
       }
     }catch(err){setError(err?.message||"No se pudo cargar la información.")}
   }
-  async function sendEmail(){
-    if(busy)return
-    setBusy("email");setError("");setNotice("")
-    try{
-      const{data:{session}}=await supabase.auth.getSession()
-      if(!session?.access_token)throw new Error("La sesión no está disponible.")
-      const response=await fetch("/api/hotel/email",{method:"POST",headers:{Authorization:`Bearer ${session.access_token}`,"Content-Type":"application/json"},body:JSON.stringify({reservation_id:item.id})})
-      const result=await response.json().catch(()=>({}))
-      if(!response.ok&&result?.error)throw new Error(result.error)
-      if(result.mode==="mailto"&&result.mailto){window.location.href=result.mailto;setNotice("Abrí tu aplicación de correo con la reserva preparada.")}else setNotice("Confirmación enviada por email.")
-    }catch(err){setError(err?.message||"No se pudo preparar el email.")}
-    finally{setBusy("")}
-  }
   function sendWhatsApp(){
     const phone=cleanPhone(item.telefono_huesped)
     if(!phone){setError("La reserva no tiene teléfono cargado.");return}
@@ -105,7 +93,7 @@ export default function ReservationActionBar({item,rooms=[],propertyId,onRefresh
     setError("");setNotice("")
     if(key==="guest")return setPanel("guest")
     if(key==="card")return setPanel("card")
-    if(key==="email")return sendEmail()
+    if(key==="email")return setPanel("email")
     if(key==="whatsapp")return sendWhatsApp()
     if(key==="phone")return openPortal()
     return openPanel(key)
@@ -115,6 +103,7 @@ export default function ReservationActionBar({item,rooms=[],propertyId,onRefresh
     <div aria-label="Acciones rápidas de la reserva" style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",padding:"8px 10px",border:"1px solid color-mix(in srgb,#fff 36%,var(--line))",borderRadius:14,background:"color-mix(in srgb,var(--panelSolid) 68%,transparent)",boxShadow:"inset 0 1px color-mix(in srgb,#fff 55%,transparent),0 8px 26px rgba(24,37,68,.06)",backdropFilter:"blur(22px) saturate(1.35)",WebkitBackdropFilter:"blur(22px) saturate(1.35)"}}>{actions.map(([key,label,icon])=><button key={key} type="button" onClick={()=>actionClick(key)} title={label} aria-label={label} style={{width:35,height:35,display:"grid",placeItems:"center",border:"1px solid color-mix(in srgb,#fff 32%,var(--line))",borderRadius:10,background:`color-mix(in srgb,${styles[key]} 9%,var(--panelSolid))`,color:styles[key],boxShadow:"inset 0 1px color-mix(in srgb,#fff 55%,transparent)",cursor:"pointer"}}><Icon name={icon}/></button>)}</div>
     {(notice||error)&&!panel?<div style={{marginTop:6,padding:"7px 9px",borderRadius:9,fontSize:9.8,fontWeight:780,border:`1px solid ${error?"color-mix(in srgb,var(--red) 28%,var(--line))":"color-mix(in srgb,#2c9a60 25%,var(--line))"}`,background:error?"color-mix(in srgb,var(--red) 6%,var(--panelSolid))":"color-mix(in srgb,#36a66a 6%,var(--panelSolid))",color:error?"var(--red)":"#277a4d"}}>{error||notice}</div>:null}
 
+    {panel==="email"?<ReservationEmailDialog item={item} rooms={rooms} propertyId={propertyId} onClose={()=>setPanel("")} onSent={message=>{setPanel("");setError("");setNotice(message||"Email enviado al huésped.")}}/>:null}
     {panel==="guest"?<ReservationGuestPanel item={item} rooms={rooms} propertyId={propertyId} onClose={()=>setPanel("")} onSaved={()=>{onRefresh?.();loadGuests().catch(()=>{})}}/>:null}
     {panel==="card"?<ReservationGuaranteePanel item={item} propertyId={propertyId} onClose={()=>setPanel("")} onChanged={onRefresh}/>:null}
 
