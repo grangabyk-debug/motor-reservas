@@ -12,7 +12,7 @@ export default function PmsNextPage(){
     @media(min-width:761px){
       [aria-label="Rooming por habitación"] article>div:nth-child(2){
         display:grid!important;
-        grid-template-columns:repeat(5,minmax(0,1fr))!important;
+        grid-template-columns:repeat(4,minmax(0,1fr)) minmax(96px,1fr)!important;
         gap:8px!important;
         align-items:start!important;
       }
@@ -50,6 +50,13 @@ export default function PmsNextPage(){
         width:100%!important;
         height:100%!important;
         min-width:0!important;
+      }
+      [aria-label="Rooming por habitación"] article>div:nth-child(2)>label:nth-child(5)>input{
+        min-width:0!important;
+        padding-left:8px!important;
+        padding-right:8px!important;
+        font-size:12px!important;
+        letter-spacing:-.01em!important;
       }
     }
   `}</style></>
