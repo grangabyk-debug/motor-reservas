@@ -8,8 +8,9 @@ import{ExternalPreview}from"./BookingEngineStudioPreviews"
 import{AnalyticsCard}from"./BookingEngineStageTwo"
 import WebsiteStudio from"./WebsiteStudio"
 
+const initialTab=()=>{try{return new URLSearchParams(window.location.search).get("website_tab")==="studio"?"site":"overview"}catch{return"overview"}}
 export default function BookingEngineStudio({engine,draft,setDraft,websiteDraft,setWebsiteDraft,description,setDescription,rooms,roomTypes,paymentConnected,bookingUrl,siteUrl,includedDomain,buttonCode,searchCode,embedCode,copied,saving,revisions,funnel,draftSavedAt,onCreate,onSaveDraft,onSave,onUpload,onRemoveGallery,onCopy,onToggleType,onRestoreRevision,onConnectDomain,domainAction}){
-  const[tab,setTab]=useState("overview"),[previewMode,setPreviewMode]=useState("desktop"),[integration,setIntegration]=useState("search"),mode=websiteDraft?.mode||"managed"
+  const[tab,setTab]=useState(initialTab),[previewMode,setPreviewMode]=useState("desktop"),[integration,setIntegration]=useState("search"),mode=websiteDraft?.mode||"managed"
   const patch=value=>setDraft(current=>({...current,...value})),patchWebsite=value=>setWebsiteDraft(current=>({...current,...value}))
   useEffect(()=>{if(mode==="external"&&tab==="site")setTab("overview")},[mode,tab])
   if(!engine)return <Start saving={saving} onCreate={onCreate}/>
