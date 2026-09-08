@@ -41,6 +41,8 @@ export async function POST(request){
     if(userError||!user)return NextResponse.json({error:"La sesión no es válida."},{status:401})
     const body=await request.json().catch(()=>null)
     const reservationId=Number(body?.reservation_id)
+    const customSubject=String(body?.subject||"").trim().slice(0,200)
+    const customText=String(body?.text||"").trim().slice(0,20000)
     if(!reservationId)return NextResponse.json({error:"Falta la reserva."},{status:400})
     const {data:r,error}=await client.from("reservas").select("id,property_id,numero_reserva,nombre_huesped,email_huesped,fecha_entrada,fecha_salida,habitacion_id,habitaciones_ids,habitaciones_detalle,precio_total,tarifa_noche,noches,moneda,cantidad_huespedes,regimen,notas,cancellation_policy_id,cancellation_policy_snapshot,impuestos_desglosados,iva_porcentaje,iva_importe,precio_sin_impuestos_nacionales,condicion_iva_huesped").eq("id",reservationId).single()
     if(error||!r)return NextResponse.json({error:error?.message||"Reserva no encontrada."},{status:404})
@@ -51,7 +53,7 @@ export async function POST(request){
     ])
     const hotel=settings?.hotel_name||"Habitación Llena"
     const ops=settings?.operational_settings&&typeof settings.operational_settings==="object"?settings.operational_settings:{}
-    const subject=`${hotel} · Reserva ${r.numero_reserva||r.id}`
+    const defaultSubject=`${hotel} · Reserva ${r.numero_reserva||r.id}`
     const details=Array.isArray(r.habitaciones_detalle)?r.habitaciones_detalle:[]
     const roomNames=details.map(row=>row?.nombre).filter(Boolean).join(", ")||String(r.habitacion_id||"Sin asignar")
     const roomTypes=[...new Set(details.map(row=>row?.categoria_vendida||row?.categoria_asignada).filter(Boolean))].join(", ")||"Habitación"
@@ -82,7 +84,9 @@ export async function POST(request){
     if(requestLines.length)textLines.push("","Solicitudes del huésped:",...requestLines)
     textLines.push("",...cancellationLines(policy,r.moneda))
     if(settings?.motto)textLines.push("",settings.motto)
-    const text=textLines.join("\n")
+    const defaultText=textLines.join("\n")
+    const subject=customSubject||defaultSubject
+    const text=customText||defaultText
     const mailto=`mailto:${encodeURIComponent(r.email_huesped)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`
     if(ops?.email?.mode==="mailto"||!process.env.RESEND_API_KEY||!process.env.HOTEL_EMAIL_FROM){
       return NextResponse.json({mode:"mailto",mailto,reason:"provider_not_configured"})
@@ -93,6 +97,6 @@ export async function POST(request){
     await client.from("reservas").update({email_resumen_enviado_at:new Date().toISOString()}).eq("id",r.id).eq("property_id",r.property_id)
     return NextResponse.json({mode:"sent",id:result?.id||null})
   }catch(error){
-    return NextResponse.json({error:error?.message||"No se pudo enviar la confirmación."},{status:500})
+    return NextResponse.json({error:error?.message||"No se pudo enviar el email."},{status:500})
   }
 }
