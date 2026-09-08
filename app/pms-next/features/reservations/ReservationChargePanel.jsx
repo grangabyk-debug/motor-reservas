@@ -9,6 +9,7 @@ const CATEGORY_LABEL={parking:"Cochera",pet:"Mascotas",extra:"Extra",service:"Se
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:0}).format(Number(value)||0)
 const dateKey=value=>String(value||"").slice(0,10)
 const diffDays=(from,to)=>Math.max(1,Math.round((new Date(`${to}T12:00:00`)-new Date(`${from}T12:00:00`))/86400000)||1)
+const roundMoney=value=>Math.round((Number(value)||0)*100)/100
 
 export default function ReservationChargePanel({reservation,propertyId,onClose,onSaved}){
   const[catalog,setCatalog]=useState([]),[folios,setFolios]=useState([]),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState("")
@@ -44,15 +45,20 @@ export default function ReservationChargePanel({reservation,propertyId,onClose,o
     if(folios.length&&!selectedFolio){setError("Elegí el folio donde querés cargar el consumo.");return}
     setSaving(true);setError("")
     try{
-      const{data:current,error:readError}=await supabase.from("reservas").select("id,property_id,servicios,precio_total,moneda").eq("id",reservation.id).eq("property_id",propertyId).single();if(readError)throw readError
+      const{data:current,error:readError}=await supabase.from("reservas").select("id,property_id,servicios,precio_total,subtotal,precio_sin_impuestos_nacionales,impuestos_desglosados,iva_porcentaje,iva_importe,moneda").eq("id",reservation.id).eq("property_id",propertyId).single();if(readError)throw readError
       const detailParts=[]
       if(selected.category==="parking")detailParts.push(`${units} vehículo${units===1?"":"s"}`);else if(units>1||selected.charge_mode?.includes("person"))detailParts.push(`${units} ${selected.charge_mode?.includes("person")?"persona":"unidad"}${units===1?"":"s"}`)
       if(timed)detailParts.push(`${chargedNights} noche${chargedNights===1?"":"s"} · ${from} → ${to}`)
       if(selectedFolio)detailParts.push(selectedFolio.label)
       if(note.trim())detailParts.push(note.trim())
       const charge={id:`charge-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,catalog_id:selected.id,nombre:selected.name,categoria:selected.category,modo_cobro:selected.charge_mode,precio:unitPrice,cantidad:units,noches:timed?chargedNights:null,desde:timed?from:null,hasta:timed?to:null,toda_estadia:timed?wholeStay:null,folio_id:selectedFolio?.id||null,habitacion_id:selectedFolio?.room_id||null,detalle:detailParts.join(" · "),total,created_at:new Date().toISOString()}
-      const nextServices=[...(Array.isArray(current.servicios)?current.servicios:[]),charge],nextTotal=(Number(current.precio_total)||0)+total
-      const{data:updated,error:updateError}=await supabase.from("reservas").update({servicios:nextServices,precio_total:nextTotal}).eq("id",reservation.id).eq("property_id",propertyId).select("id,servicios,precio_total,subtotal,moneda").single();if(updateError)throw updateError
+      const nextServices=[...(Array.isArray(current.servicios)?current.servicios:[]),charge]
+      const taxEnabled=Boolean(current.impuestos_desglosados),vatRate=taxEnabled?Math.max(0,Number(current.iva_porcentaje)||0):0
+      const currentNet=Math.max(0,Number(current.precio_sin_impuestos_nacionales??current.subtotal??0)||0),nextNet=roundMoney(currentNet+total)
+      const nextVat=taxEnabled?roundMoney(nextNet*vatRate/100):Math.max(0,Number(current.iva_importe)||0)
+      const nextTotal=taxEnabled?roundMoney(nextNet+nextVat):roundMoney((Number(current.precio_total)||0)+total)
+      const patch=taxEnabled?{servicios:nextServices,subtotal:nextNet,precio_sin_impuestos_nacionales:nextNet,iva_importe:nextVat,precio_total:nextTotal}:{servicios:nextServices,precio_total:nextTotal}
+      const{data:updated,error:updateError}=await supabase.from("reservas").update(patch).eq("id",reservation.id).eq("property_id",propertyId).select("id,servicios,precio_total,subtotal,precio_sin_impuestos_nacionales,impuestos_desglosados,iva_porcentaje,iva_importe,moneda").single();if(updateError)throw updateError
       const{data:event}=await supabase.from("hotel_reservation_events").insert({property_id:propertyId,reservation_id:reservation.id,event_type:"charge",title:`Cargo agregado · ${selected.name}`,detail:`${detailParts.length?`${detailParts.join(" · ")} · `:""}${money(total,currency)}`,payload:{catalog_id:selected.id,name:selected.name,category:selected.category,charge_mode:selected.charge_mode,unit_price:unitPrice,quantity:units,nights:timed?chargedNights:null,from:timed?from:null,to:timed?to:null,folio_id:selectedFolio?.id||null,room_id:selectedFolio?.room_id||null,total,currency}}).select("id,event_type,title,detail,payload,actor_name,created_at").maybeSingle()
       Object.assign(reservation,updated)
       if(typeof window!=="undefined"){window.dispatchEvent(new CustomEvent("hl:pms-reservation-updated",{detail:{reservationId:Number(reservation.id)}}));window.dispatchEvent(new CustomEvent("hl:pms-data-updated",{detail:{propertyId,tables:["reservas","hotel_folio_items"]}}))}
