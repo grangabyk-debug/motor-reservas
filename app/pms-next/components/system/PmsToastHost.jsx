@@ -4,18 +4,17 @@ import{useEffect,useRef,useState}from"react"
 import s from"./pms-toast.module.css"
 
 export default function PmsToastHost(){
-  const[toast,setToast]=useState(null)
-  const timer=useRef(null)
+  const[toasts,setToasts]=useState([]),timers=useRef(new Map())
+  function dismiss(id){const timer=timers.current.get(id);if(timer)window.clearTimeout(timer);timers.current.delete(id);setToasts(list=>list.filter(item=>item.id!==id))}
   useEffect(()=>{
     const show=event=>{
-      const detail=event?.detail||{}
-      if(timer.current)window.clearTimeout(timer.current)
-      setToast({id:Date.now(),tone:detail.tone||"success",title:detail.title||"Listo",message:detail.message||"Cambio guardado."})
-      timer.current=window.setTimeout(()=>setToast(null),Math.max(1800,Number(detail.duration)||3200))
+      const detail=event?.detail||{},id=detail.id||`${Date.now()}-${Math.random().toString(36).slice(2)}`,toast={id,tone:detail.tone||"success",title:detail.title||"Listo",message:detail.message||"Cambio guardado.",actionLabel:detail.actionLabel||"",onAction:typeof detail.onAction==="function"?detail.onAction:null}
+      setToasts(list=>[...list.filter(item=>item.id!==id),toast].slice(-4))
+      const duration=Math.max(1800,Number(detail.duration)||3200),timer=window.setTimeout(()=>dismiss(id),duration);timers.current.set(id,timer)
     }
     window.addEventListener("hl:pms-toast",show)
-    return()=>{window.removeEventListener("hl:pms-toast",show);if(timer.current)window.clearTimeout(timer.current)}
+    return()=>{window.removeEventListener("hl:pms-toast",show);for(const timer of timers.current.values())window.clearTimeout(timer);timers.current.clear()}
   },[])
-  if(!toast)return null
-  return <div className={s.host} role="status" aria-live="polite"><div className={s.toast} data-tone={toast.tone}><span className={s.icon}>{toast.tone==="error"?"!":toast.tone==="info"?"i":"✓"}</span><div><b>{toast.title}</b><p>{toast.message}</p></div><button type="button" onClick={()=>setToast(null)} aria-label="Cerrar aviso">×</button></div></div>
+  if(!toasts.length)return null
+  return <div className={s.host} aria-live="polite">{toasts.map(toast=><div key={toast.id} className={s.toast} data-tone={toast.tone} role={toast.tone==="danger"||toast.tone==="warning"?"alert":"status"}><span className={s.icon}>{toast.tone==="danger"||toast.tone==="error"?"!":toast.tone==="warning"?"•":toast.tone==="info"?"i":"✓"}</span><div className={s.body}><b>{toast.title}</b><p>{toast.message}</p>{toast.actionLabel&&toast.onAction?<button type="button" className={s.action} onClick={()=>{try{toast.onAction()}finally{dismiss(toast.id)}}}>{toast.actionLabel}</button>:null}</div><button type="button" className={s.close} onClick={()=>dismiss(toast.id)} aria-label="Cerrar aviso">×</button></div>)}</div>
 }
