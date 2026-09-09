@@ -12,6 +12,7 @@ const date=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"sh
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:0}).format(Number(value)||0)
 const normalize=value=>String(value||"").trim().toLowerCase()
 const channelLabel=value=>value==="guest_portal"?"Portal del huésped":value||"Canal"
+const cleanGuestMessage=value=>String(value||"Mensaje sin texto").replace(/^(solicitud|mensaje) del huésped\s*:\s*/i,"").trim()||"Mensaje sin texto"
 
 function reservationTone(status){const value=normalize(status);if(value.includes("cancel")||value.includes("no_show")||value.includes("no show"))return"red";if(value.includes("pend")||value.includes("tent"))return"yellow";if(value)return"green";return"neutral"}
 function roomTone(status){const value=normalize(status);if(value.includes("fuera")||value.includes("bloq")||value.includes("manten"))return"red";if(value.includes("sucia")||value.includes("limpieza")||value.includes("pend"))return"yellow";if(value.includes("lista")||value.includes("limpia")||value.includes("dispon"))return"green";return"neutral"}
@@ -38,6 +39,25 @@ function OperationalContext({context,loading,onNavigate,allowedViews=[],property
     </div>
     {lateRequest?<LateCheckoutDecision propertyId={propertyId} request={lateRequest} onChanged={onRefresh}/>:null}
     {reservation&&allowed.has("reservations")?<div className={s.contextActions}><button type="button" onClick={()=>onNavigate?.("reservations",{reservationId:Number(reservation.id),restoreScroll:false})}>Ver reserva</button></div>:null}
+  </div>
+}
+
+function GuestMessageBubble({message,selected,context}){
+  const guestName=selected?.contact_name||context?.guest?.name||context?.reservation?.guest_name||"Huésped"
+  const rooms=(context?.rooms||[]).map(room=>room.name).filter(Boolean)
+  const roomLabel=rooms.length?`Hab. ${rooms.join(", ")}`:"Portal del huésped"
+  return <div className={s.bubble} style={{padding:"0",overflow:"hidden",borderColor:"color-mix(in srgb,var(--accent) 24%,var(--line))",background:"color-mix(in srgb,var(--accent) 3%,var(--panelSolid))"}}>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:"10px",padding:"9px 12px 8px",borderBottom:"1px solid color-mix(in srgb,var(--accent) 14%,var(--line))",background:"color-mix(in srgb,var(--accent) 6%,var(--panelSolid))"}}>
+      <div style={{display:"flex",alignItems:"center",gap:"8px",minWidth:0}}>
+        <span style={{width:"24px",height:"24px",borderRadius:"50%",display:"grid",placeItems:"center",flex:"0 0 auto",background:"linear-gradient(145deg,var(--accent),var(--accent2))",color:"#fff",fontSize:"10px",fontWeight:900}}>{initials(guestName)}</span>
+        <b style={{fontSize:"12.5px",color:"var(--accent)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{guestName}</b>
+      </div>
+      <span style={{flex:"0 0 auto",padding:"4px 8px",borderRadius:"999px",border:"1px solid color-mix(in srgb,var(--accent) 20%,var(--line))",background:"color-mix(in srgb,var(--panelSolid) 86%,transparent)",color:"var(--muted)",fontSize:"10.5px",fontWeight:800}}>{roomLabel}</span>
+    </div>
+    <div style={{padding:"10px 12px 11px"}}>
+      <div style={{fontSize:"14px",lineHeight:1.5,color:"var(--text)"}}>{cleanGuestMessage(message.text)}</div>
+      <time style={{display:"block",marginTop:"6px",color:"var(--muted)",fontSize:"11px"}}>{time(message.occurred_at)}</time>
+    </div>
   </div>
 }
 
@@ -83,7 +103,7 @@ export default function MessagesWorkspace({propertyId,onNavigate,allowedViews=[]
       {selected?<>
         <header className={s.conversationHead}><div className={s.conversationIdentity}><button type="button" className={`${s.iconButton} ${s.mobileBack}`} aria-label="Volver a conversaciones" onClick={()=>setSelectedId("")}>←</button><span className={s.avatar}>{initials(selected.contact_name||selected.channel)}</span><span><b>{selected.contact_name||selected.contact_phone||selected.contact_email||"Contacto"}</b><small>{channelLabel(selected.channel)} · {selected.contact_phone||selected.contact_email||"Reserva vinculada"}</small></span></div><div className={s.conversationActions}><button type="button" className={s.iconButton} aria-label="Archivar conversación" disabled={saving} onClick={()=>changeStatus("archived","Conversación archivada")}>▱</button><button type="button" className={s.iconButton} aria-label="Mover conversación a papelera" disabled={saving} onClick={()=>changeStatus("trash","Conversación movida a papelera")}>⌫</button></div></header>
         <OperationalContext context={context} loading={resolving} onNavigate={onNavigate} allowedViews={allowedViews} propertyId={propertyId} onRefresh={refreshSelected}/>
-        <div className={s.messages}>{messages.map(message=><div key={message.id} className={`${s.bubble} ${message.direction==="outbound"?s.mine:""}`}>{message.text||"Mensaje sin texto"}<time>{time(message.occurred_at)}</time></div>)}{!messages.length&&<div className={s.emptyConversation}>Esta conversación todavía no tiene mensajes almacenados.</div>}</div>
+        <div className={s.messages}>{messages.map(message=>message.direction==="outbound"?<div key={message.id} className={`${s.bubble} ${s.mine}`}>{message.text||"Mensaje sin texto"}<time>{time(message.occurred_at)}</time></div>:selected.channel==="guest_portal"?<GuestMessageBubble key={message.id} message={message} selected={selected} context={context}/>:<div key={message.id} className={s.bubble}>{message.text||"Mensaje sin texto"}<time>{time(message.occurred_at)}</time></div>)}{!messages.length&&<div className={s.emptyConversation}>Esta conversación todavía no tiene mensajes almacenados.</div>}</div>
         {selected.channel==="guest_portal"?<GuestPortalComposer propertyId={propertyId} conversationId={selected.id} onSent={refreshSelected}/>:<div className={s.composerPending}><span>↗</span><div><b>Respuesta desde Habitación Llena</b><small>Se habilitará cuando el canal tenga un adaptador de salida seguro. No mostramos un botón que todavía no pueda enviar.</small></div></div>}
       </>:<div className={s.emptyConversation}><div><b>Elegí una conversación</b>Al abrirla vas a ver también su contexto operativo.</div></div>}
     </section>
