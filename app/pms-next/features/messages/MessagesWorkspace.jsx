@@ -25,8 +25,6 @@ function OperationalContext({context,loading,onNavigate,allowedViews=[],property
   const lateRequest=guestRequests.find(item=>item.kind==="late_checkout"&&!['resolved','cancelled'].includes(item.status))||null
   const roomNames=rooms.map(room=>room.name).filter(Boolean).join(", ")||"Sin habitación"
   const firstRoom=rooms[0]
-  function openHousekeeping(){if(firstRoom?.id&&typeof window!=="undefined"){const url=new URL(window.location.href);url.searchParams.set("housekeeping_room",String(firstRoom.id));window.history.replaceState(window.history.state||{},"",url)}onNavigate?.("housekeeping",{restoreScroll:false})}
-  function openRequests(){const request=guestRequests[0]||null;if(typeof window!=="undefined"){const url=new URL(window.location.href);if(request?.id){url.searchParams.set("guest_request",String(request.id));url.searchParams.delete("request_reservation")}else if(reservation?.id){url.searchParams.set("request_reservation",String(reservation.id));url.searchParams.delete("guest_request")}window.history.replaceState(window.history.state||{},"",url);window.dispatchEvent(new CustomEvent("hl:guest-request-focus",{detail:{id:request?.id||"",reservationId:request?.id?"":reservation?.id||""}}))}onNavigate?.("requests",{restoreScroll:false})}
   return <div className={s.contextPanel}>
     <div className={s.contextTop}><div><small>CONTEXTO OPERATIVO</small><b>{reservation?`Reserva ${reservation.number||reservation.id}`:"Huésped reconocido"}</b></div><span className={s.linkBadge}>● Vinculado</span></div>
     <div className={s.contextGrid}>
@@ -39,13 +37,7 @@ function OperationalContext({context,loading,onNavigate,allowedViews=[],property
       <ContextCard label="Mantenimiento" value={maintenance.length?`${maintenance.length} incidencia${maintenance.length===1?"":"s"}`:"Sin incidencias"} detail={maintenance[0]?.title||"Sin problemas abiertos"} tone={maintenance.length?"red":"green"}/>
     </div>
     {lateRequest?<LateCheckoutDecision propertyId={propertyId} request={lateRequest} onChanged={onRefresh}/>:null}
-    {reservation&&<div className={s.contextActions}>
-      {allowed.has("reservations")&&<button type="button" onClick={()=>onNavigate?.("reservations",{reservationId:Number(reservation.id),restoreScroll:false})}>Ver reserva</button>}
-      {allowed.has("dailycash")&&<button type="button" onClick={()=>onNavigate?.("dailycash",{cashReservationId:Number(reservation.id),restoreScroll:false})}>Cobros</button>}
-      {allowed.has("requests")&&<button type="button" onClick={openRequests}>Peticiones</button>}
-      {allowed.has("housekeeping")&&<button type="button" onClick={openHousekeeping}>Housekeeping</button>}
-      {allowed.has("maintenance")&&<button type="button" onClick={()=>onNavigate?.("maintenance")}>Mantenimiento</button>}
-    </div>}
+    {reservation&&allowed.has("reservations")?<div className={s.contextActions}><button type="button" onClick={()=>onNavigate?.("reservations",{reservationId:Number(reservation.id),restoreScroll:false})}>Ver reserva</button></div>:null}
   </div>
 }
 
