@@ -13,6 +13,7 @@ if(greenfield){
   run("npm",["run","check:product-boundaries"])
   run("node",["scripts/check-pms-next-isolation.mjs"])
   run("node",["scripts/check-pms-next-visual-consistency.mjs"])
+  run("npm",["run","check:pms-sitemap"])
 }else{
   console.log(`Habitación Llena prebuild: legacy architecture validation for ${branch||"local build"}`)
   run("npm",["run","check:hotel-architecture"])
