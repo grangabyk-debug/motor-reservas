@@ -99,8 +99,8 @@ function OliviaPhoto({ className = "", alt = "" }) {
 function actionSummary(action) {
   const payload = action?.payload || {}
   const parts = []
-  if (payload.reservation_id) parts.push(`Reserva ${payload.reservation_id}`)
-  if (payload.room_id) parts.push(`Habitación #${payload.room_id}`)
+  if (payload.reservation_id) parts.push(payload.reservation_number ? `Reserva ${payload.reservation_number}` : `Reserva ${payload.reservation_id}`)
+  if (payload.room_id) parts.push(`Habitación ${payload.room_name || `#${payload.room_id}`}`)
   if (payload.priority) parts.push(`Prioridad ${payload.priority}`)
   return parts.join(" · ")
 }
