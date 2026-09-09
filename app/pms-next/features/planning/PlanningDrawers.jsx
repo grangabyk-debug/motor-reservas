@@ -1,120 +1,43 @@
 "use client"
 
-import{useEffect,useRef,useState}from"react"
+import{useEffect,useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
-import s from"./planning.module.css"
-import g from"./planningGroup.module.css"
-import l from"./planningLifecycle.module.css"
-import{planningStage,planningStageLabel}from"./planningLifecycle"
-import RoomingEditor,{reservationRoomingSummary}from"./RoomingEditor"
-import useReservationTaxConfig from"./useReservationTaxConfig"
-import{chargeLabel}from"./planningPolicyLabels"
-import{finalPriceFromNet}from"../../core/priceTax"
+import{CreateReservationDrawer as LegacyCreateReservationDrawer,ReservationDetailDrawer as LegacyReservationDetailDrawer}from"./PlanningDrawersLegacy"
 
-const DAY=86400000
-const fromKey=value=>{const[y,m,d]=String(value).split("-").map(Number);return new Date(y,m-1,d,12)}
-const pad=value=>String(value).padStart(2,"0")
-const keyFromDate=date=>`${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`
-const addDays=(value,amount)=>keyFromDate(new Date(fromKey(value).getTime()+amount*DAY))
-const diffDays=(a,b)=>Math.round((fromKey(b)-fromKey(a))/DAY)
-const longDate=value=>new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short",year:"numeric"}).format(fromKey(value)).replace(".","")
-const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:2}).format(Number(value)||0)
-const STEPS=["Fecha","Habitación","Titular","Detalles"]
-const uniqueIds=values=>[...new Set((values||[]).filter(Boolean).map(value=>String(value)))]
-const roomRank=room=>room.estado==="mantenimiento"?2:room.available?0:1
-const roomCapacity=room=>Math.max(1,Number(room?.capacidad)||1)
-const DISCOUNT_REASONS=[
-  ["group","Grupo / varias habitaciones"],
-  ["long_stay","Estadía prolongada"],
-  ["promotion","Promoción comercial"],
-  ["commercial","Acuerdo comercial"],
-  ["loyalty","Fidelización"],
-  ["courtesy","Cortesía"],
-  ["other","Otro"],
-]
-function compareRooms(a,b,guests){
-  const rankDiff=roomRank(a)-roomRank(b)
-  if(rankDiff)return rankDiff
-  const capacityA=roomCapacity(a),capacityB=roomCapacity(b),fitsA=capacityA>=guests,fitsB=capacityB>=guests
-  if(fitsA!==fitsB)return fitsA?-1:1
-  const priceA=Math.max(0,Number(a.precio)||0),priceB=Math.max(0,Number(b.precio)||0)
-  if(priceA!==priceB)return priceA-priceB
-  if(fitsA&&capacityA!==capacityB)return capacityA-capacityB
-  if(!fitsA&&capacityA!==capacityB)return capacityB-capacityA
-  return String(a.nombre||"").localeCompare(String(b.nombre||""),"es",{numeric:true})
-}
+export const ReservationDetailDrawer=LegacyReservationDetailDrawer
 
-export function ReservationDetailDrawer({selected,room,rooms=[],onClose,onOpen}){
-  if(!selected)return null
-  const assigned=rooms.length?rooms:[room].filter(Boolean),selectedIds=uniqueIds([selected.habitacion_id,...(selected.habitaciones_ids||[])]),roomLabel=assigned.length>1?`${assigned.length} habitaciones · ${assigned.map(item=>item.nombre).join(", ")}`:selectedIds.length>1?`${selectedIds.length} habitaciones asignadas`:`Habitación ${assigned[0]?.nombre||"—"}`,stage=planningStage(selected)
-  return <aside className={s.detailDrawer}><header><div><small>{selected.canal_reserva||"Walk-in"} · {selected.numero_reserva||selected.id}</small><h2>{selected.nombre_huesped}</h2><p>{roomLabel}</p></div><button className={s.close} onClick={onClose}>×</button></header><div className={s.detailGrid}><div><small>Llegada</small><b>{longDate(selected.fecha_entrada)}</b></div><div><small>Salida</small><b>{longDate(selected.fecha_salida)}</b></div><div><small>Noches</small><b>{Math.max(1,diffDays(selected.fecha_entrada,selected.fecha_salida))}</b></div><div><small>Estado en Planning</small><b><span className={`${l.stagePill} ${l[stage]}`}>{planningStageLabel(selected)}</span></b></div><div><small>Huéspedes</small><b>{selected.cantidad_huespedes||1}</b></div><div><small>Rooming</small><b>{reservationRoomingSummary(selected,assigned)}</b></div><div><small>Total</small><b>{money(selected.precio_total,selected.moneda)}</b></div></div>{selected.telefono_huesped||selected.email_huesped?<div className={s.contactBlock}>{selected.telefono_huesped?<p><small>Teléfono</small><b>{selected.telefono_huesped}</b></p>:null}{selected.email_huesped?<p><small>Email</small><b>{selected.email_huesped}</b></p>:null}</div>:null}{selected.notas?<div className={s.noteBlock}><small>Notas</small><p>{selected.notas}</p></div>:null}<footer><button onClick={onClose}>Cerrar</button><button className={s.primary} onClick={onOpen}>Abrir reserva</button></footer></aside>
-}
+export function CreateReservationDrawer(props){
+  const{draft,setDraft,availableRooms=[]}=props
+  const[rateCurrency,setRateCurrency]=useState(null),[propertyId,setPropertyId]=useState(null)
+  const roomId=useMemo(()=>availableRooms.find(room=>room?.id)?.id||draft?.roomId||draft?.roomIds?.[0]||null,[availableRooms,draft?.roomId,draft?.roomIds])
 
-export function CreateReservationDrawer({draft,setDraft,drawerStep,setDrawerStep,draftState,externalError="",availableRooms,roomById,cancellationPolicies=[],nights,total,saving,onClose,onDiscard,onNext,onSave}){
-  if(!draft)return null
-  const guests=Math.max(1,Number(draft.guests)||1),roomIdsKey=availableRooms.map(room=>room.id).join(",")
-  const[blockedRoomIds,setBlockedRoomIds]=useState(()=>new Set())
-  const effectiveRooms=availableRooms.map(room=>({...room,available:room.available&&!blockedRoomIds.has(String(room.id))}))
-  const sortedRooms=[...effectiveRooms].sort((a,b)=>compareRooms(a,b,guests))
-  const availabilityKey=sortedRooms.map(room=>`${room.id}:${room.available?1:0}:${room.estado||""}:${room.capacidad||1}:${Number(room.precio)||0}`).join("|")
-  const commercialCategories=[...new Set(effectiveRooms.map(room=>String(room.tipo||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es"))
-  const rawSelectedRoomIds=uniqueIds(draft.roomIds?.length?draft.roomIds:[draft.roomId])
-  const selectedRoomIds=rawSelectedRoomIds.filter(id=>{const room=effectiveRooms.find(item=>String(item.id)===id);return room&&room.available&&room.estado!=="mantenimiento"})
-  const selectedRooms=selectedRoomIds.map(id=>roomById.get(Number(id))).filter(Boolean)
-  const roomNames=selectedRooms.map(room=>room.nombre),capacity=selectedRooms.reduce((sum,room)=>sum+roomCapacity(room),0)
-  const invalidSelectedRooms=effectiveRooms.filter(room=>rawSelectedRoomIds.includes(String(room.id))&&(!room.available||room.estado==="mantenimiento")),hasInvalidSelection=invalidSelectedRooms.length>0
-  const recommendedRoom=sortedRooms.find(room=>room.available&&room.estado!=="mantenimiento"&&roomCapacity(room)>=guests)||sortedRooms.find(room=>room.available&&room.estado!=="mantenimiento")
-  const[localError,setLocalError]=useState("")
-  const taxConfig=useReservationTaxConfig(selectedRoomIds[0]||rawSelectedRoomIds[0],setDraft)
-  const errorTimer=useRef(null)
-  const grossTotal=(Number(draft.rate)||0)*Math.max(1,nights)
-  const discountType=draft.discountType||"none",discountValue=Math.max(0,Number(draft.discountValue)||0)
-  const discountAmount=discountType==="percent"?Math.min(grossTotal,grossTotal*Math.min(100,discountValue)/100):discountType==="amount"?Math.min(grossTotal,discountValue):0
-  const netTotal=Math.max(0,grossTotal-discountAmount),taxEnabled=taxConfig.enabled!==false,vatRate=taxEnabled?Math.max(0,Number(taxConfig.vat_rate)||0):0,vatAmount=taxEnabled?Math.round(netTotal*vatRate)/100:0,totalWithTax=Math.round((netTotal+vatAmount)*100)/100,visibleError=localError||externalError,finalRateCaption=taxEnabled&&vatRate?`IVA ${vatRate}% incluido`:"Precio final"
-  const discountReasonMissing=discountAmount>0&&(!String(draft.discountReason||"").trim()||(draft.discountReason==="other"&&!String(draft.discountReasonDetail||"").trim()))
-  const selectedPolicy=cancellationPolicies.find(policy=>String(policy.id)===String(draft.cancellationPolicyId))||cancellationPolicies.find(policy=>policy.is_default)||cancellationPolicies[0]||null
-
-  function showError(message){setLocalError(message);if(errorTimer.current)clearTimeout(errorTimer.current);errorTimer.current=setTimeout(()=>setLocalError(""),3600)}
-  function next(){if(drawerStep===0&&draft.end<=draft.start)return showError("La fecha de salida tiene que ser posterior a la entrada.");if(drawerStep===1&&(hasInvalidSelection||!selectedRoomIds.length))return showError("Elegí al menos una habitación disponible para continuar.");if(drawerStep===2&&(!String(draft.firstName||"").trim()||!String(draft.lastName||"").trim()))return showError("Completá nombre y apellido para continuar.");setLocalError("");onNext()}
-
-  useEffect(()=>()=>{if(errorTimer.current)clearTimeout(errorTimer.current)},[])
-  useEffect(()=>{if(!draft.channel||draft.channel==="Directa")setDraft(current=>({...current,channel:"Walk-in"}))},[])
   useEffect(()=>{
+    if(!roomId)return
     let cancelled=false
-    async function loadBlocks(){
-      const ids=availableRooms.map(room=>Number(room.id)).filter(Number.isFinite)
-      if(!ids.length||!draft.start||!draft.end){if(!cancelled)setBlockedRoomIds(new Set());return}
-      const{data,error}=await supabase.from("bloqueos").select("habitacion_id").in("habitacion_id",ids).lt("fecha_desde",draft.end).gt("fecha_hasta",draft.start)
-      if(cancelled)return
-      if(error){setBlockedRoomIds(new Set());return}
-      setBlockedRoomIds(new Set((data||[]).map(row=>String(row.habitacion_id))))
-    }
-    loadBlocks()
+    ;(async()=>{
+      try{
+        const roomRes=await supabase.from("habitaciones").select("property_id").eq("id",Number(roomId)).maybeSingle()
+        if(roomRes.error)throw roomRes.error
+        const pid=roomRes.data?.property_id;if(!pid)return
+        const settingsRes=await supabase.from("property_settings").select("settings").eq("property_id",pid).maybeSingle()
+        if(settingsRes.error)throw settingsRes.error
+        if(cancelled)return
+        const code=String(settingsRes.data?.settings?.pricing?.rate_currency||"ARS").toUpperCase()==="USD"?"USD":"ARS"
+        setPropertyId(pid);setRateCurrency(code)
+        setDraft(current=>current&&current.currency!==code?{...current,currency:code}:current)
+      }catch{if(!cancelled)setRateCurrency(current=>current||"ARS")}
+    })()
     return()=>{cancelled=true}
-  },[draft.start,draft.end,roomIdsKey])
-  useEffect(()=>{
-    const current=uniqueIds(draft.roomIds?.length?draft.roomIds:[draft.roomId])
-    const valid=current.filter(id=>{const room=effectiveRooms.find(item=>String(item.id)===id);return room&&room.available&&room.estado!=="mantenimiento"})
-    const isGroup=current.length>1
-    const manual=Boolean(draft.roomSelectionManual)
-    let next
-    if(isGroup)next=valid
-    else if(manual&&valid.length)next=valid
-    else next=recommendedRoom?[String(recommendedRoom.id)]:[]
-    if(current.length===next.length&&current.every((id,index)=>id===next[index]))return
-    const nextRate=next.reduce((sum,id)=>sum+(Number(roomById.get(Number(id))?.precio)||0),0)
-    setDraft(currentDraft=>({...currentDraft,roomIds:next,roomId:next[0]||"",rate:nextRate,roomSelectionManual:manual&&valid.length>0}))
-  },[draft.start,draft.end,draft.guests,availabilityKey])
+  },[roomId,setDraft])
 
-  function toggleRoom(room){const id=String(room.id),current=uniqueIds(draft.roomIds?.length?draft.roomIds:[draft.roomId]),isSelected=current.includes(id),unavailable=!room.available||room.estado==="mantenimiento";if(unavailable)return;const next=isSelected?current.filter(value=>value!==id):[...current,id],nextRate=next.reduce((sum,value)=>sum+(Number(roomById.get(Number(value))?.precio)||0),0);setDraft(currentDraft=>({...currentDraft,roomIds:next,roomId:next[0]||"",rate:nextRate,roomSelectionManual:true}))}
-  const title=drawerStep===0?"Elegí las fechas":drawerStep===1?"Seleccioná habitaciones":drawerStep===2?"Datos del titular":"Revisá la reserva"
-  const errorStyle={margin:"0 0 12px",padding:"10px 12px",border:"1px solid color-mix(in srgb,var(--red) 42%,var(--line))",borderRadius:9,background:"color-mix(in srgb,var(--red) 8%,var(--panelSolid))",color:"var(--red)",fontSize:11,fontWeight:800,boxShadow:"0 8px 18px color-mix(in srgb,var(--red) 8%,transparent)"}
-  const sectionStyle={padding:"11px",border:"1px solid var(--line)",borderRadius:10,background:"color-mix(in srgb,var(--bg) 48%,var(--panelSolid))"}
-  const policyText={margin:"5px 0 0",fontSize:10.5,lineHeight:1.45,color:"var(--muted)",fontWeight:400,fontFamily:"inherit"}
-  return <div className={s.drawerShade} onMouseDown={event=>event.target===event.currentTarget&&onClose()}><aside className={s.createDrawer} role="dialog" aria-modal="true" aria-label="Crear reserva"><header className={s.drawerHeader}><div><small>CREAR RESERVA</small><h2>{title}</h2><p>{draftState}</p></div><button className={s.close} onClick={onClose}>×</button></header><nav className={s.stepNav}>{STEPS.map((step,index)=><button key={step} className={index===drawerStep?s.stepActive:index<drawerStep?s.stepDone:""} onClick={()=>index<=drawerStep&&setDrawerStep(index)}><span>{index+1}</span>{step}</button>)}</nav><div className={s.drawerBody}>{visibleError?<div style={errorStyle} role="alert">{visibleError}</div>:null}
-    {drawerStep===0?<div className={s.stepPanel}><div className={s.dateSummary}><span><small>Entrada</small><b>{longDate(draft.start)}</b></span><span className={s.nightsBadge}>{nights} noche{nights===1?"":"s"}</span><span><small>Salida</small><b>{longDate(draft.end)}</b></span></div><div className={s.formGrid}><label>Entrada<input type="date" value={draft.start} onChange={event=>setDraft(current=>({...current,start:event.target.value,end:current.end<=event.target.value?addDays(event.target.value,1):current.end,roomSelectionManual:false}))}/></label><label>Salida<input type="date" min={addDays(draft.start,1)} value={draft.end} onChange={event=>setDraft(current=>({...current,end:event.target.value,roomSelectionManual:false}))}/></label><label>Huéspedes<input type="number" min="1" value={draft.guests} onChange={event=>setDraft(current=>({...current,guests:Number(event.target.value)||1,roomSelectionManual:false}))}/></label><label>Moneda<select value={draft.currency} onChange={event=>setDraft(current=>({...current,currency:event.target.value}))}><option value="ARS">ARS</option><option value="USD">USD</option></select></label></div></div>:null}
-    {drawerStep===1?<div className={s.stepPanel}><div className={g.groupSummary}><div><small>Habitaciones seleccionadas</small><b>{selectedRoomIds.length||0}</b><span>{roomNames.length?roomNames.join(", "):"No hay habitaciones disponibles para estas fechas"}</span>{selectedRoomIds.length>1?<span className={g.groupTag}>Reserva grupal</span>:null}</div><div><small>Capacidad combinada</small><b>{capacity} pax</b><span>{selectedRoomIds.length>1?"Una sola reserva, varias habitaciones":"Selección individual"}</span></div></div><div className={s.roomOptions}>{sortedRooms.map(room=>{const unavailable=!room.available||room.estado==="mantenimiento",active=!unavailable&&selectedRoomIds.includes(String(room.id));return <button key={room.id} disabled={unavailable} className={`${s.roomOption} ${active?s.roomOptionActive:""}`} onClick={()=>toggleRoom(room)}><span className={`${g.roomCheck} ${active?g.roomCheckSelected:""}`}>{active?"✓":""}</span><span><small>{room.tipo||"Sin tipo"}</small><b>{room.nombre}</b><em>{room.capacidad||1} pax · {room.estado==="mantenimiento"?"Mantenimiento":room.available?"Disponible":"Ocupada / bloqueada"}</em></span><strong>{money(finalPriceFromNet(room.precio,taxConfig),draft.currency)}<small>/ noche · {finalRateCaption}</small></strong></button>})}</div>{!selectedRoomIds.length?<p className={s.stepHelp}>No hay una habitación disponible seleccionable en este rango. Cambiá las fechas para continuar.</p>:<RoomingEditor draft={draft} setDraft={setDraft} rooms={selectedRooms} categories={commercialCategories} currency={draft.currency}/>}</div>:null}
-    {drawerStep===2?<div className={s.stepPanel}><div className={s.formGrid}><label>Nombre<input value={draft.firstName} onChange={event=>setDraft(current=>({...current,firstName:event.target.value}))} autoFocus/></label><label>Apellido<input value={draft.lastName} onChange={event=>setDraft(current=>({...current,lastName:event.target.value}))}/></label><label>Teléfono<input value={draft.phone} onChange={event=>setDraft(current=>({...current,phone:event.target.value}))} placeholder="11 0000 0000"/></label><label>Email<input type="email" value={draft.email} onChange={event=>setDraft(current=>({...current,email:event.target.value}))} placeholder="huesped@email.com"/></label><label className={s.fullField}>País de residencia<input value={draft.country||""} onChange={event=>setDraft(current=>({...current,country:event.target.value}))} placeholder="Argentina, Estados Unidos, Brasil…"/></label></div></div>:null}
-    {drawerStep===3?<div className={s.stepPanel}><div className={s.review}><div><small>Estadía</small><b>{longDate(draft.start)} — {longDate(draft.end)}</b><span>{nights} noche{nights===1?"":"s"}</span></div><div><small>{selectedRoomIds.length>1?"Habitaciones":"Habitación"}</small><b>{roomNames.slice(0,3).join(", ")||"—"}{roomNames.length>3?` +${roomNames.length-3}`:""}</b><span>{selectedRoomIds.length>1?`${selectedRoomIds.length} habitaciones · ${capacity} pax de capacidad`:selectedRooms[0]?.tipo||""} · Rooming configurado por habitación</span></div><div><small>Titular</small><b>{`${draft.firstName} ${draft.lastName}`.trim()||"Sin completar"}</b><span>{draft.phone||draft.email||"Sin contacto"}</span></div><div><small>Precio final</small><b>{money(totalWithTax,draft.currency)}</b><span>{taxEnabled&&vatRate?`IVA ${vatRate}% incluido`:"Impuestos desactivados"}</span></div></div><div className={s.formGrid}><label>Canal<select value={draft.channel||"Walk-in"} onChange={event=>setDraft(current=>({...current,channel:event.target.value}))}><option>Walk-in</option><option>WhatsApp</option><option>Telefónica</option><option>Motor</option><option>Booking.com</option><option>Expedia</option><option>Despegar</option><option>Airbnb</option><option>Agencia</option></select></label><label>Estado comercial<select value={draft.status} onChange={event=>setDraft(current=>({...current,status:event.target.value}))}><option value="confirmada">Venta · confirmada / garantizada</option><option value="pendiente">Preventa · pendiente de confirmación</option><option value="tentativa">Preventa · tentativa</option></select></label><label className={s.fullField}>Voucher / referencia<input value={draft.voucher||""} onChange={event=>setDraft(current=>({...current,voucher:event.target.value}))} placeholder="Código de OTA, voucher, referencia externa…"/></label><label className={s.fullField}>Política de cancelación<select value={draft.cancellationPolicyId||""} onChange={event=>setDraft(current=>({...current,cancellationPolicyId:event.target.value}))}><option value="">Seleccionar política</option>{cancellationPolicies.map(policy=><option key={policy.id} value={policy.id}>{policy.name}{policy.is_default?" · Predeterminada":""}</option>)}</select></label></div>{selectedPolicy?<div style={{...sectionStyle,marginTop:10,borderColor:"color-mix(in srgb,var(--accent) 28%,var(--line))"}}><div style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"center"}}><b style={{fontSize:11.5}}>{selectedPolicy.name}</b>{selectedPolicy.is_default?<span style={{fontSize:9,fontWeight:850,color:"var(--accent)"}}>PREDETERMINADA</span>:null}</div>{selectedPolicy.description?<p style={policyText}>{selectedPolicy.description}</p>:null}<p style={{...policyText,marginTop:6}}>No Show: {chargeLabel(selectedPolicy.no_show_rule,selectedPolicy.currency||draft.currency)} · Checkout anticipado: {chargeLabel(selectedPolicy.early_checkout_rule,selectedPolicy.currency||draft.currency)}</p></div>:null}<div style={{...sectionStyle,marginTop:10,borderColor:discountAmount>0?"color-mix(in srgb,var(--gold) 38%,var(--line))":"var(--line)",background:discountAmount>0?"color-mix(in srgb,var(--gold) 5%,var(--panelSolid))":sectionStyle.background}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}><b style={{fontSize:11}}>Descuento</b>{discountAmount>0?<span style={{fontSize:9,fontWeight:900,color:"var(--gold)",padding:"4px 7px",borderRadius:999,background:"color-mix(in srgb,var(--gold) 10%,var(--panelSolid))"}}>% APLICADO</span>:null}</div><div className={s.formGrid} style={{marginTop:8}}><label>Tipo<select value={discountType} onChange={event=>setDraft(current=>({...current,discountType:event.target.value,discountValue:event.target.value==="none"?0:current.discountValue||0,discountReason:event.target.value==="none"?"":current.discountReason||"",discountReasonDetail:event.target.value==="none"?"":current.discountReasonDetail||""}))}><option value="none">Sin descuento</option><option value="percent">Porcentaje</option><option value="amount">Importe fijo</option></select></label><label>Valor<input type="number" min="0" max={discountType==="percent"?100:undefined} disabled={discountType==="none"} value={draft.discountValue||0} onChange={event=>setDraft(current=>({...current,discountValue:Number(event.target.value)||0}))}/></label>{discountAmount>0?<label>Motivo<select value={draft.discountReason||""} onChange={event=>setDraft(current=>({...current,discountReason:event.target.value,discountReasonDetail:event.target.value==="other"?current.discountReasonDetail||"":""}))}><option value="">Elegir motivo</option>{DISCOUNT_REASONS.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>:null}{discountAmount>0&&draft.discountReason==="other"?<label>Especificar motivo<input value={draft.discountReasonDetail||""} onChange={event=>setDraft(current=>({...current,discountReasonDetail:event.target.value}))} placeholder="Ej. acuerdo autorizado por gerencia"/></label>:null}</div>{discountAmount>0?<div style={{marginTop:8,padding:"9px 10px",borderRadius:9,background:"color-mix(in srgb,var(--gold) 8%,var(--panelSolid))",border:"1px solid color-mix(in srgb,var(--gold) 24%,var(--line))"}}><small style={{display:"block",color:"var(--gold)",fontWeight:850}}>Descuento aplicado: {discountType==="percent"?`${discountValue}% · `:""}{money(discountAmount,draft.currency)} menos · Base {money(netTotal,draft.currency)}</small></div>:null}</div>{taxEnabled?<div style={{...sectionStyle,marginTop:10,borderColor:"color-mix(in srgb,var(--accent) 24%,var(--line))",background:"linear-gradient(145deg,color-mix(in srgb,var(--accent) 5%,var(--panelSolid)),color-mix(in srgb,var(--panelSolid) 96%,transparent))"}}><b style={{fontSize:11.5}}>Detalle fiscal · incluido en el precio final</b><div style={{display:"grid",gap:6,marginTop:9}}><div style={{display:"flex",justifyContent:"space-between",gap:12,fontSize:10.5}}><span style={{color:"var(--muted)"}}>Base sin IVA</span><b>{money(netTotal,draft.currency)}</b></div><div style={{display:"flex",justifyContent:"space-between",gap:12,fontSize:10.5}}><span style={{color:"var(--muted)"}}>IVA {vatRate}%</span><b>{money(vatAmount,draft.currency)}</b></div><div style={{display:"flex",justifyContent:"space-between",gap:12,paddingTop:7,borderTop:"1px solid var(--line)",fontSize:12}}><strong>Precio final</strong><strong>{money(totalWithTax,draft.currency)}</strong></div></div></div>:<div style={{...sectionStyle,marginTop:10}}><b style={{fontSize:11}}>Impuestos desactivados</b></div>}<label className={s.fullField} style={{display:"grid",gap:5,marginTop:10}}>Notas<textarea rows="4" value={draft.notes} onChange={event=>setDraft(current=>({...current,notes:event.target.value}))} placeholder="Pedidos, observaciones o información interna"/></label></div>:null}
-  </div><footer className={s.drawerFooter}><div><button className={s.dangerLink} onClick={onDiscard}>Descartar</button>{drawerStep>0?<button onClick={()=>{setLocalError("");setDrawerStep(step=>Math.max(0,step-1))}}>Atrás</button>:null}</div><div className={s.totalFooter}><span><small>Precio final{taxEnabled&&vatRate?` · IVA ${vatRate}% incluido`:""}</small><b>{money(totalWithTax,draft.currency)}</b></span>{drawerStep<3?<button className={s.primary} disabled={drawerStep===1&&(hasInvalidSelection||!selectedRoomIds.length)} onClick={next}>Continuar</button>:<button className={s.primary} disabled={saving||hasInvalidSelection||!selectedRoomIds.length||!draft.cancellationPolicyId||discountReasonMissing} onClick={event=>{if(event.currentTarget.disabled)return;event.currentTarget.disabled=true;onSave()}}>{saving?"Creando…":"Crear reserva"}</button>}</div></footer></aside></div>
+  useEffect(()=>{
+    if(typeof window==="undefined"||!propertyId)return
+    const handler=event=>{if(String(event.detail?.propertyId)!==String(propertyId))return;const code=String(event.detail?.settings?.pricing?.rate_currency||"ARS").toUpperCase()==="USD"?"USD":"ARS";setRateCurrency(code);setDraft(current=>current&&current.currency!==code?{...current,currency:code}:current)}
+    window.addEventListener("hl:property-settings-updated",handler)
+    return()=>window.removeEventListener("hl:property-settings-updated",handler)
+  },[propertyId,setDraft])
+
+  const forcedDraft=draft&&rateCurrency?{...draft,currency:rateCurrency}:draft
+  const forcedSetDraft=updater=>setDraft(current=>{const next=typeof updater==="function"?updater(current):updater;if(!next||!rateCurrency)return next;return next.currency===rateCurrency?next:{...next,currency:rateCurrency}})
+  return <LegacyCreateReservationDrawer {...props} draft={forcedDraft} setDraft={forcedSetDraft}/>
 }
