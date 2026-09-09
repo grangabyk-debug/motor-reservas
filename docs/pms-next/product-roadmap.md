@@ -2,6 +2,11 @@
 
 > Fuente de verdad de ejecución. Rama de trabajo: `pms-rebuild-zero`.
 
+## Estado actual
+
+- **Paquete 0 — Sistema de producto y fuente de verdad: COMPLETADO.**
+- **Paquete 1 — Grafo operativo del hotel: EN EJECUCIÓN.** Primer corte vertical implementado en Inbox/Mensajes.
+
 ## Objetivo de producto
 
 Habitación Llena debe comportarse como un sistema operativo del hotel: simple por fuera, profundo por dentro. El sistema tiene que reducir trabajo manual, conectar las áreas sin usar a Recepción como intermediario y conservar trazabilidad de cada acción.
@@ -23,7 +28,7 @@ Regla central: **menos tiempo usando el PMS, más tiempo atendiendo el hotel y a
 
 ## Paquete 0 — Sistema de producto y fuente de verdad
 
-**Estado:** iniciado.
+**Estado:** completado.
 
 ### Objetivo
 Evitar que el PMS crezca como una colección de pantallas desconectadas.
@@ -46,6 +51,8 @@ Evitar que el PMS crezca como una colección de pantallas desconectadas.
 
 ## Paquete 1 — Grafo operativo del hotel
 
+**Estado:** en ejecución.
+
 ### Objetivo
 Conectar de forma canónica las piezas que ya existen: **Mensajes + Reserva + Huésped + Habitación + Housekeeping + Mantenimiento + Pagos**.
 
@@ -59,8 +66,25 @@ Conectar de forma canónica las piezas que ya existen: **Mensajes + Reserva + Hu
 - `operational_task`
 - `maintenance_issue`
 
-### Entregables
-- Servicio único de `OperationalContext` que, dado un `reservation_id`, pueda resolver huésped, habitación actual, estadía, saldo, conversación y trabajo operativo relacionado.
+### Primer corte implementado
+- `inbox_conversations` puede persistir vínculos a huésped, reserva y habitación.
+- Resolución automática únicamente con IDs existentes, email exacto o teléfono normalizado; no por similitud de nombre.
+- Contexto operativo único por conversación: huésped, reserva, habitaciones, saldo/pagos, housekeeping y mantenimiento.
+- Validación multitenant en base para impedir vínculos cruzados entre propiedades.
+- Mensajes muestra el contexto operativo y accesos reales según permisos.
+- Filtros de canal pasan a ser controles funcionales.
+- Se eliminan controles de envío simulados mientras no exista adaptador seguro.
+- Responsive móvil con regreso explícito desde el hilo a la lista.
+
+### Siguientes cortes
+1. Reserva -> conversación relacionada y regreso exacto.
+2. Tarea/incidencia -> reserva/habitación de origen con foco exacto.
+3. Integrar `guest_requests` al contexto.
+4. Timeline operativo unificado por reserva.
+5. Contratos/eventos estables para el futuro agente.
+
+### Entregables finales del paquete
+- Servicio único de `OperationalContext` que pueda resolver huésped, habitación actual, estadía, saldo, conversación y trabajo operativo relacionado.
 - Acciones compartidas con contratos claros: crear petición, crear tarea, asignar área, cambiar prioridad, resolver, añadir nota y navegar a la entidad de origen.
 - Historial operativo unificado por reserva/habitación.
 - Eventos internos consistentes: `guest_request.created`, `task.created`, `task.assigned`, `task.completed`, `maintenance.created`, `payment.received`, etc.
