@@ -17,7 +17,7 @@ const paneIds=collect(app,/pane\("([^"]+)"/g)
 const sitemapIds=collect(sitemap,/<!--\s*view:([a-zA-Z0-9_-]+)\s*-->/g)
 
 const descriptionsBlock=navigation.match(/export const VIEW_DESCRIPTIONS=\{([\s\S]*?)\}\nexport const ALL_VIEWS=/)?.[1]||""
-const descriptionIds=collect(descriptionsBlock,/(?:^|,)([a-zA-Z0-9_]+):"/g)
+const descriptionIds=collect(descriptionsBlock,/(?:^|,)\s*([a-zA-Z0-9_]+):"/g)
 
 const rolesBlock=navigation.match(/export const ROLE_VIEWS=\{([\s\S]*?)\}\nexport function getAllowedViews/)?.[1]||""
 const roleIds=collect(rolesBlock,/"([^"]+)"/g)
