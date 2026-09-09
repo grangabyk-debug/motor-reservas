@@ -1,5 +1,5 @@
 "use client"
 
-import PremiumPortalClient from"./PremiumPortalClient"
+import PremiumStyleWrapper from"./PremiumStyleWrapper"
 
-export default function StayPortalPage(){return <PremiumPortalClient/>}
+export default function StayPortalPage(){return <PremiumStyleWrapper/>}
