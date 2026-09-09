@@ -37,7 +37,7 @@ export default function useInboxData(propertyId){
     if(!propertyId||!id)return null
     setContextLoading(current=>({...current,[id]:true}));setError("")
     try{
-      const{data,error:contextError}=await supabase.rpc("hl_get_inbox_operational_context",{p_property_id:propertyId,p_conversation_id:id})
+      const{data,error:contextError}=await supabase.rpc("hl_get_inbox_operational_context_v2",{p_property_id:propertyId,p_conversation_id:id})
       if(contextError)throw contextError
       setContexts(current=>({...current,[id]:data||null}))
       return data||null
