@@ -3,10 +3,12 @@ import { createClient } from "@supabase/supabase-js"
 import { fallbackPmsHelp, interpretHotelOperation } from "./oliviaHotelLanguage"
 import { applyTenantTerminology, loadTenantMemory, rememberTenantTeaching, tenantMemoryPrompt } from "./oliviaTenantMemory"
 
-const ACTION_TYPES=new Set(["create_guest_request","create_maintenance_ticket"])
+const ACTION_TYPES=new Set(["create_guest_request","create_maintenance_ticket","renotify_operational_action"])
 const PRIORITIES=new Set(["low","normal","high","urgent"])
 const AREAS=new Set(["reception","housekeeping","maintenance"])
 const REQUESTED_BY=new Set(["guest","reception","housekeeping","other"])
+const TARGET_TYPES=new Set(["hotel_guest_requests","hotel_maintenance_tickets"])
+const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 const OLIVIA_RESPONSE_SCHEMA={type:"object",additionalProperties:false,required:["answer","action"],properties:{answer:{type:"string"},action:{anyOf:[{type:"null"},{type:"object",additionalProperties:false,required:["type","title","detail","priority","assigned_area","requested_by","reservation_id","room_id"],properties:{type:{type:"string",enum:["create_guest_request","create_maintenance_ticket"]},title:{type:"string"},detail:{type:["string","null"]},priority:{type:"string",enum:["low","normal","high","urgent"]},assigned_area:{type:["string","null"],enum:["reception","housekeeping","maintenance",null]},requested_by:{type:["string","null"],enum:["guest","reception","housekeeping","other",null]},reservation_id:{type:["integer","null"]},room_id:{type:["integer","null"]}}}]}}}
 
@@ -18,6 +20,8 @@ function preguntaLocal(question){return /cu[aá]ntas?.*(habitaciones?.*)?ocupad|
 function courtesyReply(question){const q=human(question);if(/^(gracias|muchas gracias|mil gracias|gracias olivia|perfecto gracias|genial gracias|buenisimo gracias|buenísimo gracias|listo gracias|excelente gracias|joya gracias)$/.test(q))return"De nada. Decime si necesitás otra cosa y lo vemos.";if(/^(hola|buen dia|buenas|buenas tardes|buenas noches|hola olivia)$/.test(q))return"¡Hola! Sí, decime qué necesitás y te doy una mano.";return null}
 function contextFor(raw={},propertyId=null){return{plataforma:raw.plataforma||"HabitaciónLlena.com · PMS hotelero",propiedad_id:propertyId,hoy:raw.hoy||null,metricas:raw.metricas||{},alojamientos:Array.isArray(raw.alojamientos)?raw.alojamientos.filter(x=>!propertyId||String(x?.id||"")===String(propertyId)).slice(0,1):[],habitaciones:Array.isArray(raw.habitaciones)?raw.habitaciones.slice(0,300):[],reservas:Array.isArray(raw.reservas)?raw.reservas.slice(-300):[]}}
 function historyFor(history){return Array.isArray(history)?history.slice(-10).map(x=>({role:x?.role==="assistant"?"assistant":"user",text:String(x?.text||"").slice(0,1500)})).filter(x=>x.text.trim()):[]}
+function wantsOperationalReminder(question){const q=human(question);if(/^(como|donde|puedo|podemos|se puede|que es|que significa)\b/.test(q))return false;return /\b(reenvia|reenviar|reenviale|reenviarlo|avisa nuevamente|avisar nuevamente|avisa otra vez|avisales otra vez|avisale otra vez|volver a avisar|volve a avisar|volveles a avisar|recordales|recordale|manda otra vez|mandalo otra vez|manda de nuevo|mandalo de nuevo|repeti el aviso|repite el aviso|recordatorio)\b/.test(q)}
+function areaLabel(area){return area==="housekeeping"?"Housekeeping":area==="maintenance"?"Mantenimiento":"Recepción"}
 
 function normalizeAction(action,context){
   if(!action||typeof action!=="object"||!ACTION_TYPES.has(action.type))return null
@@ -27,6 +31,11 @@ function normalizeAction(action,context){
   if(reservationId&&!reservation||roomId&&!room)return null
   const refs={reservation_id:reservationId,reservation_number:clean(reservation?.numero,80),room_id:roomId,room_name:clean(room?.nombre,80)}
   const priority=PRIORITIES.has(action.priority)?action.priority:"normal"
+  if(action.type==="renotify_operational_action"){
+    const targetType=clean(action.target_type,80),targetId=clean(action.target_id,80),originalActionId=clean(action.original_action_id,80)
+    if(!TARGET_TYPES.has(targetType)||!UUID_RE.test(targetId||"")||!UUID_RE.test(originalActionId||""))return null
+    return{type:action.type,payload:{title,detail:clean(action.detail,1200),priority,assigned_area:AREAS.has(action.assigned_area)?action.assigned_area:"reception",requested_by:"reception",target_type:targetType,target_id:targetId,original_action_id:originalActionId,...refs}}
+  }
   if(action.type==="create_guest_request")return{type:action.type,payload:{title,detail:clean(action.detail,1200),priority,assigned_area:AREAS.has(action.assigned_area)?action.assigned_area:"reception",requested_by:REQUESTED_BY.has(action.requested_by)?action.requested_by:"reception",...refs}}
   return{type:action.type,payload:{title,description:clean(action.detail,1200),priority,...refs}}
 }
@@ -38,6 +47,19 @@ async function createProposal(client,propertyId,action,context,sourceText){
   const{data,error}=await client.rpc("hl_olivia_propose_action",{p_property_id:propertyId,p_action_type:normalized.type,p_payload:normalized.payload})
   if(error){console.error("OlivIA proposal error:",error);return{proposal:null,error:"No pude dejar la acción preparada para aprobación."}}
   return{proposal:data||null,error:null}
+}
+
+async function prepareOperationalReminder(client,propertyId,userId,question,context){
+  const{data,error}=await client.from("hotel_ai_action_requests").select("id,action_type,status,payload,target_type,target_id,executed_at").eq("property_id",propertyId).eq("requested_by",userId).eq("status","executed").order("executed_at",{ascending:false}).limit(20)
+  if(error){console.error("OlivIA reminder lookup error:",error);return{answer:"Entendí que querés volver a avisar, pero no pude recuperar el último pedido ahora.",action:null}}
+  const previous=(data||[]).find(row=>TARGET_TYPES.has(row?.target_type)&&UUID_RE.test(String(row?.target_id||"")))
+  if(!previous)return{answer:"Sí, puedo volver a avisar. No encuentro un pedido anterior ejecutado en esta conversación/hotel para reenviar; decime cuál querés recordar.",action:null}
+  const payload=previous.payload||{},area=previous.target_type==="hotel_maintenance_tickets"?"maintenance":AREAS.has(payload.assigned_area)?payload.assigned_area:"reception"
+  const roomName=clean(payload.room_name,80),subject=clean(payload.title,160)||"el pedido anterior",label=areaLabel(area)
+  const action={type:"renotify_operational_action",title:`Reavisar a ${label}${roomName?` · Habitación ${roomName}`:""}`,detail:`Recordatorio de: ${subject}`,priority:"normal",assigned_area:area,requested_by:"reception",reservation_id:id(payload.reservation_id),room_id:id(payload.room_id),target_type:previous.target_type,target_id:String(previous.target_id),original_action_id:String(previous.id)}
+  const result=await createProposal(client,propertyId,action,context,question)
+  const answer=`Sí. Vuelvo a avisar a ${label}${roomName?` por la habitación ${roomName}`:""} sobre ${subject.toLowerCase()}. Te dejo el reaviso preparado para que lo apruebes.`
+  return{answer:result.error?`${answer}\n\n${result.error}`:answer,action:result.proposal}
 }
 
 export async function POST(request){
@@ -58,6 +80,7 @@ export async function POST(request){
 
     const courtesy=courtesyReply(question)
     if(courtesy)return NextResponse.json({answer:courtesy,mode:"local-social",assistant:"OlivIA",action:null})
+    if(wantsOperationalReminder(question)){const reminder=await prepareOperationalReminder(client,propertyId,user.id,question,context);return NextResponse.json({answer:reminder.answer,mode:"operational-followup",assistant:"OlivIA",action:reminder.action})}
     const learnedQuestion=applyTenantTerminology(question,memory)
     const hotelAction=interpretHotelOperation(learnedQuestion,context)
     if(hotelAction?.handled){if(!hotelAction.action)return NextResponse.json({answer:hotelAction.answer,mode:"hotel-language",action:null});hotelAction.action.detail=question;const result=await createProposal(client,propertyId,hotelAction.action,context,question);return NextResponse.json({answer:result.error?`${hotelAction.answer}\n\n${result.error}`:hotelAction.answer,mode:"hotel-language",assistant:"OlivIA",action:result.proposal})}

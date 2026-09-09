@@ -98,6 +98,18 @@ export default function PaymentAlertWatcher({propertyId,onNavigate,onUnreadChang
     const title=operationalTitle(table,row),message=operationalMessage(table,row),urgent=row.priority==="urgent"||String(row.title||"").toLowerCase().includes("late check-out")
     pushAlert({tone:urgent?"danger":row.priority==="high"?"warning":"info",title,message,duration:urgent?11000:8500,actionLabel:table==="hotel_guest_requests"?"Abrir petición":null,onAction:table==="hotel_guest_requests"?()=>openRequest(row):null,tag:`hl-${table}-${row.id||Date.now()}`,kind:urgent?"urgent":"info"})
   }
+  function notifyOperationalReminder(row){
+    if(row?.event_type!=="olivia_reminder")return
+    const meta=row?.metadata||{},area=String(meta.assigned_area||"")
+    if(!area||!allowedAreasRef.current.has(area)||!operationalNotificationsEnabled(area))return
+    const label=area==="housekeeping"?"Housekeeping":area==="maintenance"?"Mantenimiento":"Recepción",room=meta.room_id?` · Hab. ${meta.room_id}`:""
+    const title=`Recordatorio · ${label}${room}`,message=String(meta.detail||meta.title||"Hay una solicitud que requiere atención")
+    let actionLabel=null,onAction=null
+    if(area==="housekeeping"){actionLabel="Abrir HKP";onAction=()=>onNavigate?.("housekeeping",{restoreScroll:false})}
+    else if(area==="maintenance"){actionLabel="Abrir mantenimiento";onAction=()=>onNavigate?.("maintenance",{restoreScroll:false})}
+    else if(row?.entity_type==="hotel_guest_requests"&&row?.entity_id){actionLabel="Abrir petición";onAction=()=>openRequest({id:row.entity_id})}
+    pushAlert({tone:"warning",title,message,duration:10000,actionLabel,onAction,tag:`hl-reminder-${row.id||Date.now()}`,kind:"urgent"})
+  }
   async function notifyPayment(row){
     if(!row?.id||String(row.estado||"").toLowerCase()!=="confirmado")return
     knownPayments.current.add(String(row.id))
@@ -158,6 +170,7 @@ export default function PaymentAlertWatcher({propertyId,onNavigate,onUnreadChang
       if(table==="pagos"){window.dispatchEvent(new CustomEvent("hl:pms-payment-updated",{detail}));if(payload?.eventType==="INSERT")notifyPayment(row)}
       if(table==="hotel_cancellation_policies")window.dispatchEvent(new CustomEvent("hl:pms-cancellation-policies-updated",{detail}))
       if(OPS_TABLES.has(table)&&payload?.eventType==="INSERT")notifyOperational(table,row)
+      if(table==="hotel_operational_events"&&payload?.eventType==="INSERT")notifyOperationalReminder(row)
       if(table==="inbox_conversations"){notifyInbox(row,payload?.old||null);refreshUnread()}
     }
     let channel=supabase.channel(`hl-pms-sync-${propertyId}`)
