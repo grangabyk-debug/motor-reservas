@@ -19,7 +19,7 @@ function OperationalContext({context,loading,onNavigate,allowedViews=[]}){
   const allowed=useMemo(()=>new Set(allowedViews),[allowedViews])
   if(loading&&!context)return <div className={s.contextPanel}><div className={s.contextLoading}>Conectando conversación con la operación del hotel…</div></div>
   if(!context?.linked)return <div className={s.contextPanel}><div className={s.contextEmpty}><b>Sin vínculo operativo todavía</b><span>Se vincula automáticamente sólo con coincidencias exactas de email o teléfono. No se adivina por nombre.</span></div></div>
-  const reservation=context.reservation,guest=context.guest,rooms=context.rooms||[],payments=context.payments||{},housekeeping=context.housekeeping||[],maintenance=context.maintenance||[]
+  const reservation=context.reservation,guest=context.guest,rooms=context.rooms||[],payments=context.payments||{},housekeeping=context.housekeeping||[],maintenance=context.maintenance||[],guestRequests=context.guest_requests||[]
   const roomNames=rooms.map(room=>room.name).filter(Boolean).join(", ")||"Sin habitación"
   const firstRoom=rooms[0]
   function openHousekeeping(){if(firstRoom?.id&&typeof window!=="undefined"){const url=new URL(window.location.href);url.searchParams.set("housekeeping_room",String(firstRoom.id));window.history.replaceState(window.history.state||{},"",url)}onNavigate?.("housekeeping",{restoreScroll:false})}
@@ -30,12 +30,14 @@ function OperationalContext({context,loading,onNavigate,allowedViews=[]}){
       <ContextCard label="Estadía" value={reservation?`${date(reservation.arrival)} → ${date(reservation.departure)}`:"Sin reserva"} detail={reservation?.status||""} tone={reservationTone(reservation?.status)}/>
       <ContextCard label={rooms.length>1?"Habitaciones":"Habitación"} value={roomNames} detail={rooms.length>1?`${rooms.length} habitaciones`:firstRoom?.status||firstRoom?.type||""} tone={rooms.length===1?roomTone(firstRoom?.status):"neutral"}/>
       <ContextCard label="Saldo" value={money(payments.pending,payments.currency)} detail={`${money(payments.paid,payments.currency)} cobrado de ${money(payments.total,payments.currency)}`} tone={Number(payments.pending||0)>.009?"yellow":"green"}/>
+      <ContextCard label="Peticiones" value={guestRequests.length?`${guestRequests.length} pendiente${guestRequests.length===1?"":"s"}`:"Sin pendientes"} detail={guestRequests[0]?.title||"Sin solicitudes abiertas"} tone={guestRequests.length?"yellow":"green"}/>
       <ContextCard label="Housekeeping" value={housekeeping.length?`${housekeeping.length} pendiente${housekeeping.length===1?"":"s"}`:"Sin pendientes"} detail={housekeeping[0]?.task_type||"Habitación al día"} tone={housekeeping.length?"yellow":"green"}/>
       <ContextCard label="Mantenimiento" value={maintenance.length?`${maintenance.length} incidencia${maintenance.length===1?"":"s"}`:"Sin incidencias"} detail={maintenance[0]?.title||"Sin problemas abiertos"} tone={maintenance.length?"red":"green"}/>
     </div>
     {reservation&&<div className={s.contextActions}>
       {allowed.has("reservations")&&<button type="button" onClick={()=>onNavigate?.("reservations",{reservationId:Number(reservation.id),restoreScroll:false})}>Ver reserva</button>}
       {allowed.has("dailycash")&&<button type="button" onClick={()=>onNavigate?.("dailycash",{cashReservationId:Number(reservation.id),restoreScroll:false})}>Cobros</button>}
+      {allowed.has("requests")&&<button type="button" onClick={()=>onNavigate?.("requests",{restoreScroll:false})}>Peticiones</button>}
       {allowed.has("housekeeping")&&<button type="button" onClick={openHousekeeping}>Housekeeping</button>}
       {allowed.has("maintenance")&&<button type="button" onClick={()=>onNavigate?.("maintenance")}>Mantenimiento</button>}
     </div>}
