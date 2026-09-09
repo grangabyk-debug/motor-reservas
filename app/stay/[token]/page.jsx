@@ -1,248 +1,60 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { useParams } from "next/navigation"
-import { supabase } from "../../../lib/supabase"
-import s from "./stay.module.css"
+import{useEffect,useMemo,useState}from"react"
+import{useParams}from"next/navigation"
+import{supabase}from"../../../lib/supabase"
+import s from"./stay.module.css"
 
-const ACTIONS = [
-  { kind: "towels", icon: "🧺", title: "Pedir toallas", text: "Habitación" },
-  { kind: "pillows", icon: "🛏️", title: "Pedir almohadas", text: "Habitación" },
-  { kind: "cleaning", icon: "✨", title: "Solicitar limpieza", text: "Habitación" },
-  { kind: "maintenance", icon: "🛠️", title: "Reportar un problema", text: "Mantenimiento" },
-  { kind: "late_checkout", icon: "🕒", title: "Late check-out", text: "Requiere aprobación" },
-  { kind: "other", icon: "💬", title: "Otro pedido", text: "Recepción" },
+const ACTIONS=[
+  {kind:"towels",icon:"🧺"},{kind:"pillows",icon:"🛏️"},{kind:"cleaning",icon:"✨"},{kind:"maintenance",icon:"🛠️"},{kind:"late_checkout",icon:"🕒"},{kind:"other",icon:"💬"},
 ]
-
-const STATUS = { open: "Recibido", in_progress: "En proceso", resolved: "Resuelto", cancelled: "Cancelado" }
-const DEMO = {
-  ok: true,
-  hotel: { name: "Hotel Demo Aurora", city: "Buenos Aires", motto: "Tu estadía, más simple", welcome: "Estamos para hacerte la estadía más fácil. Pedí, consultá y encontrá todo desde acá." },
-  guest: { name: "Gabriel" },
-  stay: { number: "AUR-2058", arrival: "2026-09-09", departure: "2026-09-12", status: "alojado", room: { name: "205", type: "Doble Superior" }, late_checkout_confirmed: false },
-  guide: {
-    wifi_name: "Aurora_Huespedes", wifi_password: "aurora205", contact_whatsapp: "5491100000000", checkin_time: "14:00", checkout_time: "10:00",
-    sections: [
-      { title: "Desayuno", description: "Todos los días de 7:00 a 10:30 en planta baja.", icon: "☕" },
-      { title: "Piscina", description: "Abierta de 9:00 a 20:00. Toallas disponibles en recepción.", icon: "🏊" },
-      { title: "Recepción", description: "Disponible las 24 horas para ayudarte.", icon: "🛎️" },
-    ],
-    house_rules: [{ title: "Horario de descanso", description: "Te pedimos mantener bajo el volumen desde las 23:00." }],
-    useful_links: [
-      { title: "Café Martínez", description: "Café · a 2 cuadras", url: "https://www.google.com/maps/search/?api=1&query=Cafe+Martinez+Buenos+Aires", icon: "☕" },
-      { title: "Parque cercano", description: "Paseo · a 6 minutos", url: "https://www.google.com/maps/search/?api=1&query=parque+Buenos+Aires", icon: "🌳" },
-      { title: "Farmacia", description: "Abierta 24 h", url: "https://www.google.com/maps/search/?api=1&query=farmacia+Buenos+Aires", icon: "✚" },
-    ],
-  },
-  account: { currency: "ARS", total: 245000, paid: 200000, balance: 45000 },
-  booked_services: [], requests: [], portal: { valid_until: "2026-09-13T03:00:00Z" },
+const DEFAULT_ACTIONS={towels:true,pillows:true,cleaning:true,maintenance:true,late_checkout:true,other:true}
+const LANG_META={es:{label:"Español",flag:"🇦🇷"},en:{label:"English",flag:"🇬🇧"},pt:{label:"Português",flag:"🇧🇷"}}
+const I18N={
+  es:{welcomeTo:"Bienvenido a",hello:"Hola",question:"¿En qué te podemos ayudar?",defaultWelcome:"Todo lo que necesitás durante tu estadía, desde el celular.",room:"Hab.",departure:"Salida",myStay:"Mi estadía",staySub:"Reserva y cuenta",requestSomething:"Pedir algo",requestSub:"Toallas, limpieza y más",report:"Reportar",reportSub:"Algo no funciona",late:"Late check-out",lateSub:"Solicitar horario",lateConfirmed:"Late confirmado",lateConfirmedSub:"Ya fue aprobado",usefulInfo:"Info útil",usefulSub:"Horarios y servicios",nearby:"Cerca de acá",nearbySub:"Recomendados del hotel",openRequest:"Tenés 1 pedido en curso",openRequests:"Tenés {n} pedidos en curso",trackRequests:"Ver estado de tus solicitudes",wifi:"Wi‑Fi",wifiSub:"Conectate en un toque",network:"Red",askReception:"Consultar en recepción",password:"Contraseña",notConfigured:"No configurada",tapCopy:"Tocar para copiar",copied:"✓ Copiada",needSomething:"¿Necesitás algo?",needSomethingSub:"Mandalo directo al equipo del hotel",private:"Privado",privateSub:"Sólo visible desde tu enlace",reservation:"Reserva",checkout:"Check-out",total:"Total estadía",paid:"Pagado",balance:"Saldo pendiente",accountOk:"Cuenta al día",hotelGuide:"Guía del hotel",guideSub:"Lo importante, sin buscar ni llamar",guideEmpty:"El hotel todavía no cargó información adicional.",nearbyTitle:"Cerca de acá",nearbyTitleSub:"Lugares recomendados por el hotel",nearbyEmpty:"El hotel todavía no cargó lugares recomendados.",openLocation:"Abrir ubicación",myRequests:"Mis pedidos",requestsSub:"Seguimiento de tus solicitudes",noRequests:"Todavía no hiciste pedidos desde este portal.",preferTalk:"¿Preferís hablar con alguien?",talkSub:"Recepción también está disponible",helpTitle:"Estamos para ayudarte",helpText:"Consultas, recomendaciones o cualquier otra cosa.",whatsapp:"WhatsApp",writeReception:"Escribir a recepción",privateAccess:"Acceso privado de tu estadía",validUntil:"válido hasta",home:"Inicio",requests:"Pedidos",info:"Info",help:"Ayuda",preparing:"Preparando tu estadía…",portalUnavailable:"Portal no disponible",expired:"Este acceso ya venció porque la estadía terminó o el hotel lo desactivó.",disabled:"El hotel desactivó temporalmente este portal.",invalid:"El enlace no es válido.",askNew:"Si seguís alojado, pedí un enlace nuevo en recepción.",maintenancePrompt:"Contanos qué está fallando. El pedido se enviará asociado a tu habitación.",latePrompt:"Decinos hasta qué hora te gustaría quedarte. Recepción revisará disponibilidad y posibles cargos antes de confirmar.",otherPrompt:"Podés agregar un detalle para que el equipo sepa exactamente qué necesitás.",maintenancePlaceholder:"Ej: el aire prende pero no enfría",latePlaceholder:"Ej: si es posible, hasta las 14:00",optional:"Detalle opcional",sendReception:"Enviar solicitud a recepción",send:"Enviar pedido",sending:"Enviando…",lateDisclaimer:"Enviar la solicitud no modifica tu horario de salida hasta que el hotel la apruebe.",detailRequired:"Contanos brevemente qué no funciona.",sent:"Pedido enviado. El equipo del hotel ya puede verlo.",lateSent:"Solicitud enviada a Recepción. Tu horario de salida no cambia hasta que el hotel la apruebe.",alreadyOpen:"Ese pedido ya está abierto y el hotel lo tiene registrado.",sendError:"No pudimos enviar el pedido. Probá de nuevo o contactá a recepción.",status:{open:"Recibido",in_progress:"En proceso",resolved:"Resuelto",cancelled:"Cancelado"},area:{reception:"Recepción",maintenance:"Mantenimiento",housekeeping:"Habitación"},actions:{towels:["Pedir toallas","Habitación"],pillows:["Pedir almohadas","Habitación"],cleaning:["Solicitar limpieza","Habitación"],maintenance:["Reportar un problema","Mantenimiento"],late_checkout:["Late check-out","Requiere aprobación"],other:["Otro pedido","Recepción"]}},
+  en:{welcomeTo:"Welcome to",hello:"Hi",question:"How can we help you?",defaultWelcome:"Everything you need during your stay, right from your phone.",room:"Room",departure:"Check-out",myStay:"My stay",staySub:"Booking and account",requestSomething:"Request something",requestSub:"Towels, cleaning and more",report:"Report an issue",reportSub:"Something isn't working",late:"Late check-out",lateSub:"Request a time",lateConfirmed:"Late check-out confirmed",lateConfirmedSub:"Already approved",usefulInfo:"Useful info",usefulSub:"Hours and services",nearby:"Nearby",nearbySub:"Hotel recommendations",openRequest:"You have 1 request in progress",openRequests:"You have {n} requests in progress",trackRequests:"Check your requests",wifi:"Wi‑Fi",wifiSub:"Connect in one tap",network:"Network",askReception:"Ask reception",password:"Password",notConfigured:"Not configured",tapCopy:"Tap to copy",copied:"✓ Copied",needSomething:"Need anything?",needSomethingSub:"Send it directly to the hotel team",private:"Private",privateSub:"Only visible from your link",reservation:"Booking",checkout:"Check-out",total:"Stay total",paid:"Paid",balance:"Balance due",accountOk:"Account paid",hotelGuide:"Hotel guide",guideSub:"Everything important in one place",guideEmpty:"The hotel has not added more information yet.",nearbyTitle:"Nearby",nearbyTitleSub:"Places recommended by the hotel",nearbyEmpty:"The hotel has not added nearby recommendations yet.",openLocation:"Open location",myRequests:"My requests",requestsSub:"Track your requests",noRequests:"You haven't made any requests from this portal yet.",preferTalk:"Prefer to talk to someone?",talkSub:"Reception is also available",helpTitle:"We're here to help",helpText:"Questions, recommendations or anything else.",whatsapp:"WhatsApp",writeReception:"Message reception",privateAccess:"Private access for your stay",validUntil:"valid until",home:"Home",requests:"Requests",info:"Info",help:"Help",preparing:"Preparing your stay…",portalUnavailable:"Portal unavailable",expired:"This access has expired because your stay ended or the hotel disabled it.",disabled:"The hotel temporarily disabled this portal.",invalid:"This link is not valid.",askNew:"If you're still staying with us, ask reception for a new link.",maintenancePrompt:"Tell us what's not working. The request will be linked to your room.",latePrompt:"Tell us what time you'd like to stay until. Reception will check availability and any applicable charges before confirming.",otherPrompt:"Add a note so the team knows exactly what you need.",maintenancePlaceholder:"Example: the AC turns on but doesn't cool",latePlaceholder:"Example: if possible, until 2:00 PM",optional:"Optional details",sendReception:"Send request to reception",send:"Send request",sending:"Sending…",lateDisclaimer:"Sending this request does not change your check-out time until the hotel approves it.",detailRequired:"Please tell us briefly what's not working.",sent:"Request sent. The hotel team can already see it.",lateSent:"Request sent to Reception. Your check-out time will not change until it is approved.",alreadyOpen:"That request is already open and registered with the hotel.",sendError:"We couldn't send the request. Try again or contact reception.",status:{open:"Received",in_progress:"In progress",resolved:"Resolved",cancelled:"Cancelled"},area:{reception:"Reception",maintenance:"Maintenance",housekeeping:"Room service"},actions:{towels:["Request towels","Room service"],pillows:["Request pillows","Room service"],cleaning:["Request cleaning","Room service"],maintenance:["Report an issue","Maintenance"],late_checkout:["Late check-out","Approval required"],other:["Other request","Reception"]}},
+  pt:{welcomeTo:"Bem-vindo ao",hello:"Olá",question:"Como podemos ajudar?",defaultWelcome:"Tudo o que você precisa durante a estadia, direto do celular.",room:"Quarto",departure:"Saída",myStay:"Minha estadia",staySub:"Reserva e conta",requestSomething:"Pedir algo",requestSub:"Toalhas, limpeza e mais",report:"Reportar",reportSub:"Algo não funciona",late:"Late check-out",lateSub:"Solicitar horário",lateConfirmed:"Late confirmado",lateConfirmedSub:"Já aprovado",usefulInfo:"Informações",usefulSub:"Horários e serviços",nearby:"Perto daqui",nearbySub:"Recomendações do hotel",openRequest:"Você tem 1 pedido em andamento",openRequests:"Você tem {n} pedidos em andamento",trackRequests:"Ver seus pedidos",wifi:"Wi‑Fi",wifiSub:"Conecte-se com um toque",network:"Rede",askReception:"Consultar recepção",password:"Senha",notConfigured:"Não configurada",tapCopy:"Toque para copiar",copied:"✓ Copiada",needSomething:"Precisa de algo?",needSomethingSub:"Envie diretamente para a equipe do hotel",private:"Privado",privateSub:"Visível apenas pelo seu link",reservation:"Reserva",checkout:"Check-out",total:"Total da estadia",paid:"Pago",balance:"Saldo pendente",accountOk:"Conta em dia",hotelGuide:"Guia do hotel",guideSub:"O importante, sem precisar procurar",guideEmpty:"O hotel ainda não adicionou informações extras.",nearbyTitle:"Perto daqui",nearbyTitleSub:"Lugares recomendados pelo hotel",nearbyEmpty:"O hotel ainda não adicionou recomendações próximas.",openLocation:"Abrir localização",myRequests:"Meus pedidos",requestsSub:"Acompanhe suas solicitações",noRequests:"Você ainda não fez pedidos por este portal.",preferTalk:"Prefere falar com alguém?",talkSub:"A recepção também está disponível",helpTitle:"Estamos aqui para ajudar",helpText:"Dúvidas, recomendações ou qualquer outra coisa.",whatsapp:"WhatsApp",writeReception:"Falar com a recepção",privateAccess:"Acesso privado da sua estadia",validUntil:"válido até",home:"Início",requests:"Pedidos",info:"Info",help:"Ajuda",preparing:"Preparando sua estadia…",portalUnavailable:"Portal indisponível",expired:"Este acesso expirou porque a estadia terminou ou o hotel o desativou.",disabled:"O hotel desativou temporariamente este portal.",invalid:"Este link não é válido.",askNew:"Se você ainda estiver hospedado, peça um novo link na recepção.",maintenancePrompt:"Conte o que não está funcionando. O pedido ficará vinculado ao seu quarto.",latePrompt:"Diga até que horas gostaria de ficar. A recepção verificará disponibilidade e possíveis custos antes de confirmar.",otherPrompt:"Adicione um detalhe para que a equipe saiba exatamente o que você precisa.",maintenancePlaceholder:"Ex: o ar liga, mas não esfria",latePlaceholder:"Ex: se possível, até as 14:00",optional:"Detalhe opcional",sendReception:"Enviar solicitação à recepção",send:"Enviar pedido",sending:"Enviando…",lateDisclaimer:"Enviar a solicitação não altera seu horário de saída até que o hotel aprove.",detailRequired:"Conte brevemente o que não está funcionando.",sent:"Pedido enviado. A equipe do hotel já pode vê-lo.",lateSent:"Solicitação enviada à Recepção. Seu horário de saída não muda até a aprovação.",alreadyOpen:"Esse pedido já está aberto e registrado no hotel.",sendError:"Não foi possível enviar o pedido. Tente novamente ou fale com a recepção.",status:{open:"Recebido",in_progress:"Em andamento",resolved:"Resolvido",cancelled:"Cancelado"},area:{reception:"Recepção",maintenance:"Manutenção",housekeeping:"Quarto"},actions:{towels:["Pedir toalhas","Quarto"],pillows:["Pedir travesseiros","Quarto"],cleaning:["Solicitar limpeza","Quarto"],maintenance:["Reportar um problema","Manutenção"],late_checkout:["Late check-out","Requer aprovação"],other:["Outro pedido","Recepção"]}}
 }
 
-const money = (value, currency = "ARS") => new Intl.NumberFormat("es-AR", { style: "currency", currency, maximumFractionDigits: 0 }).format(Number(value) || 0)
-const prettyDate = (value) => value ? new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "short" }).format(new Date(`${String(value).slice(0, 10)}T12:00:00`)).replace(".", "") : "—"
-const prettyDateTime = (value) => value ? new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(value)).replace(".", "") : "—"
-
-function Section({ id, title, subtitle, children, action }) {
-  return <section id={id} className={s.section}><header><div><h2>{title}</h2>{subtitle ? <p>{subtitle}</p> : null}</div>{action}</header>{children}</section>
-}
-
-function normalizeSections(value) {
-  if (!Array.isArray(value)) return []
-  return value.slice(0, 10).map((item, index) => typeof item === "string"
-    ? { title: item, description: "", icon: "•" }
-    : { title: item?.title || item?.name || `Información ${index + 1}`, description: item?.description || item?.text || item?.detail || "", icon: item?.icon || "⌂" })
-}
-
-function normalizeLinks(value) {
-  if (!Array.isArray(value)) return []
-  return value.slice(0, 10).map((item, index) => typeof item === "string"
-    ? { title: item, description: "", url: "", icon: "📍" }
-    : {
-        title: item?.title || item?.name || `Lugar ${index + 1}`,
-        description: item?.description || item?.text || item?.detail || item?.distance || "",
-        url: item?.url || item?.href || item?.link || item?.maps_url || "",
-        icon: item?.icon || "📍",
-      }).filter((item) => item.title)
-}
-
-export default function StayPortalPage() {
-  const params = useParams()
-  const token = String(params?.token || "")
-  const demo = token === "demo"
-  const [data, setData] = useState(null)
-  const [error, setError] = useState("")
-  const [loading, setLoading] = useState(true)
-  const [selected, setSelected] = useState(null)
-  const [detail, setDetail] = useState("")
-  const [sending, setSending] = useState(false)
-  const [notice, setNotice] = useState("")
-  const [copied, setCopied] = useState("")
-
-  async function load() {
-    if (!token) return
-    setLoading(true)
-    setError("")
-    if (demo) { setData(DEMO); setLoading(false); return }
-    const { data: snapshot, error: rpcError } = await supabase.rpc("hl_guest_stay_portal_snapshot", { p_token: token })
-    if (rpcError) setError("No pudimos abrir tu portal en este momento.")
-    else if (!snapshot?.ok) setError(snapshot?.error === "access_expired" ? "Este acceso ya venció porque la estadía terminó o el hotel lo desactivó." : "El enlace no es válido.")
-    else setData(snapshot)
-    setLoading(false)
-  }
-
-  useEffect(() => { load() }, [token])
-
-  const guideSections = useMemo(() => normalizeSections(data?.guide?.sections), [data])
-  const houseRules = useMemo(() => normalizeSections(data?.guide?.house_rules), [data])
-  const nearbyPlaces = useMemo(() => normalizeLinks(data?.guide?.nearby_places?.length ? data.guide.nearby_places : data?.guide?.useful_links), [data])
-  const firstName = String(data?.guest?.name || "Huésped").trim().split(/\s+/)[0]
-
-  async function copy(value, key) {
-    if (!value) return
-    try { await navigator.clipboard.writeText(value); setCopied(key); setTimeout(() => setCopied(""), 1600) } catch {}
-  }
-
-  function jump(id) {
-    if (typeof document === "undefined") return
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" })
-  }
-
-  function goHome() {
-    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" })
-  }
-
-  function openAction(action) {
-    setSelected(action)
-    setDetail("")
-    setNotice("")
-  }
-
-  async function submitRequest(event) {
-    event.preventDefault()
-    if (!selected || sending) return
-    if (selected.kind === "maintenance" && !detail.trim()) { setNotice("Contanos brevemente qué no funciona."); return }
-    setSending(true)
-    setNotice("")
-    if (demo) {
-      const fake = { id: `demo-${Date.now()}`, kind: selected.kind, title: selected.title, status: "open", area: selected.text, created_at: new Date().toISOString() }
-      setData((current) => ({ ...current, requests: [fake, ...(current.requests || [])] }))
-      setNotice(selected.kind === "late_checkout" ? "Solicitud enviada a Recepción. Tu horario de salida no cambia hasta que el hotel la apruebe." : "Pedido enviado. El equipo del hotel ya puede verlo.")
-      setSending(false)
-      setTimeout(() => setSelected(null), 1100)
-      return
-    }
-    const { data: result, error: rpcError } = await supabase.rpc("hl_guest_stay_portal_request", { p_token: token, p_kind: selected.kind, p_detail: detail.trim() || null })
-    if (rpcError || !result?.ok) setNotice("No pudimos enviar el pedido. Probá de nuevo o contactá a recepción.")
-    else {
-      setNotice(result.already_open ? "Ese pedido ya está abierto y el hotel lo tiene registrado." : selected.kind === "late_checkout" ? "Solicitud enviada a Recepción. Tu salida no cambia hasta que la aprueben." : "Pedido enviado. El equipo del hotel ya puede verlo.")
-      await load()
-      setTimeout(() => setSelected(null), 1200)
-    }
-    setSending(false)
-  }
-
-  if (loading) return <main className={s.shell}><div className={s.loading}><span />Preparando tu estadía…</div></main>
-  if (error) return <main className={s.shell}><section className={s.expired}><div>⌛</div><h1>Portal no disponible</h1><p>{error}</p><small>Si seguís alojado, pedí un enlace nuevo en recepción.</small></section></main>
-
-  const wifiReady = data?.guide?.wifi_name || data?.guide?.wifi_password
-  const whatsapp = String(data?.guide?.contact_whatsapp || "").replace(/\D/g, "")
-  const currency = data?.account?.currency || "ARS"
-  const maintenanceAction = ACTIONS.find((action) => action.kind === "maintenance")
-  const lateAction = ACTIONS.find((action) => action.kind === "late_checkout")
-  const otherAction = ACTIONS.find((action) => action.kind === "other")
-  const openRequests = (data?.requests || []).filter((request) => !["resolved", "cancelled"].includes(request.status)).length
-
-  return <main className={s.shell}>
-    <div className={s.phone}>
-      <header className={s.hero}>
-        <div className={s.statusBar}><span>{data?.hotel?.city || "Tu estadía"}</span><span>● ● ●</span></div>
-        <div className={s.brandRow}>
-          <div className={s.logo}>{data?.hotel?.logo ? <img src={data.hotel.logo} alt="" /> : <span>{String(data?.hotel?.name || "H")[0]}</span>}</div>
-          <div><small>Bienvenido a</small><strong>{data?.hotel?.name || "Habitación Llena"}</strong></div>
-          <em>{demo ? "DEMO" : "ACTIVA"}</em>
-        </div>
-
-        <div className={s.welcome}>
-          <span>Hola, {firstName} 👋</span>
-          <h1>¿En qué te podemos ayudar?</h1>
-          <p>{data?.hotel?.welcome || data?.hotel?.motto || "Todo lo que necesitás durante tu estadía, desde el celular."}</p>
-        </div>
-
-        <div className={s.stayPill}>
-          <span><i>⌂</i><b>Hab. {data?.stay?.room?.name || "—"}</b><small>{data?.stay?.room?.type || ""}</small></span>
-          <span><i>◷</i><b>{prettyDate(data?.stay?.arrival)} → {prettyDate(data?.stay?.departure)}</b><small>Salida {data?.guide?.checkout_time || "—"}</small></span>
-        </div>
-      </header>
-
-      <div className={s.content}>
-        <div className={s.appGrid} aria-label="Accesos rápidos">
-          <button type="button" onClick={() => jump("mi-estadia")}><i>🏨</i><strong>Mi estadía</strong><small>Reserva y cuenta</small></button>
-          <button type="button" onClick={() => jump("pedidos")}><i>🛎️</i><strong>Pedir algo</strong><small>Toallas, limpieza y más</small></button>
-          <button type="button" onClick={() => openAction(maintenanceAction)}><i>🛠️</i><strong>Reportar</strong><small>Algo no funciona</small></button>
-          <button type="button" onClick={() => openAction(lateAction)} disabled={data?.stay?.late_checkout_confirmed}><i>🕒</i><strong>{data?.stay?.late_checkout_confirmed ? "Late confirmado" : "Late check-out"}</strong><small>{data?.stay?.late_checkout_confirmed ? "Ya fue aprobado" : "Solicitar horario"}</small></button>
-          <button type="button" onClick={() => jump("guia")}><i>ℹ️</i><strong>Info útil</strong><small>Horarios y servicios</small></button>
-          <button type="button" onClick={() => jump("cerca")}><i>📍</i><strong>Cerca de acá</strong><small>Recomendados del hotel</small></button>
-        </div>
-
-        {openRequests > 0 ? <button type="button" className={s.liveBanner} onClick={() => jump("mis-pedidos")}><span>●</span><div><strong>{openRequests === 1 ? "Tenés 1 pedido en curso" : `Tenés ${openRequests} pedidos en curso`}</strong><small>Ver estado de tus solicitudes</small></div><b>›</b></button> : null}
-
-        <Section id="wifi" title="Wi‑Fi" subtitle="Conectate en un toque">
-          <div className={s.wifiCard}>
-            <div><span>⌁</span><div><small>Red</small><strong>{data?.guide?.wifi_name || "Consultar en recepción"}</strong></div></div>
-            <button type="button" disabled={!wifiReady} onClick={() => copy(data?.guide?.wifi_password, "wifi")}><small>Contraseña</small><strong>{data?.guide?.wifi_password || "No configurada"}</strong><em>{copied === "wifi" ? "✓ Copiada" : data?.guide?.wifi_password ? "Tocar para copiar" : ""}</em></button>
-          </div>
-        </Section>
-
-        <Section id="pedidos" title="¿Necesitás algo?" subtitle="Mandalo directo al equipo del hotel">
-          <div className={s.actions}>{ACTIONS.map((action) => <button type="button" key={action.kind} onClick={() => openAction(action)} disabled={action.kind === "late_checkout" && data?.stay?.late_checkout_confirmed}><i>{action.icon}</i><strong>{action.kind === "late_checkout" && data?.stay?.late_checkout_confirmed ? "Late check-out confirmado" : action.title}</strong><small>{action.text}</small><b>›</b></button>)}</div>
-        </Section>
-
-        <Section id="mi-estadia" title="Mi estadía" subtitle="Sólo visible desde tu enlace" action={<span className={s.privateBadge}>Privado</span>}>
-          <div className={s.reservationCard}>
-            <div className={s.reservationTop}><span><small>Reserva</small><strong>{data?.stay?.number || "—"}</strong></span><span><small>Habitación</small><strong>{data?.stay?.room?.name || "—"}</strong></span><span><small>Check-out</small><strong>{data?.guide?.checkout_time || "—"}</strong></span></div>
-            <div className={s.account}>
-              <div><small>Total estadía</small><strong>{money(data?.account?.total, currency)}</strong></div>
-              <div><small>Pagado</small><strong>{money(data?.account?.paid, currency)}</strong></div>
-              <div className={Number(data?.account?.balance) > 0 ? s.pending : s.paid}><small>{Number(data?.account?.balance) > 0 ? "Saldo pendiente" : "Cuenta al día"}</small><strong>{money(data?.account?.balance, currency)}</strong></div>
-            </div>
-          </div>
-        </Section>
-
-        <Section id="guia" title="Guía del hotel" subtitle="Lo importante, sin buscar ni llamar">
-          {guideSections.length || houseRules.length ? <div className={s.infoGrid}>
-            {[...guideSections, ...houseRules].slice(0, 10).map((section, index) => <article key={`${section.title}-${index}`}><span>{section.icon || "⌂"}</span><div><strong>{section.title}</strong>{section.description ? <p>{section.description}</p> : null}</div></article>)}
-          </div> : <div className={s.empty}>El hotel todavía no cargó información adicional.</div>}
-        </Section>
-
-        <Section id="cerca" title="Cerca de acá" subtitle="Lugares recomendados por el hotel">
-          {nearbyPlaces.length ? <div className={s.nearbyGrid}>{nearbyPlaces.map((place, index) => place.url
-            ? <a key={`${place.title}-${index}`} href={place.url} target="_blank" rel="noreferrer"><i>{place.icon}</i><div><strong>{place.title}</strong><small>{place.description || "Abrir ubicación"}</small></div><b>↗</b></a>
-            : <article key={`${place.title}-${index}`}><i>{place.icon}</i><div><strong>{place.title}</strong><small>{place.description}</small></div></article>)}</div>
-            : <div className={s.empty}>El hotel todavía no cargó lugares recomendados.</div>}
-        </Section>
-
-        <Section id="mis-pedidos" title="Mis pedidos" subtitle="Seguimiento en tiempo real">
-          {(data?.requests || []).length ? <div className={s.requestList}>{data.requests.slice(0, 8).map((request) => <article key={request.id}><span className={s.requestIcon}>{request.kind === "maintenance" ? "🛠️" : request.kind === "late_checkout" ? "🕒" : "✓"}</span><div><strong>{request.title}</strong><small>{request.area === "reception" ? "Recepción" : request.area === "maintenance" ? "Mantenimiento" : request.area === "housekeeping" ? "Habitación" : request.area || "Hotel"} · {prettyDateTime(request.created_at)}</small></div><em data-status={request.status}>{STATUS[request.status] || request.status}</em></article>)}</div> : <div className={s.empty}>Todavía no hiciste pedidos desde este portal.</div>}
-        </Section>
-
-        <Section id="ayuda" title="¿Preferís hablar con alguien?" subtitle="Recepción también está disponible">
-          <div className={s.helpCard}>
-            <div><span>💬</span><div><strong>Estamos para ayudarte</strong><small>Consultas, recomendaciones o cualquier otra cosa.</small></div></div>
-            <div className={s.helpButtons}>{whatsapp ? <a href={`https://wa.me/${whatsapp}`} target="_blank" rel="noreferrer">WhatsApp</a> : null}<button type="button" onClick={() => openAction(otherAction)}>Escribir a recepción</button></div>
-          </div>
-        </Section>
-
-        <footer className={s.footer}>Acceso privado de tu estadía · válido hasta {prettyDateTime(data?.portal?.valid_until)}.</footer>
-      </div>
-
-      <nav className={s.dock} aria-label="Navegación del portal">
-        <button type="button" onClick={goHome}><i>⌂</i><span>Inicio</span></button>
-        <button type="button" onClick={() => jump("pedidos")}><i>🛎</i><span>Pedidos</span></button>
-        <button type="button" onClick={() => jump("guia")}><i>ℹ</i><span>Info</span></button>
-        <button type="button" onClick={() => jump("ayuda")}><i>◉</i><span>Ayuda</span></button>
-      </nav>
+const DEMO={ok:true,hotel:{name:"Hotel Demo Aurora",city:"Buenos Aires",welcome:"Estamos para hacerte la estadía más fácil. Pedí, consultá y encontrá todo desde acá.",accent_color:"#6D5BD0"},guest:{name:"Gabriel"},stay:{number:"AUR-2058",arrival:"2026-09-09",departure:"2026-09-12",status:"alojado",room:{name:"205",type:"Doble Superior"},late_checkout_confirmed:false},guide:{wifi_name:"Aurora_Huespedes",wifi_password:"aurora205",contact_whatsapp:"5491100000000",checkin_time:"14:00",checkout_time:"10:00",show_account:true,show_wifi:true,show_guide:true,show_nearby:true,show_requests:true,show_contact:true,enabled_actions:DEFAULT_ACTIONS,languages:["es","en","pt"],default_language:"es",translations:{en:{welcome_message:"We're here to make your stay easier. Request, check and find everything here."},pt:{welcome_message:"Estamos aqui para facilitar sua estadia. Peça, consulte e encontre tudo aqui."}},sections:[{title:"Desayuno",description:"Todos los días de 7:00 a 10:30 en planta baja.",title_en:"Breakfast",description_en:"Every day from 7:00 to 10:30 AM on the ground floor.",title_pt:"Café da manhã",description_pt:"Todos os dias das 7:00 às 10:30 no térreo.",icon:"☕"},{title:"Piscina",description:"Abierta de 9:00 a 20:00.",title_en:"Pool",description_en:"Open from 9:00 AM to 8:00 PM.",title_pt:"Piscina",description_pt:"Aberta das 9:00 às 20:00.",icon:"🏊"}],nearby_places:[{title:"Café cercano",description:"Café · a 2 cuadras",title_en:"Nearby café",description_en:"Coffee · 2 blocks away",title_pt:"Café próximo",description_pt:"Café · a 2 quarteirões",url:"https://www.google.com/maps/search/?api=1&query=cafe+Buenos+Aires",icon:"☕"}]},account:{currency:"ARS",total:245000,paid:200000,balance:45000},booked_services:[],requests:[],portal:{valid_until:"2026-09-13T03:00:00Z"}}
+const money=(value,currency="ARS",lang="es")=>new Intl.NumberFormat(lang==="en"?"en-US":lang==="pt"?"pt-BR":"es-AR",{style:"currency",currency,maximumFractionDigits:0}).format(Number(value)||0)
+const prettyDate=(value,lang="es")=>value?new Intl.DateTimeFormat(lang==="en"?"en-US":lang==="pt"?"pt-BR":"es-AR",{day:"2-digit",month:"short"}).format(new Date(`${String(value).slice(0,10)}T12:00:00`)).replace(".",""):"—"
+const prettyDateTime=(value,lang="es")=>value?new Intl.DateTimeFormat(lang==="en"?"en-US":lang==="pt"?"pt-BR":"es-AR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}).format(new Date(value)).replace(".",""):"—"
+function Section({id,title,subtitle,children,action}){return <section id={id} className={s.section}><header><div><h2>{title}</h2>{subtitle?<p>{subtitle}</p>:null}</div>{action}</header>{children}</section>}
+function localizeItem(item,lang,index=0){if(typeof item==="string")return{title:item,description:"",icon:"•"};return{...item,title:item?.[`title_${lang}`]||item?.title||item?.name||`Info ${index+1}`,description:item?.[`description_${lang}`]||item?.description||item?.text||item?.detail||"",icon:item?.icon||"⌂",url:item?.url||item?.href||item?.link||item?.maps_url||""}}
+export default function StayPortalPage(){
+  const params=useParams(),token=String(params?.token||""),demo=token==="demo"
+  const[data,setData]=useState(null),[error,setError]=useState(""),[loading,setLoading]=useState(true),[selected,setSelected]=useState(null),[detail,setDetail]=useState(""),[sending,setSending]=useState(false),[notice,setNotice]=useState(""),[copied,setCopied]=useState(""),[lang,setLang]=useState("es"),[langOpen,setLangOpen]=useState(false)
+  async function load(){if(!token)return;setLoading(true);setError("");if(demo){setData(DEMO);setLoading(false);return}const{data:snapshot,error:rpcError}=await supabase.rpc("hl_guest_stay_portal_snapshot",{p_token:token});if(rpcError)setError("load_error");else if(!snapshot?.ok)setError(snapshot?.error||"invalid_token");else setData(snapshot);setLoading(false)}
+  useEffect(()=>{load()},[token])
+  useEffect(()=>{if(!data)return;const allowed=Array.isArray(data?.guide?.languages)&&data.guide.languages.length?data.guide.languages:["es"],stored=typeof window!=="undefined"?window.localStorage.getItem("hl:stay-lang"):null,browser=typeof navigator!=="undefined"?String(navigator.language||"").toLowerCase().slice(0,2):"";const next=stored&&allowed.includes(stored)?stored:allowed.includes(browser)?browser:allowed.includes(data?.guide?.default_language)?data.guide.default_language:allowed[0];setLang(next)},[data])
+  const tr=I18N[lang]||I18N.es,allowedLangs=useMemo(()=>{const values=Array.isArray(data?.guide?.languages)&&data.guide.languages.length?data.guide.languages:["es"];return values.filter(id=>LANG_META[id])},[data]),guideSections=useMemo(()=>Array.isArray(data?.guide?.sections)?data.guide.sections.map((item,i)=>localizeItem(item,lang,i)).slice(0,10):[],[data,lang]),houseRules=useMemo(()=>Array.isArray(data?.guide?.house_rules)?data.guide.house_rules.map((item,i)=>localizeItem(item,lang,i)).slice(0,6):[],[data,lang]),nearbyPlaces=useMemo(()=>{const source=data?.guide?.nearby_places?.length?data.guide.nearby_places:data?.guide?.useful_links;return Array.isArray(source)?source.map((item,i)=>localizeItem(item,lang,i)).slice(0,10):[]},[data,lang])
+  const firstName=String(data?.guest?.name||"").trim().split(/\s+/)[0]||"Guest",enabledActions={...DEFAULT_ACTIONS,...(data?.guide?.enabled_actions||{})},visibleActions=ACTIONS.filter(action=>enabledActions[action.kind]!==false)
+  const customText=(key,fallback)=>data?.guide?.translations?.[lang]?.[key]||fallback
+  async function copy(value,key){if(!value)return;try{await navigator.clipboard.writeText(value);setCopied(key);setTimeout(()=>setCopied(""),1600)}catch{}}
+  function chooseLanguage(next){setLang(next);setLangOpen(false);try{window.localStorage.setItem("hl:stay-lang",next)}catch{}}
+  function jump(id){if(typeof document!=="undefined")document.getElementById(id)?.scrollIntoView({behavior:"smooth",block:"start"})}
+  function goHome(){if(typeof window!=="undefined")window.scrollTo({top:0,behavior:"smooth"})}
+  function openAction(action){if(!action||enabledActions[action.kind]===false)return;setSelected(action);setDetail("");setNotice("")}
+  async function submitRequest(event){event.preventDefault();if(!selected||sending)return;if(selected.kind==="maintenance"&&!detail.trim()){setNotice(tr.detailRequired);return}setSending(true);setNotice("");if(demo){const fake={id:`demo-${Date.now()}`,kind:selected.kind,title:tr.actions[selected.kind]?.[0],status:"open",area:selected.kind==="maintenance"?"maintenance":selected.kind==="late_checkout"||selected.kind==="other"?"reception":"housekeeping",created_at:new Date().toISOString()};setData(current=>({...current,requests:[fake,...(current.requests||[])]}));setNotice(selected.kind==="late_checkout"?tr.lateSent:tr.sent);setSending(false);setTimeout(()=>setSelected(null),1100);return}const{data:result,error:rpcError}=await supabase.rpc("hl_guest_stay_portal_request",{p_token:token,p_kind:selected.kind,p_detail:detail.trim()||null});if(rpcError||!result?.ok)setNotice(result?.error==="request_disabled"?tr.invalid:tr.sendError);else{setNotice(result.already_open?tr.alreadyOpen:selected.kind==="late_checkout"?tr.lateSent:tr.sent);await load();setTimeout(()=>setSelected(null),1200)}setSending(false)}
+  if(loading)return <main className={s.shell}><div className={s.loading}><span/>{tr.preparing}</div></main>
+  if(error){const msg=error==="access_expired"?tr.expired:error==="portal_disabled"?tr.disabled:error==="load_error"?tr.sendError:tr.invalid;return <main className={s.shell}><section className={s.expired}><div>⌛</div><h1>{tr.portalUnavailable}</h1><p>{msg}</p><small>{tr.askNew}</small></section></main>}
+  const wifiReady=data?.guide?.wifi_name||data?.guide?.wifi_password,whatsapp=String(data?.guide?.contact_whatsapp||"").replace(/\D/g,""),currency=data?.account?.currency||"ARS",maintenanceAction=ACTIONS.find(a=>a.kind==="maintenance"),lateAction=ACTIONS.find(a=>a.kind==="late_checkout"),otherAction=ACTIONS.find(a=>a.kind==="other"),openRequests=(data?.requests||[]).filter(request=>!["resolved","cancelled"].includes(request.status)).length,showWifi=data?.guide?.show_wifi!==false,showAccount=data?.guide?.show_account!==false&&data?.account,showGuide=data?.guide?.show_guide!==false,showNearby=data?.guide?.show_nearby!==false,showRequests=data?.guide?.show_requests!==false,showContact=data?.guide?.show_contact!==false,cover=data?.hotel?.cover||"",accent=data?.hotel?.accent_color||data?.guide?.accent_color||"#6D5BD0",welcome=customText("welcome_message",data?.hotel?.welcome||tr.defaultWelcome),portalTitle=customText("portal_title",data?.guide?.title||tr.question)
+  return <main className={s.shell}><div className={s.phone} style={{"--guest-accent":accent}}>
+    <header className={s.hero}>{cover?<img src={cover} alt="" aria-hidden="true" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",opacity:.2,zIndex:0}}/>:null}<div className={s.statusBar}><span>{data?.hotel?.city||""}</span><span>● ● ●</span></div><div className={s.brandRow}><div className={s.logo}>{data?.hotel?.logo?<img src={data.hotel.logo} alt=""/>:<span>{String(data?.hotel?.name||"H")[0]}</span>}</div><div><small>{tr.welcomeTo}</small><strong>{data?.hotel?.name||"Habitación Llena"}</strong></div>{allowedLangs.length>1?<div className={s.langSelect}><button type="button" onClick={()=>setLangOpen(value=>!value)}>🌐 {String(lang).toUpperCase()}⌄</button>{langOpen?<div className={s.langMenu}>{allowedLangs.map(id=><button type="button" key={id} onClick={()=>chooseLanguage(id)}>{LANG_META[id].flag} {LANG_META[id].label}</button>)}</div>:null}</div>:null}</div>
+    <div className={s.welcome}><span>{tr.hello}, {firstName} 👋</span><h1>{portalTitle}</h1><p>{welcome}</p></div><div className={s.stayPill}><span><i>⌂</i><b>{tr.room} {data?.stay?.room?.name||"—"}</b><small>{data?.stay?.room?.type||""}</small></span><span><i>◷</i><b>{prettyDate(data?.stay?.arrival,lang)} → {prettyDate(data?.stay?.departure,lang)}</b><small>{tr.departure} {data?.guide?.checkout_time||"—"}</small></span></div></header>
+    <div className={s.content}><div className={s.appGrid}><button type="button" onClick={()=>jump("mi-estadia")}><i>🏨</i><strong>{tr.myStay}</strong><small>{tr.staySub}</small></button>{visibleActions.length?<button type="button" onClick={()=>jump("pedidos")}><i>🛎️</i><strong>{tr.requestSomething}</strong><small>{tr.requestSub}</small></button>:null}{enabledActions.maintenance!==false?<button type="button" onClick={()=>openAction(maintenanceAction)}><i>🛠️</i><strong>{tr.report}</strong><small>{tr.reportSub}</small></button>:null}{enabledActions.late_checkout!==false?<button type="button" onClick={()=>openAction(lateAction)} disabled={data?.stay?.late_checkout_confirmed}><i>🕒</i><strong>{data?.stay?.late_checkout_confirmed?tr.lateConfirmed:tr.late}</strong><small>{data?.stay?.late_checkout_confirmed?tr.lateConfirmedSub:tr.lateSub}</small></button>:null}{showGuide?<button type="button" onClick={()=>jump("guia")}><i>ℹ️</i><strong>{tr.usefulInfo}</strong><small>{tr.usefulSub}</small></button>:null}{showNearby?<button type="button" onClick={()=>jump("cerca")}><i>📍</i><strong>{tr.nearby}</strong><small>{tr.nearbySub}</small></button>:null}</div>
+      {showRequests&&openRequests>0?<button type="button" className={s.liveBanner} onClick={()=>jump("mis-pedidos")}><span>●</span><div><strong>{openRequests===1?tr.openRequest:tr.openRequests.replace("{n}",openRequests)}</strong><small>{tr.trackRequests}</small></div><b>›</b></button>:null}
+      {showWifi?<Section id="wifi" title={tr.wifi} subtitle={tr.wifiSub}><div className={s.wifiCard}><div><span>⌁</span><div><small>{tr.network}</small><strong>{data?.guide?.wifi_name||tr.askReception}</strong></div></div><button type="button" disabled={!wifiReady} onClick={()=>copy(data?.guide?.wifi_password,"wifi")}><small>{tr.password}</small><strong>{data?.guide?.wifi_password||tr.notConfigured}</strong><em>{copied==="wifi"?tr.copied:data?.guide?.wifi_password?tr.tapCopy:""}</em></button></div></Section>:null}
+      {visibleActions.length?<Section id="pedidos" title={tr.needSomething} subtitle={tr.needSomethingSub}><div className={s.actions}>{visibleActions.map(action=>{const labels=tr.actions[action.kind]||[action.kind,""];return <button type="button" key={action.kind} onClick={()=>openAction(action)} disabled={action.kind==="late_checkout"&&data?.stay?.late_checkout_confirmed}><i>{action.icon}</i><strong>{action.kind==="late_checkout"&&data?.stay?.late_checkout_confirmed?tr.lateConfirmed:labels[0]}</strong><small>{labels[1]}</small><b>›</b></button>})}</div></Section>:null}
+      <Section id="mi-estadia" title={tr.myStay} subtitle={tr.privateSub} action={<span className={s.privateBadge}>{tr.private}</span>}><div className={s.reservationCard}><div className={s.reservationTop}><span><small>{tr.reservation}</small><strong>{data?.stay?.number||"—"}</strong></span><span><small>{tr.room}</small><strong>{data?.stay?.room?.name||"—"}</strong></span><span><small>{tr.checkout}</small><strong>{data?.guide?.checkout_time||"—"}</strong></span></div>{showAccount?<div className={s.account}><div><small>{tr.total}</small><strong>{money(data.account.total,currency,lang)}</strong></div><div><small>{tr.paid}</small><strong>{money(data.account.paid,currency,lang)}</strong></div><div className={Number(data.account.balance)>0?s.pending:s.paid}><small>{Number(data.account.balance)>0?tr.balance:tr.accountOk}</small><strong>{money(data.account.balance,currency,lang)}</strong></div></div>:null}</div></Section>
+      {showGuide?<Section id="guia" title={tr.hotelGuide} subtitle={tr.guideSub}>{guideSections.length||houseRules.length?<div className={s.infoGrid}>{[...guideSections,...houseRules].slice(0,10).map((section,index)=><article key={`${section.title}-${index}`}><span>{section.icon}</span><div><strong>{section.title}</strong>{section.description?<p>{section.description}</p>:null}</div></article>)}</div>:<div className={s.empty}>{tr.guideEmpty}</div>}</Section>:null}
+      {showNearby?<Section id="cerca" title={tr.nearbyTitle} subtitle={tr.nearbyTitleSub}>{nearbyPlaces.length?<div className={s.nearbyGrid}>{nearbyPlaces.map((place,index)=>place.url?<a key={`${place.title}-${index}`} href={place.url} target="_blank" rel="noreferrer"><i>{place.icon}</i><div><strong>{place.title}</strong><small>{place.description||tr.openLocation}</small></div><b>↗</b></a>:<article key={`${place.title}-${index}`}><i>{place.icon}</i><div><strong>{place.title}</strong><small>{place.description}</small></div></article>)}</div>:<div className={s.empty}>{tr.nearbyEmpty}</div>}</Section>:null}
+      {showRequests?<Section id="mis-pedidos" title={tr.myRequests} subtitle={tr.requestsSub}>{(data?.requests||[]).length?<div className={s.requestList}>{data.requests.slice(0,8).map(request=><article key={request.id}><span className={s.requestIcon}>{request.kind==="maintenance"?"🛠️":request.kind==="late_checkout"?"🕒":"✓"}</span><div><strong>{tr.actions[request.kind]?.[0]||request.title}</strong><small>{tr.area[request.area]||request.area||"Hotel"} · {prettyDateTime(request.created_at,lang)}</small></div><em data-status={request.status}>{tr.status[request.status]||request.status}</em></article>)}</div>:<div className={s.empty}>{tr.noRequests}</div>}</Section>:null}
+      {showContact?<Section id="ayuda" title={tr.preferTalk} subtitle={tr.talkSub}><div className={s.helpCard}><div><span>💬</span><div><strong>{tr.helpTitle}</strong><small>{tr.helpText}</small></div></div><div className={s.helpButtons}>{whatsapp?<a href={`https://wa.me/${whatsapp}`} target="_blank" rel="noreferrer">{tr.whatsapp}</a>:null}{enabledActions.other!==false?<button type="button" onClick={()=>openAction(otherAction)}>{tr.writeReception}</button>:null}</div></div></Section>:null}
+      <footer className={s.footer}>{tr.privateAccess} · {tr.validUntil} {prettyDateTime(data?.portal?.valid_until,lang)}.</footer></div>
+    <nav className={s.dock}><button type="button" onClick={goHome}><i>⌂</i><span>{tr.home}</span></button><button type="button" onClick={()=>jump("pedidos")}><i>🛎</i><span>{tr.requests}</span></button><button type="button" onClick={()=>jump("guia")}><i>ℹ</i><span>{tr.info}</span></button><button type="button" onClick={()=>jump("ayuda")}><i>◉</i><span>{tr.help}</span></button></nav>
     </div>
-
-    {selected ? <div className={s.backdrop} onMouseDown={(event) => { if (event.target === event.currentTarget && !sending) setSelected(null) }}><form className={s.sheet} onSubmit={submitRequest}><div className={s.sheetHandle} /><button type="button" className={s.sheetClose} onClick={() => !sending && setSelected(null)}>×</button><span className={s.sheetIcon}>{selected.icon}</span><small>{selected.text}</small><h2>{selected.title}</h2>{selected.kind === "late_checkout" ? <p>Decinos hasta qué hora te gustaría quedarte. Recepción revisará disponibilidad y posibles cargos antes de confirmar.</p> : selected.kind === "maintenance" ? <p>Contanos qué está fallando. El pedido se enviará asociado a tu habitación.</p> : <p>Podés agregar un detalle para que el equipo sepa exactamente qué necesitás.</p>}<textarea value={detail} onChange={(event) => setDetail(event.target.value)} maxLength={1000} placeholder={selected.kind === "late_checkout" ? "Ej: si es posible, hasta las 14:00" : selected.kind === "maintenance" ? "Ej: el aire prende pero no enfría" : "Detalle opcional"} rows={4} />{notice ? <div className={s.notice}>{notice}</div> : null}<button className={s.send} type="submit" disabled={sending}>{sending ? "Enviando…" : selected.kind === "late_checkout" ? "Enviar solicitud a recepción" : "Enviar pedido"}</button>{selected.kind === "late_checkout" ? <small className={s.disclaimer}>Enviar la solicitud no modifica tu horario de salida hasta que el hotel la apruebe.</small> : null}</form></div> : null}
+    {selected?<div className={s.backdrop} onMouseDown={event=>{if(event.target===event.currentTarget&&!sending)setSelected(null)}}><form className={s.sheet} onSubmit={submitRequest}><div className={s.sheetHandle}/><button type="button" className={s.sheetClose} onClick={()=>!sending&&setSelected(null)}>×</button><span className={s.sheetIcon}>{selected.icon}</span><small>{tr.actions[selected.kind]?.[1]}</small><h2>{tr.actions[selected.kind]?.[0]}</h2><p>{selected.kind==="late_checkout"?tr.latePrompt:selected.kind==="maintenance"?tr.maintenancePrompt:tr.otherPrompt}</p><textarea value={detail} onChange={event=>setDetail(event.target.value)} maxLength={1000} placeholder={selected.kind==="late_checkout"?tr.latePlaceholder:selected.kind==="maintenance"?tr.maintenancePlaceholder:tr.optional} rows={4}/>{notice?<div className={s.notice}>{notice}</div>:null}<button className={s.send} type="submit" disabled={sending}>{sending?tr.sending:selected.kind==="late_checkout"?tr.sendReception:tr.send}</button>{selected.kind==="late_checkout"?<small className={s.disclaimer}>{tr.lateDisclaimer}</small>:null}</form></div>:null}
   </main>
 }
