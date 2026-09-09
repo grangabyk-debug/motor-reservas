@@ -9,7 +9,7 @@ const roomNames=rooms=>(rooms||[]).map(room=>room?.nombre).filter(Boolean).join(
 const escapeHtml=value=>String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[char]))
 const textToHtml=value=>String(value||"").split(/\n{2,}/).map(block=>`<p>${escapeHtml(block).replace(/\n/g,"<br>")}</p>`).join("")
 const htmlToText=value=>String(value||"").replace(/<br\s*\/?\s*>/gi,"\n").replace(/<\/p>/gi,"\n\n").replace(/<\/div>/gi,"\n").replace(/<li>/gi,"• ").replace(/<\/li>/gi,"\n").replace(/<[^>]+>/g,"").replace(/&nbsp;/g," ").replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&quot;/g,'"').replace(/&#039;/g,"'").replace(/\n{3,}/g,"\n\n").trim()
-const looksLikeHtml=value=/<\/?[a-z][\s\S]*>/i.test(String(value||""))
+const looksLikeHtml=value=>/<\/?[a-z][\s\S]*>/i.test(String(value||""))
 
 const BUILT_INS=[["preconfirmation","Pre-confirmación de reserva"],["confirmation","Confirmación de reserva"],["cancellation","Cancelación de reserva"],["availability","Disponibilidad"],["budget","Presupuesto"],["payment","Confirmación de pago"]]
 function buildTemplate(key,context){
