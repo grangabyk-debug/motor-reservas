@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { supabase } from "../../../lib/supabase"
 import styles from "./OliviaAssistant.module.css"
 
 const STARTERS = [
@@ -130,10 +131,18 @@ export default function OliviaAssistant({ propertyId, propertyName, context, onH
     setSending(true)
 
     try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError) throw sessionError
+      const accessToken = sessionData?.session?.access_token
+      if (!accessToken || !propertyId) throw new Error("Tu sesión del PMS no está disponible. Volvé a iniciar sesión.")
+
       const response = await fetch("/api/assistant", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, context, history }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ propertyId, question, context, history }),
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data?.error || "No pude responder en este momento.")
@@ -235,7 +244,7 @@ export default function OliviaAssistant({ propertyId, propertyName, context, onH
             />
             <button type="submit" disabled={!input.trim() || sending} aria-label="Enviar pregunta">↑</button>
           </form>
-          <footer>Lee el contexto operativo disponible en tu PMS. Las recomendaciones no ejecutan cambios por sí solas.</footer>
+          <footer>Lee el contexto operativo disponible en tu PMS. Las acciones operativas requieren aprobación humana antes de ejecutarse.</footer>
         </section>
       ) : null}
 
