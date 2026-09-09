@@ -2,11 +2,15 @@
 
 ## Estado
 
-**Paquete 1 en ejecución.** Segundo corte completado: el grafo ya navega en ambos sentidos entre `Mensajes <-> Reserva` y desde Housekeeping/Mantenimiento vuelve por IDs reales a la reserva y habitación de origen.
+**Paquete 1 en ejecución.** Tercer corte completado: contexto con peticiones, navegación bidireccional, eventos normalizados y timeline operativo unificado por reserva.
+
+## Objetivo
+
+El grafo operativo existe para que Mensajes, Reservas, Pagos, Peticiones, Housekeeping y Mantenimiento no funcionen como silos. La reserva es el eje de una estadía y cada módulo aporta hechos vinculados por IDs reales.
+
+Esto permite que una persona —y más adelante OlivIA— pueda partir de un mensaje o de una reserva y reconstruir el estado operativo sin búsquedas manuales ni matching por nombre.
 
 ## Regla de diseño de datos
-
-No existe una copia de cada entidad dentro de Mensajes. La conversación conserva referencias estables y el contexto se resuelve desde las fuentes canónicas:
 
 ```text
 inbox_conversations
@@ -15,86 +19,103 @@ inbox_conversations
                          -> guest_profile_id
                          -> habitacion_id / habitaciones_ids
                          -> pagos
+                         -> hotel_guest_requests
                          -> hotel_housekeeping_tasks
                          -> hotel_maintenance_tickets
   -> room_id          -> habitaciones
 ```
 
-La **reserva** es el eje operativo de la estadía. El **perfil de huésped** es el eje CRM. La conversación sólo guarda vínculos; no duplica saldos, estados de habitación ni tareas.
+No se duplican saldos, estados de habitación, peticiones ni tareas dentro de Mensajes. Se conservan referencias y se consulta cada fuente canónica.
 
 ## Resolución automática
 
-`hl_get_inbox_operational_context(property_id, conversation_id)`:
+`hl_get_inbox_operational_context(property_id, conversation_id)` mantiene el vínculo canónico huésped/reserva/habitación mediante IDs existentes y coincidencias exactas de email o teléfono normalizado. No se vincula por similitud de nombre.
 
-1. Reutiliza IDs ya vinculados.
-2. Si falta huésped, intenta coincidencia exacta de email o teléfono normalizado.
-3. Si falta reserva, busca reservas de la misma propiedad asociadas al perfil/email/teléfono.
-4. Prioriza la estadía que contiene la fecha del mensaje, luego la próxima y finalmente la pasada más cercana.
-5. Persiste los IDs resueltos para no repetir búsquedas textuales en cada uso.
-6. Devuelve contexto agregado de huésped, reserva, habitaciones, saldo/pagos, housekeeping y mantenimiento.
+`hl_get_inbox_operational_context_v2(property_id, conversation_id)` extiende ese contexto sin cambiar la lógica de matching y agrega `guest_requests` abiertas de la reserva resuelta.
 
-**No se vincula por similitud de nombre.** Un nombre parecido no es evidencia suficiente.
+`hl_get_reservation_conversation(property_id, reservation_id)` resuelve la relación inversa Reserva -> Conversación y reutiliza el mismo resolvedor antes de aceptar una conversación todavía no vinculada.
 
-## Lookup inverso Reserva -> Conversación
+## Eventos normalizados
 
-`hl_get_reservation_conversation(property_id, reservation_id)` resuelve la relación en sentido inverso:
+`hl_operational_event_trigger()` registra un contrato común en `hotel_operational_events` para:
 
-1. Si ya existe una conversación vinculada a esa reserva, devuelve la más reciente.
-2. Nunca reutiliza una conversación que ya pertenezca a otra reserva.
-3. Para conversaciones todavía sin `reservation_id`, sólo considera la misma propiedad y coincidencias exactas de `guest_profile_id`, email o teléfono normalizado.
-4. Prioriza conversaciones temporalmente cercanas a la estadía.
-5. Antes de devolver una candidata la pasa por `hl_get_inbox_operational_context`; sólo se acepta si el resolvedor canónico termina en la misma reserva solicitada.
+- `hotel_guest_requests`;
+- `hotel_housekeeping_tasks`;
+- `hotel_maintenance_tickets`.
 
-Así, la ficha de Reserva puede mostrar `Mensajes` sin implementar una segunda lógica de matching distinta a la del Inbox.
+Se registran eventos `created`, `status_changed`, `assigned` y `priority_changed`, con metadata estable que incluye cuando corresponde `reservation_id`, `room_id`, etiqueta, prioridad y responsable.
 
-## Seguridad multitenant
+La migración realiza además un backfill de evento `created` para operaciones existentes que todavía no tenían historial normalizado.
 
-El trigger `trg_inbox_conversations_context_tenant` bloquea cualquier vínculo en el que huésped, reserva o habitación no pertenezcan al mismo `property_id` de la conversación.
+La función del trigger es `SECURITY DEFINER`, pero no puede ejecutarse directamente desde `public`, `anon` ni `authenticated`; sólo se invoca mediante los triggers de PostgreSQL.
 
-Los RPC del grafo son `SECURITY INVOKER`, por lo que siguen las políticas RLS del usuario que los llama. Su ejecución pública está revocada y sólo se concede a `authenticated`.
+## Timeline operativo unificado
+
+`hl_get_reservation_operational_timeline(property_id, reservation_id, limit)` entrega una secuencia cronológica con un formato único. Hoy integra:
+
+- movimientos de `hotel_reservation_events`;
+- mensajes de conversaciones vinculadas;
+- eventos de peticiones del huésped;
+- eventos de Housekeeping;
+- eventos de Mantenimiento;
+- pagos válidos de la reserva.
+
+Cada elemento incluye, cuando corresponde:
+
+- `source`;
+- `entity_type` / `entity_id`;
+- `reservation_id`;
+- `room_id`;
+- `event_type`;
+- `title` / `detail`;
+- `actor_name`;
+- `created_at`;
+- `payload` normalizado.
+
+La ficha de Reserva consume este RPC para su tarjeta **Timeline operativo**. Por lo tanto la cronología visible ya no queda limitada a cambios propios de `reservas`.
 
 ## Navegación bidireccional
 
-- `Mensajes -> Reserva`: abre `reservations` con el `reservationId` exacto.
-- `Reserva -> Mensajes`: la pestaña contextual Mensajes aparece sólo para roles habilitados y abre el `conversation_id` exacto.
-- `Mensajes -> Housekeeping`: si hay habitación vinculada, lleva el `room_id` como foco.
-- `Mantenimiento -> Reserva`: abre la ficha exacta de la reserva si el rol tiene permiso.
-- `Mantenimiento -> Habitación`: abre Housekeeping con la habitación exacta resaltada si el rol puede acceder.
-- `Housekeeping -> Reserva`: desde la cola operativa vuelve a la ficha exacta cuando existe `reservation_id` y el rol tiene permiso.
-- `Housekeeping -> Habitación`: lleva al card exacto dentro de la misma vista y lo resalta temporalmente.
+- `Mensajes -> Reserva`: abre la ficha exacta.
+- `Reserva -> Mensajes`: abre la conversación exacta cuando existe vínculo seguro.
+- `Mensajes -> Peticiones`: abre el módulo si el rol tiene permiso.
+- `Mensajes -> Housekeeping`: lleva la habitación como foco cuando existe.
+- `Mantenimiento -> Reserva / Habitación`: vuelve por IDs reales.
+- `Housekeeping -> Reserva / Habitación`: vuelve a la reserva o enfoca el card exacto.
 
-Los focos contextuales se transportan como parámetros transitorios y se consumen al llegar; no crean nuevas rutas ni duplican workspaces.
+Los accesos contextuales sólo aparecen cuando el rol puede abrir la vista de destino.
 
-## Contrato de UI
+## Contexto visible en Mensajes
 
-Al abrir una conversación, Mensajes muestra un bloque compacto de **Contexto operativo** con:
+El bloque de Contexto operativo muestra actualmente:
 
-- huésped reconocido;
-- número/estado y fechas de reserva;
-- habitación o habitaciones;
-- total cobrado y saldo pendiente;
-- tareas de Housekeeping abiertas;
-- incidencias de Mantenimiento abiertas.
+- huésped;
+- estadía;
+- habitación/es;
+- saldo y cobros;
+- peticiones abiertas;
+- Housekeeping pendiente;
+- Mantenimiento abierto.
 
-Los accesos contextuales sólo aparecen si el rol puede abrir la vista de destino. La ficha de Reserva tampoco consulta ni muestra metadata de conversaciones cuando `messages` no está permitido para ese rol.
+## Seguridad multitenant
 
-No se muestran botones de envío hasta que exista un adaptador de salida seguro. Los filtros de canal son controles reales, no decoración.
+Los vínculos conversación/huésped/reserva/habitación siguen validándose contra el mismo `property_id`. Los RPC de lectura son `SECURITY INVOKER`, respetan RLS y no se conceden a `anon`.
 
-## Responsive
+## Qué habilita para OlivIA
 
-Desktop usa patrón maestro/detalle con contexto encima del hilo. En móvil, el hilo entra como panel y dispone de una acción explícita para volver a la lista. El contexto se reorganiza en tarjetas de dos columnas y puede desplazarse sin bloquear el hilo.
+Con esta capa el futuro agente puede recibir una intención como “el huésped de la 204 dice que no anda el aire” y trabajar sobre referencias determinísticas:
 
-Cuando una navegación apunta a una habitación concreta de Housekeeping, el card se desplaza al centro del viewport y recibe un resaltado corto para explicar continuidad sin depender de hover.
+1. identificar conversación y huésped;
+2. resolver reserva y habitación;
+3. consultar si ya existe petición o mantenimiento;
+4. revisar saldo y contexto de estadía;
+5. leer el timeline para no repetir acciones;
+6. crear o actualizar una acción mediante contratos estables.
 
-## Estados semánticos
-
-- Verde: sin deuda / sin incidencias / habitación lista / operación correcta.
-- Amarillo: saldo pendiente / housekeeping pendiente / estado que requiere atención.
-- Rojo: mantenimiento abierto / bloqueo / cancelación o problema crítico.
-- Neutral: datos informativos sin juicio operativo.
+Sin esta capa, la IA tendría que inferir relaciones desde texto y pantallas. Con el grafo, opera sobre datos enlazados.
 
 ## Próximo corte del Paquete 1
 
-1. Incorporar `guest_requests` al mismo `OperationalContext`.
-2. Construir timeline operativo unificado por reserva/habitación.
-3. Normalizar eventos internos para que el futuro agente pueda actuar sobre contratos estables.
+1. Evitar duplicados semánticos en el timeline cuando un mismo pago ya fue reflejado también como evento de reserva.
+2. Agregar foco exacto de `guest_request_id` desde Mensajes/Reserva hacia Peticiones.
+3. Preparar acciones seguras y auditables que OlivIA pueda invocar sobre estos contratos.
