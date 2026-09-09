@@ -1,6 +1,6 @@
 "use client"
 
-import PremiumPortalClient from"./PremiumPortalClient"
+import GuestPortalRuntime from"./GuestPortalRuntime"
 import p from"./premium.module.css"
 
-export default function PremiumStyleWrapper(){return <div className={p.premium}><PremiumPortalClient/></div>}
+export default function PremiumStyleWrapper(){return <div className={p.premium}><GuestPortalRuntime/></div>}
