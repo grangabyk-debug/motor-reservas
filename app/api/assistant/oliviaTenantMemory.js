@@ -5,14 +5,15 @@ const stripArticle=value=>clean(value).replace(/^(?:la|el|las|los|un|una|unos|un
 export function extractTenantTeaching(question){
   const text=String(question||"").trim()
   const patterns=[
-    /^(?:acá|aca|aquí|aqui)(?:\s+en\s+(?:este|el)\s+hotel)?\s+(?:le\s+)?decimos\s+["“]?(.+?)["”]?\s+a\s+["“]?(.+?)["”]?[.!]?$/i,
-    /^(?:cuando|si)\s+(?:digo|decimos|dicen)\s+["“]?(.+?)["”]?\s+(?:me\s+refiero\s+a|nos\s+referimos\s+a|queremos\s+decir|significa)\s+["“]?(.+?)["”]?[.!]?$/i,
-    /^["“]?(.+?)["”]?\s+(?:significa|quiere\s+decir|es\s+como\s+decir)\s+["“]?(.+?)["”]?[.!]?$/i,
+    {re:/^(?:(?:acá|aca|aquí|aqui)(?:\s+en\s+(?:este|el)\s+hotel)?\s+)?a\s+["“]?(.+?)["”]?\s+(?:le|les|lo|la|los|las)\s+(?:decimos|llamamos)\s+["“]?(.+?)["”]?[.!]?$/i,reverse:true},
+    {re:/^(?:(?:acá|aca|aquí|aqui)(?:\s+en\s+(?:este|el)\s+hotel)?\s+)?(?:nosotros\s+)?(?:le\s+|les\s+)?(?:decimos|llamamos)\s+["“]?(.+?)["”]?\s+a\s+["“]?(.+?)["”]?[.!]?$/i,reverse:false},
+    {re:/^(?:cuando|si)\s+(?:digo|decimos|dicen)\s+["“]?(.+?)["”]?\s+(?:me\s+refiero\s+a|nos\s+referimos\s+a|queremos\s+decir|significa)\s+["“]?(.+?)["”]?[.!]?$/i,reverse:false},
+    {re:/^["“]?(.+?)["”]?\s+(?:significa|quiere\s+decir|es\s+como\s+decir)\s+["“]?(.+?)["”]?[.!]?$/i,reverse:false},
   ]
   for(const pattern of patterns){
-    const match=text.match(pattern)
+    const match=text.match(pattern.re)
     if(!match)continue
-    const phrase=stripArticle(match[1]),meaning=stripArticle(match[2])
+    const phrase=stripArticle(pattern.reverse?match[2]:match[1]),meaning=stripArticle(pattern.reverse?match[1]:match[2])
     if(phrase.length>=2&&phrase.length<=80&&meaning.length>=2&&meaning.length<=140&&normalize(phrase)!==normalize(meaning))return{phrase,meaning}
   }
   return null
