@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { fallbackPmsHelp, interpretHotelOperation } from "./oliviaHotelLanguage"
 
 const ACTION_TYPES=new Set(["create_guest_request","create_maintenance_ticket"])
 const PRIORITIES=new Set(["low","normal","high","urgent"])
@@ -14,7 +15,7 @@ const clean=(v,max=600)=>{const s=String(v||"").trim();return s?s.slice(0,max):n
 const id=v=>{const n=Number(v);return Number.isSafeInteger(n)&&n>0?n:null}
 
 function preguntaLocal(question){return /cu[aá]ntas?.*(habitaciones?.*)?ocupad|ocupadas?.*hoy|cu[aá]ntas?.*reservas|reservas.*(tengo|hay)|cu[aá]ntas?.*noches|noches.*vend|cu[aá]ntas?.*habitaci|cu[aá]nto.*(vend|factur|ingres)|ventas.*(hoy|30 d[ií]as|mes)/i.test(question.toLowerCase())}
-function courtesyReply(question){const q=human(question);if(/^(gracias|muchas gracias|mil gracias|gracias olivia|perfecto gracias|genial gracias|buenisimo gracias|buenísimo gracias|listo gracias|excelente gracias|joya gracias)$/.test(q))return"De nada 😊. Si necesitás algo más de la operación, decime y te ayudo.";if(/^(hola|buen dia|buenas|buenas tardes|buenas noches|hola olivia)$/.test(q))return"¡Hola! Decime qué necesitás de la operación y te ayudo.";return null}
+function courtesyReply(question){const q=human(question);if(/^(gracias|muchas gracias|mil gracias|gracias olivia|perfecto gracias|genial gracias|buenisimo gracias|buenísimo gracias|listo gracias|excelente gracias|joya gracias)$/.test(q))return"De nada. Decime si necesitás otra cosa y lo vemos.";if(/^(hola|buen dia|buenas|buenas tardes|buenas noches|hola olivia)$/.test(q))return"¡Hola! Sí, decime qué necesitás y te doy una mano.";return null}
 function roomRef(question){return human(question).match(/\b(?:habitacion|hab|cuarto|room)\s+([a-z0-9-]+)\b/i)?.[1]||null}
 function roomMatches(room,ref){const a=compact(room?.nombre),b=compact(ref);return !!a&&!!b&&(a===b||a===`habitacion${b}`||a===`hab${b}`||a===`cuarto${b}`||a===`room${b}`)}
 function isQuestion(question){const q=human(question);return String(question||"").includes("?")||/^(como|que|cual|cuanto|cuanta|cuantos|cuantas|por que|deberia|conviene|puedo|podemos)\b/.test(q)}
@@ -32,11 +33,11 @@ function naturalMaintenance(question,context){
   if(!matches.length)return{handled:true,answer:`Entendí que estás reportando un problema técnico en la habitación ${ref}, pero no encuentro esa habitación activa en esta propiedad. Revisá el número y decímelo de nuevo.`,action:null}
   if(matches.length>1)return{handled:true,answer:`Encontré más de una habitación que coincide con ${ref}. Necesito que me indiques cuál es antes de preparar mantenimiento.`,action:null}
   const room=matches[0],reservation=activeReservation(context,room.id),name=String(room.nombre||ref).trim()
-  return{handled:true,answer:`Detecté un problema de mantenimiento en la habitación ${name}. Te dejo preparada la incidencia para que la apruebes antes de ejecutarla.`,action:{type:"create_maintenance_ticket",title:`${issueLabel(question)} · Habitación ${name}`,detail:String(question).trim(),priority:issuePriority(question),assigned_area:"maintenance",requested_by:"reception",reservation_id:reservation?.id||null,room_id:room.id}}
+  return{handled:true,answer:`Dale, entendí el problema de la habitación ${name}. Te dejo mantenimiento preparado para que lo apruebes.`,action:{type:"create_maintenance_ticket",title:`${issueLabel(question)} · Habitación ${name}`,detail:String(question).trim(),priority:issuePriority(question),assigned_area:"maintenance",requested_by:"reception",reservation_id:reservation?.id||null,room_id:room.id}}
 }
 
 function contextFor(raw={},propertyId=null){return{plataforma:raw.plataforma||"HabitaciónLlena.com · PMS hotelero",propiedad_id:propertyId,hoy:raw.hoy||null,metricas:raw.metricas||{},alojamientos:Array.isArray(raw.alojamientos)?raw.alojamientos.filter(x=>!propertyId||String(x?.id||"")===String(propertyId)).slice(0,1):[],habitaciones:Array.isArray(raw.habitaciones)?raw.habitaciones.slice(0,300):[],reservas:Array.isArray(raw.reservas)?raw.reservas.slice(-300):[]}}
-function historyFor(history){return Array.isArray(history)?history.slice(-8).map(x=>({role:x?.role==="assistant"?"assistant":"user",text:String(x?.text||"").slice(0,1500)})).filter(x=>x.text.trim()):[]}
+function historyFor(history){return Array.isArray(history)?history.slice(-10).map(x=>({role:x?.role==="assistant"?"assistant":"user",text:String(x?.text||"").slice(0,1500)})).filter(x=>x.text.trim()):[]}
 
 function normalizeAction(action,context){
   if(!action||typeof action!=="object"||!ACTION_TYPES.has(action.type))return null
@@ -46,7 +47,7 @@ function normalizeAction(action,context){
   if(reservationId&&!reservation||roomId&&!room)return null
   const refs={reservation_id:reservationId,reservation_number:clean(reservation?.numero,80),room_id:roomId,room_name:clean(room?.nombre,80)}
   const priority=PRIORITIES.has(action.priority)?action.priority:"normal"
-  if(action.type==="create_guest_request")return{type:action.type,payload:{title,detail:clean(action.detail,1200),priority,assigned_area:AREAS.has(action.assigned_area)?action.assigned_area:"reception",requested_by:REQUESTED_BY.has(action.requested_by)?action.requested_by:"guest",...refs}}
+  if(action.type==="create_guest_request")return{type:action.type,payload:{title,detail:clean(action.detail,1200),priority,assigned_area:AREAS.has(action.assigned_area)?action.assigned_area:"reception",requested_by:REQUESTED_BY.has(action.requested_by)?action.requested_by:"reception",...refs}}
   return{type:action.type,payload:{title,description:clean(action.detail,1200),priority,...refs}}
 }
 
@@ -67,15 +68,43 @@ export async function POST(request){
 
     const courtesy=courtesyReply(question)
     if(courtesy)return NextResponse.json({answer:courtesy,mode:"local-social",assistant:"OlivIA",action:null})
+    const hotelAction=interpretHotelOperation(question,context)
+    if(hotelAction?.handled){if(!hotelAction.action)return NextResponse.json({answer:hotelAction.answer,mode:"hotel-language",action:null});const result=await createProposal(client,propertyId,hotelAction.action,context);return NextResponse.json({answer:result.error?`${hotelAction.answer}\n\n${result.error}`:hotelAction.answer,mode:"hotel-language",assistant:"OlivIA",action:result.proposal})}
     const localAction=naturalMaintenance(question,context)
     if(localAction?.handled){if(!localAction.action)return NextResponse.json({answer:localAction.answer,mode:"local-action",action:null});const result=await createProposal(client,propertyId,localAction.action,context);return NextResponse.json({answer:result.error?`${localAction.answer}\n\n${result.error}`:localAction.answer,mode:"local-action",assistant:"OlivIA",action:result.proposal})}
     if(preguntaLocal(question))return NextResponse.json({answer:responderSinIA(question,context),mode:"local",action:null})
 
     const apiKey=process.env.OPENAI_API_KEY;if(!apiKey)return NextResponse.json({answer:responderSinIA(question,context),mode:"local",action:null})
-    const prompt=`Sos OlivIA, asistente del PMS HabitaciónLlena.com y hablás directamente con Recepción. Respondé en español argentino natural, profesional, amable y breve. Usá sólo datos de la propiedad validada. Si te saludan o agradecen, respondé como una compañera de recepción: natural, corta y ofreciendo seguir ayudando.
-Podés explicar el PMS y PREPARAR únicamente create_guest_request y create_maintenance_ticket; nunca ejecutar por tu cuenta.
-Prepará acción si el usuario la pide explícitamente O informa afirmativamente un problema operativo concreto. Ejemplo: “habitación 203 tiene el aire roto” equivale a reportar mantenimiento y debe producir create_maintenance_ticket si existe esa habitación exacta. Si sólo pregunta qué conviene hacer, action=null. Si falta un dato esencial o hay ambigüedad, preguntalo y action=null. Nunca inventes reservation_id ni room_id: sólo copiá IDs exactos del contexto. Problemas técnicos => mantenimiento; pedidos de huésped (cuna, almohadas, desayuno, traslado) => guest request. La acción queda sólo PROPUESTA y requiere aprobación y ejecución humana. Nunca afirmes que ya se ejecutó.
-Contexto:${JSON.stringify(context)}\nHistorial:${JSON.stringify(history)}\nPregunta:${question}`
+    const prompt=`Sos OlivIA, la asistente operativa de HabitaciónLlena.com. Hablás directamente con gente de Recepción que está trabajando y suele escribir rápido, con errores, abreviaturas, frases cortadas o lenguaje informal. Tu trabajo es ENTENDER la intención antes que exigir una forma de escribir.
+
+PERSONALIDAD
+- Soná como una compañera de recepción inteligente, cálida y resolutiva; nunca como un bot, manual o parser.
+- Español argentino natural, profesional y breve. No exageres emojis ni repitas “Detecté”.
+- Si el pedido está claro, confirmá naturalmente lo que entendiste: “Dale, te preparo…”, “Sí, entendí…”, “Perfecto, dejo…”.
+- Si falta UN dato esencial, preguntá solamente ese dato en una frase corta. No hagas interrogatorios.
+- Usá el historial: “esa habitación”, “la misma”, “también”, “sumale otra” pueden referirse al turno anterior.
+
+COMPRENSIÓN HOTELERA
+- “la 205 tiene una pérdida”, “205 pierde agua”, “en la dos cero cinco gotea”, “mandá mantenimiento a 205” significan una incidencia de mantenimiento si la habitación puede identificarse con seguridad.
+- “a la 201 le falta una sábana”, “201 sin toallas”, “mandale dos almohadas a 301”, “hacer la 204”, “repasar 203” son pedidos para Housekeeping.
+- HKP, housekeeping, pisos, mucamas y limpieza pueden referirse al área Housekeeping según el contexto.
+- Aire, TV, cerradura, caja fuerte, agua, electricidad, Wi‑Fi, calefacción, heladera, filtraciones, pérdidas, roturas o fallas van normalmente a Mantenimiento.
+- Sábanas, toallas, almohadas, mantas, amenities, cuna, papel higiénico, limpieza y recambios van normalmente a Housekeeping.
+- No hace falta que el usuario diga “crear”, “registrar” o “mandar”: una afirmación operacional concreta ya puede ser una solicitud.
+- Una pregunta informativa (“¿qué hago si…?”, “¿cómo se carga…?”) NO crea acción.
+
+SEGURIDAD Y ACCIONES
+Podés PREPARAR únicamente create_guest_request y create_maintenance_ticket; nunca ejecutar sola.
+Nunca inventes reservation_id ni room_id. Sólo usá IDs exactos del contexto validado. Si no podés identificar la habitación/reserva con seguridad, action=null y preguntá lo mínimo necesario.
+Para pedidos de Housekeeping usá create_guest_request con assigned_area="housekeeping" y requested_by="reception". Para fallas técnicas usá create_maintenance_ticket.
+Toda acción queda PROPUESTA y necesita aprobación y ejecución humana. Nunca digas que ya quedó hecha antes de ejecutarse.
+
+AYUDA SOBRE EL PMS
+Podés explicar de manera conversacional Planning, Reservas, huéspedes, Mensajes, Portal del huésped, pagos, folios, Caja diaria, tarifas y disponibilidad, bloqueos, housekeeping, mantenimiento, check-in/check-out, reservas grupales y movimientos de habitación. Explicá primero lo esencial y, si hace falta, agregá pasos cortos. No inventes botones o datos que no estén en el contexto.
+
+Contexto validado:${JSON.stringify(context)}
+Historial:${JSON.stringify(history)}
+Mensaje de Recepción:${question}`
     const response=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${apiKey}`},body:JSON.stringify({model:"gpt-5.6-luna",input:prompt,max_output_tokens:1000,text:{format:{type:"json_schema",name:"olivia_pms_response",strict:true,schema:OLIVIA_RESPONSE_SCHEMA}}})})
     const data=await response.json();if(!response.ok){console.error("Error OpenAI:",data);return NextResponse.json({answer:responderSinIA(question,context),mode:"local",action:null})}
     let parsed;try{parsed=JSON.parse(data.output_text||"{}")}catch(error){console.error("OlivIA structured output parse error:",error);return NextResponse.json({answer:responderSinIA(question,context),mode:"local",action:null})}
@@ -90,8 +119,9 @@ function responderSinIA(question,context={}){
   if(q.includes("reserva")){if(Number.isFinite(Number(m.reservas30dias)))return`En los últimos 30 días registrás ${Number(m.reservas30dias)} reserva(s).`;if(Number.isFinite(Number(m.llegadasHoy))||Number.isFinite(Number(m.salidasHoy)))return`Hoy el dashboard muestra ${Number(m.llegadasHoy||0)} llegada(s) y ${Number(m.salidasHoy||0)} salida(s).`}
   if(q.includes("noche")){if(Number.isFinite(Number(m.noches)))return`En el período disponible registrás ${Number(m.noches)} noche(s) vendida(s).`;return"El dashboard actual no me está pasando el total de noches vendidas para ese período."}
   if(q.includes("ingreso")||q.includes("venta")||q.includes("factur")||q.includes("cobrad")){if(Number.isFinite(Number(m.cobradoHoy)))return`Hoy el dashboard muestra ${Number(m.cobradoHoy).toLocaleString("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0})} cobrados.`;if(Number.isFinite(Number(m.ingresos)))return`Hay ${Number(m.ingresos).toLocaleString("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0})} registrados.`;return"No tengo un importe económico suficiente en el contexto para responderte con precisión."}
-  if(q.includes("habitación")||q.includes("habitacion")||q.includes("cuarto"))return`Tenés ${total} habitación(es) activa(s) visibles en la operación actual.`
   if(q.includes("atención")||q.includes("atencion")||q.includes("urgente")||q.includes("prioridad")){const a=[];if(Number(m.mantenimientoUrgente||0)>0)a.push(`${Number(m.mantenimientoUrgente)} mantenimiento(s) urgente(s)`);if(Number(m.habitacionesSucias||0)>0)a.push(`${Number(m.habitacionesSucias)} habitación(es) sucia(s)`);if(Number(m.llegadasHoy||0)>0)a.push(`${Number(m.llegadasHoy)} llegada(s) para revisar`);return a.length?`Yo priorizaría: ${a.join(", ")}.`:"No veo alertas operativas evidentes en los datos que tengo cargados ahora."}
   if((q.includes("crear")||q.includes("hacer"))&&q.includes("reserva"))return"Para crear una reserva, abrí Reservas o seleccioná el rango desde el Planning, elegí habitación y fechas, cargá huésped, revisá el total y confirmá."
-  return"Soy OlivIA. Puedo ayudarte a leer la operación de hoy, interpretar ocupación y cobros, detectar prioridades y explicarte cómo usar Habitación Llena."
+  const help=fallbackPmsHelp(question);if(help)return help
+  if(q.includes("habitación")||q.includes("habitacion")||q.includes("cuarto"))return`Tenés ${total} habitación(es) activa(s) visibles en la operación actual.`
+  return"Decime qué necesitás de la operación o del sistema. Podés escribirme como te salga; si es un pedido operativo, con la habitación y lo que pasa me alcanza para orientarlo."
 }
