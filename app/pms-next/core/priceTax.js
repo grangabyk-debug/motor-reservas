@@ -1,6 +1,6 @@
-export const DEFAULT_PRICE_TAX_MODE="tax_excluded"
+export const DEFAULT_PRICE_TAX_MODE="tax_included"
 
-export function normalizePriceTaxMode(value){return value==="tax_included"?"tax_included":"tax_excluded"}
+export function normalizePriceTaxMode(value){return value==="tax_excluded"?"tax_excluded":"tax_included"}
 export function normalizeTaxSettings(value={}){return{enabled:value?.enabled!==false,vat_rate:Math.max(0,Number(value?.vat_rate??21)||0),price_tax_mode:normalizePriceTaxMode(value?.price_tax_mode)}}
 export function roundPrice(value){return Math.round((Number(value)||0)*100)/100}
 export function commercialPriceFromNet(value,taxes={}){const net=Math.max(0,Number(value)||0),config=normalizeTaxSettings(taxes);return config.enabled&&config.price_tax_mode==="tax_included"?roundPrice(net*(1+config.vat_rate/100)):roundPrice(net)}
