@@ -192,7 +192,15 @@ export default function OliviaAssistant({ propertyId, propertyName, context, onH
         p_action_id: action.id,
       })
       if (error) throw error
-      patchActionMessage(messageId, data || action, "")
+      const executed = data || action
+      patchActionMessage(messageId, executed, "")
+      if (executed?.status === "executed") {
+        setMessages((current) => [...current, {
+          id: `done-${Date.now()}`,
+          role: "assistant",
+          text: "Listo, ya quedó hecho y registrado en el PMS. ¿Necesitás que te ayude con algo más?",
+        }])
+      }
     } catch (error) {
       patchActionMessage(messageId, action, error?.message || "No pude ejecutar esta acción.")
     } finally {
