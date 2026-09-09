@@ -22,6 +22,7 @@ function OperationalContext({context,loading,onNavigate,allowedViews=[]}){
   const reservation=context.reservation,guest=context.guest,rooms=context.rooms||[],payments=context.payments||{},housekeeping=context.housekeeping||[],maintenance=context.maintenance||[]
   const roomNames=rooms.map(room=>room.name).filter(Boolean).join(", ")||"Sin habitación"
   const firstRoom=rooms[0]
+  function openHousekeeping(){if(firstRoom?.id&&typeof window!=="undefined"){const url=new URL(window.location.href);url.searchParams.set("housekeeping_room",String(firstRoom.id));window.history.replaceState(window.history.state||{},"",url)}onNavigate?.("housekeeping",{restoreScroll:false})}
   return <div className={s.contextPanel}>
     <div className={s.contextTop}><div><small>CONTEXTO OPERATIVO</small><b>{reservation?`Reserva ${reservation.number||reservation.id}`:"Huésped reconocido"}</b></div><span className={s.linkBadge}>● Vinculado</span></div>
     <div className={s.contextGrid}>
@@ -35,7 +36,7 @@ function OperationalContext({context,loading,onNavigate,allowedViews=[]}){
     {reservation&&<div className={s.contextActions}>
       {allowed.has("reservations")&&<button type="button" onClick={()=>onNavigate?.("reservations",{reservationId:Number(reservation.id),restoreScroll:false})}>Ver reserva</button>}
       {allowed.has("dailycash")&&<button type="button" onClick={()=>onNavigate?.("dailycash",{cashReservationId:Number(reservation.id),restoreScroll:false})}>Cobros</button>}
-      {allowed.has("housekeeping")&&<button type="button" onClick={()=>onNavigate?.("housekeeping")}>Housekeeping</button>}
+      {allowed.has("housekeeping")&&<button type="button" onClick={openHousekeeping}>Housekeeping</button>}
       {allowed.has("maintenance")&&<button type="button" onClick={()=>onNavigate?.("maintenance")}>Mantenimiento</button>}
     </div>}
   </div>
@@ -63,6 +64,7 @@ export default function MessagesWorkspace({propertyId,onNavigate,allowedViews=[]
   const resolving=selected?Boolean(data.contextLoading[selected.id]):false
 
   useEffect(()=>{if(selected?.id)data.loadContext(selected.id)},[selected?.id,data.loadContext])
+  useEffect(()=>{if(data.loading||typeof window==="undefined")return;const url=new URL(window.location.href),requested=url.searchParams.get("conversation");if(!requested)return;url.searchParams.delete("conversation");window.history.replaceState(window.history.state||{},"",url);const thread=data.conversations.find(item=>item.id===requested);if(!thread)return;setFilter("all");setChannelFilter("all");setSelectedId(thread.id);if(thread.unread_count>0)data.markRead(thread.id).catch(err=>data.setError(err?.message||"No se pudo marcar como leído."))},[data.loading,data.conversations])
 
   function notify(text){setToast(text);window.setTimeout(()=>setToast(""),2200)}
   function changeMailbox(id){setFilter(id);setSelectedId("")}
