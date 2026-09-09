@@ -5,7 +5,52 @@ import{supabase}from"../../../../lib/supabase"
 
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:0}).format(Number(value)||0)
 const emit=detail=>window.dispatchEvent(new CustomEvent("hl:pms-toast",{detail}))
-const LIVE_TABLES=["reservas","pagos","habitaciones","bloqueos","hotel_housekeeping_tasks","hotel_housekeeping_history","hotel_maintenance_tickets","hotel_guest_requests","hotel_guest_profiles","hotel_no_show_history","hotel_cancellation_policies","hotel_guarantees","hotel_reservation_events","hotel_cash_movements","hotel_finance_documents","hotel_cash_sessions","hotel_folios","hotel_folio_items","hotel_folio_payment_allocations"]
+const LIVE_TABLES=["reservas","pagos","habitaciones","bloqueos","hotel_housekeeping_tasks","hotel_housekeeping_history","hotel_maintenance_tickets","hotel_guest_requests","hotel_guest_profiles","hotel_no_show_history","hotel_cancellation_policies","hotel_guarantees","hotel_reservation_events","hotel_cash_movements","hotel_finance_documents","hotel_cash_sessions","hotel_folios","hotel_folio_items","hotel_folio_payment_allocations","hotel_operational_events"]
+const OPS_TABLES=new Set(["hotel_housekeeping_tasks","hotel_maintenance_tickets","hotel_guest_requests"])
+const OPS_KEY_PREFIX="hl:ops-notifications:"
+
+function operationalArea(table,row={}){
+  if(table==="hotel_housekeeping_tasks")return"housekeeping"
+  if(table==="hotel_maintenance_tickets")return"maintenance"
+  if(table==="hotel_guest_requests")return row.assigned_area||"reception"
+  return null
+}
+function operationalTitle(table,row={}){
+  if(table==="hotel_housekeeping_tasks")return`Housekeeping · Hab. ${row.room_id||"—"}`
+  if(table==="hotel_maintenance_tickets")return`Mantenimiento · ${row.title||"Nueva tarea"}`
+  if(table==="hotel_guest_requests")return`Petición · ${row.title||"Nueva solicitud"}`
+  return"Nueva alerta operativa"
+}
+function operationalMessage(table,row={}){
+  const priority=row.priority?` · ${String(row.priority).toUpperCase()}`:""
+  if(table==="hotel_housekeeping_tasks")return`${String(row.task_type||"Tarea").replaceAll("_"," ")}${priority}`
+  return`${row.detail||row.description||"Requiere atención"}${priority}`
+}
+function playOperationalAlert(){
+  if(typeof window==="undefined")return
+  try{
+    const AudioContext=window.AudioContext||window.webkitAudioContext
+    if(!AudioContext)return
+    const ctx=new AudioContext(),gain=ctx.createGain(),osc=ctx.createOscillator()
+    osc.type="sine";osc.frequency.setValueAtTime(720,ctx.currentTime);osc.frequency.exponentialRampToValueAtTime(1040,ctx.currentTime+.14)
+    gain.gain.setValueAtTime(.0001,ctx.currentTime);gain.gain.exponentialRampToValueAtTime(.14,ctx.currentTime+.015);gain.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+.28)
+    osc.connect(gain);gain.connect(ctx.destination);osc.start();osc.stop(ctx.currentTime+.29);osc.onended=()=>ctx.close().catch(()=>{})
+  }catch{}
+}
+function operationalNotificationsEnabled(area){
+  if(typeof window==="undefined"||!area||area==="reception")return false
+  try{return window.localStorage.getItem(`${OPS_KEY_PREFIX}${area}`)==="1"}catch{return false}
+}
+function notifyOperational(table,row={}){
+  const area=operationalArea(table,row)
+  if(!operationalNotificationsEnabled(area))return
+  const title=operationalTitle(table,row),message=operationalMessage(table,row)
+  playOperationalAlert()
+  emit({tone:row.priority==="urgent"?"danger":row.priority==="high"?"warning":"info",title,message,duration:7500})
+  if(typeof window!=="undefined"&&"Notification"in window&&Notification.permission==="granted"){
+    try{new Notification(title,{body:message,tag:`hl-${table}-${row.id||Date.now()}`,renotify:true})}catch{}
+  }
+}
 
 export default function PaymentAlertWatcher({propertyId}){
   const known=useRef(new Set()),primed=useRef(false),syncTimer=useRef(null),pendingTables=useRef(new Set())
@@ -46,6 +91,7 @@ export default function PaymentAlertWatcher({propertyId}){
       if(table==="reservas")window.dispatchEvent(new CustomEvent("hl:pms-reservation-updated",{detail}))
       if(table==="pagos")window.dispatchEvent(new CustomEvent("hl:pms-payment-updated",{detail}))
       if(table==="hotel_cancellation_policies")window.dispatchEvent(new CustomEvent("hl:pms-cancellation-policies-updated",{detail}))
+      if(OPS_TABLES.has(table)&&payload?.eventType==="INSERT")notifyOperational(table,payload?.new||{})
     }
     let channel=supabase.channel(`hl-pms-sync-${propertyId}`)
     for(const table of LIVE_TABLES)channel=channel.on("postgres_changes",{event:"*",schema:"public",table,filter:`property_id=eq.${propertyId}`},payload=>changed(table,payload))
