@@ -8,6 +8,7 @@ const emit=detail=>window.dispatchEvent(new CustomEvent("hl:pms-toast",{detail})
 const LIVE_TABLES=["reservas","pagos","habitaciones","bloqueos","hotel_housekeeping_tasks","hotel_housekeeping_history","hotel_maintenance_tickets","hotel_guest_requests","hotel_guest_profiles","hotel_no_show_history","hotel_cancellation_policies","hotel_guarantees","hotel_reservation_events","hotel_cash_movements","hotel_finance_documents","hotel_cash_sessions","hotel_folios","hotel_folio_items","hotel_folio_payment_allocations","hotel_operational_events"]
 const OPS_TABLES=new Set(["hotel_housekeeping_tasks","hotel_maintenance_tickets","hotel_guest_requests"])
 const OPS_KEY_PREFIX="hl:ops-notifications:"
+const DEFAULT_AREA_ACCESS={owner:["housekeeping","maintenance"],manager:["housekeeping","maintenance"],admin:["housekeeping","maintenance"],housekeeping:["housekeeping"],maintenance:["maintenance"],reception:[],night_audit:[],revenue:[],member:[]}
 
 function operationalArea(table,row={}){
   if(table==="hotel_housekeeping_tasks")return"housekeeping"
@@ -52,9 +53,30 @@ function notifyOperational(table,row,allowedAreas){
   }
 }
 
-export default function PaymentAlertWatcher({propertyId,allowedViews=[]}){
+export default function PaymentAlertWatcher({propertyId}){
   const known=useRef(new Set()),primed=useRef(false),syncTimer=useRef(null),pendingTables=useRef(new Set()),allowedAreasRef=useRef(new Set())
-  useEffect(()=>{allowedAreasRef.current=new Set([allowedViews.includes("housekeeping")?"housekeeping":null,allowedViews.includes("maintenance")?"maintenance":null].filter(Boolean))},[allowedViews.join("|")])
+
+  useEffect(()=>{
+    allowedAreasRef.current=new Set()
+    if(!propertyId)return
+    let cancelled=false
+    ;(async()=>{
+      try{
+        const{data:userData}=await supabase.auth.getUser(),uid=userData?.user?.id
+        if(!uid||cancelled)return
+        const[memberRes,settingsRes]=await Promise.all([
+          supabase.from("property_members").select("role").eq("property_id",propertyId).eq("user_id",uid).maybeSingle(),
+          supabase.from("property_settings").select("settings").eq("property_id",propertyId).maybeSingle(),
+        ])
+        if(cancelled)return
+        const role=memberRes.data?.role||"member",custom=settingsRes.data?.settings?.role_permissions?.[role]
+        const views=Array.isArray(custom)?custom:null
+        allowedAreasRef.current=new Set(views?[views.includes("housekeeping")?"housekeeping":null,views.includes("maintenance")?"maintenance":null].filter(Boolean):(DEFAULT_AREA_ACCESS[role]||[]))
+      }catch{allowedAreasRef.current=new Set()}
+    })()
+    return()=>{cancelled=true}
+  },[propertyId])
+
   useEffect(()=>{
     known.current=new Set();primed.current=false
     if(!propertyId)return
