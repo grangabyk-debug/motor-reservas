@@ -41,9 +41,9 @@ function operationalNotificationsEnabled(area){
   if(typeof window==="undefined"||!area||area==="reception")return false
   try{return window.localStorage.getItem(`${OPS_KEY_PREFIX}${area}`)==="1"}catch{return false}
 }
-function notifyOperational(table,row={}){
+function notifyOperational(table,row,allowedAreas){
   const area=operationalArea(table,row)
-  if(!operationalNotificationsEnabled(area))return
+  if(!area||!allowedAreas?.has(area)||!operationalNotificationsEnabled(area))return
   const title=operationalTitle(table,row),message=operationalMessage(table,row)
   playOperationalAlert()
   emit({tone:row.priority==="urgent"?"danger":row.priority==="high"?"warning":"info",title,message,duration:7500})
@@ -52,8 +52,9 @@ function notifyOperational(table,row={}){
   }
 }
 
-export default function PaymentAlertWatcher({propertyId}){
-  const known=useRef(new Set()),primed=useRef(false),syncTimer=useRef(null),pendingTables=useRef(new Set())
+export default function PaymentAlertWatcher({propertyId,allowedViews=[]}){
+  const known=useRef(new Set()),primed=useRef(false),syncTimer=useRef(null),pendingTables=useRef(new Set()),allowedAreasRef=useRef(new Set())
+  useEffect(()=>{allowedAreasRef.current=new Set([allowedViews.includes("housekeeping")?"housekeeping":null,allowedViews.includes("maintenance")?"maintenance":null].filter(Boolean))},[allowedViews.join("|")])
   useEffect(()=>{
     known.current=new Set();primed.current=false
     if(!propertyId)return
@@ -91,7 +92,7 @@ export default function PaymentAlertWatcher({propertyId}){
       if(table==="reservas")window.dispatchEvent(new CustomEvent("hl:pms-reservation-updated",{detail}))
       if(table==="pagos")window.dispatchEvent(new CustomEvent("hl:pms-payment-updated",{detail}))
       if(table==="hotel_cancellation_policies")window.dispatchEvent(new CustomEvent("hl:pms-cancellation-policies-updated",{detail}))
-      if(OPS_TABLES.has(table)&&payload?.eventType==="INSERT")notifyOperational(table,payload?.new||{})
+      if(OPS_TABLES.has(table)&&payload?.eventType==="INSERT")notifyOperational(table,payload?.new||{},allowedAreasRef.current)
     }
     let channel=supabase.channel(`hl-pms-sync-${propertyId}`)
     for(const table of LIVE_TABLES)channel=channel.on("postgres_changes",{event:"*",schema:"public",table,filter:`property_id=eq.${propertyId}`},payload=>changed(table,payload))
