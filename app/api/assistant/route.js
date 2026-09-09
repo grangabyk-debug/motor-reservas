@@ -6,12 +6,15 @@ function preguntaLocal(question) {
   return /cu[aá]ntas?.*(habitaciones?.*)?ocupad|ocupadas?.*hoy|cu[aá]ntas?.*reservas|reservas.*(tengo|hay)|cu[aá]ntas?.*noches|noches.*vend|cu[aá]ntas?.*habitaci|cu[aá]nto.*(vend|factur|ingres)|ventas.*(hoy|30 d[ií]as|mes)/i.test(q)
 }
 
-function compactarContexto(context = {}) {
+function compactarContexto(context = {}, propertyId = null) {
   return {
     plataforma: context.plataforma || "HabitaciónLlena.com · PMS hotelero",
+    propiedad_id: propertyId,
     hoy: context.hoy || null,
     metricas: context.metricas || {},
-    alojamientos: Array.isArray(context.alojamientos) ? context.alojamientos.slice(0, 20) : [],
+    alojamientos: Array.isArray(context.alojamientos)
+      ? context.alojamientos.filter((item) => !propertyId || String(item?.id || "") === String(propertyId)).slice(0, 1)
+      : [],
     habitaciones: Array.isArray(context.habitaciones) ? context.habitaciones.slice(0, 300) : [],
     reservas: Array.isArray(context.reservas) ? context.reservas.slice(-300) : [],
   }
@@ -71,9 +74,31 @@ export async function POST(request) {
     }
 
     const body = await request.json().catch(() => null)
+    const propertyId = typeof body?.propertyId === "string" ? body.propertyId.trim() : ""
     const question = typeof body?.question === "string" ? body.question.trim() : ""
     const rawContext = body?.context && typeof body.context === "object" ? body.context : {}
     const history = compactarHistorial(body?.history)
+
+    if (!propertyId) {
+      return NextResponse.json(
+        { error: "Falta la propiedad activa del PMS." },
+        { status: 400 }
+      )
+    }
+
+    const { data: membership, error: membershipError } = await authClient
+      .from("property_members")
+      .select("property_id,user_id,role")
+      .eq("property_id", propertyId)
+      .eq("user_id", currentUser.id)
+      .maybeSingle()
+
+    if (membershipError || !membership) {
+      return NextResponse.json(
+        { error: "No tenés acceso a esa propiedad." },
+        { status: 403 }
+      )
+    }
 
     if (!question) {
       return NextResponse.json(
@@ -89,21 +114,22 @@ export async function POST(request) {
       )
     }
 
+    const context = compactarContexto(rawContext, propertyId)
+
     if (preguntaLocal(question)) {
       return NextResponse.json({
-        answer: responderSinIA(question, rawContext),
+        answer: responderSinIA(question, context),
         mode: "local",
       })
     }
 
-    const context = compactarContexto(rawContext)
     const serializedContext = JSON.stringify(context)
     const serializedHistory = JSON.stringify(history)
     const apiKey = process.env.OPENAI_API_KEY
 
     if (!apiKey) {
       return NextResponse.json({
-        answer: responderSinIA(question, rawContext),
+        answer: responderSinIA(question, context),
         mode: "local",
       })
     }
@@ -130,10 +156,11 @@ PODÉS AYUDAR A
 - Promover buenas prácticas hoteleras y un uso eficiente del PMS.
 
 REGLAS IMPORTANTES
-- Los valores operativos reales salen únicamente del contexto proporcionado por el PMS. No inventes reservas, ingresos, ocupación, habitaciones, huéspedes, estados ni resultados.
+- Los valores operativos reales salen únicamente del contexto proporcionado por el PMS de la propiedad ya validada. No inventes reservas, ingresos, ocupación, habitaciones, huéspedes, estados ni resultados.
 - Si falta un dato para responder con precisión, decilo y explicá qué dato haría falta.
 - Diferenciá cobros, ventas, facturación e ingresos cuando el contexto no permita tratarlos como equivalentes.
 - No afirmes que realizaste una reserva, un cobro, un cambio de tarifa, un envío o cualquier modificación si solo estás explicando qué hacer.
+- Las acciones operativas futuras deben pasar por contratos tipados, aprobación humana y auditoría. Nunca presentes una sugerencia como si ya hubiese sido ejecutada.
 - No solicites contraseñas, tokens, datos completos de tarjetas ni credenciales sensibles.
 - No mezcles información entre alojamientos o usuarios.
 - Si te consultan por tendencias o información externa de último momento y no aparece en el contexto, aclarás que esa información en tiempo real no está disponible en esta consulta; podés dar buenas prácticas generales sin presentarlas como actualidad confirmada.
@@ -172,7 +199,7 @@ ${question}
     if (!response.ok) {
       console.error("Error OpenAI:", data)
       return NextResponse.json({
-        answer: responderSinIA(question, rawContext),
+        answer: responderSinIA(question, context),
         mode: "local",
       })
     }
