@@ -1,1 +1,1 @@
-export{default}from"../../../pms-shared/features/finance/ReservationPaymentPanelMultiCurrency"
+export{default}from"../../../pms-shared/features/finance/ReservationPaymentPanelMultiCurrencyV2"
