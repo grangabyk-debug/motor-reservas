@@ -3,126 +3,75 @@
 import{useCallback,useEffect,useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 import usePmsAutoRefresh from"../../core/usePmsAutoRefresh"
+import useOperationalNotifications from"../../core/useOperationalNotifications"
 import s from"./housekeeping.module.css"
 
-const labels={sucia:"Sucia",limpia:"Limpia",inspeccionada:"Inspeccionada",libre:"Lista",mantenimiento:"Mantenimiento"}
-const actionLabel={sucia:"Marcar limpia",limpia:"Marcar inspeccionada"}
+const labels={sucia:"Sucia",limpia:"Limpia",inspeccionada:"Inspeccionada",libre:"Lista",mantenimiento:"Mantenimiento",fuera_servicio:"Fuera de servicio"}
+const HK_STATUS={scheduled:"Programada",assigned:"Asignada",in_progress:"En curso",inspection:"A inspección",done:"Lista",blocked:"Bloqueada"}
+const HK_TYPE={clean:"Limpieza",stayover:"Repaso",checkout:"Salida",inspection:"Inspección",turndown:"Turn down",linen:"Ropa blanca",minibar:"Minibar",deep_clean:"Profunda",other:"Otra"}
+const PRIORITY={low:"Baja",normal:"Media",high:"Alta",urgent:"Urgente"},score={urgent:4,high:3,normal:2,low:1}
+const priorityTone=value=>value==="urgent"?"red":value==="high"?"orange":value==="normal"?"yellow":"green"
+const stateTone=status=>status==="done"?"green":["in_progress","inspection"].includes(status)?"yellow":"red"
 
 function localDate(){return new Date().toLocaleDateString("en-CA")}
 function daysBetween(a,b){return Math.floor((b-a)/86400000)}
-function dateLabel(value){if(!value)return"Nunca";return new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short",year:"numeric"}).format(new Date(value))}
+function dateLabel(value){if(!value)return"Nunca";return new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short",year:"numeric"}).format(new Date(value)).replace(".","")}
+function dateTime(value){if(!value)return"Ahora";return new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}).format(new Date(value)).replace(".","")}
+function nextStatus(status){if(["scheduled","assigned","blocked"].includes(status))return"in_progress";if(status==="in_progress")return"inspection";if(status==="inspection")return"done";return null}
+function nextLabel(status){const next=nextStatus(status);return next==="in_progress"?"▶ Iniciar":next==="inspection"?"◎ Enviar a inspección":next==="done"?"✓ Completar":""}
 
 export default function HousekeepingWorkspace({propertyId}){
-  const[rooms,setRooms]=useState([])
-  const[reservations,setReservations]=useState([])
-  const[tasks,setTasks]=useState([])
-  const[deepTasks,setDeepTasks]=useState([])
-  const[filter,setFilter]=useState("all")
-  const[query,setQuery]=useState("")
-  const[mode,setMode]=useState("daily")
-  const[deepCadence,setDeepCadence]=useState(90)
-  const[loading,setLoading]=useState(true)
-  const[saving,setSaving]=useState("")
-  const[error,setError]=useState("")
+  const[rooms,setRooms]=useState([]),[reservations,setReservations]=useState([]),[tasks,setTasks]=useState([]),[deepTasks,setDeepTasks]=useState([])
+  const[filter,setFilter]=useState("all"),[query,setQuery]=useState(""),[mode,setMode]=useState("daily"),[deepCadence,setDeepCadence]=useState(90)
+  const[loading,setLoading]=useState(true),[saving,setSaving]=useState(""),[error,setError]=useState("")
 
   const load=useCallback(async()=>{
     if(!propertyId)return
-    setLoading(true);setError("")
-    const today=localDate()
+    setLoading(true);setError("");const today=localDate()
     try{
       const[roomRes,reservationRes,taskRes,deepRes,settingsRes]=await Promise.all([
         supabase.from("habitaciones").select("id,nombre,tipo,estado,sort_order,housekeeping_zone").eq("property_id",propertyId).eq("activa",true).order("sort_order").order("nombre"),
-        supabase.from("reservas").select("id,habitacion_id,habitaciones_ids,fecha_entrada,fecha_salida,estado,hora_llegada_estimada,hora_salida_estimada").eq("property_id",propertyId).lte("fecha_entrada",today).gte("fecha_salida",today),
-        supabase.from("hotel_housekeeping_tasks").select("id,room_id,task_type,status,assigned_to,scheduled_for,notes,updated_at").eq("property_id",propertyId).neq("task_type","deep_clean").order("updated_at",{ascending:false}),
-        supabase.from("hotel_housekeeping_tasks").select("id,room_id,status,scheduled_for,completed_at,created_at,notes").eq("property_id",propertyId).eq("task_type","deep_clean").order("completed_at",{ascending:false,nullsFirst:false}).order("created_at",{ascending:false}),
+        supabase.from("reservas").select("id,numero_reserva,nombre_huesped,habitacion_id,habitaciones_ids,fecha_entrada,fecha_salida,estado,hora_llegada_estimada,hora_salida_estimada").eq("property_id",propertyId).lte("fecha_entrada",today).gte("fecha_salida",today).neq("estado","cancelada"),
+        supabase.from("hotel_housekeeping_tasks").select("id,reservation_id,room_id,task_type,priority,status,assigned_to,scheduled_for,started_at,completed_at,checklist,notes,created_at,updated_at").eq("property_id",propertyId).neq("task_type","deep_clean").order("updated_at",{ascending:false}),
+        supabase.from("hotel_housekeeping_tasks").select("id,reservation_id,room_id,status,priority,scheduled_for,completed_at,created_at,notes").eq("property_id",propertyId).eq("task_type","deep_clean").order("completed_at",{ascending:false,nullsFirst:false}).order("created_at",{ascending:false}),
         supabase.from("property_settings").select("settings").eq("property_id",propertyId).maybeSingle(),
       ])
       for(const result of[roomRes,reservationRes,taskRes,deepRes,settingsRes])if(result.error)throw result.error
       setRooms(roomRes.data||[]);setReservations(reservationRes.data||[]);setTasks(taskRes.data||[]);setDeepTasks(deepRes.data||[])
-      const configured=Number(settingsRes.data?.settings?.housekeeping?.deep_clean_cadence_days)
-      if(configured>0)setDeepCadence(configured)
-    }catch(err){setError(err?.message||"No se pudo cargar Housekeeping.")}
-    finally{setLoading(false)}
+      const configured=Number(settingsRes.data?.settings?.housekeeping?.deep_clean_cadence_days);if(configured>0)setDeepCadence(configured)
+    }catch(err){setError(err?.message||"No se pudo cargar Housekeeping.")}finally{setLoading(false)}
   },[propertyId])
 
   useEffect(()=>{load()},[load])
   usePmsAutoRefresh(propertyId,load,["reservas","habitaciones","hotel_housekeeping_tasks"])
+  const notifications=useOperationalNotifications({propertyId,area:"housekeeping",tables:["hotel_housekeeping_tasks"],onRefresh:load})
 
-  const reservationByRoom=useMemo(()=>{
-    const map=new Map()
-    for(const reservation of reservations){
-      const ids=[reservation.habitacion_id,...(reservation.habitaciones_ids||[])].filter(Boolean)
-      ids.forEach(id=>map.set(Number(id),reservation))
-    }
-    return map
-  },[reservations])
+  const reservationByRoom=useMemo(()=>{const map=new Map();for(const reservation of reservations){const ids=[reservation.habitacion_id,...(reservation.habitaciones_ids||[])].filter(Boolean);ids.forEach(id=>map.set(Number(id),reservation))}return map},[reservations])
+  const reservationById=useMemo(()=>new Map(reservations.map(item=>[Number(item.id),item])),[reservations])
+  const taskByRoom=useMemo(()=>{const map=new Map();for(const task of tasks){if(!task.room_id)continue;const id=Number(task.room_id),current=map.get(id);if(!current||current.status==="done"&&task.status!=="done")map.set(id,task)}return map},[tasks])
+  const lastDeepByRoom=useMemo(()=>{const map=new Map();for(const task of deepTasks)if(task.room_id&&task.status==="done"&&!map.has(Number(task.room_id)))map.set(Number(task.room_id),task);return map},[deepTasks])
 
-  const taskByRoom=useMemo(()=>{
-    const map=new Map();for(const task of tasks)if(task.room_id&&!map.has(Number(task.room_id)))map.set(Number(task.room_id),task);return map
-  },[tasks])
-
-  const lastDeepByRoom=useMemo(()=>{
-    const map=new Map();for(const task of deepTasks)if(task.room_id&&task.status==="done"&&!map.has(Number(task.room_id)))map.set(Number(task.room_id),task);return map
-  },[deepTasks])
-
-  const enriched=useMemo(()=>rooms.map(room=>{
-    const reservation=reservationByRoom.get(Number(room.id));const task=taskByRoom.get(Number(room.id));const deep=lastDeepByRoom.get(Number(room.id))
-    const today=localDate();let occupancy="Sin estadía activa"
-    if(reservation){if(reservation.fecha_entrada===today&&reservation.fecha_salida===today)occupancy="Entrada y salida hoy";else if(reservation.fecha_entrada===today)occupancy=`Entrada hoy${reservation.hora_llegada_estimada?` · ${reservation.hora_llegada_estimada}`:""}`;else if(reservation.fecha_salida===today)occupancy=`Salida hoy${reservation.hora_salida_estimada?` · ${reservation.hora_salida_estimada}`:""}`;else occupancy="Huésped alojado"}
-    const completed=deep?.completed_at||null;const elapsed=completed?daysBetween(new Date(completed),new Date()):null;const due=elapsed==null?null:deepCadence-elapsed
-    return{...room,reservation,task,occupancy,lastDeep:completed,deepDue:due}
-  }),[rooms,reservationByRoom,taskByRoom,lastDeepByRoom,deepCadence])
-
-  const visible=useMemo(()=>enriched.filter(room=>(filter==="all"||room.estado===filter)&&(!query||`${room.nombre} ${room.tipo||""} ${room.housekeeping_zone||""} ${room.occupancy}`.toLowerCase().includes(query.toLowerCase()))),[enriched,filter,query])
+  const enriched=useMemo(()=>rooms.map(room=>{const reservation=reservationByRoom.get(Number(room.id)),task=taskByRoom.get(Number(room.id)),deep=lastDeepByRoom.get(Number(room.id)),today=localDate();let occupancy="Sin estadía activa";if(reservation){if(reservation.fecha_entrada===today&&reservation.fecha_salida===today)occupancy="Entrada y salida hoy";else if(reservation.fecha_entrada===today)occupancy=`Entrada hoy${reservation.hora_llegada_estimada?` · ${reservation.hora_llegada_estimada}`:""}`;else if(reservation.fecha_salida===today)occupancy=`Salida hoy${reservation.hora_salida_estimada?` · ${reservation.hora_salida_estimada}`:""}`;else occupancy=`Alojado · ${reservation.nombre_huesped||"Huésped"}`}const completed=deep?.completed_at||null,elapsed=completed?daysBetween(new Date(completed),new Date()):null,due=elapsed==null?null:deepCadence-elapsed;return{...room,reservation,task,occupancy,lastDeep:completed,deepDue:due}}),[rooms,reservationByRoom,taskByRoom,lastDeepByRoom,deepCadence])
+  const activeTasks=useMemo(()=>tasks.filter(task=>task.status!=="done").sort((a,b)=>(score[b.priority]||0)-(score[a.priority]||0)||new Date(a.scheduled_for||0)-new Date(b.scheduled_for||0)),[tasks])
+  const stats=useMemo(()=>({urgent:activeTasks.filter(t=>t.priority==="urgent").length,pending:activeTasks.filter(t=>["scheduled","assigned","blocked"].includes(t.status)).length,progress:activeTasks.filter(t=>["in_progress","inspection"].includes(t.status)).length,done:tasks.filter(t=>t.status==="done").length}),[activeTasks,tasks])
+  const visible=useMemo(()=>enriched.filter(room=>(filter==="all"||room.estado===filter)&&(!query||`${room.nombre} ${room.tipo||""} ${room.housekeeping_zone||""} ${room.occupancy} ${room.task?.notes||""}`.toLowerCase().includes(query.toLowerCase()))),[enriched,filter,query])
   const counts=useMemo(()=>Object.fromEntries(Object.keys(labels).map(key=>[key,enriched.filter(room=>room.estado===key).length])),[enriched])
 
-  async function advance(room){
-    const next=room.estado==="sucia"?"limpia":room.estado==="limpia"?"inspeccionada":null
-    if(!next)return
-    setSaving(String(room.id));setError("")
-    try{
-      const{error:updateError}=await supabase.from("habitaciones").update({estado:next}).eq("id",room.id).eq("property_id",propertyId)
-      if(updateError)throw updateError
-      const{data:userData}=await supabase.auth.getUser()
-      const{error:historyError}=await supabase.from("hotel_housekeeping_history").insert({property_id:propertyId,room_id:room.id,reservation_id:room.reservation?.id||null,task_id:room.task?.id||null,from_status:room.estado,to_status:next,source:"pms_next",note:null,metadata:{surface:"housekeeping"},actor_id:userData?.user?.id||null})
-      if(historyError)throw historyError
-      await load()
-    }catch(err){setError(err?.message||"No se pudo actualizar la habitación.")}
-    finally{setSaving("")}
-  }
-
-  async function registerDeepClean(room){
-    setSaving(`deep-${room.id}`);setError("")
-    try{
-      const{data:userData,error:userError}=await supabase.auth.getUser();if(userError)throw userError
-      const now=new Date().toISOString()
-      const{error:taskError}=await supabase.from("hotel_housekeeping_tasks").insert({property_id:propertyId,room_id:room.id,reservation_id:room.reservation?.id||null,task_type:"deep_clean",priority:"normal",status:"done",assigned_to:userData?.user?.id||null,scheduled_for:now,started_at:now,completed_at:now,checklist:[],minibar:{},linen:{},notes:null,created_by:userData?.user?.id||null})
-      if(taskError)throw taskError
-      await load()
-    }catch(err){setError(err?.message||"No se pudo registrar la limpieza profunda.")}
-    finally{setSaving("")}
-  }
-
-  async function saveCadence(){
-    setSaving("cadence");setError("")
-    try{
-      const{data:current,error:readError}=await supabase.from("property_settings").select("settings").eq("property_id",propertyId).maybeSingle();if(readError)throw readError
-      const settings={...(current?.settings||{}),housekeeping:{...(current?.settings?.housekeeping||{}),deep_clean_cadence_days:deepCadence}}
-      const{error:writeError}=await supabase.from("property_settings").upsert({property_id:propertyId,settings,updated_at:new Date().toISOString()},{onConflict:"property_id"});if(writeError)throw writeError
-    }catch(err){setError(err?.message||"No se pudo guardar la cadencia.")}
-    finally{setSaving("")}
-  }
+  async function registerHistory(room,task,fromStatus,toStatus,note){const{data:userData}=await supabase.auth.getUser();await supabase.from("hotel_housekeeping_history").insert({property_id:propertyId,room_id:room.id,reservation_id:task?.reservation_id||room.reservation?.id||null,task_id:task?.id||null,from_status:fromStatus,to_status:toStatus,source:"housekeeping",note:note||null,metadata:{surface:"housekeeping"},actor_id:userData?.user?.id||null})}
+  async function advanceRoom(room){const next=room.estado==="sucia"?"limpia":room.estado==="limpia"?"inspeccionada":null;if(!next)return;setSaving(String(room.id));setError("");try{const{error:updateError}=await supabase.from("habitaciones").update({estado:next}).eq("id",room.id).eq("property_id",propertyId);if(updateError)throw updateError;await registerHistory(room,room.task,room.estado,next,null);await load()}catch(err){setError(err?.message||"No se pudo actualizar la habitación.")}finally{setSaving("")}}
+  async function advanceTask(task){const next=nextStatus(task.status);if(!next)return;const room=enriched.find(item=>Number(item.id)===Number(task.room_id));setSaving(`task-${task.id}`);setError("");try{const now=new Date().toISOString(),patch={status:next,updated_at:now};if(next==="in_progress")patch.started_at=now;if(next==="done")patch.completed_at=now;const{error:updateError}=await supabase.from("hotel_housekeeping_tasks").update(patch).eq("id",task.id).eq("property_id",propertyId);if(updateError)throw updateError;if(room&&(next==="inspection"||next==="done")){const to=next==="inspection"?"limpia":"inspeccionada",before=room.estado;const{error:roomError}=await supabase.from("habitaciones").update({estado:to}).eq("id",room.id).eq("property_id",propertyId);if(roomError)throw roomError;await registerHistory(room,task,before,to,`Tarea ${HK_TYPE[task.task_type]||task.task_type}: ${HK_STATUS[next]||next}`)}await load()}catch(err){setError(err?.message||"No se pudo actualizar la tarea de pisos.")}finally{setSaving("")}}
+  async function registerDeepClean(room){setSaving(`deep-${room.id}`);setError("");try{const{data:userData,error:userError}=await supabase.auth.getUser();if(userError)throw userError;const now=new Date().toISOString();const{error:taskError}=await supabase.from("hotel_housekeeping_tasks").insert({property_id:propertyId,room_id:room.id,reservation_id:room.reservation?.id||null,task_type:"deep_clean",priority:"normal",status:"done",assigned_to:userData?.user?.id||null,scheduled_for:now,started_at:now,completed_at:now,checklist:[],minibar:{},linen:{},notes:null,created_by:userData?.user?.id||null});if(taskError)throw taskError;await load()}catch(err){setError(err?.message||"No se pudo registrar la limpieza profunda.")}finally{setSaving("")}}
+  async function saveCadence(){setSaving("cadence");setError("");try{const{data:current,error:readError}=await supabase.from("property_settings").select("settings").eq("property_id",propertyId).maybeSingle();if(readError)throw readError;const settings={...(current?.settings||{}),housekeeping:{...(current?.settings?.housekeeping||{}),deep_clean_cadence_days:deepCadence}};const{error:writeError}=await supabase.from("property_settings").upsert({property_id:propertyId,settings,updated_at:new Date().toISOString()},{onConflict:"property_id"});if(writeError)throw writeError}catch(err){setError(err?.message||"No se pudo guardar la cadencia.")}finally{setSaving("")}}
 
   return <section className={s.page}>
-    <header className={s.header}><div><small>HOUSEKEEPING</small><h1>Estado de habitaciones</h1><p>Limpieza diaria, inspección y limpieza profunda con datos de la propiedad activa.</p></div><div className={s.mode}><button className={mode==="daily"?s.active:""} onClick={()=>setMode("daily")}>Operación diaria</button><button className={mode==="deep"?s.active:""} onClick={()=>setMode("deep")}>Limpieza profunda</button></div></header>
-    {error&&<div className={s.note}>{error}</div>}
+    <header className={s.header}><div><small>HOUSEKEEPING</small><h1>Estado de habitaciones</h1><p>Una vista rápida para saber qué habitación necesita atención y qué hacer después.</p></div><div className={s.headerActions}><div className={s.mode}><button className={mode==="daily"?s.active:""} onClick={()=>setMode("daily")}>Operación diaria</button><button className={mode==="deep"?s.active:""} onClick={()=>setMode("deep")}>Limpieza profunda</button></div>{mode==="daily"?<button className={`${s.notifyButton} ${notifications.enabled?s.notifyOn:""}`} onClick={notifications.toggle}>{notifications.enabled?"🔔 Alertas activas":"🔕 Activar alertas"}</button>:null}</div></header>
+    {error&&<div className={s.errorBox}>{error}</div>}
     {loading?<div className={s.note}>Cargando habitaciones…</div>:!rooms.length?<div className={s.note}>Todavía no hay habitaciones activas en esta propiedad.</div>:mode==="daily"?<>
-      <div className={s.stats}>{Object.entries(labels).map(([key,label])=><button key={key} className={filter===key?s.selected:""} onClick={()=>setFilter(filter===key?"all":key)}><span>{label}</span><b>{counts[key]||0}</b></button>)}</div>
-      <div className={s.toolbar}><label>⌕<input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar habitación, tipo o zona"/></label><button onClick={()=>setFilter("all")}>Todas</button></div>
-      <div className={s.roomGrid}>{visible.map(room=><article className={s.roomCard} key={room.id}><div className={s.roomTop}><div><small>{room.tipo||"Habitación"}</small><h2>{room.nombre}</h2></div><span data-status={room.estado}>{labels[room.estado]||room.estado}</span></div><p className={s.occupancy}>{room.occupancy}</p><dl><div><dt>Tarea</dt><dd>{room.task?room.task.task_type.replaceAll("_"," "):"Sin tarea pendiente"}</dd></div><div><dt>Última profunda</dt><dd>{dateLabel(room.lastDeep)}</dd></div></dl>{room.task?.notes&&<p className={s.note}>{room.task.notes}</p>}<footer>{actionLabel[room.estado]&&<button onClick={()=>advance(room)} disabled={saving===String(room.id)}>{saving===String(room.id)?"Guardando…":actionLabel[room.estado]}</button>}</footer></article>)}</div>
-    </>:<>
-      <div className={s.deepToolbar}><div><b>Cadencia de limpieza profunda</b><span>Cada <input type="number" min="1" max="365" value={deepCadence} onChange={e=>setDeepCadence(Math.max(1,Number(e.target.value)||1))}/> días <button onClick={saveCadence} disabled={saving==="cadence"}>Guardar</button></span></div><div><strong>{enriched.filter(r=>r.deepDue==null||r.deepDue<=14).length}</strong><span>habitaciones sin registro o próximas a vencer</span></div></div>
-      <div className={s.deepList}>{enriched.map(room=>{const overdue=room.deepDue!=null&&room.deepDue<=0;const dueSoon=room.deepDue==null||room.deepDue<=14;return <article key={room.id} className={s.deepRow}><div className={s.deepRoom}><b>{room.nombre}</b><small>{room.tipo||"Habitación"}</small></div><div><small>Última limpieza</small><b>{dateLabel(room.lastDeep)}</b></div><div><small>Próxima</small><b className={overdue?s.overdue:dueSoon?s.soon:""}>{room.deepDue==null?"Sin registro":overdue?"Vencida":`${room.deepDue} días`}</b></div><button onClick={()=>registerDeepClean(room)} disabled={saving===`deep-${room.id}`}>{saving===`deep-${room.id}`?"Guardando…":"Registrar profunda"}</button></article>})}</div>
-    </>}
+      <div className={s.overview}><article data-tone="red"><span>Urgentes</span><b>{stats.urgent}</b><small>requieren atención ya</small></article><article data-tone="orange"><span>Pendientes</span><b>{stats.pending}</b><small>programadas o bloqueadas</small></article><article data-tone="yellow"><span>En proceso</span><b>{stats.progress}</b><small>limpieza o inspección</small></article><article data-tone="green"><span>Listas hoy</span><b>{stats.done}</b><small>tareas completadas</small></article></div>
+      <section className={s.queue}><header><div><small>COLA DE PISOS</small><h2>{activeTasks.length?`${activeTasks.length} tareas activas`:"Todo al día"}</h2></div><span>Ordenadas automáticamente por urgencia</span></header>{activeTasks.length?<div className={s.queueGrid}>{activeTasks.slice(0,8).map(task=>{const room=rooms.find(r=>Number(r.id)===Number(task.room_id)),reservation=reservationById.get(Number(task.reservation_id))||reservationByRoom.get(Number(task.room_id));return <article key={task.id} data-priority={priorityTone(task.priority)}><div className={s.queueTop}><span className={s.priorityPill} data-priority={priorityTone(task.priority)}>{PRIORITY[task.priority]||task.priority}</span><span className={s.statePill} data-tone={stateTone(task.status)}>{HK_STATUS[task.status]||task.status}</span></div><h3>Hab. {room?.nombre||task.room_id} · {HK_TYPE[task.task_type]||task.task_type}</h3>{reservation?<p>{reservation.nombre_huesped||"Huésped"} · {reservation.numero_reserva||reservation.id}</p>:<p>Sin huésped vinculado</p>}<small>{task.notes||dateTime(task.scheduled_for)}</small>{nextStatus(task.status)?<button onClick={()=>advanceTask(task)} disabled={saving===`task-${task.id}`}>{saving===`task-${task.id}`?"Guardando…":nextLabel(task.status)}</button>:null}</article>})}</div>:<div className={s.goodState}>✓ No hay tareas activas de pisos.</div>}</section>
+      <div className={s.stats}>{Object.entries(labels).filter(([key])=>key!=="fuera_servicio").map(([key,label])=><button key={key} className={filter===key?s.selected:""} onClick={()=>setFilter(filter===key?"all":key)}><span>{label}</span><b>{counts[key]||0}</b></button>)}</div>
+      <div className={s.toolbar}><label>⌕<input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar habitación, huésped, tipo o zona"/></label><button onClick={()=>setFilter("all")}>Todas</button></div>
+      <div className={s.roomGrid}>{visible.map(room=><article className={s.roomCard} key={room.id} data-priority={room.task?priorityTone(room.task.priority):"none"}><div className={s.roomTop}><div><small>{room.tipo||"Habitación"}</small><h2>{room.nombre}</h2></div><span data-status={room.estado}>{labels[room.estado]||room.estado}</span></div><p className={s.occupancy}>{room.occupancy}</p>{room.task?<div className={s.activeTask}><div><span className={s.priorityPill} data-priority={priorityTone(room.task.priority)}>{PRIORITY[room.task.priority]||room.task.priority}</span><b>{HK_TYPE[room.task.task_type]||room.task.task_type}</b></div><span className={s.statePill} data-tone={stateTone(room.task.status)}>{HK_STATUS[room.task.status]||room.task.status}</span>{room.task.notes?<p>{room.task.notes}</p>:null}</div>:<div className={s.noTask}>Sin tarea pendiente</div>}<dl><div><dt>Última profunda</dt><dd>{dateLabel(room.lastDeep)}</dd></div><div><dt>Zona</dt><dd>{room.housekeeping_zone||"General"}</dd></div></dl><footer>{room.task&&nextStatus(room.task.status)?<button onClick={()=>advanceTask(room.task)} disabled={saving===`task-${room.task.id}`}>{saving===`task-${room.task.id}`?"Guardando…":nextLabel(room.task.status)}</button>:!room.task&&room.estado==="sucia"?<button onClick={()=>advanceRoom(room)} disabled={saving===String(room.id)}>Marcar limpia</button>:!room.task&&room.estado==="limpia"?<button onClick={()=>advanceRoom(room)} disabled={saving===String(room.id)}>Marcar inspeccionada</button>:null}</footer></article>)}</div>
+    </>:<><div className={s.deepToolbar}><div><b>Cadencia de limpieza profunda</b><span>Cada <input type="number" min="1" max="365" value={deepCadence} onChange={e=>setDeepCadence(Math.max(1,Number(e.target.value)||1))}/> días <button onClick={saveCadence} disabled={saving==="cadence"}>Guardar</button></span></div><div><strong>{enriched.filter(r=>r.deepDue==null||r.deepDue<=14).length}</strong><span>habitaciones sin registro o próximas a vencer</span></div></div><div className={s.deepList}>{enriched.map(room=>{const overdue=room.deepDue!=null&&room.deepDue<=0,dueSoon=room.deepDue==null||room.deepDue<=14;return <article key={room.id} className={s.deepRow}><div className={s.deepRoom}><b>{room.nombre}</b><small>{room.tipo||"Habitación"}</small></div><div><small>Última limpieza</small><b>{dateLabel(room.lastDeep)}</b></div><div><small>Próxima</small><b className={overdue?s.overdue:dueSoon?s.soon:""}>{room.deepDue==null?"Sin registro":overdue?"Vencida":`${room.deepDue} días`}</b></div><button onClick={()=>registerDeepClean(room)} disabled={saving===`deep-${room.id}`}>{saving===`deep-${room.id}`?"Guardando…":"Registrar profunda"}</button></article>})}</div></>}
   </section>
 }
