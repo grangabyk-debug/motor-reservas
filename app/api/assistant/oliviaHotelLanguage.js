@@ -15,7 +15,7 @@ const HK_ITEMS=[
 
 const FAILURE=/\b(perdida|pierde|perdiendo|fuga|gotea|goteando|gotera|filtra|filtracion|humedad|mojado|mojada|rebalsa|rebalse|tapado|tapada|atascado|atascada|roto|rota|rompio|fallando|falla|fallo|averiado|averiada|quemado|quemada|no anda|no funciona|no prende|no enciende|no enfria|no calienta|sin agua|sin luz|sin wifi|sin internet|sin calefaccion|olor a gas|humo|chispa|chispas)\b/
 const TECHNICAL=/\b(aire|acondicionado|tv|televisor|television|ducha|canilla|grifo|inodoro|bano|luz|lampara|enchufe|electricidad|cerradura|puerta|ventana|wifi|internet|calefaccion|calefactor|agua caliente|heladera|minibar|secador|telefono|caja fuerte|safe|ascensor)\b/
-const HK_NEED=/\b(falta|faltan|necesita|necesitan|sin|manda|mandale|mandar|lleva|llevale|llevar|reponer|repon|cambiar|cambio|agregar|pone|poner|pedir|pide|piden|quiere|quieren|hace falta|hacen falta)\b/
+const HK_NEED=/\b(falta|faltan|necesita|necesitan|sin|manda|mandale|mandales|mandar|envia|enviar|enviale|enviales|lleva|llevale|llevales|llevar|subi|subir|subile|subiles|deja|dejar|dejale|dejales|alcanza|alcanzar|alcanzale|alcanzales|pasa|pasar|pasale|pasales|reponer|repon|cambiar|cambio|agregar|agrega|pone|poner|pedir|pide|piden|quiere|quieren|hace falta|hacen falta)\b/
 
 function isQuestion(value){const q=normalize(value);return String(value||"").includes("?")||/^(como|que|cual|cuanto|cuanta|cuantos|cuantas|por que|deberia|conviene|puedo|podemos|sabes|sabemos)\b/.test(q)}
 function roomKey(value){return compact(value).replace(/^(habitacion|hab|cuarto|room)/,"")}
