@@ -11,7 +11,7 @@ import ReservationMidStayRoomSplitControl from"./ReservationMidStayRoomSplitCont
 import ReservationMergeDialog from"./ReservationMergeDialog"
 import{addDays,buildReservationMetadataPatch,capacity,diffDays,initialReservationEditDraft,money,originalNightlyRate,roundMoney,unique}from"./reservationEditUtils"
 
-export default function ReservationEditPanel({item,assignedRooms=[],allRooms=[],saving=false,onCancel,onPreviewMove,onMove,onUpdate,onAddRoom,onMerge,onSaved}){
+export default function ReservationEditPanel({item,assignedRooms=[],allRooms=[],saving=false,onCancel,onPreviewMove,onMove,onUpdate,onAddRoom,onMerge=async(primaryId,secondaryId)=>{const{data,error}=await supabase.rpc("hl_merge_reservations_atomic",{p_primary_id:Number(primaryId),p_secondary_id:Number(secondaryId)});if(error)throw error;return data},onSaved}){
   const[draft,setDraft]=useState(()=>initialReservationEditDraft(item,assignedRooms)),[error,setError]=useState(""),[availabilityError,setAvailabilityError]=useState(""),[availabilityOk,setAvailabilityOk]=useState(""),[checkingAvailability,setCheckingAvailability]=useState(false),[pending,setPending]=useState(null),[working,setWorking]=useState(false),[stayFees,setStayFees]=useState({early_checkin_percent:35,late_checkout_percent:35,early_checkin_time:"08:00",late_checkout_time:"18:00"}),[mergeOpen,setMergeOpen]=useState(false)
   const validationSeq=useRef(0)
   const ids=unique(draft.roomIds?.length?draft.roomIds:[draft.roomId]),isGroup=ids.length>1,currentIds=unique([item.habitacion_id,...(item.habitaciones_ids||[])])
