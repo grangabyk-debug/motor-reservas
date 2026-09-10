@@ -31,23 +31,6 @@ export async function GET() {
       return NextResponse.json({ error: "TEST bloqueado: Channex no está en staging." }, { status: 403 })
     }
 
-    const options = await channexRequest(`/api/v1/rate_plans/options?filter[property_id]=${PROPERTY_ID}`)
-    const existing = (options?.data || []).find(item => {
-      const attrs = item?.attributes || {}
-      return attrs.title === TITLE && attrs.room_type_id === ROOM_TYPE_ID
-    })
-
-    if (existing?.id) {
-      const current = await channexRequest(`/api/v1/rate_plans/${existing.id}`)
-      const ratePlan = safeRatePlan(current)
-      if (ratePlan?.currency !== "GBP") {
-        return NextResponse.json({ error: "Ya existe el TEST con una moneda distinta de GBP.", rate_plan: ratePlan }, { status: 409 })
-      }
-      return NextResponse.json({ ok: true, created: false, staging_only: true, rate_plan: ratePlan }, {
-        headers: { "Cache-Control": "no-store" },
-      })
-    }
-
     const created = await channexRequest("/api/v1/rate_plans", {
       method: "POST",
       body: {
@@ -83,20 +66,18 @@ export async function GET() {
       },
     })
 
-    const id = created?.data?.id
-    if (!id) throw new Error("Channex no devolvió ID para el rate plan TEST GBP.")
-
-    const verified = await channexRequest(`/api/v1/rate_plans/${id}`)
-    const ratePlan = safeRatePlan(verified)
-    const valid = ratePlan?.title === TITLE
+    const ratePlan = safeRatePlan(created)
+    const valid = ratePlan?.id
+      && ratePlan?.title === TITLE
       && ratePlan?.currency === "GBP"
       && ratePlan?.property_id === PROPERTY_ID
       && ratePlan?.room_type_id === ROOM_TYPE_ID
       && ratePlan?.rate_mode === "manual"
       && ratePlan?.sell_mode === "per_room"
+      && Number(ratePlan?.options?.find(option => option?.is_primary)?.occupancy) === 2
 
     if (!valid) {
-      return NextResponse.json({ error: "El rate plan fue creado pero la verificación no coincide.", rate_plan: ratePlan }, { status: 500 })
+      return NextResponse.json({ error: "Channex respondió con datos inconsistentes para el TEST GBP.", rate_plan: ratePlan }, { status: 500 })
     }
 
     return NextResponse.json({ ok: true, created: true, staging_only: true, rate_plan: ratePlan }, {
