@@ -13,16 +13,25 @@ const selectedIds=draft=>[...new Set((draft?.roomIds?.length?draft.roomIds:[draf
 
 export function CreateReservationDrawer(props){
   const{draft,setDraft,availableRooms=[],propertyId}=props
-  const[rateCurrency,setRateCurrency]=useState(null),[effectiveRates,setEffectiveRates]=useState({})
+  const[rateCurrency,setRateCurrency]=useState(null),[effectiveRates,setEffectiveRates]=useState({}),[resolvedPropertyId,setResolvedPropertyId]=useState(propertyId||null)
   const roomIdsKey=useMemo(()=>availableRooms.map(room=>room.id).join(","),[availableRooms])
   const baseRatesKey=useMemo(()=>availableRooms.map(room=>`${room.id}:${Number(room.precio)||0}`).join("|"),[availableRooms])
+  const pid=propertyId||resolvedPropertyId
 
   useEffect(()=>{
-    if(!propertyId)return
+    if(propertyId){setResolvedPropertyId(propertyId);return}
+    const roomId=availableRooms[0]?.id;if(!roomId)return
+    let cancelled=false
+    supabase.from("habitaciones").select("property_id").eq("id",Number(roomId)).maybeSingle().then(({data})=>{if(!cancelled&&data?.property_id)setResolvedPropertyId(data.property_id)}).catch(()=>{})
+    return()=>{cancelled=true}
+  },[propertyId,roomIdsKey])
+
+  useEffect(()=>{
+    if(!pid)return
     let cancelled=false
     ;(async()=>{
       try{
-        const settingsRes=await supabase.from("property_settings").select("settings").eq("property_id",propertyId).maybeSingle()
+        const settingsRes=await supabase.from("property_settings").select("settings").eq("property_id",pid).maybeSingle()
         if(settingsRes.error)throw settingsRes.error
         if(cancelled)return
         const code=String(settingsRes.data?.settings?.pricing?.rate_currency||"ARS").toUpperCase()==="USD"?"USD":"ARS"
@@ -30,22 +39,22 @@ export function CreateReservationDrawer(props){
       }catch{if(!cancelled)setRateCurrency(current=>current||"ARS")}
     })()
     return()=>{cancelled=true}
-  },[propertyId,setDraft])
+  },[pid,setDraft])
 
   useEffect(()=>{
-    if(typeof window==="undefined"||!propertyId)return
-    const handler=event=>{if(String(event.detail?.propertyId)!==String(propertyId))return;const code=String(event.detail?.settings?.pricing?.rate_currency||"ARS").toUpperCase()==="USD"?"USD":"ARS";setRateCurrency(code);setDraft(current=>current&&current.currency!==code?{...current,currency:code}:current)}
+    if(typeof window==="undefined"||!pid)return
+    const handler=event=>{if(String(event.detail?.propertyId)!==String(pid))return;const code=String(event.detail?.settings?.pricing?.rate_currency||"ARS").toUpperCase()==="USD"?"USD":"ARS";setRateCurrency(code);setDraft(current=>current&&current.currency!==code?{...current,currency:code}:current)}
     window.addEventListener("hl:property-settings-updated",handler)
     return()=>window.removeEventListener("hl:property-settings-updated",handler)
-  },[propertyId,setDraft])
+  },[pid,setDraft])
 
   useEffect(()=>{
     const ids=availableRooms.map(room=>Number(room.id)).filter(Number.isFinite),days=stayDays(draft?.start,draft?.end)
-    if(!propertyId||!ids.length||!days.length){setEffectiveRates({});return}
+    if(!pid||!ids.length||!days.length){setEffectiveRates({});return}
     let cancelled=false
     ;(async()=>{
       try{
-        const{data,error}=await supabase.from("hotel_rate_calendar").select("habitacion_id,stay_date,price").eq("property_id",propertyId).in("habitacion_id",ids).gte("stay_date",draft.start).lt("stay_date",draft.end)
+        const{data,error}=await supabase.from("hotel_rate_calendar").select("habitacion_id,stay_date,price").eq("property_id",pid).in("habitacion_id",ids).gte("stay_date",draft.start).lt("stay_date",draft.end)
         if(error)throw error
         if(cancelled)return
         const byDay=new Map((data||[]).map(row=>[`${row.habitacion_id}:${row.stay_date}`,row.price])),next={}
@@ -61,7 +70,7 @@ export function CreateReservationDrawer(props){
       }catch{if(!cancelled)setEffectiveRates({})}
     })()
     return()=>{cancelled=true}
-  },[propertyId,draft?.start,draft?.end,roomIdsKey,baseRatesKey,setDraft])
+  },[pid,draft?.start,draft?.end,roomIdsKey,baseRatesKey,setDraft])
 
   const pricedRooms=useMemo(()=>availableRooms.map(room=>effectiveRates[String(room.id)]==null?room:{...room,precio:effectiveRates[String(room.id)]}),[availableRooms,effectiveRates])
   const pricedRoomById=useMemo(()=>new Map(pricedRooms.map(room=>[Number(room.id),room])),[pricedRooms])
