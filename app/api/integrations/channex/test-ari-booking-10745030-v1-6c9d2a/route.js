@@ -14,6 +14,8 @@ const TEST_RATE = "100.00"
 const TEST_AVAILABILITY = 2
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+
 function json(data, status = 200) {
   return NextResponse.json(data, {
     status,
@@ -43,6 +45,49 @@ function assertNoWarnings(label, response) {
     error.status = 422
     throw error
   }
+}
+
+function extractTaskIds(response) {
+  return (Array.isArray(response?.data) ? response.data : [])
+    .filter(item => item?.type === "task" && item?.id)
+    .map(item => item.id)
+}
+
+function buildDates() {
+  const dates = []
+  for (let cursor = new Date(`${DATE_FROM}T00:00:00Z`); cursor <= new Date(`${DATE_TO}T00:00:00Z`); cursor.setUTCDate(cursor.getUTCDate() + 1)) {
+    dates.push(cursor.toISOString().slice(0, 10))
+  }
+  return dates
+}
+
+async function readVerification(ratePlanId, dates) {
+  const restrictionNames = "rate,min_stay_arrival,min_stay_through,max_stay,stop_sell,closed_to_arrival,closed_to_departure"
+  const [verifiedRestrictions, verifiedAvailability] = await Promise.all([
+    channexRequest(`/api/v1/restrictions?filter[property_id]=${encodeURIComponent(PROPERTY_ID)}&filter[date][gte]=${DATE_FROM}&filter[date][lte]=${DATE_TO}&filter[restrictions]=${restrictionNames}`),
+    channexRequest(`/api/v1/availability?filter[property_id]=${encodeURIComponent(PROPERTY_ID)}&filter[date][gte]=${DATE_FROM}&filter[date][lte]=${DATE_TO}`),
+  ])
+
+  const restrictionState = verifiedRestrictions?.data?.[ratePlanId] || {}
+  const availabilityState = verifiedAvailability?.data?.[ROOM_TYPE_ID] || {}
+  const verification = dates.map(date => ({
+    date,
+    rate: restrictionState?.[date]?.rate ?? null,
+    availability: availabilityState?.[date] ?? null,
+    min_stay_arrival: restrictionState?.[date]?.min_stay_arrival ?? null,
+    min_stay_through: restrictionState?.[date]?.min_stay_through ?? null,
+    stop_sell: restrictionState?.[date]?.stop_sell ?? null,
+  }))
+
+  const allVerified = verification.every(row =>
+    Number(row.rate) === 100
+    && Number(row.availability) === TEST_AVAILABILITY
+    && Number(row.min_stay_arrival) === 1
+    && Number(row.min_stay_through) === 1
+    && row.stop_sell === false
+  )
+
+  return { allVerified, verification }
 }
 
 export async function GET() {
@@ -119,42 +164,29 @@ export async function GET() {
     })
     assertNoWarnings("Availability", availabilityResponse)
 
-    const restrictionNames = "rate,min_stay_arrival,min_stay_through,max_stay,stop_sell,closed_to_arrival,closed_to_departure"
-    const [verifiedRestrictions, verifiedAvailability] = await Promise.all([
-      channexRequest(`/api/v1/restrictions?filter[property_id]=${encodeURIComponent(PROPERTY_ID)}&filter[date][gte]=${DATE_FROM}&filter[date][lte]=${DATE_TO}&filter[restrictions]=${restrictionNames}`),
-      channexRequest(`/api/v1/availability?filter[property_id]=${encodeURIComponent(PROPERTY_ID)}&filter[date][gte]=${DATE_FROM}&filter[date][lte]=${DATE_TO}`),
-    ])
-
-    const restrictionState = verifiedRestrictions?.data?.[ratePlanId] || {}
-    const availabilityState = verifiedAvailability?.data?.[ROOM_TYPE_ID] || {}
-    const dates = []
-    for (let cursor = new Date(`${DATE_FROM}T00:00:00Z`); cursor <= new Date(`${DATE_TO}T00:00:00Z`); cursor.setUTCDate(cursor.getUTCDate() + 1)) {
-      dates.push(cursor.toISOString().slice(0, 10))
+    const taskIds = {
+      restrictions: extractTaskIds(restrictionsResponse),
+      availability: extractTaskIds(availabilityResponse),
     }
 
-    const verification = dates.map(date => ({
-      date,
-      rate: restrictionState?.[date]?.rate ?? null,
-      availability: availabilityState?.[date] ?? null,
-      min_stay_arrival: restrictionState?.[date]?.min_stay_arrival ?? null,
-      min_stay_through: restrictionState?.[date]?.min_stay_through ?? null,
-      stop_sell: restrictionState?.[date]?.stop_sell ?? null,
-    }))
+    const dates = buildDates()
+    let latest = await readVerification(ratePlanId, dates)
+    let attempts = 1
 
-    const allVerified = verification.every(row =>
-      Number(row.rate) === 100
-      && Number(row.availability) === TEST_AVAILABILITY
-      && Number(row.min_stay_arrival) === 1
-      && Number(row.min_stay_through) === 1
-      && row.stop_sell === false
-    )
+    while (!latest.allVerified && attempts < 12) {
+      await sleep(attempts < 4 ? 750 : 1250)
+      latest = await readVerification(ratePlanId, dates)
+      attempts += 1
+    }
 
-    if (!allVerified) {
+    if (!latest.allVerified) {
       return json({
-        error: "Channex aceptó el update, pero la lectura de verificación todavía no refleja todo el ARI esperado.",
+        error: "Channex aceptó las tareas ARI pero no terminó de reflejar el estado esperado dentro de la ventana de verificación.",
         staging: true,
+        task_ids: taskIds,
+        verification_attempts: attempts,
         rate_plan: ratePlan,
-        verification,
+        verification: latest.verification,
       }, 409)
     }
 
@@ -163,6 +195,8 @@ export async function GET() {
       staging: true,
       test: true,
       booking_test_hotel_id: BOOKING_TEST_HOTEL_ID,
+      task_ids: taskIds,
+      verification_attempts: attempts,
       rate_plan: ratePlan,
       ari: {
         date_from: DATE_FROM,
@@ -174,7 +208,7 @@ export async function GET() {
         stop_sell: false,
       },
       verified: true,
-      verification,
+      verification: latest.verification,
     })
   } catch (error) {
     console.error("Channex TEST ARI Booking 10745030:", error)
