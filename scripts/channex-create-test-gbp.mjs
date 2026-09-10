@@ -1,4 +1,4 @@
-const TARGET = "https://motor-reservas-app-git-pms-rebuild-zero-gag7.vercel.app/api/integrations/channex/test-gbp-6519420-b7a42d"
+import { createClient } from "@supabase/supabase-js"
 
 function stop(message) {
   console.error(`[channex-test-gbp] ${message}`)
@@ -10,38 +10,48 @@ if (process.env.VERCEL_ENV !== "preview") {
   process.exit(0)
 }
 
-const oidcToken = String(process.env.VERCEL_OIDC_TOKEN || "").trim()
-if (!oidcToken) stop("falta VERCEL_OIDC_TOKEN en Preview")
+const supabaseUrl = String(process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim()
+const supabaseSecret = String(process.env.SUPABASE_SECRET_KEY || "").trim()
+const channexKey = String(process.env.CHANNEX_API_KEY || "").trim()
+if (!supabaseUrl || !supabaseSecret) stop("faltan credenciales server-side de Supabase en Preview")
+if (!channexKey) stop("falta CHANNEX_API_KEY en Preview")
+
+const db = createClient(supabaseUrl, supabaseSecret, {
+  auth: { autoRefreshToken: false, persistSession: false },
+})
 
 try {
-  const response = await fetch(TARGET, {
-    method: "GET",
-    headers: {
-      "x-vercel-trusted-oidc-idp-token": oidcToken,
-      "Accept": "application/json",
-    },
-    redirect: "follow",
+  const { data: payload, error } = await db.rpc("_channex_create_test_gbp", {
+    p_channex_key: channexKey,
   })
-  const text = await response.text()
-  let payload = null
-  try { payload = JSON.parse(text) } catch {}
+  if (error) stop(`RPC temporal -> ${error.message}`)
 
-  if (!response.ok || !payload?.ok || !payload?.rate_plan?.id) {
-    stop(`Function Preview -> ${response.status} ${text.slice(0, 800)}`)
-  }
+  const plan = payload?.data
+  const attrs = plan?.attributes || {}
+  const propertyId = plan?.relationships?.property?.data?.id
+  const roomTypeId = plan?.relationships?.room_type?.data?.id
+  const occupancy = attrs.options?.find(option => option?.is_primary)?.occupancy
+  const valid = plan?.id
+    && attrs.title === "Doble · TEST GBP"
+    && attrs.currency === "GBP"
+    && attrs.sell_mode === "per_room"
+    && attrs.rate_mode === "manual"
+    && propertyId === "2cbed57c-f907-4e77-a8bf-9357c276975e"
+    && roomTypeId === "ed88bc12-d2df-454a-817c-5f8286375cc2"
+    && Number(occupancy) === 2
 
-  const plan = payload.rate_plan
-  const safe = {
+  if (!valid) stop(`respuesta inconsistente: ${JSON.stringify({ id: plan?.id, title: attrs.title, currency: attrs.currency, sell_mode: attrs.sell_mode, rate_mode: attrs.rate_mode, property_id: propertyId, room_type_id: roomTypeId, occupancy })}`)
+
+  console.log(`[channex-test-gbp] OK CREATED ${JSON.stringify({
     id: plan.id,
-    title: plan.title,
-    currency: plan.currency,
-    sell_mode: plan.sell_mode,
-    rate_mode: plan.rate_mode,
-    property_id: plan.property_id,
-    room_type_id: plan.room_type_id,
-    occupancy: plan.options?.find(option => option?.is_primary)?.occupancy,
-  }
-  console.log(`[channex-test-gbp] OK FUNCTION ${JSON.stringify(safe)}`)
+    title: attrs.title,
+    currency: attrs.currency,
+    sell_mode: attrs.sell_mode,
+    rate_mode: attrs.rate_mode,
+    property_id: propertyId,
+    room_type_id: roomTypeId,
+    occupancy,
+  })}`)
 } catch (error) {
   stop(error?.message || String(error))
 }
