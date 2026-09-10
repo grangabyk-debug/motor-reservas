@@ -2,6 +2,7 @@
 
 import{useCallback,useEffect,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
+import ChannelHubPanel from"./ChannelHubPanel"
 import ChannelManagerPanel from"./ChannelManagerPanel"
 import s from"./channelWorkspace.module.css"
 
@@ -12,6 +13,7 @@ export default function ChannelManagerWorkspace({propertyId,property}){
   return <section className={s.page}>
     {error?<div className={s.alert}><span>{error}</span><button onClick={()=>setError("")}>×</button></div>:null}
     {notice?<div className={s.notice}><span>✓</span><b>{notice}</b><button onClick={()=>setNotice("")}>×</button></div>:null}
+    <ChannelHubPanel propertyId={propertyId} property={property}/>
     {loading?<div className={s.loading}>Cargando canales…</div>:<ChannelManagerPanel propertyId={propertyId} property={property} connections={connections} mappings={mappings} onReload={load} onMessage={setNotice}/>} 
   </section>
 }
