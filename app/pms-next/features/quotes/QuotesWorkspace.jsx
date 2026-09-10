@@ -24,7 +24,7 @@ export default function QuotesWorkspace({propertyId,property,onNavigate}){
     setLoading(true);setError("")
     try{
       const[qRes,gRes,setRes]=await Promise.all([
-        supabase.from("hotel_group_quotes").select("id,group_id,version,quote_number,status,valid_until,currency,accommodation_total,food_total,extras_total,taxes_total,discount_total,total,deposit_percent,deposit_due_date,terms,internal_notes,sent_at,accepted_at,created_at,updated_at").eq("property_id",propertyId).order("created_at",{ascending:false}).limit(100),
+        supabase.from("hotel_group_quotes").select("id,group_id,version,quote_number,status,valid_until,currency,accommodation_total,food_total,extras_total,taxes_total,discount_total,total,deposit_percent,deposit_due_date,terms,internal_notes,sent_at,accepted_at,created_at,updated_at").eq("property_id",propertyId).neq("status","rejected").order("created_at",{ascending:false}).limit(100),
         supabase.from("hotel_groups").select("id,name,status,arrival_date,departure_date,contact_name,contact_email,contact_phone,room_block,estimated_pax,sales_stage,budget_currency,budget_total,notes").eq("property_id",propertyId).order("created_at",{ascending:false}).limit(150),
         supabase.from("property_settings").select("settings").eq("property_id",propertyId).maybeSingle(),
       ])
@@ -46,7 +46,7 @@ export default function QuotesWorkspace({propertyId,property,onNavigate}){
   }
   function openNew(){const next=freshForm(currency);setForm(next);setNotice("");setError("");setFormOpen(true);refreshAvailability(next)}
   function patch(values){setForm(current=>({...current,...values}))}
-  function changeDates(values){setForm(current=>{const next={...current,...values,selection:{}};window.setTimeout(()=>refreshAvailability(next),0);return next})}
+  function changeDates(values){setForm(current=>{const adjusted=values.start?{...values,end:addDays(values.start,1)}:values,next={...current,...adjusted,selection:{}};window.setTimeout(()=>refreshAvailability(next),0);return next})}
   function setQty(type,qty){const max=availability.types.find(x=>x.name===type)?.available||0;const safe=Math.max(0,Math.min(max,Number(qty)||0));setForm(current=>({...current,selection:{...current.selection,[type]:safe}}))}
   const selectedRooms=useMemo(()=>Object.values(form.selection||{}).reduce((sum,value)=>sum+(Number(value)||0),0),[form.selection])
   const selectedCapacity=useMemo(()=>availability.types.reduce((sum,type)=>sum+(Number(form.selection?.[type.name])||0)*type.capacity,0),[availability.types,form.selection])
