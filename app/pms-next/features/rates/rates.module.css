@@ -2,7 +2,7 @@
 
 /* Alineación del editor masivo: los seis controles comparten altura y eje visual. */
 .roomsPanel>div:first-child>label:first-child{position:relative!important;display:block!important;height:38px!important;align-self:center!important;font-size:0!important;line-height:normal!important}
-.roomsPanel>div:first-child>label:first-child::before{content:"TIPO DE HABITACIÓN";position:absolute;left:0;top:-12px;font-size:9.5px;line-height:1;font-weight:850;color:var(--muted);white-space:nowrap}
+.roomsPanel>div:first-child>label:first-child::before{content:"TIPO DE HABITACIÓN";position:absolute;left:0;top:-12px;font-size:10px;line-height:1;font-weight:850;color:var(--muted);white-space:nowrap}
 .roomsPanel>div:first-child>label:first-child>select{width:100%!important;height:38px!important;font-size:13px!important;line-height:normal!important}
 .roomsPanel>div:first-child>button:nth-child(2),.roomsPanel>div:first-child>button:nth-child(3){height:38px!important;min-height:38px!important;padding-top:0!important;padding-bottom:0!important;align-self:center!important}
 
