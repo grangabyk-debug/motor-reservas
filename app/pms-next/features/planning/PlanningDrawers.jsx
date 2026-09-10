@@ -16,6 +16,7 @@ export function CreateReservationDrawer(props){
   const[rateCurrency,setRateCurrency]=useState(null),[effectiveRates,setEffectiveRates]=useState({}),[resolvedPropertyId,setResolvedPropertyId]=useState(propertyId||null)
   const roomIdsKey=useMemo(()=>availableRooms.map(room=>room.id).join(","),[availableRooms])
   const baseRatesKey=useMemo(()=>availableRooms.map(room=>`${room.id}:${Number(room.precio)||0}`).join("|"),[availableRooms])
+  const presentationPolicies=useMemo(()=>(props.cancellationPolicies||[]).map(policy=>({...policy,is_default:false})),[props.cancellationPolicies])
   const pid=propertyId||resolvedPropertyId
 
   useEffect(()=>{
@@ -76,5 +77,5 @@ export function CreateReservationDrawer(props){
   const pricedRoomById=useMemo(()=>new Map(pricedRooms.map(room=>[Number(room.id),room])),[pricedRooms])
   const forcedDraft=draft&&rateCurrency?{...draft,currency:rateCurrency}:draft
   const forcedSetDraft=updater=>setDraft(current=>{const next=typeof updater==="function"?updater(current):updater;if(!next||!rateCurrency)return next;return next.currency===rateCurrency?next:{...next,currency:rateCurrency}})
-  return <LegacyCreateReservationDrawer {...props} draft={forcedDraft} setDraft={forcedSetDraft} availableRooms={pricedRooms} roomById={pricedRoomById}/>
+  return <LegacyCreateReservationDrawer {...props} draft={forcedDraft} setDraft={forcedSetDraft} availableRooms={pricedRooms} roomById={pricedRoomById} cancellationPolicies={presentationPolicies}/>
 }
