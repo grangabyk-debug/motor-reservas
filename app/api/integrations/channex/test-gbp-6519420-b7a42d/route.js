@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { channexMode, channexRequest } from "../../../../../../lib/channexServer"
+import { channexMode, channexRequest } from "../../../../../lib/channexServer"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
