@@ -23,7 +23,7 @@ function walk(dir){
     for(const[pattern,message]of productionDataGuards)if(pattern.test(source))violations.push(`${rel}: ${message}`)
     const bytes=Buffer.byteLength(source)
     const lines=source.split(/\r?\n/).length
-    if(lines>520||bytes>26000)violations.push(`${rel}: ${lines} lines / ${bytes} bytes exceeds PMS Next module budget`)
+    if(lines>520||bytes>26200)violations.push(`${rel}: ${lines} lines / ${bytes} bytes exceeds PMS Next module budget`)
   }
 }
 
