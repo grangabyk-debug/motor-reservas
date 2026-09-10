@@ -21,37 +21,35 @@ const db = createClient(supabaseUrl, supabaseSecret, {
 })
 
 try {
-  const { data: payload, error } = await db.rpc("_channex_create_test_gbp", {
-    p_channex_key: channexKey,
+  const { data: payload, error } = await db.functions.invoke("channex-test-gbp-6519420-b7a42d", {
+    body: { channex_key: channexKey },
   })
-  if (error) stop(`RPC temporal -> ${error.message}`)
+  if (error) {
+    let detail = error.message || "Edge Function error"
+    try {
+      const context = error.context
+      if (context?.json) {
+        const extra = await context.json()
+        detail += ` · ${JSON.stringify(extra)}`
+      }
+    } catch {}
+    stop(`Edge temporal -> ${detail}`)
+  }
 
-  const plan = payload?.data
-  const attrs = plan?.attributes || {}
-  const propertyId = plan?.relationships?.property?.data?.id
-  const roomTypeId = plan?.relationships?.room_type?.data?.id
-  const occupancy = attrs.options?.find(option => option?.is_primary)?.occupancy
-  const valid = plan?.id
-    && attrs.title === "Doble · TEST GBP"
-    && attrs.currency === "GBP"
-    && attrs.sell_mode === "per_room"
-    && attrs.rate_mode === "manual"
-    && propertyId === "2cbed57c-f907-4e77-a8bf-9357c276975e"
-    && roomTypeId === "ed88bc12-d2df-454a-817c-5f8286375cc2"
-    && Number(occupancy) === 2
+  const plan = payload?.rate_plan
+  const valid = payload?.ok
+    && payload?.staging_only === true
+    && plan?.id
+    && plan?.title === "Doble · TEST GBP"
+    && plan?.currency === "GBP"
+    && plan?.sell_mode === "per_room"
+    && plan?.rate_mode === "manual"
+    && plan?.property_id === "2cbed57c-f907-4e77-a8bf-9357c276975e"
+    && plan?.room_type_id === "ed88bc12-d2df-454a-817c-5f8286375cc2"
+    && Number(plan?.occupancy) === 2
 
-  if (!valid) stop(`respuesta inconsistente: ${JSON.stringify({ id: plan?.id, title: attrs.title, currency: attrs.currency, sell_mode: attrs.sell_mode, rate_mode: attrs.rate_mode, property_id: propertyId, room_type_id: roomTypeId, occupancy })}`)
-
-  console.log(`[channex-test-gbp] OK CREATED ${JSON.stringify({
-    id: plan.id,
-    title: attrs.title,
-    currency: attrs.currency,
-    sell_mode: attrs.sell_mode,
-    rate_mode: attrs.rate_mode,
-    property_id: propertyId,
-    room_type_id: roomTypeId,
-    occupancy,
-  })}`)
+  if (!valid) stop(`respuesta inconsistente: ${JSON.stringify(payload)}`)
+  console.log(`[channex-test-gbp] OK CREATED ${JSON.stringify(plan)}`)
 } catch (error) {
   stop(error?.message || String(error))
 }
