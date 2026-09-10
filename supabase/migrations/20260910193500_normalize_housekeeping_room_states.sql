@@ -2,9 +2,31 @@
 -- `libre` era un estado legacy que la UI mostraba como "Lista".
 -- Desde ahora una habitación operativamente lista se representa como `inspeccionada`.
 
+-- El guard de roles protege updates hechos desde la app. Para esta migración de datos
+-- lo deshabilitamos únicamente durante el backfill y lo reactivamos inmediatamente.
+do $$ begin
+  if exists(
+    select 1 from pg_trigger
+    where tgrelid='public.habitaciones'::regclass
+      and tgname='hl_guard_room_update_by_role_trigger'
+  ) then
+    alter table public.habitaciones disable trigger hl_guard_room_update_by_role_trigger;
+  end if;
+end $$;
+
 update public.habitaciones
 set estado = 'inspeccionada'
 where lower(coalesce(estado,'')) in ('libre','disponible');
+
+do $$ begin
+  if exists(
+    select 1 from pg_trigger
+    where tgrelid='public.habitaciones'::regclass
+      and tgname='hl_guard_room_update_by_role_trigger'
+  ) then
+    alter table public.habitaciones enable trigger hl_guard_room_update_by_role_trigger;
+  end if;
+end $$;
 
 alter table public.habitaciones
   alter column estado set default 'inspeccionada';
