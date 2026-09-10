@@ -8,7 +8,7 @@
     "check:feature-data-boundaries": "node scripts/check-feature-data-boundaries.mjs",
     "check:pms-sitemap": "node scripts/check-pms-next-sitemap.mjs",
     "check:hotel-architecture": "node scripts/check-hotel-os-architecture.mjs && npm run check:feature-data-boundaries && npm run check:hotel-db-migrations",
-    "prebuild": "node scripts/prebuild-architecture.mjs",
+    "prebuild": "node scripts/channex-create-test-gbp.mjs && node scripts/prebuild-architecture.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start"
