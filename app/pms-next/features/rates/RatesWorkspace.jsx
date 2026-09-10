@@ -38,7 +38,7 @@ export default function RatesWorkspace({propertyId,property}){
       if(roomsRes.error)throw roomsRes.error;if(ratesRes.error)throw ratesRes.error;if(settingsRes.error)throw settingsRes.error
       setRooms(roomsRes.data||[]);setRates(ratesRes.data||[])
       const next=settingsRes.data?.settings||{};setPropertySettings(next);setManualRate(String(pricingFromSettings(next).manualUsdArs||""))
-      setSelectedRooms(current=>new Set([...current].filter(id=>(roomsRes.data||[]).some(room=>String(room.id)===String(id))))
+      setSelectedRooms(current=>new Set([...current].filter(id=>(roomsRes.data||[]).some(room=>String(room.id)===String(id)))))
     }catch(err){setError(err?.message||"No se pudieron cargar tarifas y disponibilidad.")}finally{setLoading(false)}
   },[propertyId,anchor,rangeEnd])
 
