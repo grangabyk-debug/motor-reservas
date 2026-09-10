@@ -55,7 +55,7 @@ export function CreateReservationDrawer(props){
           if(!current||current.start!==draft.start||current.end!==draft.end)return current
           const idsNow=selectedIds(current),assignments={...(current.roomAssignments||{})}
           for(const id of idsNow)if(next[id]!=null)assignments[id]={...(assignments[id]||{}),rate:next[id]}
-          const rate=idsNow.reduce((sum,id)=>sum+(next[id]??Number(assignments[id]?.rate)??Number(availableRooms.find(room=>String(room.id)===id)?.precio)||0),0)
+          const rate=idsNow.reduce((sum,id)=>sum+Number(next[id]??assignments[id]?.rate??availableRooms.find(room=>String(room.id)===id)?.precio??0),0)
           return{...current,roomAssignments:assignments,rate}
         })
       }catch{if(!cancelled)setEffectiveRates({})}
