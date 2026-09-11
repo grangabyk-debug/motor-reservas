@@ -4,6 +4,7 @@ import { useMemo, useState } from "react"
 import { isoDate, money } from "../../core/formatters"
 import ChannelPerformance from "./ChannelPerformance"
 import FinancialPerformance from "./FinancialPerformance"
+import IntelligenceSignals from "./IntelligenceSignals"
 import s from "./analytics-overview.module.css"
 
 const DAY = 86400000
@@ -165,6 +166,8 @@ export default function AnalyticsOverview({ rooms = [], reservations = [], payme
       <header><div><small>PICKUP · PRÓXIMOS 30 DÍAS</small><h2>Qué se vendió desde la última foto</h2></div><span>{booksNow?`${booksNow.rooms} noches OTB · ${money(booksNow.revenue,currency)}`:"Preparando historial"}</span></header>
       <div className={s.pickupGrid}><PickupCard label="Últimas 24 horas" value={pickup1} currency={currency}/><PickupCard label="Últimos 7 días" value={pickup7} currency={currency}/><PickupCard label="Últimos 30 días" value={pickup30} currency={currency}/></div>
     </section>
+
+    <IntelligenceSignals reservations={reservations} payments={payments} snapshots={snapshots} currency={currency}/>
 
     <section className={s.grid}>
       <article className={s.chartCard}>
