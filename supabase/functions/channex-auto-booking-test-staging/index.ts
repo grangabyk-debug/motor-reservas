@@ -101,9 +101,7 @@ async function channexRequest(path: string, method: string, body?: unknown) {
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    return { ok: false, status: res.status, data };
-  }
+  if (!res.ok) return { ok: false, status: res.status, data };
   return { ok: true, status: res.status, data };
 }
 
@@ -115,6 +113,48 @@ Deno.serve(async (req: Request) => {
   if (!(await validDispatchToken(String(body?.dispatch_token || "")))) return reply({ ok: false, error: "Unauthorized" }, 401);
 
   const action = String(body?.action || "");
+
+  if (action === "property") {
+    const result = await channexRequest(`/properties/${PROPERTY_ID}`, "GET");
+    const attrs = result.data?.data?.attributes || {};
+    const settings = attrs.settings || {};
+    return reply({
+      ok: result.ok,
+      staging: true,
+      action,
+      property_id: PROPERTY_ID,
+      title: attrs.title || attrs.name || null,
+      settings: {
+        allow_availability_autoupdate_on_confirmation: settings.allow_availability_autoupdate_on_confirmation ?? null,
+        allow_availability_autoupdate_on_modification: settings.allow_availability_autoupdate_on_modification ?? null,
+        allow_availability_autoupdate_on_cancellation: settings.allow_availability_autoupdate_on_cancellation ?? null,
+      },
+      channex_status: result.status,
+      error: result.ok ? null : result.data?.errors || result.data,
+    }, result.ok ? 200 : result.status);
+  }
+
+  if (action === "feed") {
+    const url = new URL(`${CHANNEX_BASE}/booking_revisions/feed`);
+    url.searchParams.set("filter[property_id]", PROPERTY_ID);
+    url.searchParams.set("order[inserted_at]", "asc");
+    url.searchParams.set("pagination[limit]", "50");
+    const res = await fetch(url, { headers: channexHeaders() });
+    const data = await res.json().catch(() => ({}));
+    const rows = Array.isArray(data?.data) ? data.data : [];
+    const revisions = rows.map((row: any) => {
+      const attrs = row?.attributes || row?.data?.attributes || {};
+      return {
+        id: row?.id || row?.data?.id || attrs?.id || null,
+        status: attrs?.status || null,
+        booking_id: attrs?.booking_id || null,
+        ota_reservation_code: attrs?.ota_reservation_code || null,
+        inserted_at: attrs?.inserted_at || null,
+      };
+    });
+    return reply({ ok: res.ok, staging: true, action, count: revisions.length, revisions }, res.ok ? 200 : res.status);
+  }
+
   if (action === "availability") {
     const url = new URL(`${CHANNEX_BASE}/availability`);
     url.searchParams.set("filter[property_id]", PROPERTY_ID);
