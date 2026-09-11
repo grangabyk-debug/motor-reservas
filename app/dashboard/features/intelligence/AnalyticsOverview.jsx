@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { isoDate, money } from "../../core/formatters"
+import ChannelPerformance from "./ChannelPerformance"
 import s from "./analytics-overview.module.css"
 
 const DAY = 86400000
@@ -184,8 +185,10 @@ export default function AnalyticsOverview({ rooms = [], reservations = [], setti
 
     <section className={s.paceCard}>
       <header><div><small>PACE · PRÓXIMOS 30 DÍAS</small><h2>Ocupación hoy vs. hace 7 días</h2></div><span>Detecta fechas que aceleran o se frenan</span></header>
-      <div className={s.paceRows}>{pace7.length?pace7.map((row,index)=>{const delta=row.now-row.past;return <div key={row.day} className={s.paceRow}><small>{short(row.day)}</small><div><i style={{width:`${Math.min(100,row.past)}%`}}/><b style={{width:`${Math.min(100,row.now)}%`}}/></div><strong data-tone={delta>2?"good":delta<-2?"bad":"neutral"}>{Math.round(row.now)}% <em>{delta>=0?"+":""}{delta.toFixed(0)} pp</em></strong></div>}):<p className={s.noHistory}>Todavía no hay suficiente historial para dibujar Pace. Los snapshots se generan automáticamente todos los días.</p>}</div>
+      <div className={s.paceRows}>{pace7.length?pace7.map(row=>{const delta=row.now-row.past;return <div key={row.day} className={s.paceRow}><small>{short(row.day)}</small><div><i style={{width:`${Math.min(100,row.past)}%`}}/><b style={{width:`${Math.min(100,row.now)}%`}}/></div><strong data-tone={delta>2?"good":delta<-2?"bad":"neutral"}>{Math.round(row.now)}% <em>{delta>=0?"+":""}{delta.toFixed(0)} pp</em></strong></div>}):<p className={s.noHistory}>Todavía no hay suficiente historial para dibujar Pace. Los snapshots se generan automáticamente todos los días.</p>}</div>
     </section>
+
+    <ChannelPerformance reservations={reservations} start={range.start} end={range.end} currency={currency}/>
 
     <section className={s.definition}><b>Cómo se calcula</b><span>Ocupación = noches vendidas / noches disponibles · ADR = ingreso de alojamiento / noches vendidas · RevPAR = ingreso de alojamiento / noches disponibles · Pickup = diferencia del on-the-books entre dos fechas de captura.</span><small>El backfill histórico usa fecha de creación, cancelación y no-show disponibles en el PMS. Desde hoy, los snapshots diarios quedan registrados automáticamente.</small></section>
   </main>
