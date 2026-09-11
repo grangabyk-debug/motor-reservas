@@ -23,18 +23,18 @@ function Item({id,label,view,onView,onNewReservation}){
   </button>
 }
 
-export default function HotelSidebar({view,onView,hotelName="Hotel",hotelLogo="",role="reception",properties=[],propertyId,onPropertyChange,onLogout,onNewReservation,mobileOpen=false}){
+export default function HotelSidebar({view,onView,hotelName="Hotel",hotelLogo="",role="reception",properties=[],propertyId,onPropertyChange,onLogout,onNewReservation,mobileOpen=false,canView=()=>true}){
+  const visible=list=>list.filter(([id])=>id==="new"?!!onNewReservation:canView(id))
+  const main=visible(MAIN),quick=visible(QUICK),more=visible(MORE)
   return <aside className={`${ui.rail} ${mobileOpen?ui.railOpen:""}`} aria-label="Navegación principal">
     <div className={ui.identity}>
       <button type="button" className={ui.brand} onClick={()=>onView("lobby")}>{hotelLogo?<img src={hotelLogo} alt=""/>:<span>{initials(hotelName)}</span>}<div><b>¡Hola Recepción! 👋</b><small>PROPIEDADES</small></div></button>
       {properties.length>1?<select className={ui.propertySelect} value={propertyId} onChange={e=>onPropertyChange?.(e.target.value)}>{properties.map(p=><option value={p.id} key={p.id}>{p.hotel_name||p.name}</option>)}</select>:<div className={ui.propertyName}>{hotelName}</div>}
     </div>
     <nav className={ui.navScroll}>
-      <div className={ui.navGroup}>{MAIN.map(([id,label])=><Item key={id} id={id} label={label} view={view} onView={onView} onNewReservation={onNewReservation}/>)}</div>
-      <div className={ui.groupTitle}>Accesos Rápidos</div>
-      <div className={ui.navGroup}>{QUICK.map(([id,label],i)=><Item key={`${id}-${i}`} id={id} label={label} view={view} onView={onView} onNewReservation={onNewReservation}/>)}</div>
-      <div className={ui.groupTitle}>Administración</div>
-      <div className={ui.navGroup}>{MORE.map(([id,label])=><Item key={id} id={id} label={label} view={view} onView={onView} onNewReservation={onNewReservation}/>)}</div>
+      <div className={ui.navGroup}>{main.map(([id,label])=><Item key={id} id={id} label={label} view={view} onView={onView} onNewReservation={onNewReservation}/>)}</div>
+      {!!quick.length&&<><div className={ui.groupTitle}>Accesos Rápidos</div><div className={ui.navGroup}>{quick.map(([id,label],i)=><Item key={`${id}-${i}`} id={id} label={label} view={view} onView={onView} onNewReservation={onNewReservation}/>)}</div></>}
+      {!!more.length&&<><div className={ui.groupTitle}>Administración</div><div className={ui.navGroup}>{more.map(([id,label])=><Item key={id} id={id} label={label} view={view} onView={onView} onNewReservation={onNewReservation}/>)}</div></>}
     </nav>
     <footer className={ui.sideFooter}><div><span className={ui.footerMark}>HL</span><span><b>Habitación Llena</b><small>{ROLE_LABELS[role]||role}</small></span></div><button type="button" onClick={onLogout}>Salir</button></footer>
   </aside>
