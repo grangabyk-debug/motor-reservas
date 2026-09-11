@@ -10,7 +10,7 @@ const otaTitle=event=>({ota_booking_new:"Nueva reserva OTA",ota_booking_modified
 const shortOtaDate=value=>{const parts=String(value||"").split("-");return parts.length===3?`${parts[2]}/${parts[1]}`:String(value||"")}
 const otaEventDetail=event=>{const meta=event?._ota_metadata&&typeof event._ota_metadata==="object"?event._ota_metadata:{},stay=meta.arrival_date&&meta.departure_date?`${shortOtaDate(meta.arrival_date)} → ${shortOtaDate(meta.departure_date)}`:"",room=[meta.room_type,meta.room_name?`Hab. ${meta.room_name}`:""].filter(Boolean).join(" · "),reservation=meta.reservation_number?`Reserva ${meta.reservation_number}`:"";return[meta.guest_name,stay,room,reservation].filter(Boolean).join(" · ")||event?.message||"Actualización recibida"}
 
-export function buildOperationalNotifications({rooms=[],reservations=[],payments=[],automationEvents=[],inboxConversations=[],maintenanceTickets=[]}={}){
+export function buildOperationalNotifications({rooms=[],reservations=[],payments=[],automationEvents=[],maintenanceTickets=[]}={}){
   const today=isoDate(),items=[]
   ;(reservations||[]).filter(active).forEach(reservation=>{
     const state=String(reservation.estado||"").toLowerCase(),ids=roomIds(reservation),primary=rooms.find(r=>String(r.id)===ids[0]),due=Math.max(0,Number(reservation.precio_total||0)-paidFor(payments,reservation.id)),guest=reservation.nombre_huesped||"Huésped"
@@ -29,7 +29,6 @@ export function buildOperationalNotifications({rooms=[],reservations=[],payments
     }
     items.push({id:`automation-${event.id}`,kind:"system",priority:/error|fail|rechaz|venc/i.test(`${event.event_type||""} ${event.message||""}`)?"high":"normal",icon:"⚡",title:event.event_type?String(event.event_type).replaceAll("_"," "):"Automatización pendiente",detail:event.message||"Hay una automatización que requiere atención.",reservationId:event.reservation_id||null,roomId:event.room_id||null,target:event.reservation_id?"reservation":"automations",createdAt:event.created_at})
   })
-  ;(inboxConversations||[]).filter(c=>Number(c.unread_count||0)>0).forEach(conversation=>items.push({id:`inbox-${conversation.id}`,kind:"messages",priority:"high",icon:"✉",title:`${Number(conversation.unread_count||0)} mensaje${Number(conversation.unread_count||0)===1?"":"s"} sin leer`,detail:`${conversation.contact_name||conversation.contact_phone||conversation.contact_email||"Huésped"} · ${conversation.last_message_text||conversation.channel||"Nueva conversación"}`,conversation,target:"messages",createdAt:conversation.last_message_at}))
   ;(maintenanceTickets||[]).filter(t=>!["done","resolved","cancelled","canceled"].includes(String(t.status||"").toLowerCase())&&["urgent","critical","high"].includes(String(t.priority||"").toLowerCase())).slice(0,20).forEach(ticket=>items.push({id:`maintenance-${ticket.id}`,kind:"operation",priority:String(ticket.priority||"").toLowerCase()==="urgent"?"critical":"high",icon:"!",title:ticket.title||"Mantenimiento prioritario",detail:`${roomName(rooms,ticket.room_id)}${ticket.description?` · ${ticket.description}`:""}`,roomId:ticket.room_id,target:"maintenance",createdAt:ticket.created_at}))
   return items.sort((a,b)=>(priorityRank[a.priority]??9)-(priorityRank[b.priority]??9)||String(b.createdAt||"").localeCompare(String(a.createdAt||"")))
 }
