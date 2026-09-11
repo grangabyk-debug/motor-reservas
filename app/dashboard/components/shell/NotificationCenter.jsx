@@ -5,7 +5,7 @@ import{buildOperationalNotifications}from"../../core/operationalNotifications"
 import{supabase}from"../../../../lib/supabase"
 import s from"./notification-center.module.css"
 
-const FILTERS=[["all","Todas"],["ota","OTAs"],["operation","Operación"],["payments","Cobros"],["messages","Mensajes"],["system","Sistema"]]
+const FILTERS=[["all","Todas"],["ota","OTAs"],["operation","Operación"],["payments","Cobros"],["system","Sistema"]]
 const label={critical:"Urgente",high:"Importante",normal:"Pendiente",info:"Info"}
 const shortOtaDate=value=>{const parts=String(value||"").split("-");return parts.length===3?`${parts[2]}/${parts[1]}`:String(value||"")}
 const otaAlertDetail=notification=>{const meta=notification?.metadata&&typeof notification.metadata==="object"?notification.metadata:{},stay=meta.arrival_date&&meta.departure_date?`${shortOtaDate(meta.arrival_date)} → ${shortOtaDate(meta.departure_date)}`:"",room=[meta.room_type,meta.room_name?`Hab. ${meta.room_name}`:""].filter(Boolean).join(" · "),reservation=meta.reservation_number?`Reserva ${meta.reservation_number}`:"";return[meta.guest_name,stay,room,reservation].filter(Boolean).join(" · ")||notification?.detail||"Abrir la reserva para ver el detalle."}
@@ -43,11 +43,11 @@ async function playOtaSound(){
   }catch{return false}
 }
 
-export default function NotificationCenter({open,onClose,data,onOpenReservation,onView,onOpenMessages}){
+export default function NotificationCenter({open,onClose,data,onOpenReservation,onView}){
   const[filter,setFilter]=useState("all"),[otaAlert,setOtaAlert]=useState(null),[otaSoundEnabled,setOtaSoundEnabled]=useState(true),[userId,setUserId]=useState(""),[realtimeStatus,setRealtimeStatus]=useState("connecting"),[soundTestStatus,setSoundTestStatus]=useState("")
   const reloadRef=useRef(data.reload),soundEnabledRef=useRef(otaSoundEnabled)
   const propertyId=String(data.settings?.property_id||data.reservations?.[0]?.property_id||"")
-  const items=useMemo(()=>buildOperationalNotifications({rooms:data.rooms,reservations:data.reservations,payments:data.payments,automationEvents:data.automationEvents,inboxConversations:data.inboxConversations,maintenanceTickets:data.maintenanceTickets}),[data.rooms,data.reservations,data.payments,data.automationEvents,data.inboxConversations,data.maintenanceTickets]),visible=filter==="all"?items:items.filter(item=>item.kind===filter)
+  const items=useMemo(()=>buildOperationalNotifications({rooms:data.rooms,reservations:data.reservations,payments:data.payments,automationEvents:data.automationEvents,maintenanceTickets:data.maintenanceTickets}),[data.rooms,data.reservations,data.payments,data.automationEvents,data.maintenanceTickets]),visible=filter==="all"?items:items.filter(item=>item.kind===filter)
 
   useEffect(()=>{reloadRef.current=data.reload},[data.reload])
   useEffect(()=>{soundEnabledRef.current=otaSoundEnabled},[otaSoundEnabled])
@@ -132,7 +132,6 @@ export default function NotificationCenter({open,onClose,data,onOpenReservation,
     else if(item.target==="housekeeping")onView?.("housekeeping")
     else if(item.target==="maintenance")onView?.("maintenance")
     else if(item.target==="automations")onView?.("automations")
-    else if(item.target==="messages")onOpenMessages?.(item.conversation)
     onClose?.()
   }
 
