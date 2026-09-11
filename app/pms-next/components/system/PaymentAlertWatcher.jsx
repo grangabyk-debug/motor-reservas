@@ -119,6 +119,8 @@ export default function PaymentAlertWatcher({propertyId,onNavigate,onUnreadChang
   }
   function notifyReservation(row){
     if(!row?.id)return
+    const source=`${row.codigo_canal||""} ${row.canal_reserva||""}`.toLowerCase()
+    if(source.includes("bdc:")||source.includes("booking"))return
     const guest=row.nombre_huesped||row.numero_reserva||"Nueva reserva",dates=row.fecha_entrada&&row.fecha_salida?`${row.fecha_entrada} → ${row.fecha_salida}`:"Reserva creada"
     pushAlert({tone:"info",title:"Nueva reserva",message:`${guest} · ${dates}`,duration:9000,actionLabel:"Abrir reserva",onAction:()=>openReservation(row.id),tag:`hl-reservation-${row.id}`,kind:"info"})
   }
