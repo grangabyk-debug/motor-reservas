@@ -22,11 +22,25 @@ export function createHotelRepository(client,propertyId){
         scoped("inbox_conversations").order("last_message_at",{ascending:false}).limit(100),
         scoped("hotel_housekeeping_tasks").order("scheduled_for",{ascending:false}).limit(180),
         scoped("hotel_maintenance_tickets").order("created_at",{ascending:false}).limit(120),
+        client.from("hotel_operational_notifications").select("*,hotel_notification_reads(user_id,read_at)").eq("property_id",tenant).order("created_at",{ascending:false}).limit(100),
       ])
       const error=results.find(result=>result.error)?.error
       if(error)throw error
-      const [rooms,floors,reservations,payments,blocks,charges,channels,keyIssues,packages,reservationEvents,automationEvents,inboxConversations,housekeepingTasks,maintenanceTickets]=results.map(result=>result.data||[])
-      return {rooms,floors,reservations,payments,blocks,charges,channels,keyIssues,packages,reservationEvents,automationEvents,inboxConversations,housekeepingTasks,maintenanceTickets}
+      const [rooms,floors,reservations,payments,blocks,charges,channels,keyIssues,packages,reservationEvents,automationEvents,inboxConversations,housekeepingTasks,maintenanceTickets,otaNotifications]=results.map(result=>result.data||[])
+      const unreadOta=(otaNotifications||[]).filter(item=>!Array.isArray(item.hotel_notification_reads)||item.hotel_notification_reads.length===0).map(item=>({
+        id:item.id,
+        event_type:`ota_${item.event_type}`,
+        message:item.detail,
+        title:item.title,
+        reservation_id:item.reservation_id,
+        created_at:item.created_at,
+        status:"pending",
+        _ota_notification_id:item.id,
+        _ota_provider:item.provider_name,
+        _ota_channel_code:item.channel_code,
+        _ota_metadata:item.metadata||{},
+      }))
+      return {rooms,floors,reservations,payments,blocks,charges,channels,keyIssues,packages,reservationEvents,automationEvents:[...(automationEvents||[]),...unreadOta],inboxConversations,housekeepingTasks,maintenanceTickets,otaNotifications}
     },
     async guestCRM(){const {data,error}=await scoped("hotel_guest_profiles").order("last_stay_at",{ascending:false}).limit(250);if(error)throw error;return data||[]},
     async partners(){const {data,error}=await scoped("hotel_partners").eq("active",true).order("name");if(error)throw error;return data||[]},
