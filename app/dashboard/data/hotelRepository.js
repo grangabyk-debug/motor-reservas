@@ -7,6 +7,8 @@ export function createHotelRepository(client,propertyId){
   return {
     tenant,
     async frontDeskSnapshot(){
+      const {data:auth}=await client.auth.getUser()
+      const currentUserId=auth?.user?.id||""
       const results=await Promise.all([
         scoped("habitaciones").order("sort_order").order("id"),
         scoped("hotel_floors").order("sort_order").order("name"),
@@ -22,12 +24,14 @@ export function createHotelRepository(client,propertyId){
         scoped("inbox_conversations").order("last_message_at",{ascending:false}).limit(100),
         scoped("hotel_housekeeping_tasks").order("scheduled_for",{ascending:false}).limit(180),
         scoped("hotel_maintenance_tickets").order("created_at",{ascending:false}).limit(120),
-        client.from("hotel_operational_notifications").select("*,hotel_notification_reads(user_id,read_at)").eq("property_id",tenant).order("created_at",{ascending:false}).limit(100),
+        client.from("hotel_operational_notifications").select("*").eq("property_id",tenant).order("created_at",{ascending:false}).limit(100),
+        currentUserId?client.from("hotel_notification_reads").select("notification_id,user_id,read_at").eq("user_id",currentUserId).order("read_at",{ascending:false}).limit(500):Promise.resolve({data:[],error:null}),
       ])
       const error=results.find(result=>result.error)?.error
       if(error)throw error
-      const [rooms,floors,reservations,payments,blocks,charges,channels,keyIssues,packages,reservationEvents,automationEvents,inboxConversations,housekeepingTasks,maintenanceTickets,otaNotifications]=results.map(result=>result.data||[])
-      const unreadOta=(otaNotifications||[]).filter(item=>!Array.isArray(item.hotel_notification_reads)||item.hotel_notification_reads.length===0).map(item=>({
+      const [rooms,floors,reservations,payments,blocks,charges,channels,keyIssues,packages,reservationEvents,automationEvents,inboxConversations,housekeepingTasks,maintenanceTickets,otaNotifications,notificationReads]=results.map(result=>result.data||[])
+      const readIds=new Set((notificationReads||[]).map(item=>String(item.notification_id)))
+      const unreadOta=(otaNotifications||[]).filter(item=>!readIds.has(String(item.id))).map(item=>({
         id:item.id,
         event_type:`ota_${item.event_type}`,
         message:item.detail,

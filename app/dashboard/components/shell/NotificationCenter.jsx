@@ -7,6 +7,8 @@ import s from"./notification-center.module.css"
 
 const FILTERS=[["all","Todas"],["ota","OTAs"],["operation","Operación"],["payments","Cobros"],["messages","Mensajes"],["system","Sistema"]]
 const label={critical:"Urgente",high:"Importante",normal:"Pendiente",info:"Info"}
+const shortOtaDate=value=>{const parts=String(value||"").split("-");return parts.length===3?`${parts[2]}/${parts[1]}`:String(value||"")}
+const otaAlertDetail=notification=>{const meta=notification?.metadata&&typeof notification.metadata==="object"?notification.metadata:{},stay=meta.arrival_date&&meta.departure_date?`${shortOtaDate(meta.arrival_date)} → ${shortOtaDate(meta.departure_date)}`:"",room=[meta.room_type,meta.room_name?`Hab. ${meta.room_name}`:""].filter(Boolean).join(" · "),reservation=meta.reservation_number?`Reserva ${meta.reservation_number}`:"";return[meta.guest_name,stay,room,reservation].filter(Boolean).join(" · ")||notification?.detail||"Abrir la reserva para ver el detalle."}
 
 async function playOtaSound(){
   if(typeof window==="undefined")return
@@ -93,7 +95,7 @@ export default function NotificationCenter({open,onClose,data,onOpenReservation,
   }
 
   const urgent=items.filter(x=>x.priority==="critical").length
-  const alert=otaAlert&&<div className={s.otaToast} role="status" aria-live="polite"><button type="button" className={s.otaToastMain} onClick={()=>openOta(otaAlert)}><span className={s.otaBadge}>OTA</span><span className={s.otaToastCopy}><small>{otaAlert.provider_name||"Canal externo"}</small><b>{otaAlert.title||"Nueva actualización OTA"}</b><span>{otaAlert.detail||"Abrir la reserva para ver el detalle."}</span><em>Ver reserva →</em></span></button><button type="button" className={s.otaToastClose} onClick={()=>setOtaAlert(null)} aria-label="Cerrar aviso">×</button></div>
+  const alert=otaAlert&&<div className={s.otaToast} role="status" aria-live="polite"><button type="button" className={s.otaToastMain} onClick={()=>openOta(otaAlert)}><span className={s.otaBadge}>OTA</span><span className={s.otaToastCopy}><small>{otaAlert.provider_name||"Canal externo"}</small><b>{otaAlert.title||"Nueva actualización OTA"}</b><span>{otaAlertDetail(otaAlert)}</span><em>Ver reserva →</em></span></button><button type="button" className={s.otaToastClose} onClick={()=>setOtaAlert(null)} aria-label="Cerrar aviso">×</button></div>
 
   if(!open)return alert
   return <>{alert}<div className={s.shade} onMouseDown={e=>e.target===e.currentTarget&&onClose?.()}>

@@ -7,6 +7,8 @@ const roomName=(rooms,id)=>rooms.find(r=>String(r.id)===String(id))?.nombre||"Si
 const paidFor=(payments,id)=>(payments||[]).filter(p=>String(p.reserva_id)===String(id)&&!["anulado","cancelado","reembolsado"].includes(String(p.estado||"").toLowerCase())).reduce((sum,p)=>sum+Number(p.monto||0),0)
 const priorityRank={critical:0,high:1,normal:2,info:3}
 const otaTitle=event=>({ota_booking_new:"Nueva reserva OTA",ota_booking_modified:"Reserva OTA modificada",ota_booking_cancelled:"Reserva OTA cancelada"}[String(event||"").toLowerCase()]||"Actualización OTA")
+const shortOtaDate=value=>{const parts=String(value||"").split("-");return parts.length===3?`${parts[2]}/${parts[1]}`:String(value||"")}
+const otaEventDetail=event=>{const meta=event?._ota_metadata&&typeof event._ota_metadata==="object"?event._ota_metadata:{},stay=meta.arrival_date&&meta.departure_date?`${shortOtaDate(meta.arrival_date)} → ${shortOtaDate(meta.departure_date)}`:"",room=[meta.room_type,meta.room_name?`Hab. ${meta.room_name}`:""].filter(Boolean).join(" · "),reservation=meta.reservation_number?`Reserva ${meta.reservation_number}`:"";return[meta.guest_name,stay,room,reservation].filter(Boolean).join(" · ")||event?.message||"Actualización recibida"}
 
 export function buildOperationalNotifications({rooms=[],reservations=[],payments=[],automationEvents=[],inboxConversations=[],maintenanceTickets=[]}={}){
   const today=isoDate(),items=[]
@@ -22,7 +24,7 @@ export function buildOperationalNotifications({rooms=[],reservations=[],payments
   ;(automationEvents||[]).filter(e=>!["resolved","done","completed","ignored"].includes(String(e.status||"").toLowerCase())).slice(0,60).forEach(event=>{
     if(event._ota_notification_id){
       const type=String(event.event_type||"").toLowerCase(),provider=event._ota_provider||"OTA"
-      items.push({id:`ota-${event._ota_notification_id}`,kind:"ota",priority:type==="ota_booking_new"?"high":type==="ota_booking_cancelled"?"high":"normal",icon:"OTA",title:event.title||otaTitle(type),detail:`${provider} · ${event.message||"Actualización recibida"}`,reservationId:event.reservation_id||null,target:event.reservation_id?"reservation":"notifications",createdAt:event.created_at,notificationId:event._ota_notification_id,provider,otaEventType:type.replace(/^ota_/,"")})
+      items.push({id:`ota-${event._ota_notification_id}`,kind:"ota",priority:type==="ota_booking_new"?"high":type==="ota_booking_cancelled"?"high":"normal",icon:"OTA",title:event.title||otaTitle(type),detail:`${provider} · ${otaEventDetail(event)}`,reservationId:event.reservation_id||null,target:event.reservation_id?"reservation":"notifications",createdAt:event.created_at,notificationId:event._ota_notification_id,provider,otaEventType:type.replace(/^ota_/,"")})
       return
     }
     items.push({id:`automation-${event.id}`,kind:"system",priority:/error|fail|rechaz|venc/i.test(`${event.event_type||""} ${event.message||""}`)?"high":"normal",icon:"⚡",title:event.event_type?String(event.event_type).replaceAll("_"," "):"Automatización pendiente",detail:event.message||"Hay una automatización que requiere atención.",reservationId:event.reservation_id||null,roomId:event.room_id||null,target:event.reservation_id?"reservation":"automations",createdAt:event.created_at})
