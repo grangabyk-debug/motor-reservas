@@ -2,7 +2,6 @@ import{ supabase }from"../../../lib/supabase"
 import{ requirePropertyId }from"../data/tenant"
 
 const tenant=id=>requirePropertyId(id)
-const OPEN_STATUSES=new Set(["open","assigned","in_progress","waiting_parts","waiting_vendor"])
 
 async function currentUserId(){
   const{data,error}=await supabase.auth.getUser();if(error)throw error
@@ -19,6 +18,15 @@ function nextDueDate(plan,from=new Date()){
   return d.toISOString().slice(0,10)
 }
 
+const storedPhotos=photos=>(Array.isArray(photos)?photos:[]).map(item=>({path:item.path,name:item.name||"Adjunto",stage:item.stage||"before",uploaded_at:item.uploaded_at||null})).filter(item=>item.path)
+async function hydratePhotos(photos=[]){
+  return Promise.all((Array.isArray(photos)?photos:[]).map(async item=>{
+    if(!item?.path)return item
+    const{data,error}=await supabase.storage.from("maintenance-attachments").createSignedUrl(item.path,60*60)
+    return{...item,url:error?null:data?.signedUrl||null}
+  }))
+}
+
 export async function loadMaintenanceWorkspace({propertyId}){
   const property=tenant(propertyId)
   const[tickets,assets,vendors,plans,events,members]=await Promise.all([
@@ -33,7 +41,8 @@ export async function loadMaintenanceWorkspace({propertyId}){
   const memberRows=members.data||[],ids=memberRows.map(item=>item.user_id).filter(Boolean)
   let profiles=[]
   if(ids.length){const result=await supabase.from("profiles").select("id,full_name,role").in("id",ids);if(result.error)throw result.error;profiles=result.data||[]}
-  return{tickets:tickets.data||[],assets:assets.data||[],vendors:vendors.data||[],plans:plans.data||[],events:events.data||[],staff:memberRows.map(member=>({...member,profile:profiles.find(profile=>profile.id===member.user_id)||null}))}
+  const hydratedTickets=await Promise.all((tickets.data||[]).map(async ticket=>({...ticket,photos:await hydratePhotos(ticket.photos)})))
+  return{tickets:hydratedTickets,assets:assets.data||[],vendors:vendors.data||[],plans:plans.data||[],events:events.data||[],staff:memberRows.map(member=>({...member,profile:profiles.find(profile=>profile.id===member.user_id)||null}))}
 }
 
 export function subscribeMaintenanceWorkspace({propertyId,onChange}){
@@ -54,14 +63,14 @@ async function syncInventoryBlock({propertyId,ticket}){
 
 export async function saveMaintenanceTicket({propertyId,draft}){
   const property=tenant(propertyId),uid=await currentUserId(),now=new Date().toISOString(),labor=Math.max(0,Number(draft.labor_cost||0)),materials=Math.max(0,Number(draft.material_cost||0)),external=Math.max(0,Number(draft.external_cost||0))
-  const row={property_id:property,room_id:draft.room_id?Number(draft.room_id):null,resource_id:draft.resource_id||null,asset_id:draft.asset_id||null,vendor_id:draft.vendor_id||null,reservation_id:draft.reservation_id?Number(draft.reservation_id):null,title:String(draft.title||"").trim(),description:String(draft.description||"").trim()||null,priority:draft.priority||"normal",status:draft.status||"open",assigned_to:draft.assigned_to||null,reported_by:draft.reported_by||uid,due_at:draft.due_at||null,labor_cost:labor,material_cost:materials,external_cost:external,cost:labor+materials+external,parts:Array.isArray(draft.parts)?draft.parts:[],checklist:Array.isArray(draft.checklist)?draft.checklist:[],photos:Array.isArray(draft.photos)?draft.photos:[],notes:String(draft.notes||"").trim()||null,source:draft.source||"manual",waiting_reason:String(draft.waiting_reason||"").trim()||null,resolution_note:String(draft.resolution_note||"").trim()||null,blocks_inventory:!!draft.blocks_inventory,estimated_minutes:draft.estimated_minutes?Math.max(1,Number(draft.estimated_minutes)):null,recurrence_plan_id:draft.recurrence_plan_id||null,updated_at:now}
+  const row={property_id:property,room_id:draft.room_id?Number(draft.room_id):null,resource_id:draft.resource_id||null,asset_id:draft.asset_id||null,vendor_id:draft.vendor_id||null,reservation_id:draft.reservation_id?Number(draft.reservation_id):null,title:String(draft.title||"").trim(),description:String(draft.description||"").trim()||null,priority:draft.priority||"normal",status:draft.status||"open",assigned_to:draft.assigned_to||null,reported_by:draft.reported_by||uid,due_at:draft.due_at||null,labor_cost:labor,material_cost:materials,external_cost:external,cost:labor+materials+external,parts:Array.isArray(draft.parts)?draft.parts:[],checklist:Array.isArray(draft.checklist)?draft.checklist:[],photos:storedPhotos(draft.photos),notes:String(draft.notes||"").trim()||null,source:draft.source||"manual",waiting_reason:String(draft.waiting_reason||"").trim()||null,resolution_note:String(draft.resolution_note||"").trim()||null,blocks_inventory:!!draft.blocks_inventory,estimated_minutes:draft.estimated_minutes?Math.max(1,Number(draft.estimated_minutes)):null,recurrence_plan_id:draft.recurrence_plan_id||null,updated_at:now}
   if(!row.title)throw new Error("La orden necesita un título.")
   const before=draft.id?await supabase.from("hotel_maintenance_tickets").select("status").eq("id",draft.id).eq("property_id",property).maybeSingle():{data:null,error:null};if(before.error)throw before.error
   const query=draft.id?supabase.from("hotel_maintenance_tickets").update(row).eq("id",draft.id).eq("property_id",property):supabase.from("hotel_maintenance_tickets").insert(row)
   const{data,error}=await query.select("*").single();if(error)throw error
-  await supabase.from("hotel_maintenance_events").insert({property_id:property,ticket_id:data.id,event_type:draft.id?"updated":"created",from_status:before.data?.status||null,to_status:data.status,note:draft.id?"Orden actualizada":"Orden creada",labor_cost:labor,material_cost:materials,external_cost:external,parts:row.parts,created_by:uid})
+  const event=await supabase.from("hotel_maintenance_events").insert({property_id:property,ticket_id:data.id,event_type:draft.id?"updated":"created",from_status:before.data?.status||null,to_status:data.status,note:draft.id?"Orden actualizada":"Orden creada",labor_cost:labor,material_cost:materials,external_cost:external,parts:row.parts,created_by:uid});if(event.error)throw event.error
   await syncInventoryBlock({propertyId:property,ticket:data})
-  return data
+  return{...data,photos:await hydratePhotos(data.photos)}
 }
 
 export async function setMaintenanceTicketStatus({propertyId,ticket,status,note=""}){
@@ -72,10 +81,10 @@ export async function setMaintenanceTicketStatus({propertyId,ticket,status,note=
   if(status==="verified"){patch.verified_at=now;patch.verified_by=uid;if(!ticket.completed_at)patch.completed_at=now}
   if(status==="open"){patch.started_at=null;patch.completed_at=null;patch.verified_at=null;patch.verified_by=null}
   const{data,error}=await supabase.from("hotel_maintenance_tickets").update(patch).eq("id",ticket.id).eq("property_id",property).select("*").single();if(error)throw error
-  await supabase.from("hotel_maintenance_events").insert({property_id:property,ticket_id:ticket.id,event_type:"status",from_status:ticket.status,to_status:status,note:String(note||"").trim()||null,created_by:uid})
+  const event=await supabase.from("hotel_maintenance_events").insert({property_id:property,ticket_id:ticket.id,event_type:"status",from_status:ticket.status,to_status:status,note:String(note||"").trim()||null,created_by:uid});if(event.error)throw event.error
   await syncInventoryBlock({propertyId:property,ticket:data})
   if(status==="verified"&&data.recurrence_plan_id){const{data:plan,error:planError}=await supabase.from("hotel_maintenance_plans").select("*").eq("id",data.recurrence_plan_id).eq("property_id",property).maybeSingle();if(planError)throw planError;if(plan){const{error:updateError}=await supabase.from("hotel_maintenance_plans").update({last_completed_at:now,next_due_date:nextDueDate(plan,new Date()),updated_at:now}).eq("id",plan.id).eq("property_id",property);if(updateError)throw updateError}}
-  return data
+  return{...data,photos:await hydratePhotos(data.photos)}
 }
 
 export async function addMaintenanceEvent({propertyId,ticketId,note,eventType="note"}){
@@ -104,13 +113,13 @@ export async function saveMaintenancePlan({propertyId,draft}){
 }
 
 export async function createTicketFromPlan({propertyId,plan}){
-  return saveMaintenanceTicket({propertyId,draft:{title:plan.title,description:plan.description,priority:plan.priority,status:plan.assigned_to?"assigned":"open",assigned_to:plan.assigned_to,room_id:plan.room_id,asset_id:plan.asset_id,vendor_id:plan.vendor_id,estimated_minutes:plan.estimated_minutes,checklist:plan.checklist||[],recurrence_plan_id:plan.id,source:"preventive"}})
+  return saveMaintenanceTicket({propertyId,draft:{title:plan.title,description:plan.description,priority:plan.priority,status:plan.assigned_to?"assigned":"open",assigned_to:plan.assigned_to,room_id:plan.room_id,asset_id:plan.asset_id,vendor_id:plan.vendor_id,estimated_minutes:plan.estimated_minutes,checklist:(plan.checklist||[]).map(item=>({...item,done:false})),recurrence_plan_id:plan.id,source:"preventive"}})
 }
 
 export async function uploadMaintenanceAttachment({propertyId,ticketId,file,stage="before"}){
   const property=tenant(propertyId),uid=await currentUserId(),safe=String(file.name||"archivo").replace(/[^a-zA-Z0-9._-]/g,"-")
   const path=`${property}/${ticketId}/${Date.now()}-${uid.slice(0,8)}-${safe}`
   const{error}=await supabase.storage.from("maintenance-attachments").upload(path,file,{upsert:false,contentType:file.type||undefined});if(error)throw error
-  const{data}=supabase.storage.from("maintenance-attachments").getPublicUrl(path)
-  return{path,url:data.publicUrl,name:file.name,stage,uploaded_at:new Date().toISOString()}
+  const signed=await supabase.storage.from("maintenance-attachments").createSignedUrl(path,60*60);if(signed.error)throw signed.error
+  return{path,url:signed.data?.signedUrl||null,name:file.name,stage,uploaded_at:new Date().toISOString()}
 }
