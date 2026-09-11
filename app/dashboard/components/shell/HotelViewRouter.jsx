@@ -21,6 +21,7 @@ import{KeysView,TeamView,AutomationsView,IntelligenceView}from"../../features/ho
 import IntegrationMarketplace from"../../features/hotel/IntegrationMarketplace"
 import SettingsWorkspace from"../../features/hotel/SettingsWorkspace"
 import SupportView from"../../features/hotel/SupportView"
+import SubscriptionPanel from"../../features/hotel/SubscriptionPanel"
 import{saveFloor,saveRoom,updateRoomStatus,saveHousekeepingTask,setHousekeepingStatus,saveResource}from"../../services/operations"
 import{saveRateCell,saveRateRange,savePartner,saveUpsell,saveChannelCost}from"../../services/commercial"
 import{savePackage,setPackageActive}from"../../services/packages"
@@ -56,6 +57,7 @@ export default function HotelViewRouter({view,data,session,settings,permissions,
   if(view==="automations")return <AutomationsView rules={data.hotel.automations||[]} events={data.hotel.events?.length?data.hotel.events:(data.automationEvents||[])} canManage={allowed("hotel.automations")} onSave={draft=>action(()=>saveAutomation({propertyId:session.propertyId,userId:session.user.id,draft}),"Automatización guardada.")} onToggle={(rule,enabled)=>action(()=>toggleAutomation({propertyId:session.propertyId,id:rule.id,enabled}),enabled?"Automatización activada.":"Automatización pausada.")} onDelete={rule=>action(()=>deleteAutomation({propertyId:session.propertyId,id:rule.id}),"Automatización eliminada.")} onResolve={event=>action(()=>resolveAutomationEvent({propertyId:session.propertyId,id:event.id}),"Evento resuelto.")}/>
   if(view==="intelligence")return <IntelligenceView settings={settings} rooms={activeRooms} reservations={live} payments={data.payments} onAsk={(question,context)=>askIntelligence({question,context})}/>
   if(view==="integrations")return <IntegrationMarketplace settings={settings} channels={data.channels||[]}/>
+  if(view==="subscription")return role==="owner"?<SubscriptionPanel propertyId={session.propertyId} role={role}/>:<ModuleBridge view={view}/>
   if(view==="settings")return <SettingsWorkspace settings={settings} canManage={allowed("hotel.settings")} onSave={draft=>action(()=>saveHotelSettings({propertyId:session.propertyId,draft}),"Configuración guardada.")}/>
   if(view==="support")return <SupportView propertyId={session.propertyId} hotelName={hotelName}/>
   return <ModuleBridge view={view}/>
