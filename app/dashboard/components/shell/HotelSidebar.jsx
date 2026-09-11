@@ -11,7 +11,7 @@ const QUICK=[
   ["new","Crear reserva"],["housekeeping","Rack de limpiezas"],["calendar","Rack de asignaciones"],["rooms","Rack de disponibilidad"],["maintenance","Última actividad"],["keys","Puertas"],["billing","Facturación de servicios"]
 ]
 const MORE=[
-  ["cash","Caja & Folios"],["partners","Empresas & Agencias"],["distribution","Distribución"],["team","Equipo & Roles"],["settings","Configuración"],["support","Ayuda"]
+  ["cash","Caja & Folios"],["partners","Empresas & Agencias"],["distribution","Distribución"],["team","Equipo & Roles"],["subscription","Mi plan"],["settings","Configuración"],["support","Ayuda"]
 ]
 
 function initials(name="Hotel"){return String(name).trim().split(/\s+/).map(x=>x[0]).join("").slice(0,2).toUpperCase()||"HL"}
@@ -24,7 +24,7 @@ function Item({id,label,view,onView,onNewReservation}){
 }
 
 export default function HotelSidebar({view,onView,hotelName="Hotel",hotelLogo="",role="reception",properties=[],propertyId,onPropertyChange,onLogout,onNewReservation,mobileOpen=false,canView=()=>true}){
-  const visible=list=>list.filter(([id])=>id==="new"?!!onNewReservation:canView(id))
+  const visible=list=>list.filter(([id])=>id==="new"?!!onNewReservation:id==="subscription"?role==="owner":canView(id))
   const main=visible(MAIN),quick=visible(QUICK),more=visible(MORE)
   return <aside className={`${ui.rail} ${mobileOpen?ui.railOpen:""}`} aria-label="Navegación principal">
     <div className={ui.identity}>
