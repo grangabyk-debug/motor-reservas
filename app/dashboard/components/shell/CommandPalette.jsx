@@ -7,19 +7,19 @@ import styles from"./command-palette.module.css"
 const normalize=value=>String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim()
 const initials=name=>String(name||"H").trim().split(/\s+/).slice(0,2).map(x=>x[0]).join("").toUpperCase()||"H"
 
-export default function CommandPalette({open,onClose,reservations=[],rooms=[],guests=[],onNavigate,onOpenReservation,onNewReservation}){
+export default function CommandPalette({open,onClose,reservations=[],rooms=[],guests=[],onNavigate,onOpenReservation,onNewReservation,canView=()=>true}){
   const[query,setQuery]=useState(""),[active,setActive]=useState(0),inputRef=useRef(null)
   const roomMap=useMemo(()=>new Map(rooms.map(room=>[String(room.id),room])),[rooms])
-  const navigation=useMemo(()=>HOTEL_NAVIGATION.flatMap(group=>group.items.map(([id,label,icon])=>({id:`view:${id}`,kind:"Módulo",title:label,subtitle:group.label,icon,run:()=>onNavigate?.(id)}))),[onNavigate])
+  const navigation=useMemo(()=>HOTEL_NAVIGATION.flatMap(group=>group.items.filter(([id])=>canView(id)).map(([id,label,icon])=>({id:`view:${id}`,kind:"Módulo",title:label,subtitle:group.label,icon,run:()=>onNavigate?.(id)}))),[onNavigate,canView])
   const fixed=useMemo(()=>[
-    {id:"action:new",kind:"Acción",title:"Nueva reserva",subtitle:"Crear una estadía",icon:"＋",run:()=>onNewReservation?.()},
-    {id:"action:planning",kind:"Acción",title:"Abrir Planning",subtitle:"Calendario, ocupación y disponibilidad",icon:"▦",run:()=>onNavigate?.("calendar")},
-    {id:"action:housekeeping",kind:"Acción",title:"Abrir Housekeeping",subtitle:"Limpieza y estado de habitaciones",icon:"◇",run:()=>onNavigate?.("housekeeping")},
-    {id:"action:billing",kind:"Acción",title:"Facturación y ARCA",subtitle:"Folios y comprobantes",icon:"▧",run:()=>onNavigate?.("billing")},
-  ],[onNavigate,onNewReservation])
-  const reservationItems=useMemo(()=>reservations.slice(0,600).map(r=>{const room=roomMap.get(String(r.habitacion_id));return{id:`reservation:${r.id}`,kind:"Reserva",title:r.nombre_huesped||"Huésped",subtitle:`${r.numero_reserva||r.id} · ${room?.nombre||"Sin habitación"} · ${r.fecha_entrada||""} → ${r.fecha_salida||""}`,icon:initials(r.nombre_huesped),run:()=>onOpenReservation?.(r)}}),[reservations,roomMap,onOpenReservation])
-  const roomItems=useMemo(()=>rooms.map(room=>({id:`room:${room.id}`,kind:"Habitación",title:`Habitación ${room.nombre}`,subtitle:`${room.tipo||"Habitación"} · ${room.estado||"sin estado"}`,icon:"▤",run:()=>onNavigate?.("rooms")})),[rooms,onNavigate])
-  const guestItems=useMemo(()=>guests.slice(0,400).map(guest=>({id:`guest:${guest.id}`,kind:"Huésped",title:guest.full_name||guest.nombre||guest.name||guest.email||"Huésped",subtitle:guest.email||guest.phone||guest.telefono||"Perfil de huésped",icon:initials(guest.full_name||guest.nombre||guest.name),run:()=>onNavigate?.("guests")})),[guests,onNavigate])
+    onNewReservation&&canView("reservations")?{id:"action:new",kind:"Acción",title:"Nueva reserva",subtitle:"Crear una estadía",icon:"＋",run:()=>onNewReservation?.()}:null,
+    canView("calendar")?{id:"action:planning",kind:"Acción",title:"Abrir Planning",subtitle:"Calendario, ocupación y disponibilidad",icon:"▦",run:()=>onNavigate?.("calendar")}:null,
+    canView("housekeeping")?{id:"action:housekeeping",kind:"Acción",title:"Abrir Housekeeping",subtitle:"Limpieza y estado de habitaciones",icon:"◇",run:()=>onNavigate?.("housekeeping")}:null,
+    canView("billing")?{id:"action:billing",kind:"Acción",title:"Facturación y ARCA",subtitle:"Folios y comprobantes",icon:"▧",run:()=>onNavigate?.("billing")}:null,
+  ].filter(Boolean),[onNavigate,onNewReservation,canView])
+  const reservationItems=useMemo(()=>canView("reservations")?reservations.slice(0,600).map(r=>{const room=roomMap.get(String(r.habitacion_id));return{id:`reservation:${r.id}`,kind:"Reserva",title:r.nombre_huesped||"Huésped",subtitle:`${r.numero_reserva||r.id} · ${room?.nombre||"Sin habitación"} · ${r.fecha_entrada||""} → ${r.fecha_salida||""}`,icon:initials(r.nombre_huesped),run:()=>onOpenReservation?.(r)}}):[],[reservations,roomMap,onOpenReservation,canView])
+  const roomItems=useMemo(()=>canView("rooms")?rooms.map(room=>({id:`room:${room.id}`,kind:"Habitación",title:`Habitación ${room.nombre}`,subtitle:`${room.tipo||"Habitación"} · ${room.estado||"sin estado"}`,icon:"▤",run:()=>onNavigate?.("rooms")})):[],[rooms,onNavigate,canView])
+  const guestItems=useMemo(()=>canView("guests")?guests.slice(0,400).map(guest=>({id:`guest:${guest.id}`,kind:"Huésped",title:guest.full_name||guest.nombre||guest.name||guest.email||"Huésped",subtitle:guest.email||guest.phone||guest.telefono||"Perfil de huésped",icon:initials(guest.full_name||guest.nombre||guest.name),run:()=>onNavigate?.("guests")})):[],[guests,onNavigate,canView])
   const results=useMemo(()=>{const all=[...fixed,...navigation,...reservationItems,...roomItems,...guestItems],q=normalize(query);if(!q)return all.slice(0,16);return all.map(item=>{const hay=normalize(`${item.title} ${item.subtitle} ${item.kind}`),terms=q.split(/\s+/).filter(Boolean),score=terms.reduce((sum,term)=>sum+(hay.startsWith(term)?6:hay.includes(term)?2:-5),0)+(normalize(item.title).startsWith(q)?12:0);return{...item,score}}).filter(item=>item.score>=0).sort((a,b)=>b.score-a.score).slice(0,20)},[query,fixed,navigation,reservationItems,roomItems,guestItems])
 
   useEffect(()=>{if(!open)return;setQuery("");setActive(0);const timer=setTimeout(()=>inputRef.current?.focus(),30);return()=>clearTimeout(timer)},[open])
