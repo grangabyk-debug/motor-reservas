@@ -10,29 +10,25 @@ const CONNECTION_ID = "5fe514d4-e0b3-4b6d-9d69-d14ec6dfd5c4";
 const MAX_REVISIONS = 20;
 
 function reply(data: unknown, status = 200) {
-  return Response.json(data, {
-    status,
-    headers: { "Cache-Control": "no-store, max-age=0" },
-  });
+  return Response.json(data, { status, headers: { "Cache-Control": "no-store, max-age=0" } });
 }
-
 function dbHeaders() {
-  return {
-    apikey: SERVICE_ROLE,
-    Authorization: `Bearer ${SERVICE_ROLE}`,
-    "Content-Type": "application/json",
-  };
+  return { apikey: SERVICE_ROLE, Authorization: `Bearer ${SERVICE_ROLE}`, "Content-Type": "application/json" };
 }
-
 function channexHeaders() {
-  return {
-    "user-api-key": CHANNEX_API_KEY,
-    "Content-Type": "application/json",
-  };
+  return { "user-api-key": CHANNEX_API_KEY, "Content-Type": "application/json" };
 }
-
+async function validReconcileToken(token: string) {
+  if (!token) return false;
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/hl_validate_channex_staging_reconcile_token`, {
+    method: "POST",
+    headers: dbHeaders(),
+    body: JSON.stringify({ p_token: token }),
+  });
+  if (!res.ok) return false;
+  return (await res.json().catch(() => false)) === true;
+}
 const SENSITIVE_KEYS = /^(guarantee|guarantees|card|cards|card_number|cardholder_name|card_holder|cvv|cvc|security_code|expiration|expiration_date|expiry|credit_card|credit_card_data|payment_card|raw_message|raw_booking)$/i;
-
 function sanitize(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(sanitize);
   if (!value || typeof value !== "object") return value;
@@ -42,15 +38,12 @@ function sanitize(value: unknown): unknown {
       .map(([key, nested]) => [key, sanitize(nested)])
   );
 }
-
 function attributes(revision: any) {
   return revision?.data?.attributes || revision?.attributes || revision || {};
 }
-
 function revisionId(revision: any) {
   return String(revision?.id || revision?.data?.id || attributes(revision)?.id || "");
 }
-
 async function fetchFeed() {
   const url = new URL(`${CHANNEX_BASE}/booking_revisions/feed`);
   url.searchParams.set("filter[property_id]", EXPECTED_CHANNEX_PROPERTY);
@@ -62,7 +55,6 @@ async function fetchFeed() {
   const rows = Array.isArray(body?.data) ? body.data : Array.isArray(body) ? body : [];
   return rows.slice(0, MAX_REVISIONS).map((row: unknown) => sanitize(row));
 }
-
 async function importRevision(revision: unknown) {
   const attrs = attributes(revision);
   if (String(attrs?.property_id || "") !== EXPECTED_CHANNEX_PROPERTY) {
@@ -77,7 +69,6 @@ async function importRevision(revision: unknown) {
   if (!res.ok || !result?.ok) throw new Error(`Channex import failed (${res.status})`);
   return result;
 }
-
 async function acknowledge(id: string) {
   const res = await fetch(`${CHANNEX_BASE}/booking_revisions/${encodeURIComponent(id)}/ack`, {
     method: "POST",
@@ -91,10 +82,15 @@ Deno.serve(async (req: Request) => {
   if (!CHANNEX_API_KEY) return reply({ ok: false, staging: true, error: "STAGING inbound key not configured" }, 503);
   if (req.method !== "POST") return reply({ ok: false, error: "Method not allowed" }, 405);
 
+  let body: any;
+  try { body = await req.json(); } catch { return reply({ ok: false, error: "Invalid JSON" }, 400); }
+  if (!(await validReconcileToken(String(body?.reconcile_token || "")))) {
+    return reply({ ok: false, staging: true, error: "Unauthorized" }, 401);
+  }
+
   try {
     const feed = await fetchFeed();
     const results: Array<Record<string, unknown>> = [];
-
     for (const revision of feed) {
       const id = revisionId(revision);
       if (!id) {
@@ -104,38 +100,14 @@ Deno.serve(async (req: Request) => {
       try {
         const imported = await importRevision(revision);
         await acknowledge(id);
-        results.push({
-          ok: true,
-          revision_id: id,
-          status: imported.status || null,
-          reservation_id: imported.reservation_id || null,
-          ack: "success",
-        });
+        results.push({ ok: true, revision_id: id, status: imported.status || null, reservation_id: imported.reservation_id || null, ack: "success" });
       } catch (error) {
-        results.push({
-          ok: false,
-          revision_id: id,
-          error: error instanceof Error ? error.message : "reconciliation_failed",
-        });
+        results.push({ ok: false, revision_id: id, error: error instanceof Error ? error.message : "reconciliation_failed" });
       }
     }
-
     const failed = results.filter((item) => item.ok === false).length;
-    return reply({
-      ok: failed === 0,
-      staging: true,
-      reconciliation: true,
-      received: feed.length,
-      processed: results.length - failed,
-      failed,
-      results,
-    }, failed ? 207 : 200);
+    return reply({ ok: failed === 0, staging: true, reconciliation: true, received: feed.length, processed: results.length - failed, failed, results }, failed ? 207 : 200);
   } catch (error) {
-    return reply({
-      ok: false,
-      staging: true,
-      reconciliation: true,
-      error: error instanceof Error ? error.message : "feed_failed",
-    }, 502);
+    return reply({ ok: false, staging: true, reconciliation: true, error: error instanceof Error ? error.message : "feed_failed" }, 502);
   }
 });
