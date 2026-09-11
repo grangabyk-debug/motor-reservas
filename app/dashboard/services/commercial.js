@@ -36,6 +36,13 @@ export async function saveUpsell({propertyId,draft}){
   const query=draft.id?supabase.from("hotel_upsell_catalog").update(row).eq("id",draft.id).eq("property_id",property):supabase.from("hotel_upsell_catalog").insert(row);const{error}=await query;if(error)throw error
 }
 
+export async function saveChannelCost({propertyId,draft}){
+  const property=tenant(propertyId),channelName=String(draft.channel_name||"").trim(),currency=String(draft.currency||"ARS").trim().toUpperCase()
+  if(!channelName)throw new Error("Elegí un canal para configurar el costo.")
+  const row={property_id:property,channel_name:channelName,currency,commission_percent:Math.min(100,Math.max(0,Number(draft.commission_percent||0))),fixed_fee_per_reservation:Math.max(0,Number(draft.fixed_fee_per_reservation||0)),notes:draft.notes||null,active:draft.active!==false,updated_at:new Date().toISOString()}
+  const{data,error}=await supabase.from("hotel_channel_costs").upsert(row,{onConflict:"property_id,channel_name,currency"}).select("*").single();if(error)throw error;return data
+}
+
 export async function prepareChannel({propertyId,provider}){
   const property=tenant(propertyId),native=provider==="Motor directo",row={property_id:property,provider,status:native?"connected":"sandbox",mode:native?"production":"sandbox",account_ref:native?"native":"credentials-required",mapping:{},last_error:null,updated_at:new Date().toISOString()}
   const{error}=await supabase.from("hotel_channel_connections").upsert(row,{onConflict:"property_id,provider"});if(error)throw error;return row
