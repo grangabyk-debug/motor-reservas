@@ -70,9 +70,12 @@ export function createHotelRepository(client,propertyId){
     async analytics(){
       await client.rpc("capture_hotel_analytics_snapshot",{p_property_id:tenant}).then(result=>{if(result.error)throw result.error})
       const from=new Date();from.setUTCDate(from.getUTCDate()-35)
-      const {data,error}=await scoped("hotel_analytics_daily_snapshots").gte("captured_on",from.toISOString().slice(0,10)).order("captured_on",{ascending:false}).order("stay_date").limit(5000)
-      if(error)throw error
-      return {snapshots:data||[]}
+      const [snapshots,costs]=await Promise.all([
+        scoped("hotel_analytics_daily_snapshots").gte("captured_on",from.toISOString().slice(0,10)).order("captured_on",{ascending:false}).order("stay_date").limit(5000),
+        scoped("hotel_channel_costs").eq("active",true).order("channel_name"),
+      ])
+      const error=[snapshots,costs].find(result=>result.error)?.error;if(error)throw error
+      return {snapshots:snapshots.data||[],channelCosts:costs.data||[]}
     },
     async finance(){
       const [documents,sessions,movements]=await Promise.all([
