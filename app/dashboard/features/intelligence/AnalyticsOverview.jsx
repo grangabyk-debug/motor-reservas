@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react"
 import { isoDate, money } from "../../core/formatters"
 import ChannelPerformance from "./ChannelPerformance"
+import FinancialPerformance from "./FinancialPerformance"
 import s from "./analytics-overview.module.css"
 
 const DAY = 86400000
@@ -115,7 +116,7 @@ function PickupCard({label,value,currency}){
   return <article className={s.pickupCard}><span>{label}</span><strong>{available?signed(value.rooms):"—"}<small> noches</small></strong><b>{available?`${value.revenue>=0?"+":""}${money(value.revenue,currency)}`:"Historial no disponible"}</b><em>{available?`${value.occupancy>=0?"+":""}${value.occupancy.toFixed(1)} pp de ocupación`:"Se completa automáticamente"}</em></article>
 }
 
-export default function AnalyticsOverview({ rooms = [], reservations = [], settings = {}, snapshots = [] }) {
+export default function AnalyticsOverview({ rooms = [], reservations = [], payments = [], settings = {}, snapshots = [] }) {
   const [period, setPeriod] = useState("month")
   const range = useMemo(() => rangeFor(period), [period]), previous = useMemo(() => previousRange(range), [range])
   const currencies = useMemo(() => [...new Set([...reservations.map(r => String(r.moneda || "ARS").toUpperCase()),...snapshots.map(r=>String(r.currency||"ARS").toUpperCase())])], [reservations,snapshots])
@@ -189,6 +190,7 @@ export default function AnalyticsOverview({ rooms = [], reservations = [], setti
     </section>
 
     <ChannelPerformance reservations={reservations} start={range.start} end={range.end} currency={currency}/>
+    <FinancialPerformance reservations={reservations} payments={payments} start={range.start} end={range.end} currency={currency}/>
 
     <section className={s.definition}><b>Cómo se calcula</b><span>Ocupación = noches vendidas / noches disponibles · ADR = ingreso de alojamiento / noches vendidas · RevPAR = ingreso de alojamiento / noches disponibles · Pickup = diferencia del on-the-books entre dos fechas de captura.</span><small>El backfill histórico usa fecha de creación, cancelación y no-show disponibles en el PMS. Desde hoy, los snapshots diarios quedan registrados automáticamente.</small></section>
   </main>
