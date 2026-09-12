@@ -9,6 +9,10 @@ export const metadata={
 export default function PmsNextPage(){
   const buildId=process.env.VERCEL_GIT_COMMIT_SHA||process.env.VERCEL_DEPLOYMENT_ID||"local"
   return <><PmsNextApp buildId={buildId}/><style>{`
+    [data-workspace="planning"] > section > div:has([aria-label="Herramientas del Planning"]){
+      position:relative!important;
+      top:auto!important;
+    }
     @media(min-width:761px){
       [aria-label="Rooming por habitación"] article>div:nth-child(2){
         display:grid!important;
