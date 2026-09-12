@@ -10,9 +10,9 @@ const premiumPolish=`
 [data-maintenance-premium] *{box-sizing:border-box}
 [data-maintenance-premium] button,[data-maintenance-premium] input,[data-maintenance-premium] select,[data-maintenance-premium] textarea{font-size:13.5px!important}
 [data-maintenance-premium] button{min-height:42px}
-[data-maintenance-premium] small{font-size:12px!important;line-height:1.45}
+[data-maintenance-premium] small{font-size:11px!important;line-height:1.5!important}
 [data-maintenance-premium] p{font-size:13px!important;line-height:1.55}
-[data-maintenance-premium] span,[data-maintenance-premium] em,[data-maintenance-premium] label,[data-maintenance-premium] footer{font-size:max(11px,.86em)!important;line-height:1.45}
+[data-maintenance-premium] span,[data-maintenance-premium] em,[data-maintenance-premium] label,[data-maintenance-premium] footer{font-size:max(10px,.86em)!important;line-height:1.45}
 [data-maintenance-premium] aside b,[data-maintenance-premium] aside strong{font-size:13px!important}
 [data-maintenance-premium] button footer b{font-size:11px!important}
 [data-maintenance-premium] input,[data-maintenance-premium] select{min-height:42px}
