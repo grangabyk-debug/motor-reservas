@@ -1,0 +1,210 @@
+.vizGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, .65fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.vizCard {
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--border, #d8dce5) 82%, transparent);
+  border-radius: 22px;
+  padding: 18px;
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--surface, #fff) 96%, #7c3aed 4%), var(--surface, #fff));
+  box-shadow: 0 14px 38px rgba(18, 24, 40, .06);
+  overflow: hidden;
+}
+
+.vizHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.vizTitle {
+  display: grid;
+  gap: 4px;
+}
+
+.vizTitle strong {
+  font-size: 15px;
+  letter-spacing: -.015em;
+}
+
+.vizTitle small,
+.vizMeta {
+  color: var(--muted, #667085);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.vizMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 6px 9px;
+  border: 1px solid color-mix(in srgb, var(--border, #d8dce5) 80%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface, #fff) 88%, transparent);
+}
+
+.paceChart {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(28px, 1fr));
+  align-items: end;
+  gap: 9px;
+  min-height: 170px;
+  padding: 8px 2px 0;
+}
+
+.paceDay {
+  display: grid;
+  grid-template-rows: 20px 112px 22px;
+  align-items: end;
+  gap: 5px;
+  min-width: 0;
+  text-align: center;
+}
+
+.paceValue {
+  font-size: 11px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+
+.paceTrack {
+  position: relative;
+  width: min(30px, 78%);
+  height: 112px;
+  margin: 0 auto;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--border, #d8dce5) 28%, transparent);
+  overflow: hidden;
+}
+
+.paceTrack i {
+  position: absolute;
+  inset: auto 0 0;
+  min-height: 4px;
+  border-radius: inherit;
+  background: linear-gradient(180deg, #8b5cf6, #6d28d9);
+  box-shadow: 0 -8px 22px rgba(124, 58, 237, .2);
+  transition: height .35s ease;
+}
+
+.paceDay[data-today="1"] .paceTrack {
+  outline: 2px solid color-mix(in srgb, #8b5cf6 32%, transparent);
+  outline-offset: 3px;
+}
+
+.paceDay b {
+  overflow: hidden;
+  color: var(--muted, #667085);
+  font-size: 10px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.channelList {
+  display: grid;
+  gap: 13px;
+}
+
+.channelRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 12px;
+  align-items: center;
+}
+
+.channelLabel {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 680;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.channelValue {
+  color: var(--muted, #667085);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.channelTrack {
+  grid-column: 1 / -1;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--border, #d8dce5) 36%, transparent);
+}
+
+.channelTrack i {
+  display: block;
+  height: 100%;
+  min-width: 4px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #6d28d9, #a78bfa);
+  transition: width .35s ease;
+}
+
+.emptyViz {
+  display: grid;
+  min-height: 146px;
+  place-items: center;
+  padding: 18px;
+  border: 1px dashed color-mix(in srgb, var(--border, #d8dce5) 80%, transparent);
+  border-radius: 16px;
+  color: var(--muted, #667085);
+  font-size: 12px;
+  text-align: center;
+}
+
+.dataNote {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--border, #d8dce5) 60%, transparent);
+  color: var(--muted, #667085);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.dataNote::before {
+  content: "i";
+  display: grid;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+@media (max-width: 900px) {
+  .vizGrid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 560px) {
+  .vizCard { padding: 15px; border-radius: 18px; }
+  .vizHeader { gap: 10px; margin-bottom: 14px; }
+  .vizMeta { display: none; }
+  .paceChart { gap: 5px; min-height: 150px; }
+  .paceDay { grid-template-rows: 18px 94px 20px; }
+  .paceTrack { height: 94px; width: min(24px, 82%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paceTrack i,
+  .channelTrack i { transition: none; }
+}
