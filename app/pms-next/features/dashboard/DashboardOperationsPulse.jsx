@@ -18,7 +18,7 @@ function Status({tone,label}){return <span className={u.operationStatus} data-to
 
 export default function DashboardOperationsPulse({propertyId,data,onNavigate,allowedViews=[]}){
   const[hub,setHub]=useState(null),[channelStates,setChannelStates]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState("")
-  const[freshIds,setFreshIds]=useState(()=>new Set()),[resolvedSignal,setResolvedSignal]=useState(null),[updatedNow,setUpdatedNow]=useState(false)
+  const[freshIds,setFreshIds]=useState(()=>new Set()),[resolvedSignal,setResolvedSignal]=useState(null),[updatedNow,setUpdatedNow]=useState(false),[contextInsight,setContextInsight]=useState(null)
   const previousSignalsRef=useRef(null),insightSignatureRef=useRef("")
   const allowed=useMemo(()=>new Set(allowedViews),[allowedViews]),can=id=>!allowed.size||allowed.has(id)
   const load=useCallback(async()=>{if(!propertyId)return;setLoading(true);setError("");try{const[hubRes,stateRes]=await Promise.all([
@@ -86,22 +86,23 @@ export default function DashboardOperationsPulse({propertyId,data,onNavigate,all
       const message=critical
         ?`Veo ${critical} prioridad${critical===1?"":"es"} crítica${critical===1?"":"s"}. Yo empezaría por ${first.title.toLowerCase()}.`
         :`Hay ${warning} pendiente${warning===1?"":"s"}. Conviene revisar primero ${first.title.toLowerCase()}.`
-      window.dispatchEvent(new CustomEvent("hl:pms-toast",{detail:{
-        id:"olivia-operacion-contextual",
-        tone:"olivia",
-        title:"OlivIA · prioridad sugerida",
-        message,
-        duration:5200,
-        actionLabel:can(first.target)?"Ver ahora":"",
-        onAction:can(first.target)?()=>navigate(first):null,
-      }}))
+      setContextInsight({signature:signalSignature,message,item:first})
     },firstInsight?5100:800)
     return()=>window.clearTimeout(timer)
   },[signalSignature,critical,warning])
 
-  return <article className={u.operationCard} data-tone={tone} data-live-state={loading?"loading":"ready"}>
-    <header className={u.operationHead}><div><Status tone={tone} label="OPERACIÓN AHORA"/><strong>{headline}</strong></div>{can("tasks")?<button type="button" onClick={()=>onNavigate?.("tasks")}>Ver detalle</button>:null}</header>
-    <div className={u.operationSignals}>{loading?<div className={u.operationLoading}><i/><span>Revisando señales…</span></div>:signals.length?<>{signals.map(item=><button type="button" key={item.id} data-tone={item.tone} data-fresh={freshIds.has(item.id)?"true":undefined} onClick={()=>navigate(item)} disabled={!can(item.target)}><span><PmsIcon name={item.icon} size={15}/></span><div><b>{item.title}</b><small>{item.detail}</small></div><em>›</em></button>)}{resolvedSignal?<div data-operation-resolved="true"><span>✓</span><div><b>Resuelto</b><small>{resolvedSignal.title}</small></div></div>:null}</>:<div className={u.operationClear}><span>✓</span><div><b>Sin excepciones críticas</b><small>No vemos nada urgente en la operación actual.</small></div></div>}</div>
-    <footer className={u.operationFoot}><span><i data-tone={hubState.tone}/><b>Channel Manager</b><small>{hubState.label}</small></span><span><i data-tone={data?.loading?"yellow":"green"}/><b>Datos PMS</b><small>{data?.loading?"Actualizando":updatedNow?"Actualizado ahora":"En vivo"}</small></span></footer>
-  </article>
+  useEffect(()=>{
+    if(!contextInsight)return
+    const timer=window.setTimeout(()=>setContextInsight(null),5200)
+    return()=>window.clearTimeout(timer)
+  },[contextInsight?.signature])
+
+  return <>
+    <article className={u.operationCard} data-tone={tone} data-live-state={loading?"loading":"ready"}>
+      <header className={u.operationHead}><div><Status tone={tone} label="OPERACIÓN AHORA"/><strong>{headline}</strong></div>{can("tasks")?<button type="button" onClick={()=>onNavigate?.("tasks")}>Ver detalle</button>:null}</header>
+      <div className={u.operationSignals}>{loading?<div className={u.operationLoading}><i/><span>Revisando señales…</span></div>:signals.length?<>{signals.map(item=><button type="button" key={item.id} data-tone={item.tone} data-fresh={freshIds.has(item.id)?"true":undefined} onClick={()=>navigate(item)} disabled={!can(item.target)}><span><PmsIcon name={item.icon} size={15}/></span><div><b>{item.title}</b><small>{item.detail}</small></div><em>›</em></button>)}{resolvedSignal?<div data-operation-resolved="true"><span>✓</span><div><b>Resuelto</b><small>{resolvedSignal.title}</small></div></div>:null}</>:<div className={u.operationClear}><span>✓</span><div><b>Sin excepciones críticas</b><small>No vemos nada urgente en la operación actual.</small></div></div>}</div>
+      <footer className={u.operationFoot}><span><i data-tone={hubState.tone}/><b>Channel Manager</b><small>{hubState.label}</small></span><span><i data-tone={data?.loading?"yellow":"green"}/><b>Datos PMS</b><small>{data?.loading?"Actualizando":updatedNow?"Actualizado ahora":"En vivo"}</small></span></footer>
+    </article>
+    {contextInsight?<aside data-olivia-context-insight="true" role="status"><span data-olivia-context-avatar aria-hidden="true"/><div><b>OlivIA detectó algo</b><small>{contextInsight.message}</small>{can(contextInsight.item.target)?<button type="button" onClick={()=>{navigate(contextInsight.item);setContextInsight(null)}}>Ver ahora</button>:null}</div><button type="button" aria-label="Cerrar sugerencia de OlivIA" onClick={()=>setContextInsight(null)}>×</button></aside>:null}
+  </>
 }
