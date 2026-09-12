@@ -14,6 +14,15 @@ const shortcuts = [
   { id: "rates", label: "Tarifas y disponibilidad", icon: "↗" },
 ]
 
+const DAILY_PULSES = [
+  "Un buen día operativo empieza con una decisión clara.",
+  "La ocupación cambia; el criterio queda.",
+  "Cada detalle resuelto libera tiempo para hospedar mejor.",
+  "Los datos sirven cuando terminan en una decisión.",
+  "Menos fricción. Más hospitalidad.",
+  "Ordenar hoy hace más liviano mañana.",
+  "La mejor operación es la que se siente simple.",
+]
 const DEFAULT_WIDGETS = ["occupancy", "arrivals", "departures", "inhouse", "ready", "collected"]
 const money = (value, currency = "ARS") =>
   new Intl.NumberFormat("es-AR", {
@@ -36,6 +45,13 @@ const actualVip = (value) => {
   return normalized && !["standard", "normal", "none", "sin vip", "default"].includes(normalized.toLowerCase())
     ? normalized
     : ""
+}
+
+const dailyPulse = () => {
+  const now = new Date()
+  const start = new Date(now.getFullYear(), 0, 0)
+  const day = Math.floor((now - start) / 86400000)
+  return DAILY_PULSES[Math.abs(day) % DAILY_PULSES.length]
 }
 
 function MetricIcon({ type }) {
@@ -96,6 +112,7 @@ export default function DashboardWorkspace({ propertyId, property, onNavigate, a
   const [dragging, setDragging] = useState("")
   const [oliviaHidden, setOliviaHidden] = useState(false)
   const allowed = useMemo(() => new Set(allowedViews), [allowedViews])
+  const pulse = useMemo(dailyPulse, [])
   const can = (id) => allowed.size === 0 || allowed.has(id)
 
   useEffect(() => {
@@ -239,14 +256,14 @@ export default function DashboardWorkspace({ propertyId, property, onNavigate, a
     <section className={s.page}>
       <header className={s.hero}>
         <div>
-          <small>DASHBOARD</small>
-          <h1>¡Hola! <span aria-hidden="true">👋</span></h1>
-          <p>Acá tenés un resumen claro de la operación de hoy en {property?.name || "tu alojamiento"}.</p>
+          <small>PULSO DEL DÍA</small>
+          <h1>{pulse}</h1>
+          <p>Habitación Llena · {property?.name || "tu alojamiento"}</p>
         </div>
         <div className={s.heroTools}>
-          {oliviaHidden ? <button className={s.secondaryButton} type="button" onClick={() => setOliviaVisibility(false)}>✦ Mostrar OlivIA</button> : null}
+          {oliviaHidden ? <button className={s.secondaryButton} type="button" onClick={() => setOliviaVisibility(false)}>Mostrar OlivIA</button> : null}
           <button className={s.secondaryButton} type="button" onClick={() => saveOrder(DEFAULT_WIDGETS)}>Restablecer widgets</button>
-          <button className={s.liveButton} type="button" onClick={data.load}>{data.loading ? "Actualizando…" : "● Datos en vivo"}</button>
+          <button className={s.liveButton} type="button" onClick={data.load}>{data.loading ? "Actualizando…" : "Datos en vivo"}</button>
         </div>
       </header>
 

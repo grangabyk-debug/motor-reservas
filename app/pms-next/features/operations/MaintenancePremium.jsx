@@ -6,6 +6,7 @@ import{
   saveMaintenanceAsset,saveMaintenanceVendor,saveMaintenancePlan,createTicketFromPlan,
 }from"../../services/maintenanceWorkspace"
 import s from"./maintenance-premium.module.css"
+import polish from"./maintenance-readable.module.css"
 import{AssetsView,PlansView,VendorsView}from"./MaintenanceViews"
 import TicketDrawer from"./MaintenanceDrawer"
 import{AssetModal,PlanModal,VendorModal}from"./MaintenanceModals"
@@ -30,7 +31,7 @@ export default function MaintenancePremium({propertyId,rooms=[],reservations=[]}
   async function changeStatus(ticket,status){setBusy(true);try{await setMaintenanceTicketStatus({propertyId,ticket,status});await refresh();setEditor(x=>x?.id===ticket.id?{...x,status}:x);setMessage(`Orden ${STATUS[status]?.toLowerCase()||status}.`)}catch(error){setMessage(error.message||"No se pudo cambiar el estado.")}finally{setBusy(false)}}
   async function createPreventive(plan){setBusy(true);try{const created=await createTicketFromPlan({propertyId,plan});await refresh();setEditor(created);setTab("board");setMessage("Orden preventiva creada.")}catch(error){setMessage(error.message||"No se pudo crear la orden preventiva.")}finally{setBusy(false)}}
   if(loading)return <div className={s.loading}>Preparando Mantenimiento…</div>
-  return <div className={s.page}>
+  return <div className={`${s.page} ${polish.page}`}>
     <header className={s.hero}><div><small>MANTENIMIENTO</small><h2>Operación técnica</h2></div><button className={s.primary} onClick={()=>openNew()}><Icon name="plus" size={17}/>Nueva orden</button></header>
     <section className={s.kpis}><article><small>ABIERTAS</small><b>{activeTickets.length}</b><span>{overdue.length} vencidas</span></article><article><small>URGENTES</small><b>{activeTickets.filter(t=>["urgent","high"].includes(t.priority)).length}</b><span>prioridad alta</span></article><article><small>FUERA DE VENTA</small><b>{blocked.length}</b><span>bloqueadas</span></article><article title="Tiempo medio desde inicio hasta resolución"><small>MTTR</small><b>{mttr?`${mttr.toFixed(1)} h`:"—"}</b><span>resolución media</span></article><article><small>COSTO DEL MES</small><b>{money(costMonth)}</b><span>acumulado</span></article></section>
     {message&&<div className={s.notice}>{message}</div>}

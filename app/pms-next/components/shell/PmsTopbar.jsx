@@ -23,7 +23,7 @@ export default function PmsTopbar({title,info,theme,onToggleTheme,onNewReservati
       <time title={timeZone||"Zona horaria del dispositivo"} style={{display:"grid",textAlign:"right",lineHeight:1.08,minWidth:76}}><b>{clock.time}</b><small style={{opacity:.6,textTransform:"capitalize"}}>{clock.date}</small></time>
       <div className={c.hotelToolGroup} aria-label="Acciones rápidas del hotel">
         <button className={`${s.iconButton} ${c.hotelTool} ${glass.toolGlass}`} data-kind="theme" data-tooltip={theme==="dark"?"Modo día":"Modo noche"} type="button" onClick={onToggleTheme} aria-label={theme==="dark"?"Activar modo día":"Activar modo noche"}><PmsIcon name={theme==="dark"?"sun":"moon"}/></button>
-        {onOpenSupport&&<button className={`${s.iconButton} ${c.hotelTool} ${glass.toolGlass}`} type="button" onClick={onOpenSupport} aria-label="Abrir ayuda" title="Ayuda y soporte" style={{fontWeight:900,fontSize:14,color:"#20a18f"}}>?</button>}
+        {onOpenSupport&&<button className={`${s.iconButton} ${c.hotelTool} ${glass.toolGlass}`} data-kind="support" data-tooltip="Ayuda y soporte" type="button" onClick={onOpenSupport} aria-label="Abrir ayuda y soporte" title="Abrir Ayuda y soporte" style={{fontWeight:900,fontSize:14,color:"#20a18f"}}>?</button>}
         {alertHandler&&<button className={`${s.iconButton} ${c.hotelTool} ${glass.toolGlass} ${notificationCount>0?c.alerting:""}`} data-kind="activity" data-tooltip={alertLabel} type="button" onClick={openAlerts} aria-label={alertLabel} aria-haspopup="dialog" title={notificationCount>0?`${notificationCount} notificación${notificationCount===1?"":"es"} sin leer`:"Sin notificaciones nuevas"} style={{color:notificationCount>0?"#d94149":"#596f9d",position:"relative"}}><PmsIcon name="bell"/>{notificationCount>0?<span className={c.notificationBadge}>{notificationCount>99?"99+":notificationCount}</span>:null}</button>}
         {onNewQuote&&<button className={`${s.iconButton} ${c.hotelTool} ${glass.toolGlass}`} data-kind="quote" data-tooltip="Presupuesto" type="button" onClick={onNewQuote} aria-label="Crear presupuesto" style={{color:"#d79a31"}}><PmsIcon name="quote"/></button>}
       </div>
@@ -31,4 +31,3 @@ export default function PmsTopbar({title,info,theme,onToggleTheme,onNewReservati
     </div>
   </header>
 }
-
