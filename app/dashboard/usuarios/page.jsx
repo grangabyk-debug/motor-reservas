@@ -1,4 +1,3 @@
-import UsersAccessPage from"../features/hotel/UsersAccessPage"
-import StaticCaretGuard from"../../components/StaticCaretGuard"
+import{redirect}from"next/navigation"
 
-export default function UsuariosPage(){return <><StaticCaretGuard/><UsersAccessPage/></>}
+export default function UsuariosPage(){redirect("/pms-next?view=staff")}
