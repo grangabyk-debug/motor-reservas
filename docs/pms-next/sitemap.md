@@ -47,7 +47,7 @@ PMS Next usa una sola aplicación y selecciona el workspace mediante `?view=<id>
 ## Operación
 
 <!-- view:maintenance -->
-- `maintenance` — **Mantenimiento**: incidencias, peticiones, prioridades, responsables y trazabilidad.
+- `maintenance` — **Mantenimiento**: órdenes, preventivos, activos, proveedores, costos y habitaciones fuera de venta.
 
 <!-- view:inventory -->
 - `inventory` — **Inventario**: stock operativo, movimientos y reposición.
@@ -71,6 +71,9 @@ PMS Next usa una sola aplicación y selecciona el workspace mediante `?view=<id>
 
 <!-- view:revenue -->
 - `revenue` — **Revenue**: forecast, pickup, ADR, RevPAR y recomendaciones.
+
+<!-- view:intelligence -->
+- `intelligence` — **Inteligencia**: KPIs, pickup, pace, canales, finanzas, booking window y rendimiento por tipo de habitación.
 
 <!-- view:channelmanager -->
 - `channelmanager` — **Channel Manager**: distribución de tarifas, restricciones, disponibilidad y reservas.
@@ -148,6 +151,7 @@ Tarifas y disponibilidad
   <-> Sitio web / motor
   <-> Channel Manager
   <-> Revenue
+  <-> Inteligencia
 
 Sitio web / motor
   -> Presupuesto o Reserva
@@ -197,7 +201,7 @@ Dashboard, Housekeeping, Inventario y Ayuda.
 Dashboard, Mantenimiento, Inventario y Ayuda.
 
 ## Revenue
-Dashboard, Planning, Reservas, Presupuestos, Huéspedes, Servicios, Caja diaria, Tarifas, Finanzas, Sitio web, Ventas, Revenue, Channel Manager, Informes y Ayuda.
+Dashboard, Planning, Reservas, Presupuestos, Huéspedes, Servicios, Caja diaria, Tarifas, Finanzas, Sitio web, Ventas, Revenue, Inteligencia, Channel Manager, Informes y Ayuda.
 
 ## Member
 Dashboard y Ayuda.
