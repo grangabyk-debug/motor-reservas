@@ -4,7 +4,6 @@ import{useCallback,useEffect,useMemo,useRef,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 import usePmsAutoRefresh from"../../core/usePmsAutoRefresh"
 import PmsIcon from"../../components/shell/PmsIcons"
-import PmsLiveFeedbackBridge from"../../components/system/PmsLiveFeedbackBridge"
 import HealthCenterPanel from"../operations/HealthCenterPanel"
 import u from"./dashboardUnified.module.css"
 
@@ -73,10 +72,10 @@ export default function DashboardOperationsPulse({propertyId,data,onNavigate,all
   useEffect(()=>{
     if(!signals.length||typeof window==="undefined")return
     if(insightSignatureRef.current===signalSignature)return
-    const firstInsight=!insightSignatureRef.current
+    if(!insightSignatureRef.current){insightSignatureRef.current=signalSignature;return}
     insightSignatureRef.current=signalSignature
     const first=signals[0]
-    const timer=window.setTimeout(()=>{const message=critical?`Veo ${critical} prioridad${critical===1?"":"es"} crítica${critical===1?"":"s"}. Yo empezaría por ${first.title.toLowerCase()}.`:`Hay ${warning} pendiente${warning===1?"":"s"}. Conviene revisar primero ${first.title.toLowerCase()}.`;setContextInsight({signature:signalSignature,message,item:first})},firstInsight?5100:800)
+    const timer=window.setTimeout(()=>{const message=critical?`Veo ${critical} prioridad${critical===1?"":"es"} crítica${critical===1?"":"s"}. Yo empezaría por ${first.title.toLowerCase()}.`:`Hay ${warning} pendiente${warning===1?"":"s"}. Conviene revisar primero ${first.title.toLowerCase()}.`;setContextInsight({signature:signalSignature,message,item:first})},800)
     return()=>window.clearTimeout(timer)
   },[signalSignature,critical,warning])
   useEffect(()=>{if(!contextInsight)return;const timer=window.setTimeout(()=>setContextInsight(null),5200);return()=>window.clearTimeout(timer)},[contextInsight?.signature])
@@ -88,7 +87,6 @@ export default function DashboardOperationsPulse({propertyId,data,onNavigate,all
       <footer className={u.operationFoot}><span><i data-tone={hubState.tone}/><b>Channel Manager</b><small>{hubState.label}</small></span><span><i data-tone={data?.loading?"yellow":"green"}/><b>Datos PMS</b><small>{data?.loading?"Actualizando":updatedNow?"Actualizado ahora":"En vivo"}</small></span></footer>
     </article>
     {contextInsight?<aside data-olivia-context-insight="true" role="status"><span data-olivia-context-avatar aria-hidden="true"/><div><b>OlivIA detectó algo</b><small>{contextInsight.message}</small>{can(contextInsight.item.target)?<button type="button" onClick={()=>{navigate(contextInsight.item);setContextInsight(null)}}>Ver ahora</button>:null}</div><button type="button" aria-label="Cerrar sugerencia de OlivIA" onClick={()=>setContextInsight(null)}>×</button></aside>:null}
-    <PmsLiveFeedbackBridge/>
     <HealthCenterPanel propertyId={propertyId} onNavigate={onNavigate} allowedViews={allowedViews}/>
   </>
 }
