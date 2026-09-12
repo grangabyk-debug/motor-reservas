@@ -1,5 +1,5 @@
-.calendarShell{position:relative}
-.calendar{margin-top:8px;max-height:calc(100dvh - 132px);overflow:auto;border:1px solid var(--line);border-radius:12px;background:var(--panelSolid);box-shadow:0 16px 40px rgba(27,41,72,.07);scrollbar-color:color-mix(in srgb,var(--muted) 28%,transparent) transparent;overscroll-behavior:contain}
+.calendarShell{position:relative;flex:1;min-height:0;display:flex;flex-direction:column}
+.calendar{margin-top:8px;flex:1;min-height:0;max-height:none;overflow:auto;border:1px solid var(--line);border-radius:12px;background:var(--panelSolid);box-shadow:0 16px 40px rgba(27,41,72,.07);scrollbar-color:color-mix(in srgb,var(--muted) 28%,transparent) transparent;overscroll-behavior:contain}
 .monthRow,.dayRow,.inventoryRow,.roomRow{display:grid;grid-template-columns:var(--room-width) max-content;min-width:max-content}
 .monthRow{position:sticky;top:0;z-index:42;height:34px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--panelSolid) 98%,var(--bg))}
 .corner{position:sticky;left:0;z-index:48;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 8px 0 11px;border-right:1px solid var(--line);background:inherit;overflow:visible}
@@ -106,5 +106,5 @@
 :global([data-theme="dark"]) .legendInhouse{border-color:#e05a6d;background:#b94455;color:#fff}
 :global([data-theme="dark"]) .legendFinished{border-color:#65728a;background:#252e3d;color:#c0cada}
 :global([data-theme="dark"]) .legendToday{border-color:#4d8fc1;background:#16334b;color:#8bcfff}
-@media(max-width:1150px){.calendar{max-height:calc(100dvh - 190px)}}
-@media(max-width:760px){.calendar{max-height:calc(100dvh - 210px);border-radius:9px}.reservationPreview{display:none}.referencePopover{left:4px;top:42px;width:min(330px,calc(100vw - 24px))}}
+@media(max-width:1150px){.calendar{max-height:none}}
+@media(max-width:760px){.calendar{max-height:none;border-radius:9px}.reservationPreview{display:none}.referencePopover{left:4px;top:42px;width:min(330px,calc(100vw - 24px))}}
