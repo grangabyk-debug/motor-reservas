@@ -6,6 +6,7 @@ import useOperationsData from"./useOperationsData"
 
 const premiumPolish=`
 [data-maintenance-premium]{font-size:14px;color:var(--text,#172033)}
+[data-maintenance-premium]>div{align-content:start!important}
 [data-maintenance-premium] *{box-sizing:border-box}
 [data-maintenance-premium] button,[data-maintenance-premium] input,[data-maintenance-premium] select,[data-maintenance-premium] textarea{font-size:13px!important}
 [data-maintenance-premium] button{min-height:40px}
