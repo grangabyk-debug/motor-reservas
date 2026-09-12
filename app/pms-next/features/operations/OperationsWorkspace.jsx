@@ -16,7 +16,7 @@ const premiumPolish=`
 [data-maintenance-premium] button footer b{font-size:10px!important}
 [data-maintenance-premium] input,[data-maintenance-premium] select{min-height:40px}
 [data-maintenance-premium] textarea{font-size:14px!important}
-[data-maintenance-premium] nav{background:color-mix(in srgb,var(--panelSolid,#fff) 78%,transparent)!important;backdrop-filter:blur(24px) saturate(150%);-webkit-backdrop-filter:blur(24px) saturate(150%);border:1px solid color-mix(in srgb,var(--line,#dfe5ed) 78%,transparent)!important;box-shadow:0 14px 36px rgba(61,48,122,.08),inset 0 1px rgba(255,255,255,.65)!important}
+[data-maintenance-premium] nav{min-height:0!important;height:auto!important;padding:7px!important;align-items:center!important;background:color-mix(in srgb,var(--panelSolid,#fff) 78%,transparent)!important;backdrop-filter:blur(24px) saturate(150%);-webkit-backdrop-filter:blur(24px) saturate(150%);border:1px solid color-mix(in srgb,var(--line,#dfe5ed) 78%,transparent)!important;box-shadow:0 14px 36px rgba(61,48,122,.08),inset 0 1px rgba(255,255,255,.65)!important}
 [data-maintenance-premium] nav button[data-active="true"]{background:linear-gradient(135deg,#6252dc,#7868f1)!important;color:#fff!important;box-shadow:0 8px 22px rgba(98,82,220,.26),inset 0 1px rgba(255,255,255,.22)!important}
 [data-maintenance-premium] article,[data-maintenance-premium] section{scroll-margin-top:84px}
 [data-maintenance-premium] button:focus-visible,[data-maintenance-premium] input:focus-visible,[data-maintenance-premium] select:focus-visible,[data-maintenance-premium] textarea:focus-visible{outline:3px solid rgba(98,82,220,.22);outline-offset:2px}
