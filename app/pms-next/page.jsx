@@ -86,6 +86,92 @@ export default function PmsNextPage(){
       transform:scale(.985)!important;
       filter:saturate(1.06) brightness(1.01);
     }
+    [data-olivia-context-insight="true"]{
+      position:fixed;
+      right:96px;
+      bottom:28px;
+      z-index:2147481500;
+      width:min(365px,calc(100vw - 132px));
+      display:grid;
+      grid-template-columns:42px minmax(0,1fr) 28px;
+      gap:10px;
+      align-items:start;
+      padding:12px 11px 12px 12px;
+      border:1px solid rgba(151,132,255,.22);
+      border-radius:18px;
+      color:#fff;
+      background:radial-gradient(circle at 0 0,rgba(137,111,255,.18),transparent 48%),linear-gradient(145deg,rgba(27,31,47,.97),rgba(22,27,43,.96));
+      backdrop-filter:blur(26px) saturate(135%);
+      -webkit-backdrop-filter:blur(26px) saturate(135%);
+      box-shadow:0 22px 58px rgba(15,21,38,.28),inset 0 1px rgba(255,255,255,.08);
+      animation:hlOliviaInsightIn .34s cubic-bezier(.2,.8,.2,1) both;
+      transform-origin:100% 100%;
+    }
+    [data-olivia-context-insight="true"]:after{
+      content:"";
+      position:absolute;
+      right:-7px;
+      bottom:18px;
+      width:14px;
+      height:14px;
+      transform:rotate(45deg);
+      border-top:1px solid rgba(151,132,255,.16);
+      border-right:1px solid rgba(151,132,255,.16);
+      background:#171c2c;
+    }
+    [data-olivia-context-avatar]{
+      position:relative;
+      display:block;
+      width:42px;
+      height:42px;
+      border-radius:50%;
+      background:url('/olivia-avatar.svg') center/contain no-repeat;
+      box-shadow:0 8px 22px rgba(89,67,181,.2);
+    }
+    [data-olivia-context-avatar]:after{
+      content:"";
+      position:absolute;
+      right:0;
+      bottom:0;
+      width:8px;
+      height:8px;
+      border:2px solid #1d2234;
+      border-radius:50%;
+      background:#1fc76f;
+      box-shadow:0 0 9px rgba(31,199,111,.5);
+    }
+    [data-olivia-context-insight="true"]>div{display:grid;gap:3px;min-width:0;padding-top:1px}
+    [data-olivia-context-insight="true"]>div>b{font-size:12.5px;letter-spacing:-.01em}
+    [data-olivia-context-insight="true"]>div>small{font-size:11px;line-height:1.38;color:rgba(235,239,248,.74)}
+    [data-olivia-context-insight="true"]>div>button{
+      justify-self:start;
+      margin-top:5px;
+      min-height:29px;
+      padding:0 10px;
+      border:1px solid rgba(150,132,255,.28);
+      border-radius:9px;
+      background:rgba(132,107,255,.13);
+      color:#dcd5ff;
+      font:800 10.5px inherit;
+      cursor:pointer;
+      transition:transform .15s ease,background .15s ease;
+    }
+    [data-olivia-context-insight="true"]>div>button:hover{transform:translateY(-1px);background:rgba(132,107,255,.2)}
+    [data-olivia-context-insight="true"]>button{
+      position:relative;
+      z-index:1;
+      display:grid;
+      width:28px;
+      height:28px;
+      place-items:center;
+      border:0;
+      border-radius:9px;
+      background:transparent;
+      color:rgba(235,239,248,.62);
+      font-size:18px;
+      cursor:pointer;
+    }
+    [data-olivia-context-insight="true"]>button:hover{background:rgba(255,255,255,.07);color:#fff}
     @keyframes oliviaNudgeLifetime{
       0%{opacity:0;transform:translateX(8px) scale(.985);visibility:visible}
       8%,82%{opacity:1;transform:none;visibility:visible}
@@ -113,6 +199,14 @@ export default function PmsNextPage(){
       0%,100%{opacity:.72;box-shadow:0 0 8px rgba(32,168,117,.22)}
       50%{opacity:1;box-shadow:0 0 15px rgba(32,168,117,.42)}
     }
+    @keyframes hlOliviaInsightIn{
+      from{opacity:0;transform:translateX(10px) translateY(5px) scale(.98)}
+      to{opacity:1;transform:none}
+    }
+    @media(max-width:640px){
+      [data-olivia-context-insight="true"]{right:14px;bottom:92px;width:calc(100vw - 28px)}
+      [data-olivia-context-insight="true"]:after{display:none}
+    }
     @media(prefers-reduced-motion:reduce){
       div[role="status"][class*="nudge"]{
         animation:oliviaNudgeLifetimeReduced 5s linear both!important;
@@ -122,7 +216,8 @@ export default function PmsNextPage(){
       [data-operation-resolved="true"],
       [data-live-state="loading"] [class*="operationStatus"] i,
       [class*="operationFoot"] i,
-      [data-workspace="planning"] [draggable="true"]{
+      [data-workspace="planning"] [draggable="true"],
+      [data-olivia-context-insight="true"]{
         animation:none!important;
         transition:none!important;
       }
