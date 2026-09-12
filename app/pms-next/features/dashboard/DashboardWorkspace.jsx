@@ -3,9 +3,11 @@
 import { useEffect, useMemo, useState } from "react"
 import OliviaAssistant from "../../components/OliviaAssistant"
 import useDashboardData from "./useDashboardData"
+import DashboardOperationsPulse from "./DashboardOperationsPulse"
 import s from "./dashboard.module.css"
 import d from "./frontDesk.module.css"
 import v from "./dashboardViz.module.css"
+import u from "./dashboardUnified.module.css"
 
 const shortcuts = [
   { id: "planning", label: "Planning", icon: "▦" },
@@ -15,15 +17,6 @@ const shortcuts = [
   { id: "rates", label: "Tarifas y disponibilidad", icon: "↗" },
 ]
 
-const DAILY_PULSES = [
-  "Un buen día operativo empieza con una decisión clara.",
-  "La ocupación cambia; el criterio queda.",
-  "Cada detalle resuelto libera tiempo para hospedar mejor.",
-  "Los datos sirven cuando terminan en una decisión.",
-  "Menos fricción. Más hospitalidad.",
-  "Ordenar hoy hace más liviano mañana.",
-  "La mejor operación es la que se siente simple.",
-]
 const DEFAULT_WIDGETS = ["occupancy", "arrivals", "departures", "inhouse", "ready", "collected"]
 const money = (value, currency = "ARS") =>
   new Intl.NumberFormat("es-AR", {
@@ -46,13 +39,6 @@ const actualVip = (value) => {
   return normalized && !["standard", "normal", "none", "sin vip", "default"].includes(normalized.toLowerCase())
     ? normalized
     : ""
-}
-
-const dailyPulse = () => {
-  const now = new Date()
-  const start = new Date(now.getFullYear(), 0, 0)
-  const day = Math.floor((now - start) / 86400000)
-  return DAILY_PULSES[Math.abs(day) % DAILY_PULSES.length]
 }
 
 function MetricIcon({ type }) {
@@ -112,9 +98,14 @@ export default function DashboardWorkspace({ propertyId, property, onNavigate, a
   const [widgetOrder, setWidgetOrder] = useState(DEFAULT_WIDGETS)
   const [dragging, setDragging] = useState("")
   const [oliviaHidden, setOliviaHidden] = useState(false)
+  const [welcomeVisible, setWelcomeVisible] = useState(true)
   const allowed = useMemo(() => new Set(allowedViews), [allowedViews])
-  const pulse = useMemo(dailyPulse, [])
   const can = (id) => allowed.size === 0 || allowed.has(id)
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setWelcomeVisible(false), 4200)
+    return () => window.clearTimeout(timer)
+  }, [])
 
   useEffect(() => {
     try {
@@ -248,28 +239,16 @@ export default function DashboardWorkspace({ propertyId, property, onNavigate, a
     }
     return [...unique.values()].slice(0, 4)
   })()
-  const pendingChecklist = Math.max(0, Number(m.checkTotal || 0) - Number(m.checkDone || 0))
-  const taskRows = [
-    can("housekeeping") ? { label: "Habitaciones sucias", value: m.dirty, icon: "✦", view: "housekeeping", tone: "rose" } : null,
-    can("maintenance") ? { label: "Mantenimiento", value: m.maintenance, icon: "⌁", view: "maintenance", tone: "blue" } : null,
-    can("maintenance") && m.urgent ? { label: "Mantenimiento urgente", value: m.urgent, icon: "!", view: "maintenance", tone: "red" } : null,
-    can("tasks") ? { label: "Check-list pendientes", value: pendingChecklist, icon: "✓", view: "tasks", tone: "amber" } : null,
-  ].filter(Boolean)
 
   return (
     <section className={s.page}>
-      <header className={s.hero}>
-        <div>
-          <small>PULSO DEL DÍA</small>
-          <h1>Bienvenido. Así está tu hotel hoy.</h1>
-          <p>{property?.name || "Tu alojamiento"} · {pulse}</p>
-        </div>
-        <div className={s.heroTools}>
-          {oliviaHidden ? <button className={s.secondaryButton} type="button" onClick={() => setOliviaVisibility(false)}>Mostrar OlivIA</button> : null}
-          <button className={s.secondaryButton} type="button" onClick={() => saveOrder(DEFAULT_WIDGETS)}>Restablecer widgets</button>
-          <button className={s.liveButton} type="button" onClick={data.load}>{data.loading ? "Actualizando…" : "Datos en vivo"}</button>
-        </div>
-      </header>
+      {welcomeVisible ? <div className={u.welcomeToast} role="status"><span className={u.welcomeMark}>HL</span><div><b>Bienvenido. Así está tu hotel hoy.</b><span>{property?.name || "Tu alojamiento"} · datos operativos en vivo</span></div><button type="button" onClick={() => setWelcomeVisible(false)} aria-label="Cerrar bienvenida">×</button></div> : null}
+
+      <div className={u.compactTools}>
+        {oliviaHidden ? <button type="button" onClick={() => setOliviaVisibility(false)}>Mostrar OlivIA</button> : null}
+        <button type="button" onClick={() => saveOrder(DEFAULT_WIDGETS)}>Restablecer widgets</button>
+        <button type="button" data-live="true" onClick={data.load}>{data.loading ? "Actualizando…" : "Datos en vivo"}</button>
+      </div>
 
       {data.error ? <div className={s.notice}>{data.error}</div> : null}
 
@@ -334,22 +313,7 @@ export default function DashboardWorkspace({ propertyId, property, onNavigate, a
           </div>
         </article>
 
-        <article className={s.panelCard}>
-          <header className={s.panelHeader}>
-            <div><strong>Tareas pendientes</strong><small>Prioridades operativas</small></div>
-          </header>
-          <div className={s.taskList}>
-            {taskRows.map((task) => (
-              <button type="button" key={task.label} data-tone={task.tone} onClick={() => onNavigate?.(task.view)}>
-                <span className={s.taskIcon}>{task.icon}</span>
-                <b>{task.label}</b>
-                <strong>{task.value}</strong>
-                <i>›</i>
-              </button>
-            ))}
-            {!taskRows.length ? <div className={s.emptyPanel}>Sin tareas visibles para tu rol.</div> : null}
-          </div>
-        </article>
+        <DashboardOperationsPulse propertyId={propertyId} data={data} onNavigate={onNavigate} allowedViews={allowedViews}/>
       </div>
 
       {can("reservations") ? (
