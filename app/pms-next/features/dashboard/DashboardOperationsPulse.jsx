@@ -1,6 +1,6 @@
 "use client"
 
-import{useCallback,useEffect,useMemo,useState}from"react"
+import{useCallback,useEffect,useMemo,useRef,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 import usePmsAutoRefresh from"../../core/usePmsAutoRefresh"
 import PmsIcon from"../../components/shell/PmsIcons"
@@ -18,6 +18,8 @@ function Status({tone,label}){return <span className={u.operationStatus} data-to
 
 export default function DashboardOperationsPulse({propertyId,data,onNavigate,allowedViews=[]}){
   const[hub,setHub]=useState(null),[channelStates,setChannelStates]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState("")
+  const[freshIds,setFreshIds]=useState(()=>new Set()),[resolvedSignal,setResolvedSignal]=useState(null),[updatedNow,setUpdatedNow]=useState(false)
+  const previousSignalsRef=useRef(null),insightSignatureRef=useRef("")
   const allowed=useMemo(()=>new Set(allowedViews),[allowedViews]),can=id=>!allowed.size||allowed.has(id)
   const load=useCallback(async()=>{if(!propertyId)return;setLoading(true);setError("");try{const[hubRes,stateRes]=await Promise.all([
     supabase.from("hotel_channel_hubs").select("id,status,last_sync_at,last_error,updated_at").eq("property_id",propertyId).eq("provider","channex").maybeSingle(),
@@ -47,9 +49,59 @@ export default function DashboardOperationsPulse({propertyId,data,onNavigate,all
   const hubState=error?{tone:"red",label:"Sin lectura"}:!hub?{tone:"gray",label:"Sin preparar"}:hub.last_error||norm(hub.status)==="error"?{tone:"red",label:"Revisar sync"}:norm(hub.status)==="active"?{tone:"green",label:"Sync activo"}:norm(hub.status)==="paused"?{tone:"yellow",label:"Sync pausado"}:{tone:"yellow",label:"Preparado"}
   const navigate=item=>{if(!item?.target||!can(item.target))return;if(item.reservationId&&item.target==="reservations")onNavigate?.("reservations",{reservationId:item.reservationId});else onNavigate?.(item.target)}
 
-  return <article className={u.operationCard} data-tone={tone}>
+  useEffect(()=>{
+    if(loading)return
+    const previous=previousSignalsRef.current
+    const timers=[]
+    if(previous){
+      const currentIds=new Set(signals.map(item=>item.id))
+      const previousIds=new Set(previous.map(item=>item.id))
+      const added=signals.filter(item=>!previousIds.has(item.id)).map(item=>item.id)
+      const removed=previous.find(item=>!currentIds.has(item.id)&&["red","yellow"].includes(item.tone))
+      if(added.length){
+        setFreshIds(new Set(added))
+        timers.push(window.setTimeout(()=>setFreshIds(new Set()),1900))
+      }
+      if(removed){
+        setResolvedSignal(removed)
+        timers.push(window.setTimeout(()=>setResolvedSignal(null),2100))
+      }
+    }
+    previousSignalsRef.current=signals.map(item=>({...item}))
+    setUpdatedNow(true)
+    timers.push(window.setTimeout(()=>setUpdatedNow(false),1900))
+    return()=>timers.forEach(timer=>window.clearTimeout(timer))
+  },[loading,signals])
+
+  useEffect(()=>{
+    if(loading||!signals.length||typeof window==="undefined")return
+    const signature=signals.map(item=>`${item.id}:${item.tone}`).join("|")
+    if(insightSignatureRef.current===signature)return
+    const firstInsight=!insightSignatureRef.current
+    insightSignatureRef.current=signature
+    const first=signals[0]
+    const timer=window.setTimeout(()=>{
+      const dashboard=document.querySelector('[data-workspace="dashboard"]:not([hidden])')
+      if(!dashboard)return
+      const message=critical
+        ?`Veo ${critical} prioridad${critical===1?"":"es"} crítica${critical===1?"":"s"}. Yo empezaría por ${first.title.toLowerCase()}.`
+        :`Hay ${warning} pendiente${warning===1?"":"s"}. Conviene revisar primero ${first.title.toLowerCase()}.`
+      window.dispatchEvent(new CustomEvent("hl:pms-toast",{detail:{
+        id:"olivia-operacion-contextual",
+        tone:"olivia",
+        title:"OlivIA · prioridad sugerida",
+        message,
+        duration:5200,
+        actionLabel:can(first.target)?"Ver ahora":"",
+        onAction:can(first.target)?()=>navigate(first):null,
+      }}))
+    },firstInsight?6200:900)
+    return()=>window.clearTimeout(timer)
+  },[loading,signals,critical,warning])
+
+  return <article className={u.operationCard} data-tone={tone} data-live-state={loading?"loading":"ready"}>
     <header className={u.operationHead}><div><Status tone={tone} label="OPERACIÓN AHORA"/><strong>{headline}</strong></div>{can("tasks")?<button type="button" onClick={()=>onNavigate?.("tasks")}>Ver detalle</button>:null}</header>
-    <div className={u.operationSignals}>{loading?<div className={u.operationLoading}><i/><span>Revisando señales…</span></div>:signals.length?signals.map(item=><button type="button" key={item.id} data-tone={item.tone} onClick={()=>navigate(item)} disabled={!can(item.target)}><span><PmsIcon name={item.icon} size={15}/></span><div><b>{item.title}</b><small>{item.detail}</small></div><em>›</em></button>):<div className={u.operationClear}><span>✓</span><div><b>Sin excepciones críticas</b><small>No vemos nada urgente en la operación actual.</small></div></div>}</div>
-    <footer className={u.operationFoot}><span><i data-tone={hubState.tone}/><b>Channel Manager</b><small>{hubState.label}</small></span><span><i data-tone={data?.loading?"yellow":"green"}/><b>Datos PMS</b><small>{data?.loading?"Actualizando":"En vivo"}</small></span></footer>
+    <div className={u.operationSignals}>{loading?<div className={u.operationLoading}><i/><span>Revisando señales…</span></div>:signals.length?<>{signals.map(item=><button type="button" key={item.id} data-tone={item.tone} data-fresh={freshIds.has(item.id)?"true":undefined} onClick={()=>navigate(item)} disabled={!can(item.target)}><span><PmsIcon name={item.icon} size={15}/></span><div><b>{item.title}</b><small>{item.detail}</small></div><em>›</em></button>)}{resolvedSignal?<div data-operation-resolved="true"><span>✓</span><div><b>Resuelto</b><small>{resolvedSignal.title}</small></div></div>:null}</>:<div className={u.operationClear}><span>✓</span><div><b>Sin excepciones críticas</b><small>No vemos nada urgente en la operación actual.</small></div></div>}</div>
+    <footer className={u.operationFoot}><span><i data-tone={hubState.tone}/><b>Channel Manager</b><small>{hubState.label}</small></span><span><i data-tone={data?.loading?"yellow":"green"}/><b>Datos PMS</b><small>{data?.loading?"Actualizando":updatedNow?"Actualizado ahora":"En vivo"}</small></span></footer>
   </article>
 }
