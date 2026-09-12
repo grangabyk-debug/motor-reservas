@@ -1,6 +1,7 @@
 "use client"
 
 import{useEffect,useRef,useState}from"react"
+import PmsLiveFeedbackBridge from"./PmsLiveFeedbackBridge"
 import s from"./pms-toast.module.css"
 
 export default function PmsToastHost(){
@@ -52,13 +53,12 @@ export default function PmsToastHost(){
     }
   },[])
 
-  if(!toasts.length)return null
-  return <div className={s.host} aria-live="polite">{toasts.map(toast=>{
+  return <><PmsLiveFeedbackBridge/>{toasts.length?<div className={s.host} aria-live="polite">{toasts.map(toast=>{
     const alertTone=toast.tone==="danger"||toast.tone==="warning"||toast.tone==="ota"
     return <div key={toast.id} className={s.toast} data-tone={toast.tone} data-phase={toast.phase} role={alertTone?"alert":"status"}>
       <span className={s.icon} aria-hidden="true">{toast.tone==="olivia"?"":toast.tone==="danger"||toast.tone==="error"?"!":toast.tone==="warning"?"•":toast.tone==="ota"?"OTA":toast.tone==="info"?"i":"✓"}</span>
       <div className={s.body}><b>{toast.title}</b><p>{toast.message}</p>{toast.actionLabel&&toast.onAction?<button type="button" className={s.action} onClick={()=>{try{toast.onAction()}finally{dismiss(toast.id)}}}>{toast.actionLabel}</button>:null}</div>
       <button type="button" className={s.close} onClick={()=>dismiss(toast.id)} aria-label="Cerrar aviso">×</button>
     </div>
-  })}</div>
+  })}</div>:null}</>
 }
