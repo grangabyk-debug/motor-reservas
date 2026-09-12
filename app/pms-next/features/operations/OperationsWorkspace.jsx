@@ -11,7 +11,9 @@ const premiumPolish=`
 [data-maintenance-premium] button{min-height:40px}
 [data-maintenance-premium] small{font-size:11px!important;line-height:1.35}
 [data-maintenance-premium] p{font-size:12px!important;line-height:1.45}
-[data-maintenance-premium] span{font-size:11px}
+[data-maintenance-premium] span,[data-maintenance-premium] em,[data-maintenance-premium] label,[data-maintenance-premium] footer{font-size:max(10px,.82em)!important;line-height:1.4}
+[data-maintenance-premium] aside b{font-size:12px!important}
+[data-maintenance-premium] button footer b{font-size:10px!important}
 [data-maintenance-premium] input,[data-maintenance-premium] select{min-height:40px}
 [data-maintenance-premium] textarea{font-size:14px!important}
 [data-maintenance-premium] nav{background:color-mix(in srgb,var(--panelSolid,#fff) 78%,transparent)!important;backdrop-filter:blur(24px) saturate(150%);-webkit-backdrop-filter:blur(24px) saturate(150%);border:1px solid color-mix(in srgb,var(--line,#dfe5ed) 78%,transparent)!important;box-shadow:0 14px 36px rgba(61,48,122,.08),inset 0 1px rgba(255,255,255,.65)!important}

@@ -7,9 +7,11 @@ const polish=`
 [data-intelligence] header p{display:none!important}
 [data-intelligence] button{min-height:38px;font-size:12px!important}
 [data-intelligence] small{font-size:11px!important;line-height:1.35}
+[data-intelligence] span,[data-intelligence] em,[data-intelligence] label,[data-intelligence] footer{font-size:max(10px,.82em)!important;line-height:1.4}
 [data-intelligence] table{font-size:12px}
 [data-intelligence] th,[data-intelligence] td{font-size:11px!important}
 [data-intelligence] select,[data-intelligence] input{min-height:38px;font-size:13px!important}
+[data-intelligence] article>div span>b,[data-intelligence] article footer b,[data-intelligence] aside>div>b{font-size:10px!important}
 [data-intelligence] main{border-radius:22px;overflow:hidden}
 [data-intelligence] nav,[data-intelligence] section{scroll-margin-top:82px}
 [data-theme="dark"] [data-intelligence] main{background:radial-gradient(circle at top right,rgba(118,101,230,.15),transparent 30%),#111522!important;color:#edf1fb!important}
