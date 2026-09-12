@@ -20,12 +20,13 @@ function Status({tone,label}){return <span className={u.operationStatus} data-to
 export default function DashboardOperationsPulse({propertyId,data,onNavigate,allowedViews=[]}){
   const[hub,setHub]=useState(null),[channelStates,setChannelStates]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState("")
   const[freshIds,setFreshIds]=useState(()=>new Set()),[resolvedSignal,setResolvedSignal]=useState(null),[updatedNow,setUpdatedNow]=useState(false),[contextInsight,setContextInsight]=useState(null)
-  const previousSignalsRef=useRef(null),insightSignatureRef=useRef("")
+  const previousSignalsRef=useRef(null),insightSignatureRef=useRef(""),startupQuietUntilRef=useRef(0)
   const allowed=useMemo(()=>new Set(allowedViews),[allowedViews]),can=id=>!allowed.size||allowed.has(id)
   const load=useCallback(async()=>{if(!propertyId)return;setLoading(true);setError("");try{const[hubRes,stateRes]=await Promise.all([
     supabase.from("hotel_channel_hubs").select("id,status,last_sync_at,last_error,updated_at").eq("property_id",propertyId).eq("provider","channex").maybeSingle(),
     supabase.from("hotel_channel_booking_state").select("id,reservation_id,ota_reservation_code,channel_code,ota_name,assignment_status,overbooked,conflict_state,last_revision_status,updated_at").eq("property_id",propertyId).in("assignment_status",["overbooked","partial","unassigned"]).order("updated_at",{ascending:false}).limit(40),
   ]);if(hubRes.error)throw hubRes.error;if(stateRes.error)throw stateRes.error;setHub(hubRes.data||null);setChannelStates(stateRes.data||[])}catch(err){setError(err?.message||"No pudimos comprobar las integraciones.")}finally{setLoading(false)}},[propertyId])
+  useEffect(()=>{startupQuietUntilRef.current=Date.now()+8000;insightSignatureRef.current="";setContextInsight(null)},[propertyId])
   useEffect(()=>{load()},[load])
   usePmsAutoRefresh(propertyId,load,["hotel_channel_hubs","hotel_channel_booking_state"])
 
@@ -72,8 +73,9 @@ export default function DashboardOperationsPulse({propertyId,data,onNavigate,all
   useEffect(()=>{
     if(!signals.length||typeof window==="undefined")return
     if(insightSignatureRef.current===signalSignature)return
-    if(!insightSignatureRef.current){insightSignatureRef.current=signalSignature;return}
+    const firstInsight=!insightSignatureRef.current
     insightSignatureRef.current=signalSignature
+    if(firstInsight||Date.now()<startupQuietUntilRef.current)return
     const first=signals[0]
     const timer=window.setTimeout(()=>{const message=critical?`Veo ${critical} prioridad${critical===1?"":"es"} crítica${critical===1?"":"s"}. Yo empezaría por ${first.title.toLowerCase()}.`:`Hay ${warning} pendiente${warning===1?"":"s"}. Conviene revisar primero ${first.title.toLowerCase()}.`;setContextInsight({signature:signalSignature,message,item:first})},800)
     return()=>window.clearTimeout(timer)
