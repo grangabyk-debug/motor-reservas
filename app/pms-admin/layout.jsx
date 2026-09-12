@@ -1,8 +1,11 @@
 "use client"
 
 import{usePathname}from"next/navigation"
+import"./admin-glass.css"
+
+function Icon({name}){const p={width:18,height:18,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"1.9",strokeLinecap:"round",strokeLinejoin:"round","aria-hidden":true};return name==="back"?<svg {...p}><path d="M19 12H5M10 7l-5 5 5 5"/></svg>:<svg {...p}><path d="M12 5v14M5 12h14"/></svg>}
 
 export default function PlatformAdminLayout({children}){
   const path=usePathname(),creating=path?.startsWith("/pms-admin/nuevo")
-  return <>{children}<a href={creating?"/pms-admin":"/pms-admin/nuevo"} style={{position:"fixed",right:22,bottom:22,zIndex:1000,minHeight:46,padding:"0 17px",borderRadius:14,display:"inline-flex",alignItems:"center",justifyContent:"center",background:"#6252dc",color:"#fff",fontFamily:"Inter,Arial,sans-serif",fontSize:14,fontWeight:900,textDecoration:"none",boxShadow:"0 14px 32px rgba(69,53,176,.28)",border:"1px solid rgba(255,255,255,.28)"}}>{creating?"← Clientes":"＋ Nuevo cliente"}</a></>
+  return <div className="hl-admin-shell">{children}<a href={creating?"/pms-admin":"/pms-admin/nuevo"} className="hl-admin-fab"><Icon name={creating?"back":"plus"}/>{creating?"Clientes":"Nuevo cliente"}</a></div>
 }
