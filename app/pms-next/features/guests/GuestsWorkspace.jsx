@@ -2,6 +2,7 @@
 
 import{useMemo,useState}from"react"
 import useGuestsData from"./useGuestsData"
+import GuestJourneyPanel from"./GuestJourneyPanel"
 import s from"./guests.module.css"
 
 const initials=name=>String(name||"H").trim().split(/\s+/).map(x=>x[0]).join("").slice(0,2).toUpperCase()
@@ -17,30 +18,20 @@ export default function GuestsWorkspace({propertyId}){
   const[saving,setSaving]=useState(false)
   const[draft,setDraft]=useState(null)
 
-  const filtered=useMemo(()=>{
-    const term=query.trim().toLowerCase()
-    return data.guests.filter(item=>!term||`${item.full_name} ${item.email||""} ${item.phone||""} ${item.country||""} ${(item.tags||[]).join(" ")}`.toLowerCase().includes(term))
-  },[data.guests,query])
+  const filtered=useMemo(()=>{const term=query.trim().toLowerCase();return data.guests.filter(item=>!term||`${item.full_name} ${item.email||""} ${item.phone||""} ${item.country||""} ${(item.tags||[]).join(" ")}`.toLowerCase().includes(term))},[data.guests,query])
   const vip=data.guests.filter(item=>["vip","signature"].includes(item.vip_level)).length
   const regular=data.guests.filter(item=>item.vip_level==="frequent").length
   const fresh=data.guests.filter(item=>(item.stays||0)<=1).length
 
   function openNew(){setDraft({full_name:"",email:"",phone:"",country:"Argentina",nationality:"Argentina",language:"es",vip_level:"standard",notes:""});data.setError("");setFormOpen(true)}
-  async function saveNew(){
-    if(!draft.full_name.trim())return data.setError("Ingresá el nombre del huésped.")
-    setSaving(true);data.setError("")
-    try{await data.createGuest(draft);setFormOpen(false)}catch(err){data.setError(err?.message||"No se pudo crear el huésped.")}finally{setSaving(false)}
-  }
-  async function saveProfile(patch){
-    if(!selected)return
-    setSaving(true);data.setError("")
-    try{const updated=await data.updateGuest(selected.id,patch);setSelected(current=>({...current,...updated}))}catch(err){data.setError(err?.message||"No se pudo actualizar el huésped.")}finally{setSaving(false)}
-  }
+  async function saveNew(){if(!draft.full_name.trim())return data.setError("Ingresá el nombre del huésped.");setSaving(true);data.setError("");try{await data.createGuest(draft);setFormOpen(false)}catch(err){data.setError(err?.message||"No se pudo crear el huésped.")}finally{setSaving(false)}}
+  async function saveProfile(patch){if(!selected)return;setSaving(true);data.setError("");try{const updated=await data.updateGuest(selected.id,patch);setSelected(current=>({...current,...updated}))}catch(err){data.setError(err?.message||"No se pudo actualizar el huésped.")}finally{setSaving(false)}}
 
   return <section className={s.page}>
     <header className={s.heading}><div><small>CRM DE HUÉSPEDES</small><h1>Huéspedes</h1><p>{data.guests.length} perfiles reales registrados en la propiedad.</p></div><button type="button" className={s.primary} onClick={openNew}>＋ Agregar huésped</button></header>
     {data.error&&<div className={s.empty}>{data.error}</div>}
     <div className={s.metrics}><article className={s.metric} data-kind="vip"><small>VIP / Signature</small><b>{vip}</b></article><article className={s.metric}><small>Huéspedes habituales</small><b>{regular}</b></article><article className={s.metric} data-kind="new"><small>Con 0–1 estadía</small><b>{fresh}</b></article></div>
+    <GuestJourneyPanel propertyId={propertyId}/>
     <div className={s.toolbar}><label className={s.search}>⌕<input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar huésped, email, teléfono o país"/></label></div>
     <div className={s.tableWrap}><table className={s.table}><thead><tr><th>Huésped</th><th>Contacto</th><th>País</th><th>Estadías</th><th>Última estadía</th><th>Gasto total</th><th>Nivel</th><th>Acciones</th></tr></thead><tbody>{filtered.map(item=><tr key={item.id}><td><div className={s.guestCell}><span className={s.avatar}>{initials(item.full_name)}</span><span><b>{item.full_name}</b><small>{item.document_number?`${item.document_type||"Doc."} ${item.document_number}`:`ID ${item.id.slice(0,8)}…`}</small></span></div></td><td className={s.contact}><b>{item.email||"—"}</b><small>{item.phone||"Sin teléfono"}</small></td><td>{item.country||item.nationality||"—"}</td><td>{item.stays||0}</td><td>{fmtDate(item.lastStay||item.last_stay_at)}</td><td>{item.spent?money(item.spent):"—"}</td><td><span className={`${s.status} ${item.vip_level==="frequent"?s.statusRegular:item.vip_level==="standard"?s.statusNew:""}`}>{vipLabel(item.vip_level)}</span></td><td><button type="button" className={s.view} onClick={()=>setSelected(item)}>Ver</button></td></tr>)}</tbody></table>{data.loading?<div className={s.empty}>Cargando huéspedes…</div>:!filtered.length&&<div className={s.empty}>No encontramos huéspedes con esa búsqueda.</div>}</div>
 
