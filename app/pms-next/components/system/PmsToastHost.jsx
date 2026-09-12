@@ -34,8 +34,8 @@ export default function PmsToastHost(){
         actionLabel:detail.actionLabel||"",
         onAction:typeof detail.onAction==="function"?detail.onAction:null,
       }
-      clearTimers(id)
-      setToasts(list=>[...list.filter(item=>item.id!==id),toast].slice(-4))
+      for(const activeId of [...timers.current.keys()])clearTimers(activeId)
+      setToasts([toast])
       window.requestAnimationFrame(()=>window.requestAnimationFrame(()=>setToasts(list=>list.map(item=>item.id===id?{...item,phase:"stable"}:item))))
       const duration=Math.max(1800,Number(detail.duration)||3200)
       const leave=window.setTimeout(()=>setToasts(list=>list.map(item=>item.id===id?{...item,phase:"leave"}:item)),Math.max(900,duration-460))
