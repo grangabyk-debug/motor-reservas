@@ -54,6 +54,7 @@ export default function HealthCenterPanel({propertyId,onNavigate,allowedViews=[]
   usePmsAutoRefresh(propertyId,()=>load(true),["hotel_channel_hubs","hotel_operational_notifications","hotel_channel_booking_state","hotel_booking_engines","hotel_websites","hotel_payment_connections","pagos","reservas"])
   useEffect(()=>{if(!loading){setSlow(false);return}const timer=window.setTimeout(()=>setSlow(true),1400);return()=>window.clearTimeout(timer)},[loading])
   useEffect(()=>{if(!open||!lastReadAt)return;const age=Date.now()-new Date(lastReadAt).getTime();if(age>30000)load(true)},[open,lastReadAt,load])
+  useEffect(()=>{if(typeof window==="undefined")return;const handler=()=>setOpen(true);window.addEventListener("hl:open-health-center",handler);return()=>window.removeEventListener("hl:open-health-center",handler)},[])
 
   const latestNotice=notices[0]||null,latestChannelState=channelStates[0]||null,latestPayment=payments.find(row=>!["anulado","cancelado","reembolsado","refunded","void"].includes(norm(row.estado)))||payments[0]||null,latestDirect=reservations.find(isDirect)||null
   const realOverbookings=channelStates.filter(row=>row.overbooked===true||norm(row.assignment_status)==="overbooked")
@@ -98,7 +99,6 @@ export default function HealthCenterPanel({propertyId,onNavigate,allowedViews=[]
   const metricCards=[["EVENTOS",observed.events],["LATENCIA OTA",observed.latency],["PENDIENTES",observed.pending],["OVERBOOKING REAL",observed.overbookings],["MAPEO",observed.mapping],["REINTENTOS",observed.retries],["RECUPERADAS",observed.recovered]]
 
   return <>
-    <button type="button" className={s.launcher} data-tone={overall.tone} onClick={()=>setOpen(true)} aria-label="Abrir Health Center"><span><i/></span><div><small>SALUD DEL SISTEMA</small><b>{!lastReadAt&&loading?"Comprobando…":overall.tone==="green"?"Todo estable":overall.tone==="yellow"?"En observación":"Revisar ahora"}</b></div></button>
     {open?<div className={s.shade} onMouseDown={event=>event.target===event.currentTarget&&setOpen(false)}><section className={s.panel} aria-label="Health Center de Habitación Llena">
       <header className={s.header}><div><small>HEALTH CENTER</small><h2>Confiabilidad y sincronización</h2><p>PMS ↔ Channel Manager ↔ OTAs ↔ motor ↔ pagos, explicado con señales reales.</p></div><div className={s.headerActions}><button type="button" onClick={()=>load()} disabled={loading}><PmsIcon name="refresh" size={15}/>{loading?"Actualizando…":"Actualizar"}</button><button type="button" className={s.close} onClick={()=>setOpen(false)} aria-label="Cerrar Health Center">×</button></div></header>
       {loading?<div className={s.loading}><i/><div><b>Comprobando la cadena operativa…</b><span>{slow?"Ya falta poco. Estamos cruzando canales, motor y cobros.":"Leyendo las últimas señales y eventos."}</span></div></div>:null}
