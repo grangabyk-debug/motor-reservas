@@ -75,7 +75,7 @@ export default function DashboardOperationsPulse({propertyId,data,onNavigate,all
   },[loading,signalSignature])
 
   useEffect(()=>{
-    if(loading||!signals.length||typeof window==="undefined")return
+    if(!signals.length||typeof window==="undefined")return
     if(insightSignatureRef.current===signalSignature)return
     const firstInsight=!insightSignatureRef.current
     insightSignatureRef.current=signalSignature
@@ -95,9 +95,9 @@ export default function DashboardOperationsPulse({propertyId,data,onNavigate,all
         actionLabel:can(first.target)?"Ver ahora":"",
         onAction:can(first.target)?()=>navigate(first):null,
       }}))
-    },firstInsight?6200:900)
+    },firstInsight?5100:800)
     return()=>window.clearTimeout(timer)
-  },[loading,signalSignature,critical,warning])
+  },[signalSignature,critical,warning])
 
   return <article className={u.operationCard} data-tone={tone} data-live-state={loading?"loading":"ready"}>
     <header className={u.operationHead}><div><Status tone={tone} label="OPERACIÓN AHORA"/><strong>{headline}</strong></div>{can("tasks")?<button type="button" onClick={()=>onNavigate?.("tasks")}>Ver detalle</button>:null}</header>
