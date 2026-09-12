@@ -257,8 +257,8 @@ export default function DashboardWorkspace({ propertyId, property, onNavigate, a
       <header className={s.hero}>
         <div>
           <small>PULSO DEL DÍA</small>
-          <h1>{pulse}</h1>
-          <p>Habitación Llena · {property?.name || "tu alojamiento"}</p>
+          <h1>Bienvenido. Así está tu hotel hoy.</h1>
+          <p>{property?.name || "Tu alojamiento"} · {pulse}</p>
         </div>
         <div className={s.heroTools}>
           {oliviaHidden ? <button className={s.secondaryButton} type="button" onClick={() => setOliviaVisibility(false)}>Mostrar OlivIA</button> : null}
