@@ -42,6 +42,7 @@ export default function DashboardOperationsPulse({propertyId,data,onNavigate,all
     if(Number(m.urgent)>0)list.push({id:"urgent",tone:"red",icon:"wrench",title:"Mantenimiento urgente",detail:`${m.urgent} orden${m.urgent===1?"":"es"} prioritaria${m.urgent===1?"":"s"}`,target:"maintenance"})
     return list.sort((a,b)=>toneRank(a.tone)-toneRank(b.tone)).slice(0,3)
   },[realOverbookings,mappingIssues,current,m.urgent])
+  const signalSignature=signals.map(item=>`${item.id}:${item.tone}`).join("|")
 
   const critical=signals.filter(item=>item.tone==="red").length,warning=signals.filter(item=>item.tone==="yellow").length
   const tone=critical?"red":warning?"yellow":"green"
@@ -71,14 +72,13 @@ export default function DashboardOperationsPulse({propertyId,data,onNavigate,all
     setUpdatedNow(true)
     timers.push(window.setTimeout(()=>setUpdatedNow(false),1900))
     return()=>timers.forEach(timer=>window.clearTimeout(timer))
-  },[loading,signals])
+  },[loading,signalSignature])
 
   useEffect(()=>{
     if(loading||!signals.length||typeof window==="undefined")return
-    const signature=signals.map(item=>`${item.id}:${item.tone}`).join("|")
-    if(insightSignatureRef.current===signature)return
+    if(insightSignatureRef.current===signalSignature)return
     const firstInsight=!insightSignatureRef.current
-    insightSignatureRef.current=signature
+    insightSignatureRef.current=signalSignature
     const first=signals[0]
     const timer=window.setTimeout(()=>{
       const dashboard=document.querySelector('[data-workspace="dashboard"]:not([hidden])')
@@ -97,7 +97,7 @@ export default function DashboardOperationsPulse({propertyId,data,onNavigate,all
       }}))
     },firstInsight?6200:900)
     return()=>window.clearTimeout(timer)
-  },[loading,signals,critical,warning])
+  },[loading,signalSignature,critical,warning])
 
   return <article className={u.operationCard} data-tone={tone} data-live-state={loading?"loading":"ready"}>
     <header className={u.operationHead}><div><Status tone={tone} label="OPERACIÓN AHORA"/><strong>{headline}</strong></div>{can("tasks")?<button type="button" onClick={()=>onNavigate?.("tasks")}>Ver detalle</button>:null}</header>
