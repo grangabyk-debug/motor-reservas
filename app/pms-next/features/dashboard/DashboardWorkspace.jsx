@@ -5,6 +5,7 @@ import OliviaAssistant from "../../components/OliviaAssistant"
 import useDashboardData from "./useDashboardData"
 import s from "./dashboard.module.css"
 import d from "./frontDesk.module.css"
+import v from "./dashboardViz.module.css"
 
 const shortcuts = [
   { id: "planning", label: "Planning", icon: "▦" },
@@ -59,7 +60,7 @@ function MetricIcon({ type }) {
   if (type === "occupancy") return <svg {...common}><path d="M3 17V9h18v8"/><path d="M5 9V6h6a3 3 0 0 1 3 3"/><path d="M3 17v3M21 17v3M3 14h18"/></svg>
   if (type === "arrivals") return <svg {...common}><circle cx="12" cy="12" r="9"/><path d="m8 12 2.6 2.7L16 9"/></svg>
   if (type === "departures") return <svg {...common}><path d="M10 17H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5"/><path d="m14 8 4 4-4 4M18 12H9"/></svg>
-  if (type === "inhouse") return <svg {...common}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+  if (type === "inhouse") return <svg {...common}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 1-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
   if (type === "ready") return <svg {...common}><path d="m4 19 8-8"/><path d="m9 6 9 9"/><path d="M14 3 3 14l7 7L21 10z"/></svg>
   return <svg {...common}><circle cx="12" cy="12" r="9"/><path d="M16 8.5c-.8-.7-2-1.1-3.2-1.1-1.8 0-3 .8-3 2s1 1.8 3.2 2.3c2.1.5 3.2 1.2 3.2 2.5 0 1.4-1.4 2.4-3.4 2.4-1.4 0-2.8-.5-3.8-1.3M12.8 5.6v12.8"/></svg>
 }
@@ -236,6 +237,9 @@ export default function DashboardWorkspace({ propertyId, property, onNavigate, a
       today: offset === 0,
     }
   })
+  const bookingInsights = data.bookingInsights || { days: [], channels: [], total: 0, today: 0, previousSix: 0 }
+  const paceMax = Math.max(1, ...bookingInsights.days.map((day) => Number(day.value) || 0))
+  const previousAverage = bookingInsights.previousSix ? bookingInsights.previousSix / 6 : 0
   const reservationPreviewRows = (() => {
     const unique = new Map()
     for (const offset of [0, 1]) {
@@ -347,6 +351,55 @@ export default function DashboardWorkspace({ propertyId, property, onNavigate, a
           </div>
         </article>
       </div>
+
+      {can("reservations") ? (
+        <section className={v.vizGrid} aria-label="Rendimiento comercial reciente">
+          <article className={v.vizCard}>
+            <header className={v.vizHeader}>
+              <div className={v.vizTitle}>
+                <strong>Ritmo de reservas</strong>
+                <small>Nuevas reservas creadas · últimos 7 días</small>
+              </div>
+              <span className={v.vizMeta}>{bookingInsights.total} en 7 días</span>
+            </header>
+            {bookingInsights.total ? (
+              <div className={v.paceChart} role="img" aria-label={`Reservas creadas en los últimos siete días. Hoy: ${bookingInsights.today}.`}>
+                {bookingInsights.days.map((day, index) => (
+                  <div className={v.paceDay} data-today={index === bookingInsights.days.length - 1 ? "1" : "0"} key={day.key}>
+                    <span className={v.paceValue}>{day.value}</span>
+                    <div className={v.paceTrack}><i style={{ height: `${Math.max(4, (day.value / paceMax) * 100)}%` }}/></div>
+                    <b>{day.label}</b>
+                  </div>
+                ))}
+              </div>
+            ) : <div className={v.emptyViz}>Todavía no hay reservas nuevas registradas en los últimos 7 días.</div>}
+            <div className={v.dataNote}>
+              Hoy ingresaron {bookingInsights.today} reservas nuevas. Promedio de los 6 días anteriores: {previousAverage.toLocaleString("es-AR", { maximumFractionDigits: 1 })} por día.
+            </div>
+          </article>
+
+          <article className={v.vizCard}>
+            <header className={v.vizHeader}>
+              <div className={v.vizTitle}>
+                <strong>Canales de venta</strong>
+                <small>Origen de las reservas nuevas · 7 días</small>
+              </div>
+            </header>
+            {bookingInsights.channels.length ? (
+              <div className={v.channelList}>
+                {bookingInsights.channels.map((channel) => (
+                  <div className={v.channelRow} key={channel.label}>
+                    <span className={v.channelLabel}>{channel.label}</span>
+                    <span className={v.channelValue}>{channel.value} · {channel.pct}%</span>
+                    <div className={v.channelTrack}><i style={{ width: `${Math.max(2, channel.pct)}%` }}/></div>
+                  </div>
+                ))}
+              </div>
+            ) : <div className={v.emptyViz}>Sin actividad suficiente para comparar canales.</div>}
+            <div className={v.dataNote}>Se cuentan reservas creadas realmente en el PMS; canceladas y no-show quedan fuera.</div>
+          </article>
+        </section>
+      ) : null}
 
       {can("reservations") ? (
         <section className={`${d.frontDesk} ${s.frontDeskWrap}`}>
