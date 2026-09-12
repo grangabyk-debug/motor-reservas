@@ -10,6 +10,16 @@ const dateKey = (offset) => {
   date.setDate(date.getDate() + offset)
   return date.toLocaleDateString("en-CA")
 }
+const localDayStartISO = (offset) => {
+  const date = new Date()
+  date.setDate(date.getDate() + offset)
+  date.setHours(0, 0, 0, 0)
+  return date.toISOString()
+}
+const localDateKey = (value) => {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString("en-CA")
+}
 const validPayment = (payment) => !["void", "cancelado", "anulado", "cancelled"].includes(String(payment.estado || "").toLowerCase())
 const validReservation = (reservation) => !reservation.no_show && !["cancelada", "cancelado", "cancelled"].includes(String(reservation.estado || "").toLowerCase())
 const roomIds = (item) => [...new Set([item.habitacion_id, ...(item.habitaciones_ids || [])].filter(Boolean).map(Number))]
@@ -34,8 +44,8 @@ export default function useDashboardData(propertyId) {
     const today = dateKey(0)
     const tomorrow = dateKey(1)
     const dayAfter = dateKey(2)
-    const pickupStart = `${dateKey(-6)}T00:00:00`
-    const pickupEnd = `${tomorrow}T00:00:00`
+    const pickupStart = localDayStartISO(-6)
+    const pickupEnd = localDayStartISO(1)
     try {
       const [roomRes, resRes, pickupRes, maintRes, hkRes, payTodayRes] = await Promise.all([
         supabase.from("habitaciones").select("id,nombre,tipo,estado,activa").eq("property_id", propertyId).eq("activa", true),
@@ -143,7 +153,7 @@ export default function useDashboardData(propertyId) {
     const dayMap = new Map(days.map((day) => [day.key, day]))
     const channelMap = new Map()
     for (const reservation of bookingActivity) {
-      const key = String(reservation.created_at || "").slice(0, 10)
+      const key = localDateKey(reservation.created_at)
       const day = dayMap.get(key)
       if (day) day.value += 1
       const channel = String(reservation.canal_reserva || "Directa").trim() || "Directa"
