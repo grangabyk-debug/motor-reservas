@@ -5,6 +5,7 @@ import{supabase}from"../../../../lib/supabase"
 import ReservationPaymentPanel from"./ReservationPaymentPanel"
 import CashClosureReport from"./CashClosureReport"
 import{buildCashClosureReport,cashDual,cashFmt,cashMoney}from"./cashClosureReport"
+import{parseCashSessionMeta,serializeCashSessionMeta,suggestedCashShift}from"./cashSessionMeta"
 import s from"./cashActions.module.css"
 
 export default function DailyCashActionsMultiCurrency({propertyId,session,expectedArs=0,expectedUsd=0,focusReservationId,onFocusHandled,onChanged}){
@@ -12,6 +13,7 @@ export default function DailyCashActionsMultiCurrency({propertyId,session,expect
   const[paymentReservationId,setPaymentReservationId]=useState(null)
   const[mode,setMode]=useState(null),[saving,setSaving]=useState(false),[error,setError]=useState("")
   const[openingArs,setOpeningArs]=useState("0"),[openingUsd,setOpeningUsd]=useState("0")
+  const[openingName,setOpeningName]=useState(""),[openingShift,setOpeningShift]=useState(()=>suggestedCashShift())
   const[countedArs,setCountedArs]=useState(""),[countedUsd,setCountedUsd]=useState(""),[note,setNote]=useState("")
   const[history,setHistory]=useState([]),[report,setReport]=useState(null)
   const[form,setForm]=useState({kind:"expense",other_direction:"expense",method:"Efectivo",amount:"",currency:"ARS",concept:"",reference:""})
@@ -32,6 +34,19 @@ export default function DailyCashActionsMultiCurrency({propertyId,session,expect
     })()
     return()=>{cancelled=true}
   },[mode,propertyId])
+  useEffect(()=>{
+    if(mode!=="open")return
+    let cancelled=false
+    setOpeningShift(suggestedCashShift())
+    ;(async()=>{
+      const{data}=await supabase.auth.getUser()
+      if(cancelled)return
+      const user=data?.user
+      const name=user?.user_metadata?.full_name||user?.user_metadata?.name||String(user?.email||"").split("@")[0]||""
+      setOpeningName(name)
+    })()
+    return()=>{cancelled=true}
+  },[mode])
   useEffect(()=>{if(!session){setCountedArs("");setCountedUsd("");setNote("")}},[session?.id])
 
   async function currentUser(){
@@ -44,12 +59,15 @@ export default function DailyCashActionsMultiCurrency({propertyId,session,expect
   async function openSession(){
     setSaving(true);setError("")
     try{
-      const ars=Number(openingArs||0),usd=Number(openingUsd||0)
+      const ars=Number(openingArs||0),usd=Number(openingUsd||0),openerName=openingName.trim()
+      if(!openerName)throw new Error("Ingresá el nombre de la persona que abre la caja.")
+      if(!openingShift)throw new Error("Seleccioná el turno.")
       if(!Number.isFinite(ars)||ars<0||!Number.isFinite(usd)||usd<0)throw new Error("Ingresá montos iniciales válidos.")
       const user=await currentUser()
-      const{error:insertError}=await supabase.from("hotel_cash_sessions").insert({property_id:propertyId,opened_by:user.id,closed_by:null,opened_at:new Date().toISOString(),closed_at:null,opening_amount:ars,opening_amount_usd:usd,closing_amount:null,closing_amount_usd:null,expected_amount:null,expected_amount_usd:null,status:"open",notes:null})
+      const notes=serializeCashSessionMeta({openerName,shift:openingShift,closeNote:""})
+      const{error:insertError}=await supabase.from("hotel_cash_sessions").insert({property_id:propertyId,opened_by:user.id,closed_by:null,opened_at:new Date().toISOString(),closed_at:null,opening_amount:ars,opening_amount_usd:usd,closing_amount:null,closing_amount_usd:null,expected_amount:null,expected_amount_usd:null,status:"open",notes})
       if(insertError)throw insertError
-      setOpeningArs("0");setOpeningUsd("0");finish()
+      setOpeningArs("0");setOpeningUsd("0");setOpeningName("");setOpeningShift(suggestedCashShift());finish()
     }catch(err){setError(err?.message||"No se pudo abrir la caja.")}finally{setSaving(false)}
   }
   async function addMovement(){
@@ -78,7 +96,9 @@ export default function DailyCashActionsMultiCurrency({propertyId,session,expect
     try{
       if(!session)throw new Error("No hay una caja abierta.")
       if(countedArs===""||countedUsd===""||Number(countedArs)<0||Number(countedUsd)<0)throw new Error("Contá el efectivo en ARS y USD. Si no hay dólares, ingresá 0.")
-      const user=await currentUser(),ars=Number(countedArs),usd=Number(countedUsd),closedAt=new Date().toISOString(),notes=note.trim()||null
+      const user=await currentUser(),ars=Number(countedArs),usd=Number(countedUsd),closedAt=new Date().toISOString()
+      const meta=parseCashSessionMeta(session.notes)
+      const notes=serializeCashSessionMeta({openerName:meta.openerName,shift:meta.shift,closeNote:note.trim()})
       const{error:updateError}=await supabase.from("hotel_cash_sessions").update({closed_by:user.id,closed_at:closedAt,closing_amount:ars,closing_amount_usd:usd,expected_amount:Number(expectedArs||0),expected_amount_usd:Number(expectedUsd||0),status:"closed",notes}).eq("id",session.id).eq("property_id",propertyId)
       if(updateError)throw updateError
       closed=true
@@ -91,10 +111,10 @@ export default function DailyCashActionsMultiCurrency({propertyId,session,expect
     finally{setSaving(false)}
   }
 
-  const recent=useMemo(()=>history.map(row=>({...row,diffArs:Number(row.closing_amount||0)-Number(row.expected_amount||0),diffUsd:Number(row.closing_amount_usd||0)-Number(row.expected_amount_usd||0)})),[history])
+  const recent=useMemo(()=>history.map(row=>{const meta=parseCashSessionMeta(row.notes);return{...row,meta,diffArs:Number(row.closing_amount||0)-Number(row.expected_amount||0),diffUsd:Number(row.closing_amount_usd||0)-Number(row.expected_amount_usd||0)}}),[history])
   const closeReady=countedArs!==""&&countedUsd!==""
   const title=mode==="open"?"Abrir caja":mode==="movement"?"Registrar movimiento":mode==="history"?"Cierres de caja":mode==="report"?"Cierre de caja":"Arqueo y cierre de caja"
-  const subtitle=mode==="report"?"Documento final del turno con saldos, movimientos y nota.":mode==="history"?"Reabrí un cierre para imprimirlo o descargar su PDF.":mode==="close"?"Contá el efectivo, agregá una nota opcional y cerrá el turno.":mode==="movement"?"Ingresos y egresos manuales quedan vinculados al turno abierto.":"Ingresá el efectivo inicial separado por moneda."
+  const subtitle=mode==="report"?"Documento final del turno con saldos, movimientos y nota.":mode==="history"?"Reabrí un cierre para imprimirlo o descargar su PDF.":mode==="close"?"Contá el efectivo, agregá una nota opcional y cerrá el turno.":mode==="movement"?"Ingresos y egresos manuales quedan vinculados al turno abierto.":"Identificá quién abre la caja, el turno y el efectivo inicial."
 
   return<>
     <div className={s.actions}>
@@ -109,8 +129,13 @@ export default function DailyCashActionsMultiCurrency({propertyId,session,expect
       <div className={s.body}>
         {error?<div className={s.alert}>{error}</div>:null}
         {mode==="open"?<>
-          <p className={s.hint}>Los cobros en efectivo de reservas se suman automáticamente en la moneda realmente recibida.</p>
-          <div className={s.formGrid}><label className={s.field}><span>Efectivo inicial ARS</span><input type="number" min="0" step="0.01" value={openingArs} onChange={event=>setOpeningArs(event.target.value)} autoFocus/></label><label className={s.field}><span>Efectivo inicial USD</span><input type="number" min="0" step="0.01" value={openingUsd} onChange={event=>setOpeningUsd(event.target.value)}/></label></div>
+          <p className={s.hint}>Estos datos quedan vinculados al turno y aparecen luego en el cierre de caja.</p>
+          <div className={s.formGrid}>
+            <label className={s.field}><span>Nombre de quien abre</span><input value={openingName} maxLength={120} onChange={event=>setOpeningName(event.target.value)} placeholder="Ej. Gabriel" autoFocus/></label>
+            <label className={s.field}><span>Turno</span><select value={openingShift} onChange={event=>setOpeningShift(event.target.value)}><option>Mañana</option><option>Tarde</option><option>Noche</option></select></label>
+            <label className={s.field}><span>Efectivo inicial ARS</span><input type="number" min="0" step="0.01" value={openingArs} onChange={event=>setOpeningArs(event.target.value)}/></label>
+            <label className={s.field}><span>Efectivo inicial USD</span><input type="number" min="0" step="0.01" value={openingUsd} onChange={event=>setOpeningUsd(event.target.value)}/></label>
+          </div>
           <div className={s.footer}><button type="button" className={s.secondary} onClick={()=>setMode(null)}>Cancelar</button><button type="button" className={s.save} disabled={saving} onClick={openSession}>{saving?"Abriendo…":"Abrir caja"}</button></div>
         </>:mode==="movement"?<>
           <div className={s.formGrid}>
@@ -136,7 +161,7 @@ export default function DailyCashActionsMultiCurrency({propertyId,session,expect
           <p className={s.hint} style={{marginTop:10}}>La nota queda guardada con el turno y sale en la impresión y el PDF.</p>
           <div className={s.footer}><button type="button" className={s.secondary} onClick={()=>setMode(null)}>Cancelar</button><button type="button" className={s.danger} disabled={saving||!closeReady} onClick={closeSession}>{saving?"Cerrando…":"Cerrar caja y generar cierre"}</button></div>
         </>:mode==="history"?<>
-          {saving?<div className={s.empty}>Cargando cierre…</div>:recent.length?<div className={s.history}><h3>Últimos cierres</h3><div className={s.historyRows}><div className={`${s.historyRow} ${s.historyHead}`}><span>Turno</span><span>Apertura</span><span>Esperado</span><span>Contado</span><span>Diferencia</span></div>{recent.map(row=><div className={s.historyRow} key={row.id}><span><b>{cashFmt(row.closed_at)}</b><small>Abierta {cashFmt(row.opened_at)}</small><button type="button" className={s.secondary} style={{height:27,padding:"0 8px",marginTop:4}} onClick={()=>showReport(row)}>Ver cierre</button></span><span>{cashDual(row.opening_amount,row.opening_amount_usd)}</span><span>{cashDual(row.expected_amount,row.expected_amount_usd)}</span><span>{cashDual(row.closing_amount,row.closing_amount_usd)}</span><strong className={Math.abs(row.diffArs)<.01&&Math.abs(row.diffUsd)<.01?s.good:s.bad}>{cashDual(row.diffArs,row.diffUsd)}</strong></div>)}</div></div>:<div className={s.empty}>Todavía no hay cierres guardados.</div>}
+          {saving?<div className={s.empty}>Cargando cierre…</div>:recent.length?<div className={s.history}><h3>Últimos cierres</h3><div className={s.historyRows}><div className={`${s.historyRow} ${s.historyHead}`}><span>Turno</span><span>Apertura</span><span>Esperado</span><span>Contado</span><span>Diferencia</span></div>{recent.map(row=><div className={s.historyRow} key={row.id}><span><b>{cashFmt(row.closed_at)}</b><small>{row.meta.shift?`Turno ${row.meta.shift} · `:""}{row.meta.openerName||`Abierta ${cashFmt(row.opened_at)}`}</small><button type="button" className={s.secondary} style={{height:27,padding:"0 8px",marginTop:4}} onClick={()=>showReport(row)}>Ver cierre</button></span><span>{cashDual(row.opening_amount,row.opening_amount_usd)}</span><span>{cashDual(row.expected_amount,row.expected_amount_usd)}</span><span>{cashDual(row.closing_amount,row.closing_amount_usd)}</span><strong className={Math.abs(row.diffArs)<.01&&Math.abs(row.diffUsd)<.01?s.good:s.bad}>{cashDual(row.diffArs,row.diffUsd)}</strong></div>)}</div></div>:<div className={s.empty}>Todavía no hay cierres guardados.</div>}
         </>:mode==="report"&&report?<CashClosureReport report={report} onBack={()=>setMode("history")} onClose={()=>setMode(null)} onError={setError}/>:null}
       </div>
     </section></div>:null}
