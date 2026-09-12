@@ -81,8 +81,6 @@ export default function DashboardOperationsPulse({propertyId,data,onNavigate,all
     insightSignatureRef.current=signalSignature
     const first=signals[0]
     const timer=window.setTimeout(()=>{
-      const dashboard=document.querySelector('[data-workspace="dashboard"]:not([hidden])')
-      if(!dashboard)return
       const message=critical
         ?`Veo ${critical} prioridad${critical===1?"":"es"} crítica${critical===1?"":"s"}. Yo empezaría por ${first.title.toLowerCase()}.`
         :`Hay ${warning} pendiente${warning===1?"":"s"}. Conviene revisar primero ${first.title.toLowerCase()}.`
