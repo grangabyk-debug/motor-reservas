@@ -9,8 +9,7 @@ export const PRIMARY_NAV=[
 
 export const RECEPTION_NAV=[
   {id:"dailycash",label:"Caja diaria",icon:"cash"},
-  {id:"finance",label:"Finanzas",icon:"cash"},
-  {id:"receptionreports",label:"Informes",icon:"report"},
+  {id:"receptionreports",label:"Informes de recepción",icon:"report"},
 ]
 
 export const HOUSEKEEPING_NAV=[
@@ -25,13 +24,14 @@ export const OPERATIONS_NAV=[
 ]
 
 export const MANAGEMENT_NAV=[
+  {id:"finance",label:"Finanzas",icon:"cash"},
+  {id:"revenue",label:"Revenue",icon:"rates"},
+  {id:"growth",label:"Ventas y crecimiento",icon:"growth"},
+  {id:"intelligence",label:"Inteligencia",icon:"report"},
+  {id:"reports",label:"Informes",icon:"report"},
   {id:"onboarding",label:"Puesta en marcha",icon:"activity"},
   {id:"website",label:"Sitio web",icon:"link"},
-  {id:"growth",label:"Ventas y crecimiento",icon:"growth"},
-  {id:"revenue",label:"Revenue",icon:"rates"},
-  {id:"intelligence",label:"Inteligencia",icon:"report"},
   {id:"channelmanager",label:"Channel Manager",icon:"link"},
-  {id:"reports",label:"Informes",icon:"report"},
   {id:"audit",label:"Actividad",icon:"activity"},
   {id:"staff",label:"Equipo",icon:"team"},
   {id:"settings",label:"Configuración",icon:"settings"},
