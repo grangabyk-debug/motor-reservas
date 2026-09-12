@@ -34,7 +34,7 @@ export default function PlanningWorkspace({propertyId,property,onNavigate,newRes
   const lastNewReservationRequest=useRef(0),formErrorTimer=useRef(null)
 
   const days=useMemo(()=>Array.from({length:31},(_,index)=>addDays(anchor,index-2)),[anchor]),windowStart=days[0],windowEndExclusive=addDays(days.at(-1),1)
-  const data=usePlanningData(propertyId,windowStart,windowEndExclusive),dayWidth=Math.max(28,Math.min(62,Number(settings.zoom)||38))
+  const data=usePlanningData(propertyId,windowStart,windowEndExclusive),dayWidth=Math.max(28,Math.min(80,Number(settings.zoom)||38))
   const roomById=useMemo(()=>new Map(data.rooms.map(room=>[Number(room.id),room])),[data.rooms])
   const defaultRoomId=useMemo(()=>[...data.rooms].filter(room=>room.activa!==false&&room.estado!=="mantenimiento").sort((a,b)=>(Number(a.precio)||0)-(Number(b.precio)||0)||String(a.nombre||"").localeCompare(String(b.nombre||""),"es",{numeric:true}))[0]?.id||data.rooms[0]?.id||null,[data.rooms])
   const defaultPolicyId=useMemo(()=>data.cancellationPolicies?.find(policy=>policy.is_default)?.id||data.cancellationPolicies?.[0]?.id||"",[data.cancellationPolicies])
