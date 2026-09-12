@@ -27,6 +27,27 @@ export default function PmsNextPage(){
       overflow:visible!important;
       box-shadow:0 10px 24px rgba(78,62,145,.16)!important;
     }
+    div[role="status"][class*="nudge"]{
+      animation:oliviaNudgeLifetime 5s cubic-bezier(.2,.8,.2,1) both!important;
+      transform-origin:100% 100%;
+    }
+    div[role="status"][class*="nudge"]:hover{
+      animation-play-state:paused!important;
+    }
+    @keyframes oliviaNudgeLifetime{
+      0%{opacity:0;transform:translateX(8px) scale(.985);visibility:visible}
+      8%,82%{opacity:1;transform:none;visibility:visible}
+      100%{opacity:0;transform:translateX(8px) scale(.985);visibility:hidden;pointer-events:none}
+    }
+    @media(prefers-reduced-motion:reduce){
+      div[role="status"][class*="nudge"]{
+        animation:oliviaNudgeLifetimeReduced 5s linear both!important;
+      }
+      @keyframes oliviaNudgeLifetimeReduced{
+        0%,90%{opacity:1;visibility:visible}
+        100%{opacity:0;visibility:hidden;pointer-events:none}
+      }
+    }
     @media(min-width:761px){
       [aria-label="Rooming por habitación"] article>div:nth-child(2){
         display:grid!important;
