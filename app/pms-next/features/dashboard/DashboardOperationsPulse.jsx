@@ -4,6 +4,8 @@ import{useCallback,useEffect,useMemo,useRef,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 import usePmsAutoRefresh from"../../core/usePmsAutoRefresh"
 import PmsIcon from"../../components/shell/PmsIcons"
+import PmsLiveFeedbackBridge from"../../components/system/PmsLiveFeedbackBridge"
+import HealthCenterPanel from"../operations/HealthCenterPanel"
 import u from"./dashboardUnified.module.css"
 
 const CLOSED_REVISION=new Set(["cancelled","canceled","cancelada","anulada"])
@@ -59,14 +61,8 @@ export default function DashboardOperationsPulse({propertyId,data,onNavigate,all
       const previousIds=new Set(previous.map(item=>item.id))
       const added=signals.filter(item=>!previousIds.has(item.id)).map(item=>item.id)
       const removed=previous.find(item=>!currentIds.has(item.id)&&["red","yellow"].includes(item.tone))
-      if(added.length){
-        setFreshIds(new Set(added))
-        timers.push(window.setTimeout(()=>setFreshIds(new Set()),1900))
-      }
-      if(removed){
-        setResolvedSignal(removed)
-        timers.push(window.setTimeout(()=>setResolvedSignal(null),2100))
-      }
+      if(added.length){setFreshIds(new Set(added));timers.push(window.setTimeout(()=>setFreshIds(new Set()),1900))}
+      if(removed){setResolvedSignal(removed);timers.push(window.setTimeout(()=>setResolvedSignal(null),2100))}
     }
     previousSignalsRef.current=signals.map(item=>({...item}))
     setUpdatedNow(true)
@@ -80,20 +76,10 @@ export default function DashboardOperationsPulse({propertyId,data,onNavigate,all
     const firstInsight=!insightSignatureRef.current
     insightSignatureRef.current=signalSignature
     const first=signals[0]
-    const timer=window.setTimeout(()=>{
-      const message=critical
-        ?`Veo ${critical} prioridad${critical===1?"":"es"} crítica${critical===1?"":"s"}. Yo empezaría por ${first.title.toLowerCase()}.`
-        :`Hay ${warning} pendiente${warning===1?"":"s"}. Conviene revisar primero ${first.title.toLowerCase()}.`
-      setContextInsight({signature:signalSignature,message,item:first})
-    },firstInsight?5100:800)
+    const timer=window.setTimeout(()=>{const message=critical?`Veo ${critical} prioridad${critical===1?"":"es"} crítica${critical===1?"":"s"}. Yo empezaría por ${first.title.toLowerCase()}.`:`Hay ${warning} pendiente${warning===1?"":"s"}. Conviene revisar primero ${first.title.toLowerCase()}.`;setContextInsight({signature:signalSignature,message,item:first})},firstInsight?5100:800)
     return()=>window.clearTimeout(timer)
   },[signalSignature,critical,warning])
-
-  useEffect(()=>{
-    if(!contextInsight)return
-    const timer=window.setTimeout(()=>setContextInsight(null),5200)
-    return()=>window.clearTimeout(timer)
-  },[contextInsight?.signature])
+  useEffect(()=>{if(!contextInsight)return;const timer=window.setTimeout(()=>setContextInsight(null),5200);return()=>window.clearTimeout(timer)},[contextInsight?.signature])
 
   return <>
     <article className={u.operationCard} data-tone={tone} data-live-state={loading?"loading":"ready"}>
@@ -102,5 +88,7 @@ export default function DashboardOperationsPulse({propertyId,data,onNavigate,all
       <footer className={u.operationFoot}><span><i data-tone={hubState.tone}/><b>Channel Manager</b><small>{hubState.label}</small></span><span><i data-tone={data?.loading?"yellow":"green"}/><b>Datos PMS</b><small>{data?.loading?"Actualizando":updatedNow?"Actualizado ahora":"En vivo"}</small></span></footer>
     </article>
     {contextInsight?<aside data-olivia-context-insight="true" role="status"><span data-olivia-context-avatar aria-hidden="true"/><div><b>OlivIA detectó algo</b><small>{contextInsight.message}</small>{can(contextInsight.item.target)?<button type="button" onClick={()=>{navigate(contextInsight.item);setContextInsight(null)}}>Ver ahora</button>:null}</div><button type="button" aria-label="Cerrar sugerencia de OlivIA" onClick={()=>setContextInsight(null)}>×</button></aside>:null}
+    <PmsLiveFeedbackBridge/>
+    <HealthCenterPanel propertyId={propertyId} onNavigate={onNavigate} allowedViews={allowedViews}/>
   </>
 }
