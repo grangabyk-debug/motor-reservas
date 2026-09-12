@@ -25,7 +25,7 @@ export async function POST(request,{params}){
     if(!ext)return json({error:"Usá una foto JPG/PNG o un PDF."},415)
     if(!file.size||file.size>MAX_BYTES)return json({error:"El archivo debe pesar menos de 5 MB."},413)
 
-    const{count,error:countError}=await admin.from("hotel_reservation_documents").select("id",{count:"exact",head:true}).eq("property_id",checkin.property_id).eq("reserva_id",checkin.reservation_id).eq("kind","identity_document").contains("metadata",{web_checkin_id:checkin.id})
+    const{count,error:countError}=await admin.from("hotel_reservation_documents").select("id",{count:"exact",head:true}).eq("property_id",checkin.property_id).eq("reserva_id",checkin.reservation_id).eq("kind","documento").contains("metadata",{web_checkin_id:checkin.id})
     if(countError)throw countError
     if(Number(count||0)>=4)return json({error:"Ya recibimos los archivos previstos para este check-in. Contactá al alojamiento si necesitás reemplazarlos."},409)
 
@@ -34,9 +34,9 @@ export async function POST(request,{params}){
     const storagePath=`${checkin.property_id}/${checkin.reservation_id}/web-checkin/${randomUUID()}-${side}.${ext}`,bytes=Buffer.from(await file.arrayBuffer())
     const{error:uploadError}=await admin.storage.from("hotel-reservation-documents").upload(storagePath,bytes,{contentType:file.type,upsert:false,cacheControl:"3600"})
     if(uploadError)throw uploadError
-    const row={property_id:checkin.property_id,reserva_id:checkin.reservation_id,kind:"identity_document",file_name:String(file.name||`documento-${side}.${ext}`).slice(0,180),storage_path:storagePath,mime_type:file.type,original_size_bytes:file.size,stored_size_bytes:file.size,uploaded_by:null,guest_profile_id:reservation?.guest_profile_id||null,holder_role:"primary_guest",holder_name:reservation?.nombre_huesped||null,passenger_index:0,metadata:{source:"web_checkin",side,validation_status:"pending",web_checkin_id:checkin.id}}
+    const row={property_id:checkin.property_id,reserva_id:checkin.reservation_id,kind:"documento",file_name:String(file.name||`documento-${side}.${ext}`).slice(0,180),storage_path:storagePath,mime_type:file.type,original_size_bytes:file.size,stored_size_bytes:file.size,uploaded_by:null,guest_profile_id:reservation?.guest_profile_id||null,holder_role:"primary",holder_name:reservation?.nombre_huesped||null,passenger_index:0,metadata:{source:"web_checkin",side,validation_status:"pending",web_checkin_id:checkin.id}}
     const{error:insertError}=await admin.from("hotel_reservation_documents").insert(row)
-    if(insertError){await admin.storage.from("hotel-reservation-documents").remove([storagePath]).catch(()=>{});throw insertError}
+    if(insertError){try{await admin.storage.from("hotel-reservation-documents").remove([storagePath])}catch{}throw insertError}
     return json({ok:true,side,file_name:row.file_name,status:"pending_validation"})
   }catch(error){
     console.error("WEB CHECKIN DOCUMENT UPLOAD ERROR",error)
