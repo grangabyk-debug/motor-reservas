@@ -1,6 +1,7 @@
 "use client"
 
 import MaintenancePremium from"./MaintenancePremium"
+import OperationsControlWorkspace from"./OperationsControlWorkspace"
 import OperationsWorkspaceLegacy from"./OperationsWorkspaceLegacy"
 import useOperationsData from"./useOperationsData"
 
@@ -37,5 +38,6 @@ function MaintenanceContext({propertyId}){
 
 export default function OperationsWorkspace(props){
   if(props.initialTab==="maintenance")return <MaintenanceContext propertyId={props.propertyId}/>
+  if(props.initialTab==="tasks")return <OperationsControlWorkspace propertyId={props.propertyId} property={props.property} onNavigate={props.onNavigate} allowedViews={props.allowedViews}/>
   return <OperationsWorkspaceLegacy {...props}/>
 }
