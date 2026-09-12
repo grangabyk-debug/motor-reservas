@@ -13,6 +13,20 @@ export default function PmsNextPage(){
       position:relative!important;
       top:auto!important;
     }
+    [class*="welcomeMark"],
+    [class*="oliviaMark"]{
+      background-color:transparent!important;
+      background-image:url('/olivia-avatar.svg')!important;
+      background-position:center!important;
+      background-repeat:no-repeat!important;
+      background-size:contain!important;
+      color:transparent!important;
+      font-size:0!important;
+    }
+    [class*="oliviaMark"]{
+      overflow:visible!important;
+      box-shadow:0 10px 24px rgba(78,62,145,.16)!important;
+    }
     @media(min-width:761px){
       [aria-label="Rooming por habitación"] article>div:nth-child(2){
         display:grid!important;
