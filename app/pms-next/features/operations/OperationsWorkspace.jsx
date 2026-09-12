@@ -3,6 +3,7 @@
 import MaintenancePremium from"./MaintenancePremium"
 import OperationsControlWorkspace from"./OperationsControlWorkspace"
 import OperationsWorkspaceLegacy from"./OperationsWorkspaceLegacy"
+import ReceptionAutomationPanel from"./ReceptionAutomationPanel"
 import useOperationsData from"./useOperationsData"
 
 const premiumPolish=`
@@ -38,6 +39,6 @@ function MaintenanceContext({propertyId}){
 
 export default function OperationsWorkspace(props){
   if(props.initialTab==="maintenance")return <MaintenanceContext propertyId={props.propertyId}/>
-  if(props.initialTab==="tasks")return <OperationsControlWorkspace propertyId={props.propertyId} property={props.property} onNavigate={props.onNavigate} allowedViews={props.allowedViews}/>
+  if(props.initialTab==="tasks")return <div style={{padding:"18px 20px 0"}}><ReceptionAutomationPanel propertyId={props.propertyId} onNavigate={props.onNavigate} allowedViews={props.allowedViews}/><OperationsControlWorkspace propertyId={props.propertyId} property={props.property} onNavigate={props.onNavigate} allowedViews={props.allowedViews}/></div>
   return <OperationsWorkspaceLegacy {...props}/>
 }
