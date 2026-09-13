@@ -13,6 +13,9 @@ PMS Next usa una sola aplicación y selecciona el workspace mediante `?view=<id>
 <!-- view:dashboard -->
 - `dashboard` — **Dashboard**: resumen del turno, llegadas, salidas, ocupación, habitaciones y alertas.
 
+<!-- view:portfolio -->
+- `portfolio` — **Cartera**: vista central de todas las propiedades autorizadas, pensada para hoteles múltiples y operadores de unidades distribuidas en distintas direcciones. Resume ocupación, llegadas, salidas, limpieza/mantenimiento y permite entrar a la propiedad correcta sin mezclar inventarios.
+
 <!-- view:planning -->
 - `planning` — **Planning**: calendario operativo, creación/movimiento/extensión de reservas y disponibilidad.
 
@@ -26,12 +29,12 @@ PMS Next usa una sola aplicación y selecciona el workspace mediante `?view=<id>
 - `guests` — **Huéspedes**: perfil, historial, preferencias, idioma, etiquetas y datos de contacto.
 
 <!-- view:messages -->
-- `messages` — **Mensajes**: comunicaciones asociadas a huéspedes y reservas; será el núcleo del Inbox inteligente.
+- `messages` — **Mensajes**: comunicaciones asociadas a huéspedes y reservas; núcleo del Inbox inteligente.
 
 ## Recepción y finanzas
 
 <!-- view:dailycash -->
-- `dailycash` — **Caja diaria**: cobros, efectivo, transferencias, tarjetas, movimientos, comprobantes y arqueo.
+- `dailycash` — **Caja diaria**: cobros, efectivo, transferencias, tarjetas, movimientos, comprobantes, arqueo y Libro de novedades.
 
 <!-- view:finance -->
 - `finance` — **Finanzas**: saldos, documentos, solicitudes de pago y movimientos financieros.
@@ -90,8 +93,11 @@ PMS Next usa una sola aplicación y selecciona el workspace mediante `?view=<id>
 <!-- view:settings -->
 - `settings` — **Configuración**: propiedad, preferencias, branding, reglas y features.
 
+<!-- view:help -->
+- `help` — **Centro de ayuda**: guía categorizada, búsqueda y procedimientos operativos con acceso directo al área explicada.
+
 <!-- view:support -->
-- `support` — **Ayuda & feedback**: asistente y escalamiento a soporte humano.
+- `support` — **Feedback y soporte**: asistente, escalamiento a soporte humano e ideas/mejoras con seguimiento.
 
 ## Integraciones
 
@@ -99,7 +105,7 @@ PMS Next usa una sola aplicación y selecciona el workspace mediante `?view=<id>
 - `integrations` — **Apps externas**: conectores de terceros.
 
 <!-- view:integrationapi -->
-- `integrationapi` — **REST API**: acceso programático seguro.
+- `integrationapi` — **REST API**: acceso programático seguro; la capa pública de keys/scopes/webhooks continúa en desarrollo.
 
 <!-- view:integrationmessages -->
 - `integrationmessages` — **Mensajería**: conexiones de canales externos.
@@ -122,6 +128,79 @@ No tienen que convertirse automáticamente en nuevas opciones de menú. Existen 
 
 ---
 
+# Arquitectura de información objetivo
+
+La navegación debe crecer por dominios y no por pantallas sueltas:
+
+```text
+Inicio
+  Dashboard
+  Cartera (multi-propiedad)
+
+Operación
+  Planning
+  Reservas / Presupuestos
+  Recepción / Caja
+  Housekeeping
+  Mantenimiento
+  Inventario / Servicios
+
+Huéspedes & CRM
+  Huéspedes
+  Mensajes
+  [Segmentos / Campañas / Fidelización - próximos]
+
+Comercial
+  Tarifas y disponibilidad
+  Revenue
+  Sitio web / Motor
+  [Promociones / Empresas / Agencias - próximos]
+
+Distribución
+  Channel Manager
+  [Health Center - evolución]
+
+Inteligencia
+  Inteligencia
+  Informes
+
+Administración
+  Equipo / Permisos
+  Actividad
+  Configuración
+  Integraciones / API / Pagos
+
+Ayuda
+  Centro de ayuda
+  Feedback y soporte
+```
+
+No se crea una nueva entrada lateral si la capacidad pertenece naturalmente a una página existente. Cuando un dominio crezca, debe agruparse en carpeta/subnavegación antes que sobrecargar el sidebar.
+
+# Modelo multi-propiedad
+
+```text
+Cuenta / Workspace
+  -> Propiedad A (hotel, edificio, cabañas, hostel...)
+       -> habitaciones / unidades
+  -> Propiedad B (departamento independiente)
+       -> unidad
+  -> Propiedad C (edificio)
+       -> unidad 1
+       -> unidad 2
+       -> unidad 3
+```
+
+Principios:
+- una dirección puede ser una propiedad independiente;
+- un edificio puede ser una propiedad con varias unidades;
+- la Cartera agrega lectura y priorización, pero no mezcla reservas/caja/inventario;
+- el usuario entra a una propiedad antes de modificar datos operativos;
+- roles y futuras reglas globales deberán soportar alcance por propiedad;
+- la terminología podrá adaptarse a “Habitación” o “Unidad” según el tipo de operación.
+
+---
+
 # Mapa de conexiones funcionales
 
 ```text
@@ -140,7 +219,7 @@ Huésped
        +-> Mantenimiento / incidencias
        +-> Actividad / auditoría
 
-Habitación
+Habitación / Unidad
   <-> Planning
   <-> Housekeeping
   <-> Mantenimiento
@@ -153,58 +232,38 @@ Tarifas y disponibilidad
   <-> Revenue
   <-> Inteligencia
 
-Sitio web / motor
-  -> Presupuesto o Reserva
-  -> Pago
-  -> Huésped
+Cartera
+  -> Propiedad -> todos los módulos operativos
 
-Integraciones
-  -> API / webhooks
-  -> Mensajería
-  -> Pagos
-  -> Canales
+Ayuda
+  -> módulo explicado
+  -> Feedback y soporte
 ```
-
-## Grafo prioritario de la próxima etapa
-
-La primera integración profunda obligatoria es:
-
-```text
-Mensajes
-  <-> Huésped
-  <-> Reserva
-  <-> Habitación
-  <-> Saldo/Pagos
-  <-> Housekeeping
-  <-> Mantenimiento
-```
-
-El objetivo es que una consulta nunca necesite ser copiada manualmente por Recepción a otra área.
 
 ---
 
 # Roles actuales
 
 ## Owner / Manager / Admin
-Acceso completo a las vistas permitidas por producto/feature flags.
+Acceso completo a las vistas permitidas por producto/feature flags, incluida Cartera.
 
 ## Recepción
-Dashboard, Planning, Reservas, Presupuestos, Huéspedes, Mensajes, Caja diaria, Finanzas, Informes de recepción, Inventario, Servicios, Tarifas, Actividad y Ayuda.
+Dashboard, Planning, Reservas, Presupuestos, Huéspedes, Mensajes, Caja diaria, Finanzas, Informes de recepción, Inventario, Servicios, Tarifas, Actividad, Centro de ayuda y Soporte.
 
 ## Night Audit
 Recepción + Informes generales.
 
 ## Housekeeping
-Dashboard, Housekeeping, Inventario y Ayuda.
+Dashboard, Housekeeping, Inventario, Centro de ayuda y Soporte.
 
 ## Mantenimiento
-Dashboard, Mantenimiento, Inventario y Ayuda.
+Dashboard, Mantenimiento, Inventario, Centro de ayuda y Soporte.
 
 ## Revenue
-Dashboard, Planning, Reservas, Presupuestos, Huéspedes, Servicios, Caja diaria, Tarifas, Finanzas, Sitio web, Ventas, Revenue, Inteligencia, Channel Manager, Informes y Ayuda.
+Dashboard, Cartera, Planning, Reservas, Presupuestos, Huéspedes, Servicios, Caja diaria, Tarifas, Finanzas, Sitio web, Ventas, Revenue, Inteligencia, Channel Manager, Informes, Centro de ayuda y Soporte.
 
 ## Member
-Dashboard y Ayuda.
+Dashboard, Centro de ayuda y Soporte.
 
 ---
 
@@ -222,5 +281,6 @@ Para agregar una nueva `view`, antes de darla por terminada deben existir todos 
 8. Responsive desktop/tablet/mobile.
 9. Navegación de ida y vuelta a entidades relacionadas.
 10. Auditoría para acciones sensibles.
+11. Entrada o procedimiento en el manual/centro de ayuda cuando sea una función visible al cliente.
 
 Si uno de los primeros cinco puntos falta, `check:pms-sitemap` debe fallar antes del build.

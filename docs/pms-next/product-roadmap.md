@@ -1,281 +1,204 @@
-# Habitación Llena PMS Next — roadmap por paquetes
+# Habitación Llena PMS Next — roadmap de producto
 
-> Fuente de verdad de ejecución. Rama de trabajo: `pms-rebuild-zero`.
+> Fuente de verdad de ejecución. Rama: `pms-rebuild-zero`. Actualizado 13/09/2026 después de la revisión competitiva contra Hotelgest y PxSol.
 
-## Estado actual
+## Norte de producto
 
-- **Paquete 0 — Sistema de producto y fuente de verdad: COMPLETADO.**
-- **Paquete 1 — Grafo operativo del hotel: EN EJECUCIÓN.** Primer corte vertical implementado en Inbox/Mensajes.
+**Solidez operativa de Hotelgest + profundidad comercial/CRM de PxSol + una interfaz más limpia, conectada y fácil de aprender.**
 
-## Objetivo de producto
+Habitación Llena ya tiene una base operativa madura en Planning, Reservas, grupos, Housekeeping, Mantenimiento, Caja, folios, tarifas e inteligencia. El siguiente salto no es sumar botones de recepción: es conseguir que el sistema **venda más, cobre mejor, reconozca al huésped, automatice tareas y avise cuando algo requiere intervención**.
 
-Habitación Llena debe comportarse como un sistema operativo del hotel: simple por fuera, profundo por dentro. El sistema tiene que reducir trabajo manual, conectar las áreas sin usar a Recepción como intermediario y conservar trazabilidad de cada acción.
+## Reglas transversales
 
-Regla central: **menos tiempo usando el PMS, más tiempo atendiendo el hotel y al huésped**.
-
-## Reglas de ejecución
-
-1. No se abre un módulo nuevo si una capacidad puede resolverse contextualmente dentro de uno existente.
-2. Ningún botón visible queda sin acción real, destino correcto, permiso, feedback y estado de error.
-3. Toda información de negocio mantiene `property_id` y relaciones por IDs estables.
-4. Una reserva, huésped, habitación, pago, conversación, petición y tarea deben poder cruzarse sin duplicar datos.
-5. Primero se construye el contrato de datos/acciones; después la interfaz.
-6. La IA propone o ejecuta únicamente acciones disponibles mediante herramientas explícitas y permisos.
-7. Acciones financieras, destructivas o de alto impacto requieren confirmación humana hasta que exista una política configurable y auditada.
-8. Cada paquete debe cerrar con QA desktop + tablet + móvil y sin accesos muertos.
+1. Visual y funcionamiento se desarrollan juntos.
+2. Ningún botón visible queda sin acción real, permiso, feedback y estado de error.
+3. Toda función visible debe entrar al sitemap y al manual.
+4. No duplicar módulos cuando la capacidad pertenece a uno existente.
+5. Cada acción sensible respeta `property_id`, roles, auditoría y confirmación.
+6. Multi-propiedad agrega una capa de cartera; no mezcla inventarios ni duplica el PMS.
+7. Cada entrega pasa desktop/tablet/móvil y modo día/noche cuando corresponda.
+8. Antes de automatizar dinero, cancelaciones, inventario o tarifas, primero existe un flujo manual seguro y auditable.
 
 ---
 
-## Paquete 0 — Sistema de producto y fuente de verdad
+# Fase 0 — Cimientos de producto, documentación y multi-propiedad
 
-**Estado:** completado.
+**Estado: EN EJECUCIÓN.**
 
-### Objetivo
-Evitar que el PMS crezca como una colección de pantallas desconectadas.
+### Incluye
+- sitemap operativo con guard de build;
+- manual funcional vivo + PDF de capacitación;
+- Centro de ayuda categorizado;
+- Feedback y soporte;
+- vista **Cartera** para varias propiedades;
+- modelo `Workspace/Cartera -> Propiedades -> Habitaciones/Unidades`;
+- revisión progresiva de duplicaciones y arquitectura sin refactors masivos innecesarios.
+
+### Multi-propiedad
+Un hotel puede ser una propiedad con muchas habitaciones. Un anfitrión de Airbnb puede tener cada dirección como propiedad independiente. Un edificio puede ser una propiedad con varias unidades. Todas usan los mismos motores de Reservas, Planning, Housekeeping, Finanzas, Revenue y Canales; Cartera agrega visión central.
+
+### Siguiente evolución
+Planning multi-propiedad, operación por dirección, rutas de limpieza/mantenimiento, finanzas consolidadas, inbox OTA unificado, defaults de workspace con override por propiedad y permisos por alcance.
+
+---
+
+# Fase 1 — CRM y fidelización
+
+**Prioridad: CRÍTICA.**
+
+La base de huéspedes ya guarda recurrencia, VIP, preferencias, cumpleaños, idioma, contacto e historial. Hay que transformarla en acción comercial.
 
 ### Entregables
-- Sitemap operativo vivo.
-- Mapa de conexiones entre módulos.
-- Manual UX/UI y responsive.
-- Contrato obligatorio para cada CTA y cada vista.
-- Validador automático de navegación/sitemap antes del build.
-- Criterio de finalización común para todos los paquetes.
-
-### Terminado cuando
-- Cada `view` navegable tiene workspace real.
-- Cada `view` tiene descripción y entrada en sitemap.
-- No existen IDs duplicados ni vistas huérfanas.
-- El build de PMS Next falla si se rompe ese contrato.
+- perfil 360 de huésped;
+- segmentos guardados;
+- cumpleaños y fechas relevantes;
+- recurrentes / dormidos / alto valor / canal habitual / familias / empresas;
+- campañas email/mensajería;
+- automatizaciones pre-estadía, durante, post-estadía y reactivación;
+- consentimiento y exclusión;
+- métricas apertura/clic/conversión cuando el canal lo permita;
+- fidelización e incentivos de reserva directa.
 
 ---
 
-## Paquete 1 — Grafo operativo del hotel
+# Fase 2 — Payments Automation
 
-**Estado:** en ejecución.
-
-### Objetivo
-Conectar de forma canónica las piezas que ya existen: **Mensajes + Reserva + Huésped + Habitación + Housekeeping + Mantenimiento + Pagos**.
-
-### Entidades núcleo
-- `guest`
-- `reservation`
-- `room`
-- `folio/payment`
-- `conversation`
-- `guest_request`
-- `operational_task`
-- `maintenance_issue`
-
-### Primer corte implementado
-- `inbox_conversations` puede persistir vínculos a huésped, reserva y habitación.
-- Resolución automática únicamente con IDs existentes, email exacto o teléfono normalizado; no por similitud de nombre.
-- Contexto operativo único por conversación: huésped, reserva, habitaciones, saldo/pagos, housekeeping y mantenimiento.
-- Validación multitenant en base para impedir vínculos cruzados entre propiedades.
-- Mensajes muestra el contexto operativo y accesos reales según permisos.
-- Filtros de canal pasan a ser controles funcionales.
-- Se eliminan controles de envío simulados mientras no exista adaptador seguro.
-- Responsive móvil con regreso explícito desde el hilo a la lista.
-
-### Siguientes cortes
-1. Reserva -> conversación relacionada y regreso exacto.
-2. Tarea/incidencia -> reserva/habitación de origen con foco exacto.
-3. Integrar `guest_requests` al contexto.
-4. Timeline operativo unificado por reserva.
-5. Contratos/eventos estables para el futuro agente.
-
-### Entregables finales del paquete
-- Servicio único de `OperationalContext` que pueda resolver huésped, habitación actual, estadía, saldo, conversación y trabajo operativo relacionado.
-- Acciones compartidas con contratos claros: crear petición, crear tarea, asignar área, cambiar prioridad, resolver, añadir nota y navegar a la entidad de origen.
-- Historial operativo unificado por reserva/habitación.
-- Eventos internos consistentes: `guest_request.created`, `task.created`, `task.assigned`, `task.completed`, `maintenance.created`, `payment.received`, etc.
-
-### Terminado cuando
-Desde una reserva se puede ver y abrir todo lo operativo relacionado y, desde una tarea/petición, volver a la reserva o habitación correcta sin búsquedas manuales.
-
----
-
-## Paquete 2 — Inbox inteligente y contexto de huésped
-
-### Objetivo
-Convertir Mensajes en el punto único de conversación, no en otra bandeja aislada.
-
-### Fase 2A — sin depender de Meta
-- Web chat / conversación interna.
-- Hilo asociado automáticamente a huésped y reserva.
-- Panel lateral con fechas, habitación, estado, saldo, idioma, preferencias y alertas.
-- Clasificación de intención: reserva, pago, housekeeping, mantenimiento, información, reclamo, early/late, cambio/cancelación.
-- Traducción y resumen asistidos.
-- Respuestas sugeridas por IA, con envío humano inicialmente.
-- Detección de sentimiento y urgencia.
-
-### Fase 2B — acciones desde la conversación
-- Crear petición a Housekeeping.
-- Crear incidencia a Mantenimiento.
-- Solicitar/registrar early o late check-in/out.
-- Generar solicitud/enlace de pago cuando el PSP lo permita.
-- Crear presupuesto o llevar al flujo de reserva.
-
-### Terminado cuando
-Recepción no tiene que copiar una consulta del huésped a otro módulo: el mensaje dispara o propone la acción correcta y queda todo relacionado.
-
----
-
-## Paquete 3 — Agente operativo de Habitación Llena
-
-### Objetivo
-Pasar de “chat que responde” a **agente que trabaja con herramientas reales**.
-
-### Herramientas iniciales
-- `find_reservation`
-- `get_guest_context`
-- `get_room_status`
-- `get_balance`
-- `create_guest_request`
-- `create_housekeeping_task`
-- `create_maintenance_issue`
-- `add_reservation_note`
-- `create_quote`
-- `request_payment`
-- `suggest_early_late_action`
-
-### Seguridad
-- Lecturas: automáticas según rol.
-- Operaciones reversibles: automáticas si la política lo permite.
-- Dinero, cancelaciones, movimientos de habitación y cambios tarifarios: aprobación humana por defecto.
-- Toda acción del agente queda en Actividad/Auditoría con actor, herramienta, parámetros y resultado.
-
-### Terminado cuando
-Una conversación del huésped puede convertirse en trabajo real del hotel sin que Recepción actúe como “copiar y pegar humano”.
-
----
-
-## Paquete 4 — Housekeeping Intelligence
-
-### Objetivo
-Que Housekeeping trabaje con una cola simple, priorizada automáticamente y usable con una mano desde el teléfono.
+**Prioridad: CRÍTICA.**
 
 ### Entregables
-- Priorización por salida, próxima llegada, early check-in, VIP/incidencia y tiempo disponible.
-- Autoasignación configurable por piso/zona/carga.
-- Tiempo iniciado / estimado / real por habitación.
-- Estado: pendiente → en limpieza → inspección → lista.
-- Voz a acción: “terminé la 204, falta un toallón y el aire no enfría”.
-- Separación automática de la frase en limpieza, reposición y mantenimiento.
-- Alertar a Recepción únicamente cuando requiere intervención.
-
-### Terminado cuando
-El equipo puede operar desde móvil sin navegar múltiples pantallas y Recepción sólo recibe excepciones.
+- depósitos configurables;
+- garantías;
+- links/cobros programados;
+- penalidades por cancelación/No Show;
+- reintentos;
+- devoluciones;
+- conciliación;
+- timeline financiero de la reserva;
+- alertas por cobro fallido;
+- reglas por tarifa/canal;
+- conectores PSP desacoplados de la lógica hotelera.
 
 ---
 
-## Paquete 5 — Mantenimiento Intelligence
+# Fase 3 — API real y plataforma abierta
 
-### Objetivo
-Evolucionar de incidencias sueltas a gestión del activo y prevención.
+**Prioridad: CRÍTICA.**
 
 ### Entregables
-- Registro de activos por habitación/área.
-- QR opcional por activo.
-- Historial de fallas, reparaciones, repuestos, costo y tiempo fuera de servicio.
-- Mantenimiento preventivo periódico.
-- Detección de reincidencias.
-- Recomendación de revisión/reemplazo basada en frecuencia y costo.
-- Impacto operativo: habitaciones/noches afectadas.
+- API keys reales;
+- scopes (`reservations:read`, `rates:write`, etc.);
+- revocación;
+- rate limits;
+- logs;
+- sandbox;
+- documentación;
+- webhooks versionados para reservas, pagos, check-in/out, habitaciones y otras entidades.
 
-### Terminado cuando
-Mantenimiento puede responder qué falla, cuánto cuesta, cuánto se repite y qué conviene prevenir.
+La pantalla no debe mostrar una falsa capacidad productiva mientras siga marcada como “Próximamente”.
 
 ---
 
-## Paquete 6 — Front desk por excepción
+# Fase 4 — Permisos granulares
 
-### Objetivo
-Automatizar burocracia para devolver a Recepción su rol de hospitalidad.
+**Prioridad: ALTA.**
+
+La estructura de roles/permisos existente evoluciona a una matriz por acción.
+
+Ejemplos: crear reserva, modificar tarifa, aplicar descuento, cancelar, anular pago, cerrar caja, ver finanzas, cambiar inventario OTA, administrar usuarios. Debe soportar permisos por propiedad y, más adelante, por cartera.
+
+---
+
+# Fase 5 — Channel Manager Health Center
+
+**Prioridad: ALTA.**
+
+No sumar canales antes de mejorar observabilidad.
 
 ### Entregables
-- Pre check-in y datos previos.
-- Documentos/firma según factibilidad legal e integración.
-- Pago previo o garantía.
-- Cola de huéspedes “listos para llegar”.
-- Check-in rápido con mínimos toques.
-- Check-out autónomo/asistido.
-- Al check-out: disparo automático a Housekeeping.
-- Night Audit automático con bandeja de excepciones.
-
-### Terminado cuando
-El turno no necesita ejecutar manualmente procesos repetitivos salvo excepciones reales.
+- último ARI enviado;
+- última reserva recibida;
+- estado de mapping;
+- errores por habitación/tarifa/canal;
+- reservas rechazadas;
+- cola y reintentos;
+- inconsistencias PMS-OTA;
+- historial y diagnóstico explicable.
 
 ---
 
-## Paquete 7 — Revenue Copilot
+# Fase 6 — Segunda ola comercial y operativa
 
-### Objetivo
-Que Revenue deje de ser sólo reportes y se convierta en recomendación accionable y explicable.
+Puede ejecutarse por cortes independientes después de estabilizar 1-5.
 
-### Entregables
-- Pickup, pace, ocupación, ADR, RevPAR, cancelación y ventana de reserva.
-- Comparación con períodos equivalentes.
-- Señales externas cuando existan fuentes confiables.
-- Recomendación de tarifa/restricción con explicación e impacto estimado.
-- Aplicar / modificar / ignorar.
-- Historial de recomendaciones y resultado.
-- Modo automático solamente posterior, configurable y con límites.
+### Revenue avanzado
+- señales confiables de mercado/competencia;
+- impacto estimado;
+- aplicar/modificar/ignorar;
+- autopilot posterior con piso/techo, límites y auditoría.
 
----
+### Motor de reservas comercial
+- códigos promocionales;
+- paquetes;
+- upselling pre-arrival;
+- recuperación de abandono;
+- Google Hotel Ads / Free Booking Links;
+- motor multi-propiedad.
 
-## Paquete 8 — Canales de conversación y WhatsApp
+### Empresas, agencias y comisiones
+- cuentas corporativas;
+- tarifas negociadas;
+- crédito/cuenta corriente;
+- comisión por agencia;
+- estados pendientes/pagados;
+- facturación consolidada.
 
-### Objetivo
-Conectar el agente construido en los paquetes 2 y 3 a canales externos sin atar la inteligencia a un proveedor.
+### Lista de espera
+- solicitud por fechas/tipo/pax;
+- coincidencia automática al liberarse inventario;
+- conversión a cotización/reserva sin bloquear cupo.
 
-### Arquitectura
-`Canal externo -> adaptador -> Conversaciones HL -> Agente/Herramientas -> PMS`
+### Optimizador de Planning
+- detectar fragmentación de inventario;
+- proponer movimientos;
+- estimar ingreso recuperable;
+- aplicar sólo con confirmación y auditoría.
 
-### Orden
-1. Web chat propio.
-2. Email/OTA donde haya APIs útiles.
-3. WhatsApp mediante BSP compatible para primeras propiedades.
-4. Meta Tech Provider / Embedded Signup cuando el volumen lo justifique.
-
-### Regla
-La lógica de IA, contexto y automatización es de Habitación Llena. Twilio, 360dialog, Meta u otro proveedor son adaptadores reemplazables.
-
----
-
-## Paquete 9 — Plataforma abierta e inventario universal
-
-### Objetivo
-Convertir Habitación Llena en plataforma y no en software cerrado.
-
-### Entregables
-- REST API estable y versionada.
-- Webhooks por eventos de negocio.
-- Credenciales/scopes por integración.
-- Marketplace de apps.
-- Inventario vendible más allá de habitaciones: cochera, spa, salón, actividad, transfer, late checkout, experiencias y recursos.
+### Check-in online
+La base actual ya cubre datos, acompañantes, documentos, preferencias, servicios, mascotas, vehículos y firma. Próximos cortes: OCR, garantía/pago y acceso/PIN/llave digital.
 
 ---
 
-# Orden obligatorio
+# Fase 7 — Madurez empresarial
 
-`0 -> 1 -> 2 -> 3 -> 4/5 -> 6 -> 7 -> 8 -> 9`
+- contabilidad visible o exportación contable de primera clase;
+- constructor de informes y envíos programados;
+- reputación/encuestas y desvío de casos negativos a resolución interna;
+- integraciones reales con cerraduras;
+- Cartera avanzada y finanzas consolidadas;
+- inbox OTA/mensajería unificado;
+- reglas globales de workspace con overrides por propiedad.
 
-Housekeeping y Mantenimiento pueden avanzar en paralelo después del paquete 3. WhatsApp no debe adelantar al Inbox/Agente: primero construimos el cerebro y después conectamos canales.
+---
 
-# Definition of Done global
+# Capacidades que continúan evolucionando en paralelo
 
-Un paquete sólo se considera terminado cuando:
+El grafo operativo ya conecta Reserva, Huésped, Habitación, Mensajes, Housekeeping, Mantenimiento y Pagos. Se sigue profundizando en navegación bidireccional, timeline, solicitudes, acciones compartidas y agente operativo, sin frenar las prioridades comerciales anteriores.
 
-- usa datos reales de la propiedad;
-- respeta roles/permisos;
-- tiene estados loading/empty/error/success;
-- acciones principales tienen feedback visible;
-- no hay botones decorativos o sin destino;
-- los enlaces contextuales vuelven a la entidad correcta;
-- genera auditoría cuando corresponde;
+Housekeeping y Mantenimiento pueden sumar priorización, tiempos, autoasignación, activos, preventivos e inteligencia, pero sin crear módulos duplicados.
+
+---
+
+# Definition of Done
+
+Una entrega sólo se considera terminada cuando:
+- usa datos reales y respeta multitenancy;
+- tiene loading/empty/error/success;
+- respeta rol y permiso;
+- las acciones principales tienen feedback;
+- no hay controles decorativos sin función;
 - funciona con mouse, teclado y touch;
-- pasa móvil, tablet y desktop;
-- no depende de hover para una acción esencial;
-- mantiene estados semánticos coherentes;
-- pasa validadores de arquitectura, visuales y sitemap;
-- no rompe flujos existentes del Planning, Reservas, Caja ni Operaciones.
+- pasa móvil/tablet/desktop;
+- día/noche es legible;
+- acciones sensibles quedan auditadas;
+- no rompe Planning, Reservas, Caja ni Operación;
+- el sitemap y el manual se actualizan en la misma entrega cuando cambia una capacidad visible.
