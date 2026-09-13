@@ -14,7 +14,7 @@
 .days>div{height:44px;position:relative;display:grid;place-items:center;align-content:center;gap:1px;border-right:1px solid var(--line);background:var(--panelSolid)}
 .days>div:after{content:"";position:absolute;left:50%;top:8px;bottom:7px;border-left:1px dashed color-mix(in srgb,var(--muted) 24%,transparent);pointer-events:none}
 .days small{font-size:10px;font-weight:760;letter-spacing:.025em;text-transform:uppercase;color:var(--muted);opacity:.82}
-.days b{font-size:15px;font-weight:900;line-height:1;color:var(--text)}
+.days b{font-size:16px;font-weight:900;line-height:1;color:var(--text)}
 .weekendHead{background:color-mix(in srgb,var(--muted) 6%,var(--panelSolid))!important}
 .todayHead{color:var(--accent)!important;background:color-mix(in srgb,#69bfff 14%,var(--panelSolid))!important}
 .todayHead:before{content:"";position:absolute;left:0;top:0;bottom:0;width:1px;background:color-mix(in srgb,#5b9cff 36%,transparent);z-index:2}
@@ -24,9 +24,9 @@
 .inventoryLabel b{font-size:10px;font-weight:760;color:var(--muted);opacity:.82}
 .inventoryLabel small{font-size:10px;color:var(--muted);opacity:.62}
 .inventoryDays{display:grid;height:31px}
-.inventoryDays>div{height:31px;display:flex;align-items:center;justify-content:center;gap:3px;border-right:1px solid var(--line);background:transparent;color:color-mix(in srgb,#2f8651 58%,var(--muted))}
-.inventoryDays b{font-size:10px;font-weight:760;line-height:1;opacity:.78}
-.inventoryDays small{font-size:10px;font-weight:650;opacity:.5}
+.inventoryDays>div{height:31px;display:flex;align-items:center;justify-content:center;gap:3px;border-right:1px solid var(--line);background:transparent;color:color-mix(in srgb,#2f8651 54%,var(--muted))}
+.inventoryDays b{font-size:10px;font-weight:500;line-height:1;opacity:.68}
+.inventoryDays small{font-size:10px;font-weight:500;opacity:.5}
 .inventoryDays .soldOut{color:#c4535f;background:color-mix(in srgb,var(--red) 6%,transparent)}
 .inventoryWeekend{background:color-mix(in srgb,var(--muted) 6%,var(--panelSolid))!important}
 .inventoryToday{background:color-mix(in srgb,#69bfff 11%,var(--panelSolid))!important;box-shadow:inset 1px 0 color-mix(in srgb,#5b9cff 28%,transparent)}
