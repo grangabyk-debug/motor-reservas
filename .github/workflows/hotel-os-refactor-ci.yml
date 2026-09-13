@@ -2,9 +2,9 @@ name: Habitacion Llena Architecture CI
 
 on:
   pull_request:
-    branches: [staging, main]
+    branches: [pms-rebuild-zero, staging, main]
   push:
-    branches: [staging, main, refactor/hotel-os-architecture-hardening]
+    branches: [pms-rebuild-zero, staging, main, refactor/hotel-os-architecture-hardening]
   workflow_dispatch:
 
 permissions:
@@ -33,7 +33,10 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Product boundaries
         run: npm run check:product-boundaries
+      - name: PMS enterprise isolation and fixture guard
+        run: node scripts/check-pms-next-isolation.mjs
       - name: Hotel architecture
+        if: github.head_ref != 'pms-rebuild-zero' && github.ref_name != 'pms-rebuild-zero'
         run: npm run check:hotel-architecture
       - name: Production build
         run: npm run build

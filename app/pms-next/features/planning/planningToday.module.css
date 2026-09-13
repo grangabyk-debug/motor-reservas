@@ -1,0 +1,6 @@
+.todayBand{background:color-mix(in srgb,#67bfff 12%,transparent)!important;box-shadow:inset 1px 0 color-mix(in srgb,#5b9cff 28%,transparent),inset -1px 0 color-mix(in srgb,#5b9cff 16%,transparent)!important}
+.todayHeader{background:color-mix(in srgb,#67bfff 15%,var(--panelSolid))!important}
+.todayInventory{background:color-mix(in srgb,#67bfff 12%,var(--panelSolid))!important}
+:global([data-theme="dark"]) .todayBand{background:color-mix(in srgb,#67bfff 10%,transparent)!important}
+:global([data-theme="dark"]) .todayHeader{background:color-mix(in srgb,#67bfff 12%,var(--panelSolid))!important}
+:global([data-theme="dark"]) .todayInventory{background:color-mix(in srgb,#67bfff 10%,var(--panelSolid))!important}

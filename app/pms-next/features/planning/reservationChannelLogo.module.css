@@ -1,0 +1,14 @@
+.badge{width:20px;height:20px;flex:0 0 20px;display:grid;place-items:center;border-radius:6px;background:#fff;border:1px solid rgba(15,23,42,.14);box-shadow:0 1px 3px rgba(15,23,42,.16),inset 0 1px rgba(255,255,255,.9);overflow:hidden;color:#344054}
+.logo{width:14px;height:14px;display:block}
+.booking{color:#003580}
+.airbnb{color:#ff385c}
+.expedia{color:#191e3b}
+.whatsapp{color:#25d366}
+.despegar{width:16px;height:16px;display:block;object-fit:contain}
+.phone{color:#315b7d;background:#f7fbff;border-color:rgba(49,91,125,.22)}
+.motor{color:#4057c8;background:#f6f7ff;border-color:rgba(64,87,200,.2)}
+.agency{color:#71522f;background:#fffaf2;border-color:rgba(113,82,47,.2)}
+.walkin{color:#26384a;background:#f8fafc;border-color:rgba(38,56,74,.2)}
+.other{color:#667085;background:#f8fafc}
+.badge:hover{transform:translateY(-1px);box-shadow:0 3px 8px rgba(15,23,42,.2),inset 0 1px rgba(255,255,255,.92)}
+@media(max-width:760px){.badge{width:19px;height:19px;flex-basis:19px}.logo{width:13px;height:13px}.despegar{width:15px;height:15px}}

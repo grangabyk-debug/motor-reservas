@@ -1,0 +1,16 @@
+.stageBar,.stagePill,.legendSwatch{--stage-bg:#087d1e;--stage-border:#056617;--stage-text:#fff}
+.stageBar{background:var(--stage-bg)!important;border-color:var(--stage-border)!important;color:var(--stage-text)!important;box-shadow:0 2px 7px rgba(28,44,72,.1),inset 0 -3px color-mix(in srgb,var(--stage-border) 55%,transparent)!important}
+.stagePill{background:var(--stage-bg)!important;color:var(--stage-text)!important;border:1px solid var(--stage-border)!important}
+.legendSwatch{width:28px;height:16px;flex:0 0 28px;border:1px solid var(--stage-border);border-radius:4px;background:var(--stage-bg);box-shadow:inset 0 -2px color-mix(in srgb,var(--stage-border) 45%,transparent)}
+.preventa{--stage-bg:#18d82a;--stage-border:#0dae1c;--stage-text:#073b0d}
+.venta{--stage-bg:#087d1e;--stage-border:#056617;--stage-text:#fff}
+.checkin{--stage-bg:#1538e8;--stage-border:#1029bd;--stage-text:#fff}
+.inhouse{--stage-bg:#ff7a35;--stage-border:#dc5e22;--stage-text:#3d1b07}
+.checkout{--stage-bg:#ef1e25;--stage-border:#c91218;--stage-text:#fff}
+.postventa{--stage-bg:#929292;--stage-border:#707070;--stage-text:#fff}
+.noshow{--stage-bg:#111;--stage-border:#000;--stage-text:#fff}
+.weekendLegend{width:28px;height:16px;flex:0 0 28px;border:1px solid var(--line);border-radius:4px;background:color-mix(in srgb,var(--muted) 10%,var(--panelSolid))}
+.unassignedRow{position:sticky;top:109px;z-index:37;height:29px;display:grid;grid-template-columns:var(--room-width) max-content;min-width:max-content;border-bottom:1px solid var(--line);background:color-mix(in srgb,#ef4f59 5%,var(--panelSolid));box-shadow:0 4px 9px rgba(20,32,55,.025)}
+.unassignedLabel{position:sticky;left:0;z-index:43;height:29px;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 10px;border-right:1px solid var(--line);background:inherit;color:#c23843}
+.unassignedLabel b,.unassignedLabel small{font-size:10px}.unassignedLabel small{font-weight:850}
+.unassignedDays{display:grid;height:29px}.unassignedDays>div{height:29px;display:flex;align-items:center;justify-content:center;border-right:1px solid var(--line);font-size:10px;font-weight:850;color:var(--muted);background:transparent}.unassignedDays>div[data-active="true"]{color:#c23843;background:color-mix(in srgb,#ef4f59 10%,var(--panelSolid))}
