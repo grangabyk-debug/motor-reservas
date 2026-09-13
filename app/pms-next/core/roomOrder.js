@@ -49,6 +49,9 @@ export function roomTypeFamily(value,capacity){
 function numericOrder(value){const number=Number(value);return Number.isFinite(number)?number:0}
 function typeName(value,typeById){const linked=typeById&&value?.room_type_id?typeById.get(value.room_type_id):null;return linked?.name||value?.tipo||value?.type||""}
 function typeCapacity(value,typeById){const linked=typeById&&value?.room_type_id?typeById.get(value.room_type_id):null;return linked?.capacity??value?.capacidad??value?.capacity??0}
+function floorData(value,floorById){return floorById&&value?.floor_id?floorById.get(value.floor_id)||null:null}
+function floorOrder(value,floorById){const floor=floorData(value,floorById),raw=floor?.sort_order??value?.floor_sort;const number=Number(raw);return Number.isFinite(number)?number:Number.MAX_SAFE_INTEGER}
+function floorName(value,floorById){return floorData(value,floorById)?.name||value?.floor_name||""}
 
 export function compareRoomTypes(a,b){
   const familyA=roomTypeFamily(a),familyB=roomTypeFamily(b)
@@ -58,15 +61,19 @@ export function compareRoomTypes(a,b){
   return collator.compare(a?.name||"",b?.name||"")||collator.compare(String(a?.id||""),String(b?.id||""))
 }
 
-export function compareRooms(a,b,typeById){
+export function compareRooms(a,b,typeById,floorById){
   const nameA=typeName(a,typeById),nameB=typeName(b,typeById),familyA=roomTypeFamily(nameA,typeCapacity(a,typeById)),familyB=roomTypeFamily(nameB,typeCapacity(b,typeById))
   if(familyA.rank!==familyB.rank)return familyA.rank-familyB.rank
   const typeOrder=collator.compare(nameA,nameB)
   if(typeOrder)return typeOrder
+  const floorDiff=floorOrder(a,floorById)-floorOrder(b,floorById)
+  if(floorDiff)return floorDiff
+  const floorLabel=collator.compare(floorName(a,floorById),floorName(b,floorById))
+  if(floorLabel)return floorLabel
   const roomOrder=numericOrder(a?.sort_order)-numericOrder(b?.sort_order)
   if(roomOrder)return roomOrder
   return collator.compare(a?.nombre||a?.name||"",b?.nombre||b?.name||"")||collator.compare(String(a?.id||""),String(b?.id||""))
 }
 
 export const sortRoomTypesByHotelCategory=types=>[...(types||[])].sort(compareRoomTypes)
-export const sortRoomsByHotelCategory=(rooms,typeById)=>[...(rooms||[])].sort((a,b)=>compareRooms(a,b,typeById))
+export const sortRoomsByHotelCategory=(rooms,typeById,floorById)=>[...(rooms||[])].sort((a,b)=>compareRooms(a,b,typeById,floorById))
