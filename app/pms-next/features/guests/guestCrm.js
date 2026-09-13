@@ -8,28 +8,28 @@ export function birthdayInDays(birthDate,now=localToday()){
   if(next<now)next=new Date(now.getFullYear()+1,birth.getMonth(),birth.getDate(),12)
   return Math.max(0,Math.round((next-now)/ONE_DAY))
 }
-
-export function daysSince(dateValue,now=localToday()){
-  const date=asDate(dateValue);if(!date)return null
-  return Math.max(0,Math.floor((now-date)/ONE_DAY))
+export function daysSince(dateValue,now=localToday()){const date=asDate(dateValue);if(!date)return null;return Math.max(0,Math.floor((now-date)/ONE_DAY))}
+export function marketingState(guest={}){const marketing=guest.preferences?.marketing||{};return{email:marketing.email===true,whatsapp:marketing.whatsapp===true,updated_at:marketing.updated_at||null,source:marketing.source||null}}
+export function loyaltySuggestion(guest={}){
+  const birthday=birthdayInDays(guest.birth_date)
+  if(birthday===0)return{label:"Cumpleaños hoy",detail:"Sugerir atención o beneficio de cortesía."}
+  if(birthday!=null&&birthday<=7)return{label:"Cumpleaños próximo",detail:"Preparar una atención para la estadía."}
+  if((guest.stays||0)>=3)return{label:"Huésped muy frecuente",detail:"Priorizar reserva directa y beneficio recurrente."}
+  if((guest.stays||0)>=2&&guest.dominantChannel&&!/^directa$/i.test(guest.dominantChannel))return{label:"Oportunidad de reserva directa",detail:"Ya volvió al hotel; ofrecer canal directo en la próxima visita."}
+  return null
 }
 
 export const CRM_SEGMENTS=[
-  {id:"repeat",label:"Recurrentes",description:"2 o más estadías",match:g=>(g.stays||0)>=2},
-  {id:"loyal",label:"Muy frecuentes",description:"3 o más estadías",match:g=>(g.stays||0)>=3},
-  {id:"vip",label:"VIP / Signature",description:"Atención prioritaria",match:g=>["vip","signature"].includes(g.vip_level)},
-  {id:"birthday",label:"Cumpleaños próximos",description:"Dentro de 30 días",match:g=>{const days=birthdayInDays(g.birth_date);return days!=null&&days<=30}},
-  {id:"upcoming",label:"Con próxima estadía",description:"Reserva futura registrada",match:g=>Boolean(g.nextStay)},
-  {id:"dormant",label:"Para reactivar",description:"180+ días sin volver",match:g=>{const days=daysSince(g.lastStay||g.last_stay_at);return(g.stays||0)>0&&!g.nextStay&&days!=null&&days>=180}},
-  {id:"ota_repeat",label:"OTA recurrentes",description:"Volvieron y reservan por OTA",match:g=>(g.stays||0)>=2&&Boolean(g.dominantChannel)&&!/^directa$/i.test(g.dominantChannel)},
+  {id:"repeat",label:"Recurrentes",description:"2+ estadías",match:g=>(g.stays||0)>=2},
+  {id:"loyal",label:"Muy frecuentes",description:"3+ estadías",match:g=>(g.stays||0)>=3},
+  {id:"vip",label:"VIP / Signature",description:"Prioritarios",match:g=>["vip","signature"].includes(g.vip_level)},
+  {id:"birthday",label:"Cumpleaños",description:"Próximos 30 días",match:g=>{const days=birthdayInDays(g.birth_date);return days!=null&&days<=30}},
+  {id:"upcoming",label:"Próxima estadía",description:"Reserva futura",match:g=>Boolean(g.nextStay)},
+  {id:"dormant",label:"Para reactivar",description:"180+ días",match:g=>{const days=daysSince(g.lastStay||g.last_stay_at);return(g.stays||0)>0&&!g.nextStay&&days!=null&&days>=180}},
+  {id:"ota_repeat",label:"OTA recurrentes",description:"Volvieron por OTA",match:g=>(g.stays||0)>=2&&Boolean(g.dominantChannel)&&!/^directa$/i.test(g.dominantChannel)},
+  {id:"contactable",label:"Contacto autorizado",description:"Email o WhatsApp",match:g=>{const m=marketingState(g);return m.email||m.whatsapp}},
   {id:"new",label:"Nuevos",description:"0–1 estadía",match:g=>(g.stays||0)<=1},
 ]
-
 export function segmentCounts(guests=[]){return Object.fromEntries(CRM_SEGMENTS.map(segment=>[segment.id,guests.filter(segment.match).length]))}
 export function segmentById(id){return CRM_SEGMENTS.find(item=>item.id===id)||null}
-
-export function spendLabel(spentByCurrency={}){
-  const entries=Object.entries(spentByCurrency).filter(([,value])=>Number(value)>0)
-  if(!entries.length)return"—"
-  return entries.slice(0,2).map(([currency,value])=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:0}).format(Number(value)||0)).join(" · ")+(entries.length>2?" +":"")
-}
+export function spendLabel(spentByCurrency={}){const entries=Object.entries(spentByCurrency).filter(([,value])=>Number(value)>0);if(!entries.length)return"—";return entries.slice(0,2).map(([currency,value])=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:0}).format(Number(value)||0)).join(" · ")+(entries.length>2?" +":"")}
