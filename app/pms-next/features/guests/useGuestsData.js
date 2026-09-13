@@ -3,6 +3,7 @@
 import{useCallback,useEffect,useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 import usePmsAutoRefresh from"../../core/usePmsAutoRefresh"
+import{isBookingChannel,isOtaChannel}from"./guestCrm"
 
 function canonicalKey(draft){
   const email=draft.email?.trim().toLowerCase();if(email)return`email:${email}`
@@ -11,6 +12,7 @@ function canonicalKey(draft){
 }
 const todayKey=()=>new Date().toLocaleDateString("en-CA")
 const nightsBetween=(from,to)=>{const a=new Date(`${from}T12:00:00`),b=new Date(`${to}T12:00:00`);return Number.isNaN(a.getTime())||Number.isNaN(b.getTime())?0:Math.max(0,Math.round((b-a)/86400000))}
+const emptyStats=profile=>({stays:0,nights:0,spent:0,spentByCurrency:{},lastStay:profile?.last_stay_at||null,nextStay:null,currentStay:null,channelCounts:{},dominantChannel:"",lastChannel:"",otaStays:0,bookingStays:0,directStays:0})
 
 export default function useGuestsData(propertyId){
   const[profiles,setProfiles]=useState([])
@@ -39,25 +41,38 @@ export default function useGuestsData(propertyId){
     const map=new Map(),today=todayKey()
     for(const reservation of reservations){
       if(!reservation.guest_profile_id)continue
-      const key=reservation.guest_profile_id,existing=map.get(key)||{stays:0,nights:0,spent:0,spentByCurrency:{},lastStay:null,nextStay:null,channelCounts:{},dominantChannel:"",lastChannel:""}
-      const start=reservation.fecha_entrada,end=reservation.fecha_salida,isFuture=start&&start>today
-      if(!isFuture){
-        existing.stays+=1
-        existing.nights+=nightsBetween(start,end)
-        const currency=String(reservation.moneda||"ARS").toUpperCase(),amount=Number(reservation.precio_total)||0
-        existing.spent+=amount
-        existing.spentByCurrency[currency]=(existing.spentByCurrency[currency]||0)+amount
-        const channel=String(reservation.canal_reserva||"Directa").trim()||"Directa"
-        existing.channelCounts[channel]=(existing.channelCounts[channel]||0)+1
-        if(!existing.lastStay||end>existing.lastStay){existing.lastStay=end;existing.lastChannel=channel}
-      }else if(!existing.nextStay||start<existing.nextStay)existing.nextStay=start
+      const key=reservation.guest_profile_id,existing=map.get(key)||emptyStats()
+      const start=String(reservation.fecha_entrada||"").slice(0,10),end=String(reservation.fecha_salida||"").slice(0,10)
+      if(!start)continue
+      const isFuture=start>today,isCurrent=!isFuture&&Boolean(end)&&end>today
+      const channel=String(reservation.canal_reserva||"Directa").trim()||"Directa"
+
+      if(isFuture){
+        if(!existing.nextStay||start<existing.nextStay)existing.nextStay=start
+        map.set(key,existing);continue
+      }
+
+      existing.stays+=1
+      existing.nights+=nightsBetween(start,end)
+      const currency=String(reservation.moneda||"ARS").toUpperCase(),amount=Number(reservation.precio_total)||0
+      existing.spent+=amount
+      existing.spentByCurrency[currency]=(existing.spentByCurrency[currency]||0)+amount
+      existing.channelCounts[channel]=(existing.channelCounts[channel]||0)+1
+      if(isOtaChannel(channel))existing.otaStays+=1;else existing.directStays+=1
+      if(isBookingChannel(channel))existing.bookingStays+=1
+
+      if(isCurrent){
+        if(!existing.currentStay||start>existing.currentStay.checkIn)existing.currentStay={reservationId:reservation.id,checkIn:start,checkOut:end,channel}
+      }else if(end&&(!existing.lastStay||end>existing.lastStay)){
+        existing.lastStay=end;existing.lastChannel=channel
+      }
       map.set(key,existing)
     }
-    for(const stats of map.values())stats.dominantChannel=Object.entries(stats.channelCounts).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]))[0]?.[0]||stats.lastChannel||""
+    for(const stats of map.values())stats.dominantChannel=Object.entries(stats.channelCounts).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]))[0]?.[0]||stats.lastChannel||stats.currentStay?.channel||""
     return map
   },[reservations])
 
-  const guests=useMemo(()=>profiles.map(profile=>({...profile,...(statsByProfile.get(profile.id)||{stays:0,nights:0,spent:0,spentByCurrency:{},lastStay:profile.last_stay_at,nextStay:null,dominantChannel:"",lastChannel:""})})),[profiles,statsByProfile])
+  const guests=useMemo(()=>profiles.map(profile=>({...profile,...(statsByProfile.get(profile.id)||emptyStats(profile))})),[profiles,statsByProfile])
 
   const createGuest=useCallback(async draft=>{
     const payload={property_id:propertyId,canonical_key:canonicalKey(draft),full_name:draft.full_name.trim(),email:draft.email?.trim()||null,phone:draft.phone?.trim()||null,country:draft.country?.trim()||null,nationality:draft.nationality?.trim()||null,language:draft.language||"es",preferences:{},tags:[],vip_level:draft.vip_level||"standard",status:"active",notes:draft.notes?.trim()||null}
