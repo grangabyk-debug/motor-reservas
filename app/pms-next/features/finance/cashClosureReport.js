@@ -113,7 +113,13 @@ export function cashClosurePdf(report){
   for(const[item,values]of summary)add(`${item}: ${Number(values.ARS||0).toFixed(2)} ARS | ${Number(values.USD||0).toFixed(2)} USD`)
   add("");add("MEDIOS DE PAGO - NETO",true)
   report.methods.forEach(item=>add(`${item.label}: ${item.ARS.toFixed(2)} ARS | ${item.USD.toFixed(2)} USD`))
-  add("");add("NOTA DE CIERRE",true);wrap(report.session.notes||"Sin nota.").forEach(text=>add(text))
+  add("");add("LIBRO DE NOVEDADES",true)
+  add("Novedades del turno:",true);wrap(report.handover?.note||"Sin novedades.").forEach(text=>add(text))
+  add("Pendientes para el proximo turno:",true)
+  const pending=Array.isArray(report.handover?.pending)?report.handover.pending:[]
+  if(pending.length)pending.forEach((item,index)=>wrap(`${index+1}. ${item}`).forEach(text=>add(text)))
+  else add("Sin pendientes informados.")
+  add("");add("NOTA DE CAJA",true);wrap(report.session.notes||"Sin nota.").forEach(text=>add(text))
   add("");add(`MOVIMIENTOS (${report.rows.length})`,true)
   for(const row of report.rows){
     wrap(`${cashTime(row.created_at)} | ${row.type} | ${cashMethodLabel(row.method)} | ${row.reservation||"Sin reserva"} | ${row.direction==="out"?"-":"+"}${Number(row.amount).toFixed(2)} ${row.currency}`).forEach(text=>add(text))
