@@ -12,7 +12,7 @@ const reservationRoomIds=item=>[...new Set([item?.habitacion_id,...(item?.habita
 const pct=value=>`${Math.round(Number(value)||0)}%`
 const roleLabel={owner:"Propietario",admin:"Administrador",manager:"Gerencia",reception:"Recepción",night_audit:"Auditoría nocturna",housekeeping:"Housekeeping",maintenance:"Mantenimiento",revenue:"Revenue",member:"Equipo"}
 const typeLabel={hotel:"Hotel / Hostería",apartment:"Departamento",house:"Casa",building:"Edificio",cabins:"Cabañas",hostel:"Hostel",other:"Otra"}
-const canEditMeta=role=>["owner","admin","manager"].includes(role)
+const canEditMeta=role=>["owner","manager"].includes(role)
 
 export default function PortfolioWorkspace({properties=[],activePropertyId,onProperty,onNavigate}){
   const[rows,setRows]=useState([]),[settingsByProperty,setSettingsByProperty]=useState({}),[loading,setLoading]=useState(true),[error,setError]=useState("")
