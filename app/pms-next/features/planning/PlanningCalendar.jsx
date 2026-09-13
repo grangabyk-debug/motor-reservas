@@ -10,11 +10,16 @@ function openHousekeepingForRoom(event,rooms){
   if(!room||typeof window==="undefined")return
   event.preventDefault()
   event.stopPropagation()
+  const sidebarButtons=[...document.querySelectorAll("aside button")]
+  const housekeepingButton=sidebarButtons.find(button=>button.getAttribute("aria-label")==="Housekeeping"||button.textContent?.trim()==="Housekeeping")
+  if(!housekeepingButton){
+    window.dispatchEvent(new CustomEvent("hl:pms-toast",{detail:{tone:"warning",title:"Housekeeping no disponible",message:"Tu rol no tiene acceso a Housekeeping."}}))
+    return
+  }
+  housekeepingButton.click()
   const url=new URL(window.location.href)
-  url.searchParams.set("view","housekeeping")
   url.searchParams.set("housekeeping_room",String(room.id))
-  window.history.pushState({pmsView:"housekeeping"},"",url)
-  window.dispatchEvent(new PopStateEvent("popstate",{state:{pmsView:"housekeeping"}}))
+  window.history.replaceState(window.history.state||{},"",url)
 }
 
 export default function PlanningCalendar(props){
