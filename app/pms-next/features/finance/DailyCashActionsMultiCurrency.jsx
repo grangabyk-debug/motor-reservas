@@ -57,6 +57,34 @@ export default function DailyCashActionsMultiCurrency({propertyId,session,expect
     return data.user
   }
   function finish(){setMode(null);setError("");onChanged?.()}
+  function loadHandover(){
+    const meta=parseCashSessionMeta(session?.notes)
+    setHandoverNote(meta.handoverNote||"")
+    setHandoverPending((meta.handoverPending||[]).join("\n"))
+    return meta
+  }
+  function openHandover(){
+    if(!session){setError("");setMode("open");return}
+    loadHandover();setError("");setMode("handover")
+  }
+  function openClose(){
+    if(!session){setError("");setMode("open");return}
+    const meta=loadHandover()
+    setNote(meta.closeNote||"")
+    setError("");setMode("close")
+  }
+  async function saveHandover(){
+    setSaving(true);setError("")
+    try{
+      if(!session)throw new Error("No hay una caja abierta.")
+      const meta=parseCashSessionMeta(session.notes)
+      const notes=serializeCashSessionMeta({openerName:meta.openerName,shift:meta.shift,closeNote:meta.closeNote,handoverNote:handoverNote.trim(),handoverPending})
+      const{error:updateError}=await supabase.from("hotel_cash_sessions").update({notes}).eq("id",session.id).eq("property_id",propertyId).eq("status","open")
+      if(updateError)throw updateError
+      setMode(null);onChanged?.()
+      window.dispatchEvent(new CustomEvent("hl:pms-toast",{detail:{title:"Libro de novedades actualizado",message:"Los cambios quedaron guardados para este turno."}}))
+    }catch(err){setError(err?.message||"No se pudo guardar el libro de novedades.")}finally{setSaving(false)}
+  }
   async function openSession(){
     setSaving(true);setError("")
     try{
@@ -114,15 +142,16 @@ export default function DailyCashActionsMultiCurrency({propertyId,session,expect
 
   const recent=useMemo(()=>history.map(row=>{const meta=parseCashSessionMeta(row.notes);return{...row,meta,diffArs:Number(row.closing_amount||0)-Number(row.expected_amount||0),diffUsd:Number(row.closing_amount_usd||0)-Number(row.expected_amount_usd||0)}}),[history])
   const closeReady=countedArs!==""&&countedUsd!==""
-  const title=mode==="open"?"Abrir caja":mode==="movement"?"Registrar movimiento":mode==="history"?"Cierres de caja":mode==="report"?"Cierre de caja":"Arqueo y cierre de caja"
-  const subtitle=mode==="report"?"Documento final del turno con caja, movimientos y libro de novedades.":mode==="history"?"Reabrí un cierre para consultar la caja y el pase de turno.":mode==="close"?"Contá el efectivo y dejá el pase de turno para quien sigue.":mode==="movement"?"Ingresos y egresos manuales quedan vinculados al turno abierto.":"Identificá quién abre la caja, el turno y el efectivo inicial."
+  const title=mode==="open"?"Abrir caja":mode==="movement"?"Registrar movimiento":mode==="handover"?"Libro de novedades":mode==="history"?"Cierres de caja":mode==="report"?"Cierre de caja":"Arqueo y cierre de caja"
+  const subtitle=mode==="report"?"Documento final del turno con caja, movimientos y libro de novedades.":mode==="history"?"Reabrí un cierre para consultar la caja y el pase de turno.":mode==="handover"?"Escribí, corregí o borrá novedades durante el turno. Se usará la versión vigente al cerrar caja.":mode==="close"?"Contá el efectivo y revisá el pase de turno antes de cerrar.":mode==="movement"?"Ingresos y egresos manuales quedan vinculados al turno abierto.":"Identificá quién abre la caja, el turno y el efectivo inicial."
 
   return<>
     <div className={s.actions}>
       <button type="button" className={s.action} onClick={()=>{setPaymentReservationId(null);setPaymentOpen(true)}}>＋ Cobrar reserva</button>
       <button type="button" className={s.action} onClick={()=>{setError("");setMode(session?"movement":"open")}}>{session?"＋ Movimiento":"＋ Abrir caja"}</button>
+      {session?<button type="button" className={s.action} onClick={openHandover}>Libro de novedades</button>:null}
       <button type="button" className={s.action} onClick={()=>{setError("");setMode("history")}}>Cierres</button>
-      <button type="button" className={s.primary} onClick={()=>{setError("");setMode(session?"close":"open")}}>{session?"Arqueo / cerrar caja":"Abrir caja"}</button>
+      <button type="button" className={s.primary} onClick={openClose}>{session?"Arqueo / cerrar caja":"Abrir caja"}</button>
     </div>
     {paymentOpen?<ReservationPaymentPanel propertyId={propertyId} reservationId={paymentReservationId} session={session} onClose={()=>{setPaymentOpen(false);setPaymentReservationId(null)}} onSaved={()=>{setPaymentOpen(false);setPaymentReservationId(null);onChanged?.()}}/>:null}
     {mode?<div className={s.overlay} role="dialog" aria-modal="true" aria-label={title}><section className={`${s.panel} ${mode==="report"?s.panelWide:""}`}>
@@ -149,6 +178,14 @@ export default function DailyCashActionsMultiCurrency({propertyId,session,expect
             <label className={`${s.field} ${s.fieldFull}`}><span>Referencia</span><input value={form.reference} onChange={event=>setForm(current=>({...current,reference:event.target.value}))} placeholder="Opcional"/></label>
           </div>
           <div className={s.footer}><button type="button" className={s.secondary} onClick={()=>setMode(null)}>Cancelar</button><button type="button" className={s.save} disabled={saving} onClick={addMovement}>{saving?"Registrando…":"Registrar movimiento"}</button></div>
+        </>:mode==="handover"?<>
+          <div style={{padding:12,border:"1px solid color-mix(in srgb,var(--accent) 18%,var(--line))",borderRadius:13,background:"color-mix(in srgb,var(--accent) 4%,var(--panelSolid))"}}>
+            <div className={s.formGrid}>
+              <label className={`${s.field} ${s.fieldFull}`}><span>Novedades del turno</span><textarea maxLength={3000} value={handoverNote} onChange={event=>setHandoverNote(event.target.value)} placeholder="Ej. Hab. 204 pidió late checkout. Reserva 483 espera confirmación de transferencia…" autoFocus/></label>
+              <label className={`${s.field} ${s.fieldFull}`}><span>Pendientes para el próximo turno · uno por línea</span><textarea maxLength={3000} value={handoverPending} onChange={event=>setHandoverPending(event.target.value)} placeholder={"Cobrar saldo Hab. 204\nConfirmar reparación Hab. 108\nPreparar early breakfast Hab. 305"}/></label>
+            </div>
+          </div>
+          <div className={s.footer}><button type="button" className={s.secondary} onClick={()=>setMode(null)}>Cancelar</button><button type="button" className={s.save} disabled={saving} onClick={saveHandover}>{saving?"Guardando…":"Guardar novedades"}</button></div>
         </>:mode==="close"?<>
           <div className={s.reconcile}>
             <div className={s.reconcileRow}><span>Efectivo esperado ARS</span><b>{cashMoney(expectedArs,"ARS")}</b></div>
@@ -159,14 +196,14 @@ export default function DailyCashActionsMultiCurrency({propertyId,session,expect
             <div className={s.reconcileRow}><span>Diferencia USD</span><b className={Math.abs(differenceUsd)<.01?s.good:s.bad}>{countedUsd===""?"—":cashMoney(differenceUsd,"USD")}</b></div>
           </div>
           <div style={{margin:"4px 0 14px",padding:12,border:"1px solid color-mix(in srgb,var(--accent) 18%,var(--line))",borderRadius:13,background:"color-mix(in srgb,var(--accent) 4%,var(--panelSolid))"}}>
-            <div style={{marginBottom:10}}><b style={{display:"block",fontSize:12}}>Libro de novedades</b><small style={{display:"block",marginTop:3,color:"var(--muted)",fontSize:10.5}}>Dejá sólo lo importante para el próximo turno. No reemplaza Housekeeping ni Mantenimiento.</small></div>
+            <div style={{marginBottom:10}}><b style={{display:"block",fontSize:12}}>Libro de novedades</b></div>
             <div className={s.formGrid}>
               <label className={`${s.field} ${s.fieldFull}`}><span>Novedades del turno</span><textarea maxLength={3000} value={handoverNote} onChange={event=>setHandoverNote(event.target.value)} placeholder="Ej. Hab. 204 pidió late checkout. Reserva 483 espera confirmación de transferencia…"/></label>
               <label className={`${s.field} ${s.fieldFull}`}><span>Pendientes para el próximo turno · uno por línea</span><textarea maxLength={3000} value={handoverPending} onChange={event=>setHandoverPending(event.target.value)} placeholder={"Cobrar saldo Hab. 204\nConfirmar reparación Hab. 108\nPreparar early breakfast Hab. 305"}/></label>
             </div>
           </div>
           <label className={`${s.field} ${s.fieldFull}`}><span>Nota de caja · opcional</span><textarea maxLength={1000} value={note} onChange={event=>setNote(event.target.value)} placeholder="Diferencias justificadas, comprobantes pendientes o aclaraciones financieras…"/></label>
-          <p className={s.hint} style={{marginTop:10}}>El libro queda guardado con el turno, aparece en el cierre y su PDF, y después se puede enviar por email.</p>
+          <p className={s.hint} style={{marginTop:10}}>La versión que ves acá se adjunta al cierre, PDF y email.</p>
           <div className={s.footer}><button type="button" className={s.secondary} onClick={()=>setMode(null)}>Cancelar</button><button type="button" className={s.danger} disabled={saving||!closeReady} onClick={closeSession}>{saving?"Cerrando…":"Cerrar caja y guardar pase"}</button></div>
         </>:mode==="history"?<>
           {saving?<div className={s.empty}>Cargando cierre…</div>:recent.length?<div className={s.history}><h3>Últimos cierres</h3><div className={s.historyRows}><div className={`${s.historyRow} ${s.historyHead}`}><span>Turno</span><span>Apertura</span><span>Esperado</span><span>Contado</span><span>Diferencia</span></div>{recent.map(row=><div className={s.historyRow} key={row.id}><span><b>{cashFmt(row.closed_at)}</b><small>{row.meta.shift?`Turno ${row.meta.shift} · `:""}{row.meta.openerName||`Abierta ${cashFmt(row.opened_at)}`}{row.meta.handoverNote||row.meta.handoverPending.length?" · Con novedades":""}</small><button type="button" className={s.secondary} style={{height:27,padding:"0 8px",marginTop:4}} onClick={()=>showReport(row)}>Ver cierre</button></span><span>{cashDual(row.opening_amount,row.opening_amount_usd)}</span><span>{cashDual(row.expected_amount,row.expected_amount_usd)}</span><span>{cashDual(row.closing_amount,row.closing_amount_usd)}</span><strong className={Math.abs(row.diffArs)<.01&&Math.abs(row.diffUsd)<.01?s.good:s.bad}>{cashDual(row.diffArs,row.diffUsd)}</strong></div>)}</div></div>:<div className={s.empty}>Todavía no hay cierres guardados.</div>}
