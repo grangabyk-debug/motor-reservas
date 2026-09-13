@@ -23,5 +23,5 @@ function openHousekeepingForRoom(event,rooms){
 }
 
 export default function PlanningCalendar(props){
-  return <div onClickCapture={event=>openHousekeepingForRoom(event,props.rooms)}><style>{`i[aria-label^="Housekeeping:"]{cursor:pointer!important;transition:transform .14s ease,box-shadow .14s ease}i[aria-label^="Housekeeping:"]:hover{transform:scale(1.35);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 12%,transparent)!important}`}</style><PlanningCalendarCore {...props}/></div>
+  return <div className="hlPlanningCalendarHost" onClickCapture={event=>openHousekeepingForRoom(event,props.rooms)}><style>{`.hlPlanningCalendarHost{flex:1;min-height:0;width:100%;display:flex;flex-direction:column;overflow:hidden}.hlPlanningCalendarHost>div{flex:1;min-height:0;width:100%}.hlPlanningCalendarHost>div>div:first-child{scrollbar-gutter:stable}i[aria-label^="Housekeeping:"]{cursor:pointer!important;transition:transform .14s ease,box-shadow .14s ease}i[aria-label^="Housekeeping:"]:hover{transform:scale(1.35);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 12%,transparent)!important}`}</style><PlanningCalendarCore {...props}/></div>
 }
