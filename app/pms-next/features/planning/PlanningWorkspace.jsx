@@ -9,6 +9,7 @@ import ReservationPreview from"./ReservationPreview"
 import PlanningRateChangeDialog from"./PlanningRateChangeDialog"
 import{CreateReservationDrawer,ReservationDetailDrawer}from"./PlanningDrawers"
 import{planningStage}from"./planningLifecycle"
+import{sortRoomsByHotelCategory}from"../../core/roomOrder"
 import PmsIcon from"../../components/shell/PmsIcons"
 import s from"./planning.module.css"
 import controls from"./planningControls.module.css"
@@ -41,7 +42,7 @@ export default function PlanningWorkspace({propertyId,property,onNavigate,newRes
   const draftKey=propertyId?`hl:pms-next:reservation-draft:${propertyId}`:"",settingsKey=propertyId?`hl:pms-next:planning-settings:${propertyId}`:"",quoteSeedKey=propertyId?`hl:pms-next:quote-reservation-seed:${propertyId}`:""
   const roomTypes=useMemo(()=>[...new Set(data.rooms.map(room=>room.tipo||"Sin tipo"))].sort(),[data.rooms]),channels=useMemo(()=>[...new Set(data.reservations.filter(item=>!item.no_show).map(item=>item.canal_reserva||"Walk-in"))].sort(),[data.reservations])
   const availabilityReservations=useMemo(()=>data.reservations.filter(item=>!item.no_show),[data.reservations])
-  const visibleRooms=useMemo(()=>{const term=roomQuery.trim().toLowerCase();return data.rooms.filter(room=>(typeFilter==="all"||(room.tipo||"Sin tipo")===typeFilter)&&(!term||`${room.nombre} ${room.tipo||""} ${room.floor_name||""}`.toLowerCase().includes(term)))},[data.rooms,typeFilter,roomQuery])
+  const visibleRooms=useMemo(()=>{const term=roomQuery.trim().toLowerCase();return sortRoomsByHotelCategory(data.rooms.filter(room=>(typeFilter==="all"||(room.tipo||"Sin tipo")===typeFilter)&&(!term||`${room.nombre} ${room.tipo||""} ${room.floor_name||""}`.toLowerCase().includes(term))))},[data.rooms,typeFilter,roomQuery])
   const visibleReservations=useMemo(()=>data.reservations.filter(item=>{if(item.no_show)return false;if(statusFilter!=="all"&&planningStage(item,today)!==statusFilter)return false;if(channelFilter!=="all"&&(item.canal_reserva||"Walk-in")!==channelFilter)return false;const term=query.trim().toLowerCase(),room=roomById.get(Number(item.habitacion_id));return !term||`${item.numero_reserva||item.id} ${item.nombre_huesped} ${room?.nombre||""} ${item.canal_reserva||""}`.toLowerCase().includes(term)}),[data.reservations,statusFilter,channelFilter,query,roomById,today])
 
   useEffect(()=>{if(draftKey)try{setHasSavedDraft(Boolean(localStorage.getItem(draftKey)))}catch{}},[draftKey])
