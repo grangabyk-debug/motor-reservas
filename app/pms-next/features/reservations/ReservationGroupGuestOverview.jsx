@@ -7,8 +7,8 @@ export default function ReservationGroupGuestOverview({roomList=[],guests=[],act
   const activeGuests=guests.filter(guest=>!guest.checked_out_at),departedGuests=guests.filter(guest=>Boolean(guest.checked_out_at)),unassignedGuests=guests.filter(guest=>!guest.room_id),selectedRoom=roomList.find(room=>String(room.id)===String(activeRoomId))||null,selectedRoomPeople=guests.filter(guest=>String(guest.room_id||"")===String(activeRoomId||"")),insideSelected=selectedRoomPeople.filter(guest=>!guest.checked_out_at),goneSelected=selectedRoomPeople.filter(guest=>guest.checked_out_at)
   const section={padding:13,border:"1px solid var(--line)",borderRadius:13,background:"color-mix(in srgb,var(--accent) 3%,var(--panelSolid))",marginBottom:12}
   return <section style={section} aria-label="Habitaciones y pasajeros del grupo">
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
-      <div><small style={{fontSize:9,fontWeight:900,letterSpacing:".08em",color:"var(--accent)"}}>HABITACIONES DEL GRUPO</small><h3 style={{margin:"3px 0 0",fontSize:14}}>¿Quién sigue alojado y quién ya se fue?</h3><p style={{margin:"4px 0 0",fontSize:9.8,color:"var(--muted)"}}>Entrá a una habitación para ver y editar únicamente sus pasajeros.</p></div>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+      <small style={{fontSize:9,fontWeight:900,letterSpacing:".08em",color:"var(--accent)"}}>HABITACIONES DEL GRUPO</small>
       <div style={{display:"flex",gap:6,flexWrap:"wrap"}}><span style={pill()}>{activeGuests.length} alojados</span><span style={pill("out")}>{departedGuests.length} check-out</span>{unassignedGuests.length?<span style={{...pill(),background:"color-mix(in srgb,#d99b2b 10%,var(--panelSolid))",color:"#aa7118"}}>{unassignedGuests.length} sin habitación</span>:null}</div>
     </div>
     <div data-group-room-list style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:8,marginTop:12}}>
