@@ -4,6 +4,7 @@ import{useState}from"react"
 import AnalyticsOverview from"./AnalyticsOverview"
 import SalesIntelligence from"./SalesIntelligence"
 import DemandIntelligence from"./DemandIntelligence"
+import PipelineIntelligence from"./PipelineIntelligence"
 import useIntelligenceData from"./useIntelligenceData"
 
 const polish=`
@@ -17,6 +18,8 @@ const polish=`
 [data-intelligence] article>div span>b,[data-intelligence] article footer b,[data-intelligence] aside>div>b{font-size:10px!important}
 [data-intelligence] article>div>div>em{display:none!important}
 [data-intelligence] main aside>p,[data-intelligence] main aside>div:last-child{display:none!important}
+[data-intelligence] main aside>div[class*="focusEmpty"]:last-child{display:grid!important}
+[data-intelligence] main aside>div[class*="guard"]:last-child{display:block!important}
 [data-intelligence] main{border-radius:22px;overflow:hidden}
 [data-intelligence] nav,[data-intelligence] section{scroll-margin-top:82px}
 [data-intelligence-switch]{position:sticky;top:68px;z-index:15;display:flex;gap:6px;width:max-content;max-width:calc(100% - 32px);margin:12px 16px -2px;padding:5px;border:1px solid rgba(94,108,142,.15);border-radius:14px;background:rgba(250,251,254,.9);backdrop-filter:blur(18px);box-shadow:0 8px 24px rgba(36,45,76,.08)}
@@ -35,5 +38,5 @@ export default function IntelligenceWorkspace({propertyId,property}){
   const data=useIntelligenceData(propertyId),role=property?.role||"member",canManage=["owner","manager"].includes(role),[mode,setMode]=useState("sales")
   if(data.loading)return <section style={{padding:24,fontSize:15,fontWeight:750}}>Cargando Inteligencia…</section>
   if(data.error)return <section style={{padding:24}}><div style={{padding:14,borderRadius:14,background:"rgba(229,72,77,.1)",color:"#b42343",fontWeight:750}}>{data.error}</div></section>
-  return <section data-intelligence><style>{polish}</style><nav data-intelligence-switch aria-label="Secciones de Inteligencia"><button type="button" data-active={mode==="sales"} onClick={()=>setMode("sales")}>Ventas directas</button><button type="button" data-active={mode==="demand"} onClick={()=>setMode("demand")}>Demanda</button><button type="button" data-active={mode==="hotel"} onClick={()=>setMode("hotel")}>Rendimiento hotelero</button></nav>{mode==="sales"?<SalesIntelligence reservations={data.reservations} conversations={data.conversations} messages={data.messages} webEvents={data.webEvents} quotes={data.quotes} groups={data.groups} channelCosts={data.channelCosts} settings={property||{}}/>:mode==="demand"?<DemandIntelligence reservations={data.reservations} groups={data.groups} quotes={data.quotes} webEvents={data.webEvents} settings={property||{}}/>:<AnalyticsOverview rooms={data.rooms} reservations={data.reservations} payments={data.payments} blocks={data.blocks} snapshots={data.snapshots} channelCosts={data.channelCosts} settings={property||{}} canManageChannelCosts={canManage} onSaveChannelCost={data.saveChannelCost}/>}</section>
+  return <section data-intelligence><style>{polish}</style><nav data-intelligence-switch aria-label="Secciones de Inteligencia"><button type="button" data-active={mode==="sales"} onClick={()=>setMode("sales")}>Ventas directas</button><button type="button" data-active={mode==="demand"} onClick={()=>setMode("demand")}>Demanda</button><button type="button" data-active={mode==="pipeline"} onClick={()=>setMode("pipeline")}>Pipeline</button><button type="button" data-active={mode==="hotel"} onClick={()=>setMode("hotel")}>Rendimiento hotelero</button></nav>{mode==="sales"?<SalesIntelligence reservations={data.reservations} conversations={data.conversations} messages={data.messages} webEvents={data.webEvents} quotes={data.quotes} groups={data.groups} channelCosts={data.channelCosts} settings={property||{}}/>:mode==="demand"?<DemandIntelligence reservations={data.reservations} groups={data.groups} quotes={data.quotes} webEvents={data.webEvents} settings={property||{}}/>:mode==="pipeline"?<PipelineIntelligence reservations={data.reservations} conversations={data.conversations} messages={data.messages} quotes={data.quotes} groups={data.groups}/>:<AnalyticsOverview rooms={data.rooms} reservations={data.reservations} payments={data.payments} blocks={data.blocks} snapshots={data.snapshots} channelCosts={data.channelCosts} settings={property||{}} canManageChannelCosts={canManage} onSaveChannelCost={data.saveChannelCost}/>}</section>
 }
