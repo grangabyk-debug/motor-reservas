@@ -35,8 +35,7 @@ jobs:
         run: npm run check:product-boundaries
       - name: PMS enterprise isolation and fixture guard
         run: node scripts/check-pms-next-isolation.mjs
-      - name: Hotel architecture
-        if: github.head_ref != 'pms-rebuild-zero' && github.ref_name != 'pms-rebuild-zero'
-        run: npm run check:hotel-architecture
+      - name: Canonical PMS architecture
+        run: node scripts/prebuild-architecture.mjs
       - name: Production build
         run: npm run build
