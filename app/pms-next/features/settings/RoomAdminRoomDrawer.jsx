@@ -30,7 +30,7 @@ export default function RoomAdminRoomDrawer({form,setForm,types,floors,access,ca
       }
       if(!values.length){values=siblings.map(room=>Number(room.precio)).filter(value=>Number.isFinite(value)&&value>0);if(values.length)source="precio base de otras habitaciones del mismo tipo"}
       if(!values.length&&Number(type?.base_price)>0){values=[Number(type.base_price)];source="precio base del tipo de habitación"}
-      const value=median(values)
+      const value=Math.round(median(values)*100)/100
       if(cancelled)return
       setPriceSuggestion(value>0?{loading:false,value,source}:{loading:false,value:0,source:""})
       if(value>0&&!priceTouched.current)setForm(current=>current&&!current.id&&String(current.room_type_id)===String(typeId)?{...current,precio:value}:current)
