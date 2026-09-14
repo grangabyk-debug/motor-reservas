@@ -8,10 +8,12 @@ const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"curren
 const fmtDateTime=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}).format(new Date(value)).replace(".",""):"—"
 const DOC_LABELS={invoice:"Factura",credit_note:"Nota de crédito",debit_note:"Nota de débito",receipt:"Recibo",proforma:"Proforma",folio:"Folio"}
 const TAX_LABELS={consumidor_final:"Consumidor final",responsable_inscripto:"Responsable inscripto",monotributo:"Monotributo",exento:"Exento",cliente_exterior:"Cliente del exterior",no_categorizado:"No categorizado"}
+const STATUS_LABELS={draft:"Borrador",issued:"Emitida",void:"Anulada",cancelled:"Cancelada",paid:"Pagada",partial:"Pago parcial"}
 const docLabel=doc=>DOC_LABELS[doc?.document_type]||"Documento"
 const docNumber=doc=>doc?.number||"Sin numerar"
 const nextType=doc=>doc?.document_type==="invoice"?"credit_note":doc?.document_type==="credit_note"?"debit_note":null
 const nextLabel=type=>type==="credit_note"?"Nota de crédito":"Nota de débito"
+const rowTotal=row=>{const quantity=Math.max(0,Number(row?.quantity)||0),unit=Math.max(0,Number(row?.unit_price)||0),rate=Math.max(0,Number(row?.tax_rate)||0);return Number.isFinite(Number(row?.total))?Number(row.total):quantity*unit*(1+rate/100)}
 
 function sourceLines(doc,remaining){
   const rows=Array.isArray(doc?.items)?doc.items:[]
@@ -25,12 +27,14 @@ function sourceLines(doc,remaining){
 export default function ReservationDocumentHistory({documents,selected,reservation,propertyId,onRefresh,setError}){
   const[showAll,setShowAll]=useState(false)
   const[adjustment,setAdjustment]=useState(null)
+  const[preview,setPreview]=useState(null)
   const[saving,setSaving]=useState(false)
   const folioDocs=useMemo(()=>selected?documents.filter(row=>row.folio_id===selected.id):[],[documents,selected?.id])
   const relatedById=useMemo(()=>new Map(documents.map(row=>[row.id,row])),[documents])
 
   function usedAmount(doc,type){return documents.filter(row=>row.related_document_id===doc.id&&row.document_type===type&&row.status!=="void").reduce((sum,row)=>sum+Math.max(0,Number(row.total)||0),0)}
   function remainingFor(doc,type){return Math.max(0,(Number(doc.total)||0)-usedAmount(doc,type))}
+  function openPreview(doc){setError?.("");setPreview(doc)}
   function openAdjustment(doc){
     const type=nextType(doc);if(!type)return
     const remaining=remainingFor(doc,type)
@@ -74,14 +78,16 @@ export default function ReservationDocumentHistory({documents,selected,reservati
       <header><b>Facturas y notas vinculadas</b>{folioDocs.length>4?<button type="button" onClick={()=>setShowAll(value=>!value)}>{showAll?"Ver menos":`Ver todas (${folioDocs.length})`}</button>:null}</header>
       {folioDocs.length?visible.map(doc=>{
         const type=nextType(doc),remaining=type?remainingFor(doc,type):0,original=doc.related_document_id?relatedById.get(doc.related_document_id):null
-        return <div key={doc.id} style={{gap:8}}>
+        return <div key={doc.id} role="button" tabIndex={0} aria-label={`Ver ${docLabel(doc)} ${docNumber(doc)}`} onClick={()=>openPreview(doc)} onKeyDown={event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();openPreview(doc)}}} style={{gap:8,cursor:"pointer"}}>
           <span style={{minWidth:0}}><span style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}><b>{docNumber(doc)}</b><em style={tag}>{docLabel(doc)}</em></span><small>{doc.billing_mode==="payment"?"Sobre pago":doc.billing_mode==="partial_items"?"Parcial":doc.billing_mode==="adjustment_partial"?"Ajuste parcial":doc.billing_mode==="adjustment_total"?"Ajuste total":"Sobre folio"} · {fmtDateTime(doc.issued_at||doc.created_at)}{original?` · Vinculada a ${docLabel(original)} ${docNumber(original)}`:""}</small></span>
           <strong>{money(doc.total,doc.currency)}</strong>
-          <em data-status={doc.status}>{doc.status==="draft"?"Borrador":doc.status==="issued"?"Emitida":doc.status}</em>
-          {type&&doc.status!=="draft"&&doc.status!=="void"&&remaining>.009?<button type="button" style={actionButton} onClick={()=>openAdjustment(doc)}>{type==="credit_note"?"＋ Nota de crédito":"＋ Nota de débito"}</button>:<span/>}
+          <em data-status={doc.status}>{STATUS_LABELS[doc.status]||doc.status}</em>
+          {type&&doc.status!=="draft"&&doc.status!=="void"&&remaining>.009?<button type="button" style={actionButton} onClick={event=>{event.stopPropagation();openAdjustment(doc)}}>{type==="credit_note"?"＋ Nota de crédito":"＋ Nota de débito"}</button>:<span/>}
         </div>
       }):<div className={s.emptySmall}>Todavía no hay facturas ni notas para este folio.</div>}
     </div>
+
+    {preview?<DocumentPreview doc={preview} reservation={reservation} onClose={()=>setPreview(null)}/>:null}
 
     {adjustment?<div className={s.overlay} onMouseDown={event=>event.target===event.currentTarget&&!saving&&setAdjustment(null)}><div className={`${s.modal} ${s.invoiceModal}`}>
       <button className={s.close} onClick={()=>!saving&&setAdjustment(null)}>×</button>
@@ -96,3 +102,28 @@ export default function ReservationDocumentHistory({documents,selected,reservati
     </div></div>:null}
   </>
 }
+
+function DocumentPreview({doc,reservation,onClose}){
+  const rows=Array.isArray(doc?.items)?doc.items:[]
+  const currency=doc?.currency||reservation?.moneda||"ARS"
+  const total=Math.max(0,Number(doc?.total)||0)
+  const balance=Math.max(0,Number(doc?.balance)||0)
+  const applied=Math.max(0,total-balance)
+  const billing=doc?.billing_to||{}
+  const title=doc?.status==="draft"?`Borrador de ${docLabel(doc).toLowerCase()}`:`${docLabel(doc)} ${docNumber(doc)}`
+  return <div className={s.overlay} onMouseDown={event=>event.target===event.currentTarget&&onClose?.()}><div className={`${s.modal} ${s.invoiceModal}`} role="dialog" aria-modal="true" aria-label={title}>
+    <button className={s.close} type="button" onClick={onClose}>×</button>
+    <small>{docLabel(doc).toUpperCase()} · {STATUS_LABELS[doc.status]||doc.status||"Documento"}</small>
+    <h2>{title}</h2>
+    <div style={{display:"grid",gridTemplateColumns:"minmax(0,1.5fr) minmax(180px,.8fr)",gap:10,margin:"10px 0 12px"}}>
+      <div style={{padding:"11px 12px",border:"1px solid var(--line)",borderRadius:12,background:"color-mix(in srgb,var(--bg) 42%,var(--panelSolid))",fontSize:10.5,lineHeight:1.55}}><b>{billing.name||reservation?.nombre_huesped||"Cliente sin identificar"}</b><div>{TAX_LABELS[billing.iva_condition]||billing.iva_condition||"Condición IVA no informada"}</div>{billing.folio_label?<div>Folio: {billing.folio_label}</div>:null}{billing.email?<div>{billing.email}</div>:null}<div style={{marginTop:4,color:"var(--muted)"}}>{doc.number?`Comprobante ${doc.number}`:"Todavía sin número fiscal"} · {fmtDateTime(doc.issued_at||doc.created_at)}</div></div>
+      <div style={{display:"grid",gap:7}}><PreviewStat label="Total" value={money(total,currency)}/><PreviewStat label="Pago imputado" value={money(applied,currency)}/><PreviewStat label="Saldo" value={money(balance,currency)} strong/></div>
+    </div>
+    <div className={s.invoiceLines}><header><h3>Conceptos</h3><span style={{fontSize:9.5,color:"var(--muted)",fontWeight:800}}>{rows.length} línea{rows.length===1?"":"s"}</span></header><div style={{overflowX:"auto",paddingBottom:2}}><div style={{minWidth:690}}><div style={{display:"grid",gridTemplateColumns:"minmax(240px,2fr) 72px 118px 76px 120px",gap:8,padding:"7px 0 3px",fontSize:9,fontWeight:850,color:"var(--muted)"}}><span>Descripción</span><span>Cant.</span><span>Precio</span><span>IVA</span><span style={{textAlign:"right"}}>Total</span></div>{rows.length?rows.map((row,index)=><div key={`${index}-${row.folio_item_id||row.description||"line"}`} style={{display:"grid",gridTemplateColumns:"minmax(240px,2fr) 72px 118px 76px 120px",gap:8,alignItems:"center",padding:"9px 0",borderTop:"1px solid var(--line)",fontSize:10}}><span><b>{row.description||"Concepto"}</b>{row.detail?<small style={{display:"block",marginTop:2,color:"var(--muted)"}}>{row.detail}</small>:null}</span><span>{Number(row.quantity)||1}</span><span>{money(row.unit_price,currency)}</span><span>{Number(row.tax_rate)||0}%</span><strong style={{textAlign:"right"}}>{money(rowTotal(row),currency)}</strong></div>):<div style={{padding:"16px 0",color:"var(--muted)",fontSize:10}}>El documento no tiene líneas detalladas guardadas.</div>}</div></div></div>
+    <div className={s.invoiceTotals}><span>Subtotal <b>{money(doc.subtotal,currency)}</b></span><span>IVA / impuestos <b>{money(doc.tax,currency)}</b></span><strong>Total {money(total,currency)}</strong></div>
+    {doc.status==="draft"?<div style={{marginTop:10,padding:"9px 11px",border:"1px solid var(--line)",borderRadius:11,fontSize:9.5,color:"var(--muted)",lineHeight:1.45}}>Este comprobante está en <b style={{color:"var(--text)"}}>borrador</b>. Podés revisarlo, pero todavía no tiene numeración fiscal ni se considera emitido.</div>:null}
+    <div className={s.documentActions}><button type="button" className={s.primary} onClick={onClose}>Cerrar</button></div>
+  </div></div>
+}
+
+function PreviewStat({label,value,strong=false}){return <div style={{padding:"8px 10px",border:"1px solid var(--line)",borderRadius:11,background:"var(--panelSolid)",display:"flex",justifyContent:"space-between",gap:8,alignItems:"center",fontSize:9.5}}><span style={{color:"var(--muted)",fontWeight:800}}>{label}</span>{strong?<strong style={{fontSize:11}}>{value}</strong>:<b>{value}</b>}</div>}
