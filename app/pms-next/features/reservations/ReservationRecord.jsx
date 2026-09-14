@@ -20,13 +20,43 @@ export default function ReservationRecord(props){
   const[chargeBasis,setChargeBasis]=useState(null)
   useEffect(()=>{setGroupCheckoutOpen(false);setOperationsMode(null);setChargeBasis(null)},[item?.id])
   useEffect(()=>{
-    if(!item?.id||!propertyId||rooms.length<=1){setChargeBasis(null);return}
+    const needsBasis=rooms.length>1||String(item?.estado||"").toLowerCase()==="cancelada"
+    if(!item?.id||!propertyId||!needsBasis){setChargeBasis(null);return}
     let cancelled=false
     ;(async()=>{const{data,error}=await supabase.rpc("hl_get_reservation_charge_basis",{p_reservation_id:Number(item.id)});if(!cancelled&&!error)setChargeBasis(data||null)})()
     return()=>{cancelled=true}
-  },[item?.id,item?.precio_total,item?.subtotal,item?.tarifa_noche,item?.habitaciones_detalle,propertyId,rooms.length])
+  },[item?.id,item?.estado,item?.precio_total,item?.subtotal,item?.tarifa_noche,item?.habitaciones_detalle,propertyId,rooms.length])
   const isGroupCheckout=item?.estado==="alojado"&&rooms.length>1
   const displayItem=useMemo(()=>{
+    const cancelledReservation=String(item?.estado||"").toLowerCase()==="cancelada"
+    if(cancelledReservation){
+      const penaltyGross=Math.max(0,Number(item?.cancellation_penalty_amount)||0)
+      const charged=String(item?.cancellation_penalty_status||"").toLowerCase()==="charged"
+      const waived=String(item?.cancellation_penalty_status||"").toLowerCase()==="waived"
+      const penaltyNet=charged?Math.max(0,Number(chargeBasis?.charges_net??item?.precio_sin_impuestos_nacionales??item?.subtotal)||0):0
+      const cancellationService=penaltyGross>0?{
+        id:"cancellation-penalty-display",
+        nombre:waived?"Penalidad eximida":"Penalidad por cancelación",
+        categoria:"fee",
+        cantidad:1,
+        precio:penaltyNet,
+        total:penaltyNet,
+        detalle:waived?"La política preveía una penalidad, pero fue eximida.":`Obligación final por cancelación · ${item?.cancellation_note||"según política del establecimiento"}`
+      }:null
+      return{
+        ...item,
+        tarifa_noche:0,
+        subtotal:0.0000001,
+        regimen:"Cancelada · alojamiento liberado",
+        servicios:cancellationService?[cancellationService]:[],
+        cochera_total:0,
+        mascotas_total:0,
+        early_checkin_importe:0,
+        late_checkout_importe:0,
+        extra:0,
+        descuento_importe:0
+      }
+    }
     const details=Array.isArray(item?.habitaciones_detalle)?item.habitaciones_detalle:[]
     if(rooms.length<=1)return item
     const detailLodging=details.reduce((sum,detail)=>{
