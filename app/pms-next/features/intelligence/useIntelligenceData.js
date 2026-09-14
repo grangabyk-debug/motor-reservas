@@ -4,7 +4,7 @@ import{useCallback,useEffect,useMemo,useRef,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 
 const empty={rooms:[],reservations:[],payments:[],blocks:[],snapshots:[],channelCosts:[],conversations:[],messages:[],webEvents:[],quotes:[],groups:[]}
-const tables=["habitaciones","reservas","pagos","bloqueos","hotel_channel_costs","hotel_web_events","hotel_group_quotes","hotel_groups","inbox_conversations"]
+const tables=["habitaciones","reservas","pagos","bloqueos","hotel_channel_costs","hotel_group_quotes","hotel_groups","inbox_conversations"]
 
 export default function useIntelligenceData(propertyId){
   const[data,setData]=useState(empty),[loading,setLoading]=useState(true),[error,setError]=useState("")
@@ -25,18 +25,20 @@ export default function useIntelligenceData(propertyId){
         supabase.from("hotel_analytics_daily_snapshots").select("*").eq("property_id",propertyId).gte("captured_on",from.toISOString().slice(0,10)).order("captured_on",{ascending:false}).order("stay_date").limit(5000),
         supabase.from("hotel_channel_costs").select("*").eq("property_id",propertyId).eq("active",true).order("channel_name"),
         supabase.from("inbox_conversations").select("id,channel,contact_name,contact_email,contact_phone,last_message_at,last_message_text,unread_count,status,reservation_id,guest_profile_id,created_at,updated_at").eq("property_id",propertyId).gte("created_at",commercialIso).order("last_message_at",{ascending:false,nullsFirst:false}).limit(3000),
-        supabase.from("hotel_web_events").select("id,event_name,source,session_id,metadata,created_at").eq("property_id",propertyId).gte("created_at",commercialIso).order("created_at",{ascending:false}).limit(10000),
         supabase.from("hotel_group_quotes").select("id,group_id,quote_number,status,currency,total,sent_at,accepted_at,created_at,updated_at").eq("property_id",propertyId).gte("created_at",commercialIso).order("created_at",{ascending:false}).limit(3000),
         supabase.from("hotel_groups").select("id,name,status,contact_name,contact_email,contact_phone,sales_stage,budget_currency,budget_total,created_at,updated_at").eq("property_id",propertyId).gte("created_at",commercialIso).order("created_at",{ascending:false}).limit(3000),
       ]
       const results=await Promise.all(queries),failed=results.find(result=>result.error)
       if(failed?.error)throw failed.error
-      const[rooms,reservations,payments,blocks,snapshots,channelCosts,conversations,webEvents,quotes,groups]=results.map(result=>result.data||[])
+      const[rooms,reservations,payments,blocks,snapshots,channelCosts,conversations,quotes,groups]=results.map(result=>result.data||[])
       const conversationIds=conversations.map(item=>item.id)
       let messages=[]
       if(conversationIds.length){
         for(let i=0;i<conversationIds.length;i+=250){const ids=conversationIds.slice(i,i+250),messageResult=await supabase.from("inbox_messages").select("id,conversation_id,direction,text,payload,occurred_at,created_at").in("conversation_id",ids).gte("occurred_at",commercialIso).order("occurred_at",{ascending:true}).limit(10000);if(messageResult.error)throw messageResult.error;messages.push(...(messageResult.data||[]))}
       }
+      let webEvents=[]
+      const webResult=await supabase.from("hotel_web_events").select("id,event_name,source,session_id,metadata,created_at").eq("property_id",propertyId).gte("created_at",commercialIso).order("created_at",{ascending:false}).limit(10000)
+      if(!webResult.error)webEvents=webResult.data||[]
       setData({rooms,reservations,payments,blocks,snapshots,channelCosts,conversations,messages,webEvents,quotes,groups})
     }catch(err){setError(err?.message||"No se pudo cargar Inteligencia.")}finally{setLoading(false)}
   },[propertyId])
