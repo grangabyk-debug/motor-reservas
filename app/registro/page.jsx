@@ -1,6 +1,5 @@
-import HospitalityShell from"../components/hospitality/HospitalityShell"
-import SignupForm from"./SignupForm"
+import{redirect}from"next/navigation"
 
-export const metadata={title:"Crear cuenta | Habitación Llena",description:"Creá tu hotel en Habitación Llena PMS Hotelero.",robots:{index:true,follow:true}}
+export const metadata={title:"Habitación Llena | En preparación",robots:{index:false,follow:false}}
 
-export default function RegistroPage(){return <HospitalityShell backHref="/" backOnScene hideBrand topAligned eyebrow="CREAR CUENTA" title="Tu hotel, listo para entrar." copy="Abrí tu espacio de trabajo con una propiedad aislada, segura y preparada para sumar al equipo." productLabel="PMS Hotelero" sceneEyebrow="HABITACIÓN LLENA · PMS"><SignupForm/></HospitalityShell>}
+export default function RegistroPage(){redirect("/")}
