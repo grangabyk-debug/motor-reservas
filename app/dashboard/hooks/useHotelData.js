@@ -16,6 +16,11 @@ const empty = {
   channels: [],
   keyIssues: [],
   packages: [],
+  reservationEvents: [],
+  automationEvents: [],
+  inboxConversations: [],
+  housekeepingTasks: [],
+  maintenanceTickets: [],
 }
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -54,6 +59,7 @@ export function useHotelData(propertyId, view) {
   const [commercial, setCommercial] = useState({ rates: [], upsells: [], packages: [], partners: [], groups: [] })
   const [finance, setFinance] = useState({ documents: [], sessions: [], movements: [] })
   const [hotel, setHotel] = useState({ members: [], automations: [], events: [], permissions: [] })
+  const [analytics, setAnalytics] = useState({ snapshots: [] })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const seq = useRef(0)
@@ -68,8 +74,6 @@ export function useHotelData(propertyId, view) {
     setError("")
 
     try {
-      // Vencer tentativas es mantenimiento de fondo. Una caída de red en esta
-      // operación no debe bloquear la carga de la pantalla ni dejar el PMS vacío.
       await withRetry(() => expireTentativeReservations({ propertyId }), 2).catch(() => [])
 
       const repo = createHotelRepository(supabase, propertyId)
@@ -98,14 +102,9 @@ export function useHotelData(propertyId, view) {
         }
       )
 
-      // Presupuestar sólo necesita el catálogo activo de extras. Antes se cargaban
-      // CRM, empresas, grupos, housekeeping y mantenimiento; cualquier fallo en
-      // esas consultas podía dejar el presupuesto sin habitaciones ni servicios.
       if (quoteMode) {
         const resources = await withRetry(() => loadActiveResources(propertyId), 3)
-        if (run === seq.current) {
-          setOperations((current) => ({ ...current, resources }))
-        }
+        if (run === seq.current) setOperations((current) => ({ ...current, resources }))
       } else if (group === "frontdesk") {
         const [g, p, groups] = await Promise.all([
           withRetry(() => repo.guestCRM(), 2),
@@ -115,6 +114,11 @@ export function useHotelData(propertyId, view) {
         if (run === seq.current) {
           setGuests(g)
           setCommercial((current) => ({ ...current, packages: base.packages || [], partners: p, groups }))
+          setOperations((current) => ({
+            ...current,
+            housekeeping: base.housekeepingTasks || [],
+            maintenance: base.maintenanceTickets || [],
+          }))
         }
       }
 
@@ -130,6 +134,11 @@ export function useHotelData(propertyId, view) {
           withRetry(() => repo.groups(), 2),
         ])
         if (run === seq.current) setCommercial({ ...c, partners: p, groups })
+      }
+
+      if (group === "analytics") {
+        const a = await withRetry(() => repo.analytics(), 2)
+        if (run === seq.current) setAnalytics(a)
       }
 
       if (group === "finance") {
@@ -189,31 +198,31 @@ export function useHotelData(propertyId, view) {
     }
   }, [propertyId, group, quoteMode])
 
-  useEffect(() => {
-    reload()
-  }, [reload])
+  useEffect(() => { reload() }, [reload])
 
   useEffect(() => {
     if (!propertyId) return
-    const timer = setInterval(() => {
-      expireTentativeReservations({ propertyId }).catch(() => {})
-    }, 60000)
+    const timer = setInterval(() => { expireTentativeReservations({ propertyId }).catch(() => {}) }, 60000)
     return () => clearInterval(timer)
   }, [propertyId])
 
   useEffect(() => {
     if (!propertyId) return
+    const filter = `property_id=eq.${propertyId}`
     const channel = supabase
       .channel(`hl-v2-${propertyId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "reservas", filter: `property_id=eq.${propertyId}` }, reload)
-      .on("postgres_changes", { event: "*", schema: "public", table: "habitaciones", filter: `property_id=eq.${propertyId}` }, reload)
-      .on("postgres_changes", { event: "*", schema: "public", table: "pagos", filter: `property_id=eq.${propertyId}` }, reload)
-      .on("postgres_changes", { event: "*", schema: "public", table: "hotel_packages", filter: `property_id=eq.${propertyId}` }, reload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "reservas", filter }, reload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "habitaciones", filter }, reload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "pagos", filter }, reload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "hotel_packages", filter }, reload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "hotel_reservation_events", filter }, reload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "hotel_automation_events", filter }, reload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "inbox_conversations", filter }, reload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "hotel_housekeeping_tasks", filter }, reload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "hotel_maintenance_tickets", filter }, reload)
       .subscribe()
-    return () => {
-      supabase.removeChannel(channel)
-    }
+    return () => { supabase.removeChannel(channel) }
   }, [propertyId, reload])
 
-  return { ...core, settings, guests, operations, commercial, finance, hotel, loading, error, reload }
+  return { ...core, settings, guests, operations, commercial, finance, hotel, analytics, loading, error, reload }
 }

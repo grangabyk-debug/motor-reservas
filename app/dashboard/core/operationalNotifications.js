@@ -1,0 +1,36 @@
+import{isoDate}from"./formatters"
+
+const roomIds=r=>[...new Set([r?.habitacion_id,...(Array.isArray(r?.habitaciones_ids)?r.habitaciones_ids:[])].filter(Boolean).map(String))]
+const active=r=>r&&String(r.estado||"").toLowerCase()!=="cancelada"&&!r.no_show
+const roomReady=room=>["inspeccionada","inspeccion","disponible","libre"].includes(String(room?.estado||"").toLowerCase())
+const roomName=(rooms,id)=>rooms.find(r=>String(r.id)===String(id))?.nombre||"Sin habitación"
+const paidFor=(payments,id)=>(payments||[]).filter(p=>String(p.reserva_id)===String(id)&&!["anulado","cancelado","reembolsado"].includes(String(p.estado||"").toLowerCase())).reduce((sum,p)=>sum+Number(p.monto||0),0)
+const priorityRank={critical:0,high:1,normal:2,info:3}
+const otaTitle=event=>({ota_booking_new:"Nueva reserva OTA",ota_booking_modified:"Reserva OTA modificada",ota_booking_cancelled:"Reserva OTA cancelada"}[String(event||"").toLowerCase()]||"Actualización OTA")
+const shortOtaDate=value=>{const parts=String(value||"").split("-");return parts.length===3?`${parts[2]}/${parts[1]}`:String(value||"")}
+const otaEventDetail=event=>{const meta=event?._ota_metadata&&typeof event._ota_metadata==="object"?event._ota_metadata:{},stay=meta.arrival_date&&meta.departure_date?`${shortOtaDate(meta.arrival_date)} → ${shortOtaDate(meta.departure_date)}`:"",room=[meta.room_type,meta.room_name?`Hab. ${meta.room_name}`:""].filter(Boolean).join(" · "),reservation=meta.reservation_number?`Reserva ${meta.reservation_number}`:"";return[meta.guest_name,stay,room,reservation].filter(Boolean).join(" · ")||event?.message||"Actualización recibida"}
+
+export function buildOperationalNotifications({rooms=[],reservations=[],payments=[],automationEvents=[],maintenanceTickets=[]}={}){
+  const today=isoDate(),items=[]
+  ;(reservations||[]).filter(active).forEach(reservation=>{
+    const state=String(reservation.estado||"").toLowerCase(),ids=roomIds(reservation),primary=rooms.find(r=>String(r.id)===ids[0]),due=Math.max(0,Number(reservation.precio_total||0)-paidFor(payments,reservation.id)),guest=reservation.nombre_huesped||"Huésped"
+    if(reservation.fecha_entrada===today&&state!=="alojado"&&state!=="finalizada"){
+      if(!primary||!roomReady(primary))items.push({id:`room-ready-${reservation.id}`,kind:"operation",priority:"critical",icon:"◇",title:"Habitación no lista para llegada",detail:`${guest} · ${roomName(rooms,ids[0])} · check-in hoy`,reservationId:reservation.id,target:"housekeeping"})
+      items.push({id:`checkin-${reservation.id}`,kind:"operation",priority:"high",icon:"IN",title:"Check-in pendiente",detail:`${guest} · ${roomName(rooms,ids[0])}`,reservationId:reservation.id,target:"reservation"})
+    }
+    if(reservation.fecha_salida===today&&state==="alojado")items.push({id:`checkout-${reservation.id}`,kind:"operation",priority:"high",icon:"OUT",title:"Salida pendiente",detail:`${guest} · ${roomName(rooms,ids[0])}`,reservationId:reservation.id,target:"reservation"})
+    if(due>.01&&(state==="alojado"||reservation.fecha_entrada===today||reservation.fecha_salida===today))items.push({id:`balance-${reservation.id}`,kind:"payments",priority:state==="alojado"&&reservation.fecha_salida===today?"critical":"normal",icon:"$",title:"Saldo pendiente",detail:`${guest} · ${new Intl.NumberFormat("es-AR",{style:"currency",currency:reservation.moneda||"ARS",maximumFractionDigits:0}).format(due)}`,reservationId:reservation.id,target:"reservation"})
+  })
+  ;(automationEvents||[]).filter(e=>!["resolved","done","completed","ignored"].includes(String(e.status||"").toLowerCase())).slice(0,60).forEach(event=>{
+    if(event._ota_notification_id){
+      const type=String(event.event_type||"").toLowerCase(),provider=event._ota_provider||"OTA"
+      items.push({id:`ota-${event._ota_notification_id}`,kind:"ota",priority:type==="ota_booking_new"?"high":type==="ota_booking_cancelled"?"high":"normal",icon:"OTA",title:event.title||otaTitle(type),detail:`${provider} · ${otaEventDetail(event)}`,reservationId:event.reservation_id||null,target:event.reservation_id?"reservation":"notifications",createdAt:event.created_at,notificationId:event._ota_notification_id,provider,otaEventType:type.replace(/^ota_/,"")})
+      return
+    }
+    items.push({id:`automation-${event.id}`,kind:"system",priority:/error|fail|rechaz|venc/i.test(`${event.event_type||""} ${event.message||""}`)?"high":"normal",icon:"⚡",title:event.event_type?String(event.event_type).replaceAll("_"," "):"Automatización pendiente",detail:event.message||"Hay una automatización que requiere atención.",reservationId:event.reservation_id||null,roomId:event.room_id||null,target:event.reservation_id?"reservation":"automations",createdAt:event.created_at})
+  })
+  ;(maintenanceTickets||[]).filter(t=>!["done","resolved","cancelled","canceled"].includes(String(t.status||"").toLowerCase())&&["urgent","critical","high"].includes(String(t.priority||"").toLowerCase())).slice(0,20).forEach(ticket=>items.push({id:`maintenance-${ticket.id}`,kind:"operation",priority:String(ticket.priority||"").toLowerCase()==="urgent"?"critical":"high",icon:"!",title:ticket.title||"Mantenimiento prioritario",detail:`${roomName(rooms,ticket.room_id)}${ticket.description?` · ${ticket.description}`:""}`,roomId:ticket.room_id,target:"maintenance",createdAt:ticket.created_at}))
+  return items.sort((a,b)=>(priorityRank[a.priority]??9)-(priorityRank[b.priority]??9)||String(b.createdAt||"").localeCompare(String(a.createdAt||"")))
+}
+
+export function notificationCount(data){return buildOperationalNotifications(data).length}

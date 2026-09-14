@@ -1,0 +1,34 @@
+"use client"
+
+import{useEffect,useMemo,useState}from"react"
+import s from"../../pms-next.module.css"
+import c from"./pmsTopbarControls.module.css"
+import glass from"./pmsGlassShell.module.css"
+import PmsIcon from"./PmsIcons"
+
+export default function PmsTopbar({title,info,theme,onToggleTheme,onNewReservation,onNewQuote,onOpenSearch,onOpenActivity,onOpenNotifications,notificationCount=0,onOpenSupport,timeZone}){
+  const[now,setNow]=useState(()=>new Date())
+  useEffect(()=>{const timer=setInterval(()=>setNow(new Date()),30000);return()=>clearInterval(timer)},[])
+  const clock=useMemo(()=>{const zone=timeZone||Intl.DateTimeFormat().resolvedOptions().timeZone;try{return{date:new Intl.DateTimeFormat("es-AR",{weekday:"short",day:"2-digit",month:"short",timeZone:zone}).format(now),time:new Intl.DateTimeFormat("es-AR",{hour:"2-digit",minute:"2-digit",hour12:false,timeZone:zone}).format(now)}}catch{return{date:new Intl.DateTimeFormat("es-AR",{weekday:"short",day:"2-digit",month:"short"}).format(now),time:new Intl.DateTimeFormat("es-AR",{hour:"2-digit",minute:"2-digit",hour12:false}).format(now)}}},[now,timeZone])
+  const alertHandler=onOpenNotifications||onOpenActivity,alertLabel=onOpenNotifications?"Notificaciones":"Actividad del hotel"
+  const alertTooltip=notificationCount>0?`${notificationCount} notificación${notificationCount===1?"":"es"} sin leer`:alertLabel
+  const openAlerts=()=>{if(onOpenNotifications)onOpenNotifications();else alertHandler?.()}
+
+  return <header className={`${s.topbar} ${glass.topbarGlass}`}>
+    <div className={s.topbarTitle}>
+      <small>HABITACIÓN LLENA</small>
+      <span style={{display:"flex",alignItems:"center",gap:6}}><b>{title}</b>{info?<button type="button" aria-label={`Información sobre ${title}`} title={info} className={glass.toolGlass} style={{width:18,height:18,padding:0,border:"1px solid var(--lineStrong)",borderRadius:"50%",background:"color-mix(in srgb,var(--panelSolid) 60%,transparent)",color:"var(--muted)",fontSize:10,fontWeight:900,lineHeight:1,cursor:"help"}}>i</button>:null}</span>
+    </div>
+    <button className={`${s.globalSearch} ${glass.searchGlass}`} type="button" onClick={onOpenSearch}><span>⌕</span><span>Buscar huésped, reserva o habitación…</span><kbd>Ctrl K</kbd></button>
+    <div className={s.topbarActions}>
+      <time title={timeZone||"Zona horaria del dispositivo"} style={{display:"grid",textAlign:"right",lineHeight:1.08,minWidth:76}}><b>{clock.time}</b><small style={{opacity:.6,textTransform:"capitalize"}}>{clock.date}</small></time>
+      <div className={c.hotelToolGroup} aria-label="Acciones rápidas del hotel">
+        <button className={`${s.iconButton} ${c.hotelTool} ${glass.toolGlass}`} data-kind="theme" data-tooltip={theme==="dark"?"Modo día":"Modo noche"} type="button" onClick={onToggleTheme} aria-label={theme==="dark"?"Activar modo día":"Activar modo noche"}><PmsIcon name={theme==="dark"?"sun":"moon"}/></button>
+        {onOpenSupport&&<button className={`${s.iconButton} ${c.hotelTool} ${glass.toolGlass}`} data-kind="support" data-tooltip="Ayuda y soporte" type="button" onClick={onOpenSupport} aria-label="Abrir ayuda y soporte" style={{fontWeight:900,fontSize:14,color:"#20a18f"}}>?</button>}
+        {alertHandler&&<button className={`${s.iconButton} ${c.hotelTool} ${glass.toolGlass} ${notificationCount>0?c.alerting:""}`} data-kind="activity" data-tooltip={alertTooltip} type="button" onClick={openAlerts} aria-label={alertLabel} aria-haspopup="dialog" style={{color:notificationCount>0?"#d94149":"#596f9d",position:"relative"}}><PmsIcon name="bell"/>{notificationCount>0?<span className={c.notificationBadge}>{notificationCount>99?"99+":notificationCount}</span>:null}</button>}
+        {onNewQuote&&<button className={`${s.iconButton} ${c.hotelTool} ${glass.toolGlass}`} data-kind="quote" data-tooltip="Presupuesto" type="button" onClick={onNewQuote} aria-label="Crear presupuesto" style={{color:"#d79a31"}}><PmsIcon name="quote"/></button>}
+      </div>
+      {onNewReservation&&<button className={s.primaryButton} type="button" onClick={onNewReservation}>＋ Nueva reserva</button>}
+    </div>
+  </header>
+}
