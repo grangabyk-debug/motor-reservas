@@ -14,6 +14,8 @@ const polish=`
 [data-intelligence] th,[data-intelligence] td{font-size:11px!important}
 [data-intelligence] select,[data-intelligence] input{min-height:38px;font-size:13px!important}
 [data-intelligence] article>div span>b,[data-intelligence] article footer b,[data-intelligence] aside>div>b{font-size:10px!important}
+[data-intelligence] article>div>div>em{display:none!important}
+[data-intelligence] main aside>p,[data-intelligence] main aside>div:last-child{display:none!important}
 [data-intelligence] main{border-radius:22px;overflow:hidden}
 [data-intelligence] nav,[data-intelligence] section{scroll-margin-top:82px}
 [data-intelligence-switch]{position:sticky;top:68px;z-index:15;display:flex;gap:6px;width:max-content;max-width:calc(100% - 32px);margin:12px 16px -2px;padding:5px;border:1px solid rgba(94,108,142,.15);border-radius:14px;background:rgba(250,251,254,.9);backdrop-filter:blur(18px);box-shadow:0 8px 24px rgba(36,45,76,.08)}
