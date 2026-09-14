@@ -24,8 +24,9 @@ const qualifiedWords=["disponibilidad","disponible","habitacion","habitación","
 
 function stageFor({group,quote,reservation,messages}){
   const fromReservation=reservationStage(reservation);if(fromReservation)return fromReservation
+  const fromQuote=quoteStage(quote);if(fromQuote==="lost")return"lost"
   const explicit=explicitStage(group?.sales_stage||group?.status);if(explicit)return explicit
-  const fromQuote=quoteStage(quote),inbound=messages.filter(m=>normalize(m.direction)==="inbound"),text=normalize(inbound.slice(-8).map(m=>m.text).join(" "))
+  const inbound=messages.filter(m=>normalize(m.direction)==="inbound"),text=normalize(inbound.slice(-8).map(m=>m.text).join(" "))
   const intent=intentWords.some(word=>text.includes(normalize(word))),qualified=qualifiedWords.some(word=>text.includes(normalize(word)))||/\b\d{1,2}[\/-]\d{1,2}\b/.test(text)
   if(intent&&["quoted","qualified"].includes(fromQuote))return"interested"
   if(fromQuote)return fromQuote
@@ -104,7 +105,7 @@ export default function CommercialCopilot({property,rooms=[],reservations=[],blo
   function openMotor(){if(!bookingEngine?.enabled||!bookingEngine?.slug||typeof window==="undefined")return;const qs=new URLSearchParams({source:"olivia_commercial"});if(selected?.start)qs.set("check_in",selected.start);if(selected?.end)qs.set("check_out",selected.end);if(selected?.pax)qs.set("guests",String(selected.pax));window.open(`/book/${encodeURIComponent(bookingEngine.slug)}?${qs}`,"_blank","noopener,noreferrer")}
   async function copyDraft(){if(!draft)return;try{await navigator.clipboard.writeText(draft);setCopied(true);window.setTimeout(()=>setCopied(false),1800)}catch{}}
   return <main className={s.page}>
-    <header className={s.hero}><div><small>OLIVIA COMERCIAL · FASE 5</small><h1>Del dato a la próxima acción.</h1><p>OlivIA cruza intención, cotización, inventario, motor y reserva para ayudar al equipo a cerrar mejor, sin actuar por su cuenta.</p></div><div className={s.guard}><span>CONTROL HUMANO</span><strong>Asiste, no ejecuta</strong><small>No envía mensajes, no cobra y no confirma reservas sola.</small></div></header>
+    <header className={s.hero}><div><small>OLIVIA COMERCIAL · FASE 5</small><h1 style={{color:"#fff"}}>Del dato a la próxima acción.</h1><p>OlivIA cruza intención, cotización, inventario, motor y reserva para ayudar al equipo a cerrar mejor, sin actuar por su cuenta.</p></div><div className={s.guard}><span>CONTROL HUMANO</span><strong>Asiste, no ejecuta</strong><small>No envía mensajes, no cobra y no confirma reservas sola.</small></div></header>
     <section className={s.kpis}><Signal label="Oportunidades activas" value={active.length} detail={`${highIntent} con intención alta`} tone="violet"/><Signal label="Listas para cotizar" value={quoteReady} detail="Con fechas detectadas y flujo de presupuesto" tone="blue"/><Signal label="Valor comercial visible" value={money(activeValue,currency)} detail="Sólo importes registrados en el PMS" tone="cyan"/><Signal label="Motor directo" value={bookingEngine?.enabled?"Disponible":"No activo"} detail={bookingEngine?.enabled?"Handoff seguro con búsqueda precargada":"Se mantiene el flujo interno"} tone={bookingEngine?.enabled?"green":"neutral"}/></section>
     <section className={s.workspace}>
       <div className={s.queue}>
