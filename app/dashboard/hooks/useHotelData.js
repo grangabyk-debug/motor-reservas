@@ -59,6 +59,7 @@ export function useHotelData(propertyId, view) {
   const [commercial, setCommercial] = useState({ rates: [], upsells: [], packages: [], partners: [], groups: [] })
   const [finance, setFinance] = useState({ documents: [], sessions: [], movements: [] })
   const [hotel, setHotel] = useState({ members: [], automations: [], events: [], permissions: [] })
+  const [analytics, setAnalytics] = useState({ snapshots: [] })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const seq = useRef(0)
@@ -133,6 +134,11 @@ export function useHotelData(propertyId, view) {
           withRetry(() => repo.groups(), 2),
         ])
         if (run === seq.current) setCommercial({ ...c, partners: p, groups })
+      }
+
+      if (group === "analytics") {
+        const a = await withRetry(() => repo.analytics(), 2)
+        if (run === seq.current) setAnalytics(a)
       }
 
       if (group === "finance") {
@@ -218,5 +224,5 @@ export function useHotelData(propertyId, view) {
     return () => { supabase.removeChannel(channel) }
   }, [propertyId, reload])
 
-  return { ...core, settings, guests, operations, commercial, finance, hotel, loading, error, reload }
+  return { ...core, settings, guests, operations, commercial, finance, hotel, analytics, loading, error, reload }
 }

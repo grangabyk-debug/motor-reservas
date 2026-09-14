@@ -1,0 +1,22 @@
+"use client"
+
+import{useEffect,useMemo,useState}from"react"
+import{supabase}from"../../../../lib/supabase"
+import s from"./virtualHotel.module.css"
+
+const today=()=>new Date().toLocaleDateString("en-CA")
+const statusLabel=value=>value==="sucia"?"Sucia":value==="mantenimiento"?"Mantenimiento":value==="inspeccionada"?"Inspeccionada":value==="limpia"?"Limpia":"Libre"
+
+export default function VirtualHotelWidget({propertyId,propertyName}){
+  const[rooms,setRooms]=useState([]),[floors,setFloors]=useState([]),[reservations,setReservations]=useState([]),[collapsed,setCollapsed]=useState(false),[error,setError]=useState("")
+  useEffect(()=>{let active=true;async function load(){if(!propertyId)return;const day=today(),[roomRes,floorRes,resRes]=await Promise.all([supabase.from("habitaciones").select("id,nombre,tipo,estado,floor_id,sort_order").eq("property_id",propertyId).eq("activa",true).order("sort_order").order("nombre"),supabase.from("hotel_floors").select("id,name,sort_order").eq("property_id",propertyId).order("sort_order"),supabase.from("reservas").select("id,nombre_huesped,habitacion_id,habitaciones_ids,fecha_entrada,fecha_salida,estado,no_show").eq("property_id",propertyId).lte("fecha_entrada",day).gt("fecha_salida",day).neq("estado","cancelada")]);if(!active)return;const problem=roomRes.error||floorRes.error||resRes.error;if(problem){setError("No se pudo armar la vista viva del hotel.");return}setRooms(roomRes.data||[]);setFloors(floorRes.data||[]);setReservations((resRes.data||[]).filter(item=>!item.no_show))}load();return()=>{active=false}},[propertyId])
+  const guestByRoom=useMemo(()=>{const map=new Map();for(const reservation of reservations){const ids=[reservation.habitacion_id,...(reservation.habitaciones_ids||[])].filter(Boolean).map(Number);for(const id of ids)if(!map.has(id))map.set(id,reservation)}return map},[reservations])
+  const floorGroups=useMemo(()=>{const known=new Map(floors.map(floor=>[floor.id,{...floor,rooms:[]}])) ,fallback={id:"other",name:"Sin piso",sort_order:999,rooms:[]};for(const room of rooms){const target=known.get(room.floor_id)||fallback;target.rooms.push(room)}return[...known.values(),fallback].filter(group=>group.rooms.length).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0))},[rooms,floors])
+  const occupied=guestByRoom.size,attention=rooms.filter(room=>["sucia","mantenimiento"].includes(room.estado)).length
+  if(error)return null
+  return <section className={s.shell} aria-label="Hotel vivo">
+    <header className={s.head}><div><small>HOTEL VIVO · EXPERIMENTAL</small><h2>{propertyName||"Mi hotel"}</h2></div><div className={s.summary}><span><b>{occupied}</b> ocupadas</span><span><b>{attention}</b> requieren atención</span><button type="button" onClick={()=>setCollapsed(v=>!v)}>{collapsed?"Mostrar":"Ocultar"}</button></div></header>
+    {!collapsed?<div className={s.scene}><div className={s.sky}><span>Recepción en vivo</span><i className={s.cloud}/></div><div className={s.building}>{floorGroups.map((floor,index)=><div className={s.floor} key={floor.id||index}><div className={s.floorLabel}><b>{floor.name||`Piso ${index+1}`}</b><small>{floor.rooms.length} hab.</small></div><div className={s.corridor}>{floor.rooms.map((room,roomIndex)=>{const guest=guestByRoom.get(Number(room.id)),occupiedRoom=Boolean(guest),state=room.estado||"libre";return <article key={room.id} className={s.room} data-state={state} data-occupied={occupiedRoom?"true":"false"} title={`${room.nombre} · ${statusLabel(state)}${guest?` · ${guest.nombre_huesped}`:""}`}><div className={s.roomTop}><span className={s.door}>{room.nombre}</span><i className={s.window}/></div><small>{room.tipo||"Habitación"}</small>{guest?<div className={s.guest}><span className={s.person} style={{"--delay":`${(roomIndex+index)%5*.35}s`}}/><b>{guest.nombre_huesped?.split(" ")[0]||"Huésped"}</b></div>:<div className={s.emptyRoom}>{statusLabel(state)}</div>}</article>})}</div></div>)}</div><div className={s.lobby}><div className={s.desk}>RECEPCIÓN</div><span className={`${s.walker} ${s.walkerOne}`}/><span className={`${s.walker} ${s.walkerTwo}`}/><div className={s.plant}>♣</div><div className={s.sofa}/></div></div>:null}
+    <footer className={s.legend}><span><i data-state="libre"/>Libre</span><span><i data-state="limpia"/>Limpia</span><span><i data-state="sucia"/>Sucia</span><span><i data-state="mantenimiento"/>Mantenimiento</span><small>Vista operativa inspirada en un hotel virtual: usa estados y huéspedes reales, no es un juego separado del PMS.</small></footer>
+  </section>
+}

@@ -1,0 +1,28 @@
+"use client"
+
+import{useCallback,useEffect,useMemo,useState}from"react"
+import{supabase}from"../../../../lib/supabase"
+import usePmsAutoRefresh from"../../core/usePmsAutoRefresh"
+
+const dateKey=offset=>{const date=new Date();date.setHours(12,0,0,0);date.setDate(date.getDate()+offset);return date.toLocaleDateString("en-CA")}
+const validPayment=payment=>!["void","cancelado","anulado","cancelled"].includes(String(payment.estado||"").toLowerCase())
+const validReservation=reservation=>!reservation.no_show&&!["cancelada","cancelado","cancelled"].includes(String(reservation.estado||"").toLowerCase())
+const roomIds=item=>[...new Set([item.habitacion_id,...(item.habitaciones_ids||[])].filter(Boolean).map(Number))]
+
+export default function useOperationsControlData(propertyId){
+  const[rooms,setRooms]=useState([]),[reservations,setReservations]=useState([]),[maintenance,setMaintenance]=useState([]),[housekeeping,setHousekeeping]=useState([]),[reservationPayments,setReservationPayments]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState("")
+  const load=useCallback(async()=>{if(!propertyId)return;setLoading(true);setError("");const yesterday=dateKey(-1),today=dateKey(0),tomorrow=dateKey(1),dayAfter=dateKey(2);try{const[roomRes,resRes,maintRes,hkRes]=await Promise.all([
+    supabase.from("habitaciones").select("id,nombre,tipo,estado,activa").eq("property_id",propertyId).eq("activa",true),
+    supabase.from("reservas").select("id,numero_reserva,nombre_huesped,habitacion_id,habitaciones_ids,fecha_entrada,fecha_salida,estado,no_show,precio_total,moneda,cantidad_huespedes,canal_reserva,hora_llegada_estimada,hora_salida_estimada,created_at").eq("property_id",propertyId).lte("fecha_entrada",dayAfter).gte("fecha_salida",yesterday).neq("estado","cancelada"),
+    supabase.from("hotel_maintenance_tickets").select("id,status,priority,due_at").eq("property_id",propertyId).not("status","in","(resolved,cancelled)"),
+    supabase.from("hotel_housekeeping_tasks").select("id,status,checklist,scheduled_for").eq("property_id",propertyId).gte("scheduled_for",`${today}T00:00:00`).lt("scheduled_for",`${tomorrow}T00:00:00`),
+  ]);for(const result of[roomRes,resRes,maintRes,hkRes])if(result.error)throw result.error;const reservationRows=resRes.data||[],ids=reservationRows.map(row=>row.id);let payments=[];if(ids.length){const payRes=await supabase.from("pagos").select("id,reserva_id,monto,refunded_amount,estado,moneda").eq("property_id",propertyId).in("reserva_id",ids);if(payRes.error)throw payRes.error;payments=payRes.data||[]}setRooms(roomRes.data||[]);setReservations(reservationRows);setMaintenance(maintRes.data||[]);setHousekeeping(hkRes.data||[]);setReservationPayments(payments)}catch(err){setError(err?.message||"No se pudo cargar la operación del hotel.")}finally{setLoading(false)}},[propertyId])
+  useEffect(()=>{load()},[load])
+  usePmsAutoRefresh(propertyId,load,["reservas","pagos","habitaciones","hotel_housekeeping_tasks","hotel_maintenance_tickets"])
+  const paymentByReservation=useMemo(()=>{const map=new Map();for(const payment of reservationPayments){if(!validPayment(payment))continue;const id=Number(payment.reserva_id),net=Math.max(0,Number(payment.monto||0)-Number(payment.refunded_amount||0));map.set(id,(map.get(id)||0)+net)}return map},[reservationPayments])
+  const roomById=useMemo(()=>new Map(rooms.map(room=>[Number(room.id),room])),[rooms])
+  const enrich=useCallback(item=>{const ids=roomIds(item),assigned=ids.map(id=>roomById.get(id)).filter(Boolean),paid=paymentByReservation.get(Number(item.id))||0,total=Number(item.precio_total)||0;return{...item,rooms:assigned,roomNames:assigned.map(room=>room.nombre),roomDirty:assigned.some(room=>room.estado==="sucia"),roomMaintenance:assigned.some(room=>room.estado==="mantenimiento"),paid,balance:Math.max(0,total-paid)}},[roomById,paymentByReservation])
+  const operationsByOffset=useMemo(()=>{const result={},valid=reservations.filter(validReservation);for(const offset of[-1,0,1]){const day=dateKey(offset),arrivals=valid.filter(r=>r.fecha_entrada===day).map(enrich),departures=valid.filter(r=>r.fecha_salida===day).map(enrich),inhouse=valid.filter(r=>r.fecha_entrada<=day&&r.fecha_salida>day&&r.estado!=="finalizada").map(enrich);result[offset]={day,arrivals,inhouse,departures}}return result},[reservations,enrich])
+  const metrics=useMemo(()=>{const today=dateKey(0),valid=reservations.filter(validReservation),arrivals=valid.filter(r=>r.fecha_entrada===today).length,departures=valid.filter(r=>r.fecha_salida===today).length,occupiedIds=new Set();for(const reservation of valid.filter(r=>r.fecha_entrada<=today&&r.fecha_salida>today&&r.estado!=="finalizada"))roomIds(reservation).forEach(id=>occupiedIds.add(id));const inhouse=occupiedIds.size,occupancy=rooms.length?Math.min(100,(inhouse/rooms.length)*100):0;let checkDone=0,checkTotal=0;for(const task of housekeeping){const list=Array.isArray(task.checklist)?task.checklist:[];if(list.length){checkTotal+=list.length;checkDone+=list.filter(item=>item?.done===true).length}else{checkTotal+=1;if(task.status==="done")checkDone+=1}}return{arrivals,departures,inhouse,occupancy,maintenance:maintenance.length,urgent:maintenance.filter(ticket=>["urgent","critical"].includes(String(ticket.priority||"").toLowerCase())).length,checkDone,checkTotal,checkPct:checkTotal?Math.round((checkDone/checkTotal)*100):0,dirty:rooms.filter(room=>room.estado==="sucia").length,ready:rooms.filter(room=>["libre","limpia","inspeccionada"].includes(room.estado)).length,totalRooms:rooms.length}},[rooms,reservations,maintenance,housekeeping])
+  return{metrics,operationsByOffset,loading,error,load}
+}

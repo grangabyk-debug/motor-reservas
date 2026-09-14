@@ -8,19 +8,22 @@ import DashboardExperience from"../../features/frontdesk/DashboardExperience"
 import QuoteBuilder from"../../features/frontdesk/QuoteBuilder"
 import LobbyTentativeStrip from"../../features/frontdesk/LobbyTentativeStrip"
 import GuestInbox from"../../features/frontdesk/GuestInbox"
-import{RoomsView,MaintenanceView,ResourcesView,DigitalTwinView}from"../../features/operations/OperationsViews"
+import{RoomsView,ResourcesView,DigitalTwinView}from"../../features/operations/OperationsViews"
 import HousekeepingPremium from"../../features/operations/HousekeepingPremium"
+import MaintenancePremium from"../../features/operations/MaintenancePremium"
 import{RevenueView,PartnersView,UpsellingView}from"../../features/commercial/CommercialViews"
 import ChannelHubPremium from"../../features/commercial/ChannelHubPremium"
 import PackagesView from"../../features/commercial/PackagesView"
 import GroupsPremium from"../../features/commercial/GroupsPremium"
 import{CashView,BillingView,ReportsView}from"../../features/finance/FinanceViews"
+import AnalyticsOverview from"../../features/intelligence/AnalyticsOverview"
 import{KeysView,TeamView,AutomationsView,IntelligenceView}from"../../features/hotel/HotelViews"
 import IntegrationMarketplace from"../../features/hotel/IntegrationMarketplace"
 import SettingsWorkspace from"../../features/hotel/SettingsWorkspace"
 import SupportView from"../../features/hotel/SupportView"
-import{saveFloor,saveRoom,updateRoomStatus,saveHousekeepingTask,setHousekeepingStatus,saveMaintenanceTicket,setMaintenanceStatus,saveResource}from"../../services/operations"
-import{saveRateCell,saveRateRange,savePartner,saveUpsell}from"../../services/commercial"
+import SubscriptionPanel from"../../features/hotel/SubscriptionPanel"
+import{saveFloor,saveRoom,updateRoomStatus,saveHousekeepingTask,setHousekeepingStatus,saveResource}from"../../services/operations"
+import{saveRateCell,saveRateRange,savePartner,saveUpsell,saveChannelCost}from"../../services/commercial"
 import{savePackage,setPackageActive}from"../../services/packages"
 import{openCashSession,saveCashMovement,closeCashSession,saveFinanceDocument,issueInternalDocument}from"../../services/finance"
 import{updateMemberRole,saveRolePermission,saveAutomation,toggleAutomation,deleteAutomation,resolveAutomationEvent,saveHotelSettings,prepareKey,revokeKey,askIntelligence}from"../../services/hotel"
@@ -37,7 +40,7 @@ export default function HotelViewRouter({view,data,session,settings,permissions,
   if(view==="keys")return <KeysView reservations={live} rooms={data.rooms} issues={data.keyIssues||[]} settings={settings} onPrepare={(reservation,room,encoder,count)=>action(()=>prepareKey({propertyId:session.propertyId,userId:session.user.id,reservation,room,encoder,count}),r=>r?.physical?"Llave codificada.":"Emisión registrada; falta confirmación física.")} onRevoke={issue=>action(()=>revokeKey({propertyId:session.propertyId,id:issue.id}),"Llave revocada en el PMS.")}/>
   if(view==="rooms")return <RoomsView rooms={data.rooms} floors={data.floors} canManage={allowed("operations.rooms.manage")} onSaveFloor={draft=>action(()=>saveFloor({propertyId:session.propertyId,draft}),"Piso guardado.")} onSaveRoom={draft=>action(()=>saveRoom({propertyId:session.propertyId,draft}),"Habitación guardada.")} onBlock={room=>setBlockDraft({roomId:String(room.id),start:today,end:addDays(today,1),reason:"Mantenimiento",detail:""})}/>
   if(view==="housekeeping")return <HousekeepingPremium rooms={activeRooms} floors={data.floors} reservations={live} tasks={data.operations.housekeeping||[]} onRoomStatus={(room,status)=>action(()=>updateRoomStatus({propertyId:session.propertyId,roomId:room.id,status}),"Estado actualizado.")} onSaveTask={draft=>action(()=>saveHousekeepingTask({propertyId:session.propertyId,userId:session.user.id,draft}),"Tarea creada.")} onTaskStatus={(task,status)=>action(()=>setHousekeepingStatus({propertyId:session.propertyId,id:task.id,status}),"Tarea actualizada.")}/>
-  if(view==="maintenance")return <MaintenanceView rooms={activeRooms} resources={data.operations.resources||[]} tickets={data.operations.maintenance||[]} onSave={draft=>action(()=>saveMaintenanceTicket({propertyId:session.propertyId,userId:session.user.id,draft}),"Ticket creado.")} onStatus={(ticket,status)=>action(()=>setMaintenanceStatus({propertyId:session.propertyId,id:ticket.id,status}),"Mantenimiento actualizado.")}/>
+  if(view==="maintenance")return <MaintenancePremium propertyId={session.propertyId} rooms={activeRooms} reservations={live} resources={data.operations.resources||[]}/>
   if(view==="resources")return <ResourcesView resources={data.operations.resources||[]} onSave={draft=>action(()=>saveResource({propertyId:session.propertyId,draft}),"Recurso guardado.")}/>
   if(view==="twin")return <DigitalTwinView rooms={activeRooms} floors={data.floors} reservations={live}/>
   if(view==="rates")return <RevenueView rooms={activeRooms} reservations={committed} rates={data.commercial.rates||[]} canManage={allowed("commercial.rates.manage")} onSaveCell={draft=>action(()=>saveRateCell({propertyId:session.propertyId,draft}),"Tarifa actualizada.")} onBulk={draft=>action(()=>saveRateRange({propertyId:session.propertyId,roomId:draft.roomId,start:draft.start,end:draft.end,price:draft.price,minStay:draft.minStay,stopSell:draft.stopSell,cta:draft.cta,ctd:draft.ctd,existingRates:data.commercial.rates||[],fallbackPrice:draft.fallbackPrice}),n=>`${n||0} días tarifarios actualizados.`)}/>
@@ -46,6 +49,7 @@ export default function HotelViewRouter({view,data,session,settings,permissions,
   if(view==="groups")return <GroupsPremium propertyId={session.propertyId} userId={session.user?.id} partners={data.commercial.partners||[]} rooms={activeRooms} canManage={allowed("commercial.groups.manage")} onOpenPlanning={()=>changeView("calendar")}/>
   if(view==="upselling")return <UpsellingView items={data.commercial.upsells||[]} canManage={allowed("commercial.upsell")} onSave={draft=>action(()=>saveUpsell({propertyId:session.propertyId,draft}),"Upsell guardado.")}/>
   if(view==="distribution")return <ChannelHubPremium propertyId={session.propertyId} userId={session.user?.id} canManage={allowed("commercial.rates.manage")||allowed("hotel.settings")}/>
+  if(view==="analytics")return <AnalyticsOverview rooms={data.rooms} reservations={data.reservations} payments={data.payments} blocks={data.blocks} settings={settings} snapshots={data.analytics?.snapshots||[]} channelCosts={data.analytics?.channelCosts||[]} canManageChannelCosts={role==="owner"||role==="manager"} onSaveChannelCost={draft=>action(()=>saveChannelCost({propertyId:session.propertyId,draft}),"Costo de canal guardado.")}/>
   if(view==="cash")return <CashView sessions={data.finance.sessions||[]} movements={data.finance.movements||[]} reservations={live} canManage={allowed("finance.cash")} onOpen={draft=>action(()=>openCashSession({propertyId:session.propertyId,userId:session.user.id,openingAmount:draft.openingAmount,notes:draft.notes}),"Caja abierta.")} onMovement={draft=>action(()=>saveCashMovement({propertyId:session.propertyId,userId:session.user.id,sessionId:draft.sessionId,reservationId:draft.reservationId,movementType:draft.movementType,method:draft.method,amount:draft.amount,concept:draft.concept,reference:draft.reference,currency:draft.currency}),"Movimiento registrado.")} onClose={draft=>action(()=>closeCashSession({propertyId:session.propertyId,userId:session.user.id,sessionId:draft.sessionId,closingAmount:draft.closingAmount,notes:draft.notes}),r=>`Caja cerrada · diferencia ${money(r?.difference||0)}`)}/>
   if(view==="billing")return <BillingView documents={data.finance.documents||[]} reservations={live} partners={data.commercial.partners||[]} groups={data.commercial.groups||[]} canManage={allowed("finance.folios")} onSave={draft=>action(()=>saveFinanceDocument({propertyId:session.propertyId,userId:session.user.id,draft}),"Documento guardado.")} onIssue={doc=>action(()=>issueInternalDocument({propertyId:session.propertyId,id:doc.id}),number=>`Documento interno emitido: ${number}`)}/>
   if(view==="reports")return <ReportsView reservations={data.reservations} rooms={data.rooms} payments={data.payments} housekeeping={data.operations.housekeeping||data.housekeepingTasks||[]}/>
@@ -53,6 +57,7 @@ export default function HotelViewRouter({view,data,session,settings,permissions,
   if(view==="automations")return <AutomationsView rules={data.hotel.automations||[]} events={data.hotel.events?.length?data.hotel.events:(data.automationEvents||[])} canManage={allowed("hotel.automations")} onSave={draft=>action(()=>saveAutomation({propertyId:session.propertyId,userId:session.user.id,draft}),"Automatización guardada.")} onToggle={(rule,enabled)=>action(()=>toggleAutomation({propertyId:session.propertyId,id:rule.id,enabled}),enabled?"Automatización activada.":"Automatización pausada.")} onDelete={rule=>action(()=>deleteAutomation({propertyId:session.propertyId,id:rule.id}),"Automatización eliminada.")} onResolve={event=>action(()=>resolveAutomationEvent({propertyId:session.propertyId,id:event.id}),"Evento resuelto.")}/>
   if(view==="intelligence")return <IntelligenceView settings={settings} rooms={activeRooms} reservations={live} payments={data.payments} onAsk={(question,context)=>askIntelligence({question,context})}/>
   if(view==="integrations")return <IntegrationMarketplace settings={settings} channels={data.channels||[]}/>
+  if(view==="subscription")return role==="owner"?<SubscriptionPanel propertyId={session.propertyId} role={role}/>:<ModuleBridge view={view}/>
   if(view==="settings")return <SettingsWorkspace settings={settings} canManage={allowed("hotel.settings")} onSave={draft=>action(()=>saveHotelSettings({propertyId:session.propertyId,draft}),"Configuración guardada.")}/>
   if(view==="support")return <SupportView propertyId={session.propertyId} hotelName={hotelName}/>
   return <ModuleBridge view={view}/>

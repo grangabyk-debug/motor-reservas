@@ -1,31 +1,21 @@
 {
-  "id": "/dashboard",
-  "name": "Habitación Llena",
-  "short_name": "Hab. Llena",
-  "description": "PMS hotelero para operar recepción, reservas, habitaciones y ventas desde una sola app.",
-  "lang": "es-AR",
-  "dir": "ltr",
-  "start_url": "/dashboard",
-  "scope": "/",
-  "display": "standalone",
-  "display_override": ["window-controls-overlay", "standalone"],
-  "background_color": "#f6f7f9",
-  "theme_color": "#ffffff",
-  "orientation": "any",
-  "prefer_related_applications": false,
-  "categories": ["business", "productivity"],
-  "icons": [
-    {
-      "src": "/pwa-icon-192.svg",
-      "sizes": "192x192",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/pwa-icon-512.svg",
-      "sizes": "512x512",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    }
+  "name":"HabitacionLlena.com · Hotel Operating System",
+  "short_name":"Habitación Llena",
+  "description":"PMS hotelero para reservas, planning, huéspedes, housekeeping, caja y operación diaria.",
+  "id":"/pms-next",
+  "start_url":"/pms-next?source=pwa",
+  "scope":"/",
+  "display":"standalone",
+  "display_override":["window-controls-overlay","standalone","minimal-ui"],
+  "orientation":"any",
+  "background_color":"#eef2f8",
+  "theme_color":"#5b5bf7",
+  "categories":["business","productivity"],
+  "prefer_related_applications":false,
+  "icons":[{"src":"/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}],
+  "shortcuts":[
+    {"name":"Planning","short_name":"Planning","url":"/pms-next?view=planning&source=pwa-shortcut","icons":[{"src":"/icon.svg","sizes":"any","type":"image/svg+xml"}]},
+    {"name":"Reservas","short_name":"Reservas","url":"/pms-next?view=reservations&source=pwa-shortcut","icons":[{"src":"/icon.svg","sizes":"any","type":"image/svg+xml"}]},
+    {"name":"Huéspedes","short_name":"Huéspedes","url":"/pms-next?view=guests&source=pwa-shortcut","icons":[{"src":"/icon.svg","sizes":"any","type":"image/svg+xml"}]}
   ]
 }
