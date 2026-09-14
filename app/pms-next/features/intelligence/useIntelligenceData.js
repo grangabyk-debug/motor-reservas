@@ -26,7 +26,7 @@ export default function useIntelligenceData(propertyId){
         supabase.from("hotel_channel_costs").select("*").eq("property_id",propertyId).eq("active",true).order("channel_name"),
         supabase.from("inbox_conversations").select("id,channel,contact_name,contact_email,contact_phone,last_message_at,last_message_text,unread_count,status,reservation_id,guest_profile_id,created_at,updated_at").eq("property_id",propertyId).gte("created_at",commercialIso).order("last_message_at",{ascending:false,nullsFirst:false}).limit(3000),
         supabase.from("hotel_group_quotes").select("id,group_id,quote_number,status,currency,total,sent_at,accepted_at,created_at,updated_at").eq("property_id",propertyId).gte("created_at",commercialIso).order("created_at",{ascending:false}).limit(3000),
-        supabase.from("hotel_groups").select("id,name,status,contact_name,contact_email,contact_phone,sales_stage,budget_currency,budget_total,created_at,updated_at").eq("property_id",propertyId).gte("created_at",commercialIso).order("created_at",{ascending:false}).limit(3000),
+        supabase.from("hotel_groups").select("id,name,status,kind,event_type,arrival_date,departure_date,contact_name,contact_email,contact_phone,sales_stage,priority,budget_currency,budget_total,estimated_pax,notes,created_at,updated_at").eq("property_id",propertyId).gte("created_at",commercialIso).order("created_at",{ascending:false}).limit(3000),
       ]
       const results=await Promise.all(queries),failed=results.find(result=>result.error)
       if(failed?.error)throw failed.error
