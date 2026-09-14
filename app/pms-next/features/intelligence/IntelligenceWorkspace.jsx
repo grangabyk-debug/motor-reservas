@@ -6,9 +6,10 @@ import SalesIntelligence from"./SalesIntelligence"
 import DemandIntelligence from"./DemandIntelligence"
 import PipelineIntelligence from"./PipelineIntelligence"
 import CommercialAutomation from"./CommercialAutomation"
+import CommercialCopilot from"./CommercialCopilot"
 import useIntelligenceData from"./useIntelligenceData"
 
-const modes=new Set(["sales","demand","pipeline","automation","hotel"])
+const modes=new Set(["sales","demand","pipeline","automation","olivia","hotel"])
 const polish=`
 [data-intelligence] header p{display:none!important}
 [data-intelligence] button{min-height:38px;font-size:12px!important}
@@ -33,7 +34,7 @@ const polish=`
 [data-theme="dark"] [data-intelligence-switch]{background:rgba(17,21,34,.9);border-color:rgba(151,163,194,.18)}
 [data-theme="dark"] [data-intelligence-switch] button{color:#aab4c8}
 [data-theme="dark"] [data-intelligence-switch] button[data-active="true"]{background:#ede9ff;color:#24213e}
-@media(max-width:760px){[data-intelligence] button{min-height:42px}[data-intelligence] select,[data-intelligence] input{font-size:16px!important}[data-intelligence-switch]{top:60px;max-width:calc(100% - 20px);margin:9px 10px -1px;overflow:auto}[data-intelligence-switch] button{padding:0 12px}}
+@media(max-width:760px){[data-intelligence] button{min-height:42px}[data-intelligence] select,[data-intelligence] input,[data-intelligence] textarea{font-size:16px!important}[data-intelligence-switch]{top:60px;max-width:calc(100% - 20px);margin:9px 10px -1px;overflow:auto}[data-intelligence-switch] button{padding:0 12px}}
 `
 
 export default function IntelligenceWorkspace({propertyId,property}){
@@ -42,5 +43,12 @@ export default function IntelligenceWorkspace({propertyId,property}){
   function changeMode(next){setMode(next);if(typeof window==="undefined")return;const url=new URL(window.location.href);url.searchParams.set("intelligence",next);window.history.replaceState(window.history.state||{},"",url)}
   if(data.loading)return <section style={{padding:24,fontSize:15,fontWeight:750}}>Cargando Inteligencia…</section>
   if(data.error)return <section style={{padding:24}}><div style={{padding:14,borderRadius:14,background:"rgba(229,72,77,.1)",color:"#b42343",fontWeight:750}}>{data.error}</div></section>
-  return <section data-intelligence><style>{polish}</style><nav data-intelligence-switch aria-label="Secciones de Inteligencia"><button type="button" data-active={mode==="sales"} onClick={()=>changeMode("sales")}>Ventas directas</button><button type="button" data-active={mode==="demand"} onClick={()=>changeMode("demand")}>Demanda</button><button type="button" data-active={mode==="pipeline"} onClick={()=>changeMode("pipeline")}>Pipeline</button><button type="button" data-active={mode==="automation"} onClick={()=>changeMode("automation")}>Automatización</button><button type="button" data-active={mode==="hotel"} onClick={()=>changeMode("hotel")}>Rendimiento hotelero</button></nav>{mode==="sales"?<SalesIntelligence reservations={data.reservations} conversations={data.conversations} messages={data.messages} webEvents={data.webEvents} quotes={data.quotes} groups={data.groups} channelCosts={data.channelCosts} settings={property||{}}/>:mode==="demand"?<DemandIntelligence reservations={data.reservations} groups={data.groups} quotes={data.quotes} webEvents={data.webEvents} settings={property||{}}/>:mode==="pipeline"?<PipelineIntelligence reservations={data.reservations} conversations={data.conversations} messages={data.messages} quotes={data.quotes} groups={data.groups}/>:mode==="automation"?<CommercialAutomation propertyId={propertyId} property={property} reservations={data.reservations} conversations={data.conversations} messages={data.messages} quotes={data.quotes} groups={data.groups}/>:<AnalyticsOverview rooms={data.rooms} reservations={data.reservations} payments={data.payments} blocks={data.blocks} snapshots={data.snapshots} channelCosts={data.channelCosts} settings={property||{}} canManageChannelCosts={canManage} onSaveChannelCost={data.saveChannelCost}/>}</section>
+  let content
+  if(mode==="sales")content=<SalesIntelligence reservations={data.reservations} conversations={data.conversations} messages={data.messages} webEvents={data.webEvents} quotes={data.quotes} groups={data.groups} channelCosts={data.channelCosts} settings={property||{}}/>
+  else if(mode==="demand")content=<DemandIntelligence reservations={data.reservations} groups={data.groups} quotes={data.quotes} webEvents={data.webEvents} settings={property||{}}/>
+  else if(mode==="pipeline")content=<PipelineIntelligence reservations={data.reservations} conversations={data.conversations} messages={data.messages} quotes={data.quotes} groups={data.groups}/>
+  else if(mode==="automation")content=<CommercialAutomation propertyId={propertyId} property={property} reservations={data.reservations} conversations={data.conversations} messages={data.messages} quotes={data.quotes} groups={data.groups}/>
+  else if(mode==="olivia")content=<CommercialCopilot property={property} rooms={data.rooms} reservations={data.reservations} blocks={data.blocks} conversations={data.conversations} messages={data.messages} quotes={data.quotes} groups={data.groups} bookingEngine={data.bookingEngine}/>
+  else content=<AnalyticsOverview rooms={data.rooms} reservations={data.reservations} payments={data.payments} blocks={data.blocks} snapshots={data.snapshots} channelCosts={data.channelCosts} settings={property||{}} canManageChannelCosts={canManage} onSaveChannelCost={data.saveChannelCost}/>
+  return <section data-intelligence><style>{polish}</style><nav data-intelligence-switch aria-label="Secciones de Inteligencia"><button type="button" data-active={mode==="sales"} onClick={()=>changeMode("sales")}>Ventas directas</button><button type="button" data-active={mode==="demand"} onClick={()=>changeMode("demand")}>Demanda</button><button type="button" data-active={mode==="pipeline"} onClick={()=>changeMode("pipeline")}>Pipeline</button><button type="button" data-active={mode==="automation"} onClick={()=>changeMode("automation")}>Automatización</button><button type="button" data-active={mode==="olivia"} onClick={()=>changeMode("olivia")}>OlivIA</button><button type="button" data-active={mode==="hotel"} onClick={()=>changeMode("hotel")}>Rendimiento hotelero</button></nav>{content}</section>
 }

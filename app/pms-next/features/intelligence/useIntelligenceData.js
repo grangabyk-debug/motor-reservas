@@ -3,8 +3,8 @@
 import{useCallback,useEffect,useMemo,useRef,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 
-const empty={rooms:[],reservations:[],payments:[],blocks:[],snapshots:[],channelCosts:[],conversations:[],messages:[],webEvents:[],quotes:[],groups:[]}
-const tables=["habitaciones","reservas","pagos","bloqueos","hotel_channel_costs","hotel_group_quotes","hotel_groups","inbox_conversations"]
+const empty={rooms:[],reservations:[],payments:[],blocks:[],snapshots:[],channelCosts:[],conversations:[],messages:[],webEvents:[],quotes:[],groups:[],bookingEngine:null}
+const tables=["habitaciones","reservas","pagos","bloqueos","hotel_channel_costs","hotel_group_quotes","hotel_groups","inbox_conversations","hotel_booking_engines"]
 
 export default function useIntelligenceData(propertyId){
   const[data,setData]=useState(empty),[loading,setLoading]=useState(true),[error,setError]=useState("")
@@ -39,7 +39,10 @@ export default function useIntelligenceData(propertyId){
       let webEvents=[]
       const webResult=await supabase.from("hotel_web_events").select("id,event_name,source,session_id,metadata,created_at").eq("property_id",propertyId).gte("created_at",commercialIso).order("created_at",{ascending:false}).limit(10000)
       if(!webResult.error)webEvents=webResult.data||[]
-      setData({rooms,reservations,payments,blocks,snapshots,channelCosts,conversations,messages,webEvents,quotes,groups})
+      let bookingEngine=null
+      const engineResult=await supabase.from("hotel_booking_engines").select("id,property_id,slug,enabled,display_name,currency,min_advance_days,max_advance_days,min_nights,payment_mode,deposit_percent,updated_at").eq("property_id",propertyId).maybeSingle()
+      if(!engineResult.error)bookingEngine=engineResult.data||null
+      setData({rooms,reservations,payments,blocks,snapshots,channelCosts,conversations,messages,webEvents,quotes,groups,bookingEngine})
     }catch(err){setError(err?.message||"No se pudo cargar Inteligencia.")}finally{setLoading(false)}
   },[propertyId])
   useEffect(()=>{setLoading(true);load({capture:true})},[load])
