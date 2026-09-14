@@ -11,11 +11,13 @@ export default function ResetPasswordPage(){
 
   useEffect(()=>{
     let active=true
+    const blockContextMenu=(event)=>event.preventDefault()
+    document.addEventListener("contextmenu",blockContextMenu)
     const finish=session=>{if(!active)return;setValidSession(Boolean(session));setVerifying(false);if(!session){setMessage("El enlace de recuperación no es válido o ya venció. Solicitá uno nuevo desde el inicio de sesión.");setKind("error")}}
     supabase.auth.getSession().then(({data})=>{if(data?.session)finish(data.session)})
     const{data:{subscription}}=supabase.auth.onAuthStateChange((event,session)=>{if((event==="PASSWORD_RECOVERY"||event==="SIGNED_IN")&&session)finish(session)})
     const timer=window.setTimeout(async()=>{if(!active)return;const{data}=await supabase.auth.getSession();finish(data?.session||null)},1500)
-    return()=>{active=false;window.clearTimeout(timer);subscription.unsubscribe()}
+    return()=>{active=false;document.removeEventListener("contextmenu",blockContextMenu);window.clearTimeout(timer);subscription.unsubscribe()}
   },[])
 
   async function changePassword(e){
