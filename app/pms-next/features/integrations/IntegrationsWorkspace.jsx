@@ -3,10 +3,11 @@
 import{useEffect,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 import ApiAccessPanel from"./ApiAccessPanel"
+import ArcaConnectionPanel from"./ArcaConnectionPanel"
 import s from"./integrations.module.css"
 
 const SECTIONS={
-  apps:{eyebrow:"INTEGRACIONES",title:"Apps externas",description:"Conectores útiles para ampliar el hotel sin mezclar la operación diaria."},
+  apps:{eyebrow:"INTEGRACIONES",title:"Apps y servicios",description:"Conectores útiles para ampliar el hotel sin mezclar la operación diaria."},
   api:{eyebrow:"INTEGRACIONES",title:"REST API",description:"Claves, permisos, rate limit, auditoría y documentación para integraciones propias y partners autorizados."},
   messages:{eyebrow:"INTEGRACIONES",title:"Mensajería",description:"Canales para centralizar conversaciones de huéspedes y automatizaciones."},
   payments:{eyebrow:"INTEGRACIONES",title:"Pagos",description:"Pasarelas de cobro online conectadas al motor y a la caja del hotel."},
@@ -28,8 +29,8 @@ export default function IntegrationsWorkspace({propertyId,section="apps",onNavig
   useEffect(()=>{let alive=true;if(section!=="api"||!propertyId){setApiAllowed(null);return}supabase.rpc("hl_can_property_action",{p_property_id:propertyId,p_action:"api.manage_keys"}).then(({data,error})=>{if(alive)setApiAllowed(!error&&data===true)}).catch(()=>alive&&setApiAllowed(false));return()=>{alive=false}},[propertyId,section])
   if(section==="api")return <section className={s.catalogPage}><header className={s.catalogHeader}><div><small>{meta.eyebrow}</small><h1>{meta.title}</h1><p>{meta.description}</p></div><span className={s.connectedCount}>API v1</span></header>{apiAllowed===null?<div className={s.paymentCard}><h2>Validando acceso</h2></div>:apiAllowed?<ApiAccessPanel propertyId={propertyId}/>:<div className={s.paymentGrid}><article className={s.paymentCard}><div className={s.cardHead}><span className={s.appMark}>API</span><span className={s.statusChip}>Sólo lectura</span></div><h2>Acceso restringido</h2><span className={s.category}>Permisos</span><p>Un Propietario o Gerencia puede habilitar esta acción desde Configuración → Roles y permisos.</p></article></div>}</section>
   return <section className={s.catalogPage}>
-    <header className={s.catalogHeader}><div><small>{meta.eyebrow}</small><h1>{meta.title}</h1><p>{meta.description}</p></div><span className={s.connectedCount}>{section==="payments"&&payment?.status==="connected"?"1 conectado":"Configuración simple"}</span></header>
-    {section==="apps"?<CardGrid cards={APP_CARDS}/>:section==="messages"?<CardGrid cards={MESSAGE_CARDS}/>:<PaymentsPanel payment={payment} loading={loading} onNavigate={onNavigate}/>} 
+    <header className={s.catalogHeader}><div><small>{meta.eyebrow}</small><h1>{meta.title}</h1><p>{meta.description}</p></div><span className={s.connectedCount}>{section==="payments"&&payment?.status==="connected"?"1 conectado":section==="apps"?"Servicios del hotel":"Configuración simple"}</span></header>
+    {section==="apps"?<><ArcaConnectionPanel propertyId={propertyId}/><CardGrid cards={APP_CARDS}/></>:section==="messages"?<CardGrid cards={MESSAGE_CARDS}/>:<PaymentsPanel payment={payment} loading={loading} onNavigate={onNavigate}/>} 
   </section>
 }
 
