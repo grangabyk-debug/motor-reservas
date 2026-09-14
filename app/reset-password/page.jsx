@@ -31,7 +31,7 @@ export default function ResetPasswordPage(){
     setCompleted(true);setValidSession(false);setMessage("Contraseña actualizada. Ya podés volver a ingresar al PMS.");setKind("success");setLoading(false)
   }
 
-  return <HospitalityShell eyebrow="RECUPERAR ACCESO" title={verifying?"Verificando tu enlace.":completed?"Acceso actualizado.":"Elegí una nueva contraseña."} copy={verifying?"Estamos validando el enlace de recuperación de forma segura.":completed?"Tu nueva contraseña ya quedó guardada.":"Actualizá la clave de tu cuenta hotelera para volver a operar."} productLabel="PMS Hotelero" sceneEyrow="HABITACIÓN LLENA · ACCESO SEGURO" compact>
+  return <HospitalityShell eyebrow="RECUPERAR ACCESO" title={verifying?"Verificando tu enlace.":completed?"Acceso actualizado.":"Elegí una nueva contraseña."} copy={verifying?"Estamos validando el enlace de recuperación de forma segura.":completed?"Tu nueva contraseña ya quedó guardada.":"Actualizá la clave de tu cuenta hotelera para volver a operar."} productLabel="PMS Hotelero" sceneEyebrow="HABITACIÓN LLENA · ACCESO SEGURO" compact>
     {verifying?<div className={ui.message}>Validando sesión de recuperación…</div>:validSession?<form onSubmit={changePassword} className={ui.form}>
       <label className={ui.field}>Nueva contraseña<input type="password" required minLength={8} autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Mínimo 8 caracteres"/></label>
       <label className={ui.field}>Repetir contraseña<input type="password" required minLength={8} autoComplete="new-password" value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} placeholder="Repetí tu contraseña"/></label>
