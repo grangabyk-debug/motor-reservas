@@ -1,6 +1,6 @@
 "use client"
 
-import{useEffect,useState}from"react"
+import{useEffect,useMemo,useState}from"react"
 import AnalyticsOverview from"./AnalyticsOverview"
 import SalesIntelligence from"./SalesIntelligence"
 import DemandIntelligence from"./DemandIntelligence"
@@ -39,6 +39,11 @@ const polish=`
 
 export default function IntelligenceWorkspace({propertyId,property}){
   const data=useIntelligenceData(propertyId),role=property?.role||"member",canManage=["owner","manager"].includes(role),[mode,setMode]=useState("sales")
+  const commercialGroups=useMemo(()=>{
+    const latestByGroup=new Map()
+    ;[...data.quotes].sort((a,b)=>new Date(b.updated_at||b.created_at||0)-new Date(a.updated_at||a.created_at||0)).forEach(quote=>{const key=String(quote.group_id||"");if(key&&!latestByGroup.has(key))latestByGroup.set(key,quote)})
+    return data.groups.map(group=>{const quote=latestByGroup.get(String(group.id)),status=String(quote?.status||"").trim().toLowerCase();return status==="rejected"||status.includes("rechaz")?{...group,sales_stage:"lost"}:group})
+  },[data.groups,data.quotes])
   useEffect(()=>{if(typeof window==="undefined")return;const apply=()=>{const requested=new URL(window.location.href).searchParams.get("intelligence");if(modes.has(requested))setMode(requested)};apply();window.addEventListener("popstate",apply);return()=>window.removeEventListener("popstate",apply)},[])
   function changeMode(next){setMode(next);if(typeof window==="undefined")return;const url=new URL(window.location.href);url.searchParams.set("intelligence",next);window.history.replaceState(window.history.state||{},"",url)}
   if(data.loading)return <section style={{padding:24,fontSize:15,fontWeight:750}}>Cargando Inteligencia…</section>
@@ -46,9 +51,9 @@ export default function IntelligenceWorkspace({propertyId,property}){
   let content
   if(mode==="sales")content=<SalesIntelligence reservations={data.reservations} conversations={data.conversations} messages={data.messages} webEvents={data.webEvents} quotes={data.quotes} groups={data.groups} channelCosts={data.channelCosts} settings={property||{}}/>
   else if(mode==="demand")content=<DemandIntelligence reservations={data.reservations} groups={data.groups} quotes={data.quotes} webEvents={data.webEvents} settings={property||{}}/>
-  else if(mode==="pipeline")content=<PipelineIntelligence reservations={data.reservations} conversations={data.conversations} messages={data.messages} quotes={data.quotes} groups={data.groups}/>
-  else if(mode==="automation")content=<CommercialAutomation propertyId={propertyId} property={property} reservations={data.reservations} conversations={data.conversations} messages={data.messages} quotes={data.quotes} groups={data.groups}/>
-  else if(mode==="olivia")content=<CommercialCopilot property={property} rooms={data.rooms} reservations={data.reservations} blocks={data.blocks} conversations={data.conversations} messages={data.messages} quotes={data.quotes} groups={data.groups} bookingEngine={data.bookingEngine}/>
+  else if(mode==="pipeline")content=<PipelineIntelligence reservations={data.reservations} conversations={data.conversations} messages={data.messages} quotes={data.quotes} groups={commercialGroups}/>
+  else if(mode==="automation")content=<CommercialAutomation propertyId={propertyId} property={property} reservations={data.reservations} conversations={data.conversations} messages={data.messages} quotes={data.quotes} groups={commercialGroups}/>
+  else if(mode==="olivia")content=<CommercialCopilot property={property} rooms={data.rooms} reservations={data.reservations} blocks={data.blocks} conversations={data.conversations} messages={data.messages} quotes={data.quotes} groups={commercialGroups} bookingEngine={data.bookingEngine}/>
   else content=<AnalyticsOverview rooms={data.rooms} reservations={data.reservations} payments={data.payments} blocks={data.blocks} snapshots={data.snapshots} channelCosts={data.channelCosts} settings={property||{}} canManageChannelCosts={canManage} onSaveChannelCost={data.saveChannelCost}/>
   return <section data-intelligence><style>{polish}</style><nav data-intelligence-switch aria-label="Secciones de Inteligencia"><button type="button" data-active={mode==="sales"} onClick={()=>changeMode("sales")}>Ventas directas</button><button type="button" data-active={mode==="demand"} onClick={()=>changeMode("demand")}>Demanda</button><button type="button" data-active={mode==="pipeline"} onClick={()=>changeMode("pipeline")}>Pipeline</button><button type="button" data-active={mode==="automation"} onClick={()=>changeMode("automation")}>Automatización</button><button type="button" data-active={mode==="olivia"} onClick={()=>changeMode("olivia")}>OlivIA</button><button type="button" data-active={mode==="hotel"} onClick={()=>changeMode("hotel")}>Rendimiento hotelero</button></nav>{content}</section>
 }
