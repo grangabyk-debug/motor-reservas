@@ -109,7 +109,7 @@ begin
         from unnest(
           coalesce(r.habitaciones_ids,'{}'::bigint[]) ||
           case when r.habitacion_id is null then '{}'::bigint[] else array[r.habitacion_id]::bigint[] end
-        ) x
+        ) as ids(x)
         where x is not null
       ),'{}'::bigint[]) as analytics_room_ids
     from public.reservas r
@@ -149,7 +149,7 @@ begin
             end
           )
         ),0)::numeric as room_value_per_night
-      from unnest(rb.analytics_room_ids) rid
+      from unnest(rb.analytics_room_ids) as room_ids(rid)
       where d.stay_date>=public.hl_reservation_room_start_date(rb.habitaciones_detalle,rid,rb.fecha_entrada)
         and d.stay_date<public.hl_reservation_room_effective_end_date(rb.habitaciones_detalle,rb.room_checkout_dates,rid,rb.fecha_salida)
     ) active
