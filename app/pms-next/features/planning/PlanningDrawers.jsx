@@ -161,7 +161,7 @@ export function CreateReservationDrawer(props){
     return()=>{cancelled=true}
   },[pid,draft?.start,draft?.end,roomIdsKey,baseRatesKey,setDraft])
 
-  const pricedRooms=useMemo(()=>availableRooms.map(room=>effectiveRates[String(room.id)]==null?room:{...room,precio:effectiveRates[String(room.id)]}),[availableRooms,effectiveRates])
+  const pricedRooms=useMemo(()=>availableRooms.map(room=>{const priced=effectiveRates[String(room.id)]==null?room:{...room,precio:effectiveRates[String(room.id)]};return priced.estado==="mantenimiento"&&priced.available?{...priced,estado:"inspeccionada",currentOperationalStatus:"mantenimiento"}:priced}),[availableRooms,effectiveRates])
   const pricedRoomById=useMemo(()=>new Map(pricedRooms.map(room=>[Number(room.id),room])),[pricedRooms])
   const forcedDraft=draft&&rateCurrency?{...draft,currency:rateCurrency}:draft
   const forcedSetDraft=updater=>setDraft(current=>{const next=typeof updater==="function"?updater(current):updater;if(!next||!rateCurrency)return next;return next.currency===rateCurrency?next:{...next,currency:rateCurrency}})
