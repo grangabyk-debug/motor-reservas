@@ -71,7 +71,7 @@ export default function usePlanningData(propertyId,windowStart,windowEndExclusiv
     for(const room of rooms){const key=String(room.tipo||"Habitación").trim();if(!categoryRooms.has(key))categoryRooms.set(key,[]);categoryRooms.get(key).push(room)}
     function categoryPrice(category,day){
       const candidates=categoryRooms.get(category)||[],values=candidates.map(room=>byDay.get(`${Number(room.id)}:${day}`)).filter(Number.isFinite)
-      if(!values.length)throw new Error(`Falta una tarifa configurada para la categoría ${category} el ${day}. Completala en Tarifas y disponibilidad antes de crear la reserva.`)
+      if(!values.length)throw new Error(`Falta una tarifa de calendario para la categoría vendida ${category} el ${day}. Definila o elegí una tarifa manual explícita.`)
       const anchor=values[0],different=values.some(value=>Math.abs(value-anchor)>.005)
       if(different)throw new Error(`La categoría ${category} tiene tarifas distintas entre habitaciones el ${day}. Elegí una tarifa manual para esta reserva o unificá la categoría en Tarifas y disponibilidad.`)
       return anchor
@@ -79,9 +79,10 @@ export default function usePlanningData(propertyId,windowStart,windowEndExclusiv
     for(const room of selectedRooms){
       const assignment=roomAssignments[String(room.id)]||{},soldAs=String(assignment.soldAs||room.tipo||"Habitación").trim(),manual=assignment.manualRate===true
       if(manual){const manualRate=Math.max(0,Number(assignment.rate)||0);pricing.set(Number(room.id),{rate:manualRate,total:roundInternalPrice(manualRate*nights),source:"manual",category:soldAs});continue}
-      const sameCategory=soldAs===String(room.tipo||"Habitación").trim(),values=dates.map(day=>sameCategory?byDay.get(`${Number(room.id)}:${day}`):categoryPrice(soldAs,day)),missingIndex=values.findIndex(value=>!Number.isFinite(value))
-      if(missingIndex>=0)throw new Error(`Falta una tarifa configurada para ${sameCategory?`la habitación ${room.nombre}`:`la categoría ${soldAs}`} el ${dates[missingIndex]}. Completala en Tarifas y disponibilidad antes de crear la reserva.`)
-      const roomTotal=roundInternalPrice(values.reduce((sum,value)=>sum+value,0)),average=roundInternalPrice(roomTotal/Math.max(1,dates.length));pricing.set(Number(room.id),{rate:average,total:roomTotal,source:sameCategory?"calendar_room":"calendar_sold_category",category:soldAs})
+      const sameCategory=soldAs===String(room.tipo||"Habitación").trim();let fallbackDays=0
+      const values=dates.map(day=>{if(!sameCategory)return categoryPrice(soldAs,day);const calendar=byDay.get(`${Number(room.id)}:${day}`);if(Number.isFinite(calendar))return calendar;fallbackDays++;return Math.max(0,Number(room.precio)||0)}),missingIndex=values.findIndex(value=>!Number.isFinite(value))
+      if(missingIndex>=0)throw new Error(`No se pudo resolver una tarifa para la habitación ${room.nombre} el ${dates[missingIndex]}. Revisá Tarifas y disponibilidad.`)
+      const roomTotal=roundInternalPrice(values.reduce((sum,value)=>sum+value,0)),average=roundInternalPrice(roomTotal/Math.max(1,dates.length)),source=sameCategory?(fallbackDays?"calendar_room_with_base_fallback":"calendar_room"):"calendar_sold_category";pricing.set(Number(room.id),{rate:average,total:roomTotal,source,category:soldAs})
     }
     const groupTaxes=normalizeTaxSettings(settingsRes.data?.settings?.taxes||{})
 
