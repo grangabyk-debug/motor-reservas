@@ -3,8 +3,8 @@
 import{useCallback,useEffect,useMemo,useRef,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 
-const empty={rooms:[],reservations:[],payments:[],blocks:[],snapshots:[],channelCosts:[],conversations:[],messages:[],webEvents:[],quotes:[],groups:[],bookingEngine:null}
-const tables=["habitaciones","reservas","pagos","bloqueos","hotel_channel_costs","hotel_group_quotes","hotel_groups","inbox_conversations","hotel_booking_engines"]
+const empty={rooms:[],reservations:[],payments:[],expenses:[],blocks:[],snapshots:[],channelCosts:[],conversations:[],messages:[],webEvents:[],quotes:[],groups:[],bookingEngine:null}
+const tables=["habitaciones","reservas","pagos","hotel_accounting_expenses","bloqueos","hotel_channel_costs","hotel_group_quotes","hotel_groups","inbox_conversations","hotel_booking_engines"]
 
 export default function useIntelligenceData(propertyId){
   const[data,setData]=useState(empty),[loading,setLoading]=useState(true),[error,setError]=useState("")
@@ -21,6 +21,7 @@ export default function useIntelligenceData(propertyId){
         supabase.from("habitaciones").select("*").eq("property_id",propertyId).order("sort_order").order("id"),
         supabase.from("reservas").select("*").eq("property_id",propertyId).order("fecha_entrada"),
         supabase.from("pagos").select("*").eq("property_id",propertyId).order("created_at",{ascending:false}).limit(5000),
+        supabase.from("hotel_accounting_expenses").select("id,occurred_on,amount,tax_amount,currency,status,category,payment_method,created_at").eq("property_id",propertyId).gte("occurred_on",from.toISOString().slice(0,10)).order("occurred_on",{ascending:false}).limit(3000),
         supabase.from("bloqueos").select("*").eq("property_id",propertyId).order("fecha_desde"),
         supabase.from("hotel_analytics_daily_snapshots").select("*").eq("property_id",propertyId).gte("captured_on",from.toISOString().slice(0,10)).order("captured_on",{ascending:false}).order("stay_date").limit(5000),
         supabase.from("hotel_channel_costs").select("*").eq("property_id",propertyId).eq("active",true).order("channel_name"),
@@ -30,7 +31,7 @@ export default function useIntelligenceData(propertyId){
       ]
       const results=await Promise.all(queries),failed=results.find(result=>result.error)
       if(failed?.error)throw failed.error
-      const[rooms,reservations,payments,blocks,snapshots,channelCosts,conversations,quotes,groups]=results.map(result=>result.data||[])
+      const[rooms,reservations,payments,expenses,blocks,snapshots,channelCosts,conversations,quotes,groups]=results.map(result=>result.data||[])
       const conversationIds=conversations.map(item=>item.id)
       let messages=[]
       if(conversationIds.length){
@@ -42,7 +43,7 @@ export default function useIntelligenceData(propertyId){
       let bookingEngine=null
       const engineResult=await supabase.from("hotel_booking_engines").select("id,property_id,slug,enabled,display_name,currency,min_advance_days,max_advance_days,min_nights,payment_mode,deposit_percent,updated_at").eq("property_id",propertyId).maybeSingle()
       if(!engineResult.error)bookingEngine=engineResult.data||null
-      setData({rooms,reservations,payments,blocks,snapshots,channelCosts,conversations,messages,webEvents,quotes,groups,bookingEngine})
+      setData({rooms,reservations,payments,expenses,blocks,snapshots,channelCosts,conversations,messages,webEvents,quotes,groups,bookingEngine})
     }catch(err){setError(err?.message||"No se pudo cargar Inteligencia.")}finally{setLoading(false)}
   },[propertyId])
   useEffect(()=>{setLoading(true);load({capture:true})},[load])
