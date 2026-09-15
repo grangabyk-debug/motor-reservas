@@ -20,7 +20,8 @@ function localBusinessDate(timezone,cutoff){
 }
 
 export default function NightAuditPanel({propertyId,property,onNavigate}){
-  const[status,setStatus]=useState(null),[history,setHistory]=useState([]),[loading,setLoading]=useState(true),[closing,setClosing]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState(""),[note,setNote]=useState(""),[backendReady,setBackendReady]=useState(true)
+  const[status,setStatus]=useState(null),[history,setHistory]=useState([]),[loading,setLoading]=useState(true),[closing,setClosing]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState(""),[note,setNote]=useState(""),[backendReady,setBackendReady]=useState(true),[cutoffEditing,setCutoffEditing]=useState(false),[cutoffDraft,setCutoffDraft]=useState("05:00"),[savingCutoff,setSavingCutoff]=useState(false)
+  const canManageCutoff=["owner","admin","manager"].includes(property?.role)
 
   const fallbackStatus=useCallback(async()=>{
     const settingsRes=await supabase.from("property_settings").select("settings").eq("property_id",propertyId).maybeSingle()
@@ -52,6 +53,7 @@ export default function NightAuditPanel({propertyId,property,onNavigate}){
     finally{setLoading(false)}
   },[propertyId,fallbackStatus])
   useEffect(()=>{load()},[load])
+  useEffect(()=>{if(!cutoffEditing&&status?.cutoff_time)setCutoffDraft(String(status.cutoff_time).slice(0,5))},[status?.cutoff_time,cutoffEditing])
 
   const blockers=status?.blockers||{},warnings=status?.warnings||{},counts=status?.counts||{},ready=Boolean(status?.ready),alreadyClosed=Boolean(status?.already_closed)
   const cards=useMemo(()=>[
@@ -62,6 +64,22 @@ export default function NightAuditPanel({propertyId,property,onNavigate}){
   ],[blockers,warnings,counts])
 
   function openItem(card,item){if(card.action==="dailycash")return onNavigate?.("dailycash");if(item?.id)return onNavigate?.("reservations",{reservationId:Number(item.id),restoreScroll:false});onNavigate?.(card.action)}
+  async function saveCutoff(){
+    if(!canManageCutoff||savingCutoff)return
+    const value=String(cutoffDraft||"").slice(0,5)
+    if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(value)){setError("Ingresá una hora de corte válida.");return}
+    setSavingCutoff(true);setError("");setNotice("")
+    try{
+      const[settingsRes,userRes]=await Promise.all([supabase.from("property_settings").select("settings").eq("property_id",propertyId).maybeSingle(),supabase.auth.getUser()])
+      if(settingsRes.error)throw settingsRes.error
+      const current=settingsRes.data?.settings||{},next={...current,preferences:{...(current.preferences||{}),business_day_cutoff:value}}
+      const write=await supabase.from("property_settings").upsert({property_id:propertyId,settings:next,updated_at:new Date().toISOString(),updated_by:userRes.data?.user?.id||null},{onConflict:"property_id"})
+      if(write.error)throw write.error
+      if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("hl:property-settings-updated",{detail:{propertyId,settings:next}}))
+      setCutoffEditing(false);setNotice(`Corte del día operativo actualizado a ${value}.`);await load()
+    }catch(err){setError(err?.message||"No se pudo guardar el horario de corte.")}
+    finally{setSavingCutoff(false)}
+  }
   async function closeDay(){
     if(closing||alreadyClosed||!ready)return
     if(!backendReady){setError("El cierre ya está programado en la rama, pero la migración de Night Audit todavía no está aplicada en esta base. No se escribió ningún dato.");return}
@@ -81,7 +99,7 @@ export default function NightAuditPanel({propertyId,property,onNavigate}){
     {!backendReady?<div className={s.backendNotice}><b>Vista previa segura</b><span>La lógica y la interfaz están listas en esta rama, pero esta base no tiene aplicada la migración de Night Audit. Podés revisar los pendientes; el botón de cierre no escribirá nada hasta que exista una base de prueba aislada.</span></div>:null}
     {error?<div className={s.errorNotice}>{error}</div>:null}{notice?<div className={s.successNotice}>{notice}</div>:null}
     <section className={s.dayHero} data-state={alreadyClosed?"closed":ready?"ready":"blocked"}>
-      <div><small>DÍA OPERATIVO</small><h2>{fmtDate(status.business_date)}</h2><p>Corte {String(status.cutoff_time||"05:00").slice(0,5)} · {status.timezone||"America/Argentina/Buenos_Aires"}</p></div>
+      <div><small>DÍA OPERATIVO</small><h2>{fmtDate(status.business_date)}</h2><div className={s.cutoffRow}><p>Corte {String(status.cutoff_time||"05:00").slice(0,5)} · {status.timezone||"America/Argentina/Buenos_Aires"}</p>{canManageCutoff&&!cutoffEditing?<button type="button" className={s.cutoffLink} onClick={()=>setCutoffEditing(true)}>Cambiar corte</button>:null}</div>{canManageCutoff&&cutoffEditing?<div className={s.cutoffEditor}><input type="time" value={cutoffDraft} onChange={event=>setCutoffDraft(event.target.value)} disabled={savingCutoff}/><button type="button" onClick={saveCutoff} disabled={savingCutoff}>{savingCutoff?"Guardando…":"Guardar"}</button><button type="button" className={s.cutoffCancel} onClick={()=>{setCutoffEditing(false);setCutoffDraft(String(status.cutoff_time||"05:00").slice(0,5))}} disabled={savingCutoff}>Cancelar</button></div>:null}</div>
       <div className={s.dayState}><i/><div><b>{alreadyClosed?"Día cerrado":ready?"Listo para cerrar":`${status.blocker_count||0} pendiente${Number(status.blocker_count||0)===1?"":"s"} obligatorio${Number(status.blocker_count||0)===1?"":"s"}`}</b><span>{alreadyClosed?`Cerrado ${fmtDateTime(status.closure?.closed_at)}`:ready?"No hay bloqueos operativos.":"Resolvé los puntos rojos antes de cerrar."}</span></div></div>
     </section>
     <div className={s.auditGrid}>{cards.map(card=><article className={s.auditCard} data-tone={card.tone} key={card.id}><header><div><small>{card.tone==="warn"?"ADVERTENCIA":"CONTROL"}</small><h3>{card.label}</h3></div><strong>{card.count}</strong></header><p>{card.help}</p>{card.items.length?<div className={s.auditItems}>{card.items.slice(0,5).map((item,index)=><button type="button" key={item.id||`${card.id}-${index}`} onClick={()=>openItem(card,item)}><span><b>{item.code?`#${item.code}`:card.id==="cash"?`Caja desde ${fmtDateTime(item.opened_at)}`:"Pendiente"}</b><small>{item.guest||item.state||"Abrir detalle"}{item.balance?` · ${money(item.balance,item.currency)}`:""}</small></span><i>→</i></button>)}{card.items.length>5?<small className={s.moreItems}>+ {card.items.length-5} más</small>:null}</div>:<div className={s.auditOk}>Sin pendientes</div>}</article>)}</div>
