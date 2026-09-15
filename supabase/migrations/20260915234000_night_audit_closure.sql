@@ -145,11 +145,11 @@ begin
       'state',coalesce(r.estado,'pendiente'),
       'arrival_date',r.fecha_entrada,
       'operational_date',coalesce(r.fecha_operativa,r.fecha_entrada)
-    ) order by r.id),'[]'::jsonb)
+    ) order by coalesce(r.fecha_operativa,r.fecha_entrada),r.id),'[]'::jsonb)
   into v_arrivals_count,v_pending_arrivals
   from public.reservas r
   where r.property_id=p_property_id
-    and coalesce(r.fecha_operativa,r.fecha_entrada)=v_date
+    and coalesce(r.fecha_operativa,r.fecha_entrada)<=v_date
     and coalesce(r.no_show,false)=false
     and lower(coalesce(r.estado,'pendiente')) not in ('alojado','finalizada','cancelada','cancelled','anulada','anulado')
     and r.merged_into_id is null;
