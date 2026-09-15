@@ -4,6 +4,7 @@ import{useEffect,useMemo,useState}from"react"
 import{createPortal}from"react-dom"
 import{supabase}from"../../../../lib/supabase"
 import{CreateReservationDrawer as LegacyCreateReservationDrawer,ReservationDetailDrawer as LegacyReservationDetailDrawer}from"./PlanningDrawersLegacy"
+import useMaintenanceCheckoutGuard from"./useMaintenanceCheckoutGuard"
 import s from"./planning.module.css"
 
 export const ReservationDetailDrawer=LegacyReservationDetailDrawer
@@ -165,5 +166,6 @@ export function CreateReservationDrawer(props){
   const pricedRoomById=useMemo(()=>new Map(pricedRooms.map(room=>[Number(room.id),room])),[pricedRooms])
   const forcedDraft=draft&&rateCurrency?{...draft,currency:rateCurrency}:draft
   const forcedSetDraft=updater=>setDraft(current=>{const next=typeof updater==="function"?updater(current):updater;if(!next||!rateCurrency)return next;return next.currency===rateCurrency?next:{...next,currency:rateCurrency}})
-  return <><LegacyCreateReservationDrawer {...props} propertyId={pid} draft={forcedDraft} setDraft={forcedSetDraft} availableRooms={pricedRooms} roomById={pricedRoomById} cancellationPolicies={presentationPolicies}/><GuestRecognitionPanel propertyId={pid} draft={forcedDraft} setDraft={forcedSetDraft} drawerStep={props.drawerStep} roomById={pricedRoomById}/></>
+  const maintenance=useMaintenanceCheckoutGuard({propertyId:pid,draft:forcedDraft,setDraft:forcedSetDraft,drawerStep:props.drawerStep,roomById:pricedRoomById})
+  return <><LegacyCreateReservationDrawer {...props} propertyId={pid} draft={forcedDraft} setDraft={forcedSetDraft} availableRooms={pricedRooms} roomById={pricedRoomById} cancellationPolicies={presentationPolicies} onSave={()=>maintenance.run(props.onSave)}/><GuestRecognitionPanel propertyId={pid} draft={forcedDraft} setDraft={forcedSetDraft} drawerStep={props.drawerStep} roomById={pricedRoomById}/>{maintenance.panel}</>
 }
