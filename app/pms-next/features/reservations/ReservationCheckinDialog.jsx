@@ -1,6 +1,6 @@
 "use client"
 
-import{useEffect,useMemo,useState}from"react"
+import{useEffect,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 
 const fmtDate=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"2-digit",year:"numeric"}).format(new Date(`${value}T12:00:00`)):"—"
@@ -13,7 +13,7 @@ export default function ReservationCheckinDialog({item,onClose,onConfirm,onHouse
   const[guests,setGuests]=useState([]),[payments,setPayments]=useState([]),[policy,setPolicy]=useState("allow"),[loading,setLoading]=useState(true),[loadError,setLoadError]=useState("")
   const assigned=item?.rooms?.length?item.rooms:[item?.room].filter(Boolean),dirty=assigned.filter(room=>String(room.estado||"").toLowerCase()==="sucia"),blocked=assigned.filter(room=>room.activa===false||!["libre","limpia","inspeccionada","sucia"].includes(String(room.estado||"").toLowerCase()))
   useEffect(()=>{
-    if(!item?.id||!item?.property_id)return
+    if(!item?.id||!item?.property_id){setGuests([]);setPayments([]);setPolicy("allow");setLoading(false);setLoadError("");return}
     let cancelled=false;setLoading(true);setLoadError("")
     ;(async()=>{try{const[g,p,s]=await Promise.all([
       supabase.from("hotel_reservation_guests").select("id,role,full_name,document_number,document_front_path,document_back_path,checked_out_at").eq("property_id",item.property_id).eq("reservation_id",item.id),
@@ -23,7 +23,7 @@ export default function ReservationCheckinDialog({item,onClose,onConfirm,onHouse
   },[item?.id,item?.property_id])
   if(!item)return null
   const today=todayKey(),future=String(item.fecha_entrada||"")>today,past=String(item.fecha_salida||"")<today,activeGuests=guests.filter(g=>!g.checked_out_at),hasContact=Boolean(String(item.email_huesped||"").trim()||String(item.telefono_huesped||"").trim()),hasDocument=Boolean(item.dni_huesped||activeGuests.some(g=>g.document_number||g.document_front_path||g.document_back_path)),guestTarget=Math.max(1,Number(item.cantidad_huespedes)||1),guestReady=activeGuests.length>=guestTarget,paid=payments.filter(validPayment).reduce((sum,p)=>sum+Math.max(0,Number(p.monto||0)-Number(p.refunded_amount||0)),0),hasGuarantee=paid>0||Boolean(item.garantia_tipo||item.garantia_ultimos4),dirtyBlocked=dirty.length>0&&policy==="block"
-  const checks=useMemo(()=>[
+  const checks=[
     {label:"Fecha de llegada",detail:future?`La llegada es ${fmtDate(item.fecha_entrada)}.`:past?"La estadía quedó fuera de fecha.":"Fecha válida para realizar el check-in.",tone:future||past?"block":"ok"},
     {label:"Huésped y contacto",detail:hasContact?"Hay email o teléfono disponible.":"Falta email o teléfono. Se puede completar desde la ficha del huésped.",tone:hasContact?"ok":"warn"},
     {label:"Documento",detail:hasDocument?"Hay identificación registrada.":"Documento pendiente. No bloquea salvo política interna del hotel.",tone:hasDocument?"ok":"warn"},
@@ -31,7 +31,7 @@ export default function ReservationCheckinDialog({item,onClose,onConfirm,onHouse
     {label:"Habitación",detail:!assigned.length?"No hay habitación asignada.":blocked.length?`Revisar ${blocked.map(r=>r.nombre).join(", ")}.`:`${assigned.length} habitación${assigned.length===1?"":"es"} asignada${assigned.length===1?"":"s"}.`,tone:!assigned.length||blocked.length?"block":"ok"},
     {label:"Housekeeping",detail:dirty.length?`${dirty.map(r=>r.nombre).join(", ")} figura${dirty.length===1?"":"n"} como sucia${dirty.length===1?"":"s"}. Política: ${policy==="block"?"bloquear":policy==="manager_only"?"requiere supervisor":"advertir"}.`:"Habitaciones sin alerta de limpieza.",tone:dirtyBlocked?"block":dirty.length?"warn":"ok"},
     {label:"Pago o garantía",detail:hasGuarantee?paid>0?`Hay pagos registrados por ${new Intl.NumberFormat("es-AR",{style:"currency",currency:item.moneda||"ARS",maximumFractionDigits:0}).format(paid)}.`:"Hay garantía registrada.":"No hay prepago ni garantía registrada.",tone:hasGuarantee?"ok":"warn"},
-  ],[item.id,item.fecha_entrada,item.fecha_salida,item.moneda,assigned.length,blocked.length,dirty.length,activeGuests.length,guestTarget,policy,paid,hasContact,hasDocument,guestReady,hasGuarantee,dirtyBlocked,future,past])
+  ]
   const canConfirm=assigned.length>0&&!blocked.length&&!future&&!past&&!dirtyBlocked
   const overlay={position:"fixed",inset:0,zIndex:270,display:"grid",placeItems:"center",padding:18,background:"rgba(19,28,46,.38)",backdropFilter:"blur(12px) saturate(1.08)"},panel={width:"min(680px,calc(100vw - 28px))",maxHeight:"92vh",overflow:"auto",border:"1px solid color-mix(in srgb,var(--line) 82%,#fff)",borderRadius:22,background:"color-mix(in srgb,var(--panelSolid) 97%,transparent)",boxShadow:"0 28px 80px rgba(17,28,52,.3)"},button={height:40,padding:"0 14px",border:"1px solid var(--line)",borderRadius:11,background:"var(--panelSolid)",color:"var(--text)",font:"inherit",fontSize:11,fontWeight:850,cursor:saving?"wait":"pointer"},stateCard={flex:"1 1 150px",padding:"12px 13px",border:"1px solid var(--line)",borderRadius:12,background:"var(--panelSolid)"}
   return <div style={overlay} role="dialog" aria-modal="true" aria-label="Confirmar check-in"><section style={panel}>
