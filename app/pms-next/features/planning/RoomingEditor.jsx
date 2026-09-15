@@ -1,16 +1,40 @@
 "use client"
 
-import{useEffect}from"react"
+import{useEffect,useMemo,useState}from"react"
+import{supabase}from"../../../../lib/supabase"
 
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:0}).format(Number(value)||0)
 const roomCapacity=room=>Math.max(1,Number(room?.capacidad)||1)
 const idsOf=rooms=>(rooms||[]).map(room=>String(room.id))
 const clamp=(value,min,max)=>Math.min(max,Math.max(min,Number(value)||0))
 const clean=value=>String(value||"").trim()
+const normalize=value=>clean(value).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase()
 
+function configuredBeds(room){
+  const capacity=roomCapacity(room),text=normalize(room?.bed_configuration)
+  if(!text)return null
+  const sumMatches=regex=>{let total=0;for(const match of text.matchAll(regex))total+=Math.max(0,Number(match[1])||0);return total}
+  let matrimonial=sumMatches(/(\d+)\s*(?:camas?\s*)?(?:matrimoniales?|dobles?|queens?|kings?)/g)
+  let individual=sumMatches(/(\d+)\s*(?:camas?\s*)?(?:individual(?:es)?|twins?|singles?)/g)
+  const hasMatrimonial=/(?:matrimonial|doble|queen|king)/.test(text),hasIndividual=/(?:individual|twin|single)/.test(text)
+  if(!matrimonial&&!individual){
+    if(hasIndividual&&!hasMatrimonial)individual=capacity
+    else if(hasMatrimonial&&!hasIndividual)matrimonial=Math.min(1,Math.floor(capacity/2))
+    else if(hasMatrimonial&&hasIndividual){matrimonial=Math.min(1,Math.floor(capacity/2));individual=Math.max(0,capacity-matrimonial*2)}
+  }
+  matrimonial=clamp(matrimonial,0,Math.floor(capacity/2));individual=clamp(individual,0,capacity-matrimonial*2)
+  return matrimonial||individual?{matrimonial,individual}:null
+}
 function defaultBeds(room,guests){
   const capacity=roomCapacity(room),g=clamp(guests,0,capacity)
   if(g===0)return{matrimonial:0,individual:0}
+  const configured=configuredBeds(room)
+  if(configured){
+    let{matrimonial,individual}=configured
+    const occupied=matrimonial*2+individual
+    if(occupied<g)individual=Math.min(capacity-matrimonial*2,individual+(g-occupied))
+    return{matrimonial,individual}
+  }
   if(capacity<2)return{matrimonial:0,individual:1}
   if(g===1)return{matrimonial:1,individual:0}
   const matrimonial=Math.min(Math.floor(g/2),Math.floor(capacity/2))
@@ -68,14 +92,26 @@ function SingleBedIcon(){return <svg viewBox="0 0 18 18" width="17" height="17" 
 
 export default function RoomingEditor({draft,setDraft,rooms=[],categories=[],currency="ARS",editableRate=true}){
   const selectedKey=idsOf(rooms).join("|")
-  const categoryOptions=[...new Set([...(categories||[]).map(clean),...rooms.map(room=>clean(room.tipo))].filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es"))
+  const[bedConfigById,setBedConfigById]=useState({}),[bedConfigReady,setBedConfigReady]=useState(false)
+  useEffect(()=>{
+    const ids=idsOf(rooms).map(Number).filter(Number.isFinite)
+    if(!ids.length){setBedConfigById({});setBedConfigReady(true);return}
+    const allInline=rooms.every(room=>Object.prototype.hasOwnProperty.call(room,"bed_configuration"))
+    if(allInline){setBedConfigById(Object.fromEntries(rooms.map(room=>[String(room.id),room.bed_configuration||""])));setBedConfigReady(true);return}
+    let cancelled=false;setBedConfigReady(false)
+    ;(async()=>{const{data,error}=await supabase.from("habitaciones").select("id,bed_configuration").in("id",ids);if(error)throw error;if(!cancelled){setBedConfigById(Object.fromEntries((data||[]).map(row=>[String(row.id),row.bed_configuration||""])));setBedConfigReady(true)}})().catch(()=>{if(!cancelled){setBedConfigById({});setBedConfigReady(true)}})
+    return()=>{cancelled=true}
+  },[selectedKey])
+  const effectiveRooms=useMemo(()=>rooms.map(room=>({...room,bed_configuration:Object.prototype.hasOwnProperty.call(room,"bed_configuration")?room.bed_configuration:bedConfigById[String(room.id)]||""})),[rooms,bedConfigById])
+  const bedConfigKey=effectiveRooms.map(room=>`${room.id}:${room.bed_configuration||""}`).join("|")
+  const categoryOptions=[...new Set([...(categories||[]).map(clean),...effectiveRooms.map(room=>clean(room.tipo))].filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es"))
   const vatRate=draft?.impuestosDesglosados===false?0:Math.max(0,Number(draft?.ivaPorcentaje)||0),rateFactor=1+vatRate/100,displayRate=value=>Math.round((Number(value)||0)*rateFactor*100)/100,netRate=value=>Math.round(((Number(value)||0)/rateFactor)*100)/100
   useEffect(()=>{
-    if(!rooms.length)return
+    if(!effectiveRooms.length||!bedConfigReady)return
     setDraft(current=>{
       if(!current)return current
-      const ids=idsOf(rooms),existing=current.roomAssignments||{},requested=Math.max(1,Number(current.guests)||1),distribution=distributedGuests(rooms,requested),next={}
-      rooms.forEach(room=>{
+      const ids=idsOf(effectiveRooms),existing=current.roomAssignments||{},requested=Math.max(1,Number(current.guests)||1),distribution=distributedGuests(effectiveRooms,requested),next={}
+      effectiveRooms.forEach(room=>{
         const id=String(room.id),desired=distribution.get(id)||0,previous=existing[id]
         if(previous){
           const guestChanged=Number(previous.guests||0)!==desired,beds=guestChanged?defaultBeds(room,desired):fitBeds(room,desired,previous.matrimonial,previous.individual)
@@ -88,7 +124,7 @@ export default function RoomingEditor({draft,setDraft,rooms=[],categories=[],cur
       if(sameAssignments&&Number(current.rate||0)===totalRate)return current
       return{...current,roomAssignments:next,rate:totalRate}
     })
-  },[selectedKey,setDraft])
+  },[selectedKey,bedConfigReady,bedConfigKey,setDraft])
 
   function update(room,patch){
     const id=String(room.id)
@@ -98,13 +134,14 @@ export default function RoomingEditor({draft,setDraft,rooms=[],categories=[],cur
       if(Object.prototype.hasOwnProperty.call(patch,"guests")){const beds=defaultBeds(room,next.guests);next.matrimonial=beds.matrimonial;next.individual=beds.individual}
       else{const changed=Object.prototype.hasOwnProperty.call(patch,"matrimonial")?"matrimonial":Object.prototype.hasOwnProperty.call(patch,"individual")?"individual":"",beds=fitBeds(room,next.guests,next.matrimonial,next.individual,changed);next.matrimonial=beds.matrimonial;next.individual=beds.individual}
       assignments[id]=next
-      const selected=idsOf(rooms),totalRate=selected.reduce((sum,key)=>sum+(Number(assignments[key]?.rate)||0),0)
+      const selected=idsOf(effectiveRooms),totalRate=selected.reduce((sum,key)=>sum+(Number(assignments[key]?.rate)||0),0)
       return{...current,roomAssignments:assignments,rate:totalRate,roomSelectionManual:true}
     })
   }
 
-  if(!rooms.length)return null
-  const assignments=draft.roomAssignments||{},selectedIds=idsOf(rooms),totalRate=selectedIds.reduce((sum,id)=>sum+(Number(assignments[id]?.rate)||Number(rooms.find(room=>String(room.id)===id)?.precio)||0),0),assignedGuests=selectedIds.reduce((sum,id)=>sum+Math.max(0,Number(assignments[id]?.guests)||0),0),requestedGuests=Math.max(1,Number(draft.guests)||1)
+  if(!effectiveRooms.length)return null
+  if(!bedConfigReady)return <div style={{marginTop:12,padding:"11px 12px",border:"1px solid var(--line)",borderRadius:12,color:"var(--muted)",fontSize:10.5,fontWeight:700}}>Cargando configuración física de camas…</div>
+  const assignments=draft.roomAssignments||{},selectedIds=idsOf(effectiveRooms),totalRate=selectedIds.reduce((sum,id)=>sum+(Number(assignments[id]?.rate)||Number(effectiveRooms.find(room=>String(room.id)===id)?.precio)||0),0),assignedGuests=selectedIds.reduce((sum,id)=>sum+Math.max(0,Number(assignments[id]?.guests)||0),0),requestedGuests=Math.max(1,Number(draft.guests)||1)
   const shell={marginTop:12,border:"1px solid color-mix(in srgb,var(--line) 78%,transparent)",borderRadius:14,overflow:"hidden",background:"color-mix(in srgb,var(--panelSolid) 86%,transparent)",boxShadow:"inset 0 1px color-mix(in srgb,#fff 48%,transparent),0 10px 26px rgba(28,42,68,.05)"}
   const top={display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,padding:"11px 12px",borderBottom:"1px solid var(--line)",background:"color-mix(in srgb,var(--bg) 38%,var(--panelSolid))"}
   const row={padding:"10px 12px",borderBottom:"1px solid color-mix(in srgb,var(--line) 82%,transparent)"}
@@ -113,9 +150,9 @@ export default function RoomingEditor({draft,setDraft,rooms=[],categories=[],cur
   const tinyLabel={display:"block",height:13,marginBottom:5,fontSize:9,fontWeight:850,letterSpacing:".03em",color:"var(--muted)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}
   const bedControl=tone=>({height:36,boxSizing:"border-box",display:"flex",alignItems:"center",gap:5,padding:"0 6px",border:"1px solid var(--line)",borderRadius:10,background:"color-mix(in srgb,var(--panelSolid) 88%,transparent)",color:tone})
   return <section style={shell} aria-label="Rooming por habitación">
-    <header style={top}><div><small style={{display:"block",fontSize:9,fontWeight:900,letterSpacing:".1em",color:"var(--accent)"}}>HABITACIONES SELECCIONADAS</small><b style={{display:"block",marginTop:2,fontSize:12}}>Rooming y categoría vendida por habitación</b></div><span style={{fontSize:10,color:assignedGuests===requestedGuests?"var(--muted)":"var(--red)",fontWeight:assignedGuests===requestedGuests?600:850}}>{rooms.length} habitación{rooms.length===1?"":"es"} · {assignedGuests}/{requestedGuests} huéspedes</span></header>
-    {rooms.map(room=>{const id=String(room.id),assignment=assignments[id]||makeAssignment(room,0),capacity=roomCapacity(room),options=Array.from({length:capacity+1},(_,index)=>index),matOptions=Array.from({length:Math.floor(capacity/2)+1},(_,index)=>index),indOptions=Array.from({length:capacity+1},(_,index)=>index),physical=clean(room.tipo)||"Habitación",sold=clean(assignment.soldAs)||physical,different=sold!==physical;return <article key={id} style={row}>
-      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:9,flexWrap:"wrap"}}><span style={{width:20,height:20,display:"grid",placeItems:"center",borderRadius:6,border:"1px solid color-mix(in srgb,#2f8e58 38%,var(--line))",background:"color-mix(in srgb,#36a269 12%,transparent)",color:"#268357",fontSize:11,fontWeight:950}}>✓</span><b style={{fontSize:12}}>Hab. {room.nombre}</b>{different?<span style={{marginLeft:"auto",padding:"4px 7px",borderRadius:999,background:"color-mix(in srgb,var(--accent) 11%,transparent)",color:"var(--accent)",fontSize:9,fontWeight:850}}>Vendida como {sold}</span>:null}</div>
+    <header style={top}><div><small style={{display:"block",fontSize:9,fontWeight:900,letterSpacing:".1em",color:"var(--accent)"}}>HABITACIONES SELECCIONADAS</small><b style={{display:"block",marginTop:2,fontSize:12}}>Rooming y categoría vendida por habitación</b></div><span style={{fontSize:10,color:assignedGuests===requestedGuests?"var(--muted)":"var(--red)",fontWeight:assignedGuests===requestedGuests?600:850}}>{effectiveRooms.length} habitación{effectiveRooms.length===1?"":"es"} · {assignedGuests}/{requestedGuests} huéspedes</span></header>
+    {effectiveRooms.map(room=>{const id=String(room.id),assignment=assignments[id]||makeAssignment(room,0),capacity=roomCapacity(room),options=Array.from({length:capacity+1},(_,index)=>index),matOptions=Array.from({length:Math.floor(capacity/2)+1},(_,index)=>index),indOptions=Array.from({length:capacity+1},(_,index)=>index),physical=clean(room.tipo)||"Habitación",sold=clean(assignment.soldAs)||physical,different=sold!==physical;return <article key={id} style={row}>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:9,flexWrap:"wrap"}}><span style={{width:20,height:20,display:"grid",placeItems:"center",borderRadius:6,border:"1px solid color-mix(in srgb,#2f8e58 38%,var(--line))",background:"color-mix(in srgb,#36a269 12%,transparent)",color:"#268357",fontSize:11,fontWeight:950}}>✓</span><b style={{fontSize:12}}>Hab. {room.nombre}</b>{room.bed_configuration?<span style={{fontSize:9.5,color:"var(--muted)",fontWeight:700}}>· Configuración: {room.bed_configuration}</span>:null}{different?<span style={{marginLeft:"auto",padding:"4px 7px",borderRadius:999,background:"color-mix(in srgb,var(--accent) 11%,transparent)",color:"var(--accent)",fontSize:9,fontWeight:850}}>Vendida como {sold}</span>:null}</div>
       <div style={grid}>
         <label><span style={tinyLabel}>Vendida como</span><select value={sold} onChange={event=>update(room,{soldAs:event.target.value})} style={control}>{categoryOptions.map(value=><option key={value} value={value}>{value}</option>)}</select></label>
         <label><span style={tinyLabel}>Huéspedes</span><select value={assignment.guests} onChange={event=>update(room,{guests:Number(event.target.value)})} style={control}>{options.map(value=><option key={value} value={value}>{value}</option>)}</select></label>
