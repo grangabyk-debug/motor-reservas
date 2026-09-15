@@ -7,9 +7,16 @@ async function requireAction(client,propertyId,action){const{data,error}=await c
 
 async function reservationContext(client,propertyId,reservationId){
   const{data:reservation,error}=await client.from("reservas").select("id,property_id,numero_reserva,nombre_huesped,email_huesped,telefono_huesped,precio_total,moneda").eq("id",Number(reservationId)).eq("property_id",propertyId).single();if(error||!reservation)throw Object.assign(new Error("Reserva no encontrada en esta propiedad."),{status:404})
-  const{data:payments,error:payError}=await client.from("pagos").select("monto,refunded_amount,estado").eq("property_id",propertyId).eq("reserva_id",Number(reservationId));if(payError)throw payError
-  const paid=(payments||[]).filter(p=>!["anulado","cancelado","reembolsado","void","cancelled"].includes(String(p.estado||"").toLowerCase())).reduce((sum,p)=>sum+Math.max(0,num(p.monto)-num(p.refunded_amount)),0)
-  return{reservation,paid,balance:Math.max(0,num(reservation.precio_total)-paid)}
+  const[paymentsResult,itemsResult]=await Promise.all([
+    client.from("pagos").select("monto,refunded_amount,estado").eq("property_id",propertyId).eq("reserva_id",Number(reservationId)),
+    client.from("hotel_folio_items").select("total,status,currency").eq("property_id",propertyId).eq("reservation_id",Number(reservationId)),
+  ])
+  if(paymentsResult.error)throw paymentsResult.error
+  if(itemsResult.error)throw itemsResult.error
+  const payments=paymentsResult.data||[],items=(itemsResult.data||[]).filter(row=>!["void","cancelled","canceled","anulado","cancelado"].includes(String(row.status||"").toLowerCase()))
+  const paid=payments.filter(p=>!["anulado","cancelado","reembolsado","void","cancelled"].includes(String(p.estado||"").toLowerCase())).reduce((sum,p)=>sum+Math.max(0,num(p.monto)-num(p.refunded_amount)),0)
+  const folioTotal=items.reduce((sum,row)=>sum+num(row.total),0),total=items.length?folioTotal:num(reservation.precio_total),currency=items.find(row=>row.currency)?.currency||reservation.moneda||"ARS"
+  return{reservation:{...reservation,moneda:currency},paid,total,balance:Math.max(0,total-paid)}
 }
 
 export async function GET(request){
@@ -18,7 +25,7 @@ export async function GET(request){
     await requireRole(client,user.id,propertyId,ROLES)
     let query=client.from("hotel_payment_requests").select("*").eq("property_id",propertyId).order("created_at",{ascending:false}).limit(100);if(reservationId)query=query.eq("reserva_id",Number(reservationId));const{data,error}=await query;if(error)throw error
     let finance=null
-    if(reservationId){const context=await reservationContext(client,propertyId,reservationId);finance={paid:context.paid,balance:context.balance,total:num(context.reservation.precio_total),currency:context.reservation.moneda||"ARS",reservation_number:context.reservation.numero_reserva||context.reservation.id,guest_name:context.reservation.nombre_huesped||"Huésped"}}
+    if(reservationId){const context=await reservationContext(client,propertyId,reservationId);finance={paid:context.paid,balance:context.balance,total:context.total,currency:context.reservation.moneda||"ARS",reservation_number:context.reservation.numero_reserva||context.reservation.id,guest_name:context.reservation.nombre_huesped||"Huésped"}}
     return Response.json({requests:data||[],finance})
   }catch(error){return errorResponse(error)}
 }
