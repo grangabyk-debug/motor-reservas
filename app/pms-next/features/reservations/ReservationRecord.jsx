@@ -5,6 +5,7 @@ import ReservationRecordBase from"./ReservationRecordBase"
 import ReservationGroupCheckoutDialog from"./ReservationGroupCheckoutDialog"
 import ReservationInlineOperationsDialog from"./ReservationInlineOperationsDialog"
 import ReservationPaymentRequestPanel from"./ReservationPaymentRequestPanel"
+import ReservationAttachmentsPanel from"./ReservationAttachmentsPanel"
 
 export default function ReservationRecord(props){
   const{item,rooms=[],propertyId,onPrimaryAction,onNavigate}=props
@@ -23,6 +24,7 @@ export default function ReservationRecord(props){
   }
   return <>
     <ReservationRecordBase key={`${item?.id||"reservation"}:${paymentRevision}`} {...props} onNavigate={navigateFromRecord} onPrimaryAction={primaryAction}/>
+    <ReservationAttachmentsPanel item={item} propertyId={propertyId}/>
     <ReservationPaymentRequestPanel item={item} propertyId={propertyId} onChanged={()=>setPaymentRevision(value=>value+1)}/>
     {operationsMode?<ReservationInlineOperationsDialog mode={operationsMode} item={item} rooms={rooms} propertyId={propertyId} onClose={()=>setOperationsMode(null)}/>:null}
     {groupCheckoutOpen?<ReservationGroupCheckoutDialog item={item} rooms={rooms} propertyId={propertyId} onClose={()=>setGroupCheckoutOpen(false)} onCheckoutAll={()=>{setGroupCheckoutOpen(false);onPrimaryAction?.()}}/>:null}
