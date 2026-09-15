@@ -23,7 +23,7 @@ export default function RevenueWorkspace({propertyId,property,onNavigate}){
       [data-performance-tabs] button[data-active="true"]{background:var(--panelSolid);color:var(--text);box-shadow:0 5px 16px rgba(20,28,44,.08)}
       [data-performance-body]>section{padding:0!important;min-height:0!important}
       [data-performance-body]>section>header:first-child>div:first-child{display:none!important}
-      [data-performance-body]>section>header:first-child{justify-content:flex-end!important;margin-bottom:14px!important}
+      [data-performance-body]>section>header:first-child{justify-content:flex-end!important;margin:0 0 10px!important;padding:0!important;min-height:0!important;border:0!important;background:transparent!important;box-shadow:none!important}
       [data-performance-body] [data-intelligence]{margin:0!important}
       @media(max-width:760px){[data-performance]{padding:16px 12px 32px}[data-performance-head]{align-items:flex-start;flex-direction:column}[data-performance-head] h1{font-size:29px}[data-performance-tabs]{width:100%;overflow:auto}[data-performance-tabs] button{flex:1;white-space:nowrap}}
     `}</style>
