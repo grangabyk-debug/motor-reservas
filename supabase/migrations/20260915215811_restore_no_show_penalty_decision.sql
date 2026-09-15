@@ -107,8 +107,8 @@ begin
   set no_show=false,
       no_show_at=null,
       no_show_release_date=null,
-      no_show_penalty_amount=0,
-      no_show_penalty_status='none',
+      no_show_penalty_amount=case when v_action='remove' then 0 else v_previous_penalty end,
+      no_show_penalty_status=case when v_action='remove' then 'none' else v_previous_status end,
       no_show_note=null,
       servicios=case when v_action='remove' then v_services else servicios end
   where id=v.id
