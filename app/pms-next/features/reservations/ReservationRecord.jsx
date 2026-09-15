@@ -5,6 +5,8 @@ import{supabase}from"../../../../lib/supabase"
 import ReservationRecordBase from"./ReservationRecordBase"
 import ReservationGroupCheckoutDialog from"./ReservationGroupCheckoutDialog"
 import ReservationInlineOperationsDialog from"./ReservationInlineOperationsDialog"
+import ReservationPaymentRequestPanel from"./ReservationPaymentRequestPanel"
+import ReservationAttachmentsPanel from"./ReservationAttachmentsPanel"
 
 const DAY_MS=86400000
 const dateNights=(start,end)=>{
@@ -18,7 +20,8 @@ export default function ReservationRecord(props){
   const[groupCheckoutOpen,setGroupCheckoutOpen]=useState(false)
   const[operationsMode,setOperationsMode]=useState(null)
   const[chargeBasis,setChargeBasis]=useState(null)
-  useEffect(()=>{setGroupCheckoutOpen(false);setOperationsMode(null);setChargeBasis(null)},[item?.id])
+  const[paymentRevision,setPaymentRevision]=useState(0)
+  useEffect(()=>{setGroupCheckoutOpen(false);setOperationsMode(null);setChargeBasis(null);setPaymentRevision(0)},[item?.id])
   useEffect(()=>{
     if(!item?.id||!propertyId||rooms.length<=1){setChargeBasis(null);return}
     let cancelled=false
@@ -51,7 +54,9 @@ export default function ReservationRecord(props){
     onNavigate?.(target,options)
   }
   return <>
-    <ReservationRecordBase {...props} item={displayItem} onNavigate={navigateFromRecord} onPrimaryAction={primaryAction}/>
+    <ReservationRecordBase key={`${item?.id||"reservation"}:${paymentRevision}`} {...props} item={displayItem} onNavigate={navigateFromRecord} onPrimaryAction={primaryAction}/>
+    <ReservationAttachmentsPanel item={item} propertyId={propertyId}/>
+    <ReservationPaymentRequestPanel item={item} propertyId={propertyId} onChanged={()=>setPaymentRevision(value=>value+1)}/>
     {operationsMode?<ReservationInlineOperationsDialog mode={operationsMode} item={item} rooms={rooms} propertyId={propertyId} onClose={()=>setOperationsMode(null)}/>:null}
     {groupCheckoutOpen?<ReservationGroupCheckoutDialog item={item} rooms={rooms} propertyId={propertyId} onClose={()=>setGroupCheckoutOpen(false)} onCheckoutAll={()=>{setGroupCheckoutOpen(false);onPrimaryAction?.()}}/>:null}
   </>

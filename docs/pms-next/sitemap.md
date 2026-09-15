@@ -36,6 +36,9 @@ PMS Next usa una sola aplicación y selecciona el workspace mediante `?view=<id>
 <!-- view:dailycash -->
 - `dailycash` — **Caja diaria**: cobros, efectivo, transferencias, tarjetas, movimientos, comprobantes, arqueo y Libro de novedades.
 
+<!-- view:dailycontrol -->
+- `dailycontrol` — **Control diario**: visitantes, vehículos y guarda equipajes vinculados a reservas, con entradas, salidas, entregas, búsqueda, exportación y trazabilidad operativa.
+
 <!-- view:finance -->
 - `finance` — **Finanzas**: saldos, documentos, solicitudes de pago y movimientos financieros.
 
@@ -141,6 +144,7 @@ Operación
   Planning
   Reservas / Presupuestos
   Recepción / Caja
+  Control diario
   Housekeeping
   Mantenimiento
   Inventario / Servicios
@@ -214,6 +218,7 @@ Huésped
        |         +-> Solicitud -> Pago / Presupuesto
        |
        +-> Caja diaria <-> Finanzas
+       +-> Control diario -> Visitantes / Vehículos / Equipajes
        +-> Servicios y extras
        +-> Housekeeping / estado de habitación
        +-> Mantenimiento / incidencias
@@ -248,10 +253,10 @@ Ayuda
 Acceso completo a las vistas permitidas por producto/feature flags, incluida Cartera.
 
 ## Recepción
-Dashboard, Planning, Reservas, Presupuestos, Huéspedes, Mensajes, Caja diaria, Finanzas, Informes de recepción, Inventario, Servicios, Tarifas, Actividad, Centro de ayuda y Soporte.
+Dashboard, Planning, Reservas, Presupuestos, Huéspedes, Mensajes, Caja diaria, Control diario, Finanzas, Informes de recepción, Inventario, Servicios, Tarifas, Actividad, Centro de ayuda y Soporte.
 
 ## Night Audit
-Recepción + Informes generales.
+Recepción + Control diario + Informes generales.
 
 ## Housekeeping
 Dashboard, Housekeeping, Inventario, Centro de ayuda y Soporte.
