@@ -20,10 +20,17 @@ const addDays=(value,amount)=>keyFromDate(new Date(fromKey(value).getTime()+amou
 const diffDays=(a,b)=>Math.round((fromKey(b)-fromKey(a))/DAY)
 const dayName=value=>new Intl.DateTimeFormat("es-AR",{weekday:"short"}).format(fromKey(value)).replace(".","")
 const selectionDate=value=>new Intl.DateTimeFormat("es-AR",{weekday:"short",day:"2-digit",month:"short"}).format(fromKey(value)).replaceAll(".","")
+const validDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(String(value||""))
 const roomHas=(item,roomId)=>Number(item.habitacion_id)===Number(roomId)||(item.habitaciones_ids||[]).map(Number).includes(Number(roomId))
-const covers=(item,roomId,day)=>roomHas(item,roomId)&&item.fecha_entrada<=day&&item.fecha_salida>day
+const roomMeta=(item,roomId)=>item?._room_detail&&Number(item._room_detail?.habitacion_id)===Number(roomId)?item._room_detail:(Array.isArray(item?.habitaciones_detalle)?item.habitaciones_detalle:[]).find(detail=>Number(detail?.habitacion_id)===Number(roomId))||{}
+const roomEarly=(item,roomId)=>{const meta=roomMeta(item,roomId);return item?._room_segment?Boolean(meta?.early_checkin_requested||meta?.early_checkin_time||Number(meta?.early_checkin_net)>0):Boolean(item?.early_checkin)||Number(item?.early_checkin_importe)>0}
+const roomLateDate=(item,roomId)=>{const value=item?.room_checkout_dates?.[`late:${roomId}`];return validDate(value)?String(value):""}
+const roomLate=(item,roomId)=>{const meta=roomMeta(item,roomId);return item?._room_segment?Boolean(meta?.late_checkout_requested||meta?.late_checkout_time||roomLateDate(item,roomId)):Boolean(item?.late_checkout)||Number(item?.late_checkout_importe)>0}
+const inventoryStart=(item,roomId)=>roomEarly(item,roomId)&&validDate(item?.fecha_entrada)?addDays(item.fecha_entrada,-1):item?.fecha_entrada
+const inventoryEnd=(item,roomId)=>{const planned=item?.fecha_salida,lateDate=roomLateDate(item,roomId);if(lateDate&&(!planned||lateDate>planned))return lateDate;return roomLate(item,roomId)&&validDate(planned)?addDays(planned,1):planned}
+const covers=(item,roomId,day)=>roomHas(item,roomId)&&inventoryStart(item,roomId)<=day&&inventoryEnd(item,roomId)>day
 const coversDay=(item,day)=>item.fecha_entrada<=day&&item.fecha_salida>day
-const overlaps=(item,start,end)=>item.fecha_entrada<end&&item.fecha_salida>start
+const overlaps=(item,start,end)=>{const roomId=item?.habitacion_id;return inventoryStart(item,roomId)<end&&inventoryEnd(item,roomId)>start}
 const assignedIds=item=>new Set([item.habitacion_id,...(item.habitaciones_ids||[])].filter(Boolean).map(Number))
 const dayDivider={borderRight:"1px solid color-mix(in srgb,var(--muted) 48%,var(--line))"}
 const HOUSEKEEPING_STATUS={sucia:{label:"Sucia",color:"#d75555"},limpia:{label:"Limpia",color:"#3b82f6"},inspeccionada:{label:"Inspeccionada",color:"#2d9f62"}}
