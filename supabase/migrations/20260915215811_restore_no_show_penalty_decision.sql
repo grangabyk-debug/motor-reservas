@@ -15,6 +15,7 @@ declare
   v_previous_penalty numeric := 0;
   v_previous_status text := 'none';
   v_removed_count integer := 0;
+  v_invoiced_penalty_count integer := 0;
   v_penalty_item_ids uuid[] := '{}'::uuid[];
 begin
   if auth.uid() is null then
@@ -47,6 +48,25 @@ begin
   v_services := coalesce(v.servicios,'[]'::jsonb);
 
   if v_action='remove' then
+    select count(*)
+    into v_invoiced_penalty_count
+    from public.hotel_folio_items i
+    where i.reservation_id=v.id
+      and i.status='active'
+      and i.invoice_document_id is not null
+      and (
+        i.source_key='service:no-show-penalty-'||v.id::text
+        or (
+          lower(trim(coalesce(i.description,'')))='penalidad no show'
+          and lower(trim(coalesce(i.source_type,'')))='fee'
+        )
+        or lower(coalesce(i.metadata->'source_payload'->>'no_show_penalty','false'))='true'
+      );
+
+    if v_invoiced_penalty_count>0 then
+      raise exception using errcode='P0001', message='La penalidad de No Show ya está incluida en un comprobante emitido. Resolvé primero la nota de crédito o anulación fiscal correspondiente antes de quitarla.';
+    end if;
+
     select coalesce(jsonb_agg(s order by ord) filter (where not is_penalty),'[]'::jsonb),
            count(*) filter (where is_penalty)
     into v_services,v_removed_count
@@ -82,6 +102,19 @@ begin
       delete from public.hotel_folio_item_payment_allocations
       where reservation_id=v.id
         and folio_item_id=any(v_penalty_item_ids);
+
+      update public.hotel_folio_items
+      set status='void',
+          metadata=coalesce(metadata,'{}'::jsonb)||jsonb_build_object(
+            'void_reason','no_show_restored',
+            'voided_at',now(),
+            'voided_by',auth.uid()
+          ),
+          updated_at=now()
+      where reservation_id=v.id
+        and id=any(v_penalty_item_ids)
+        and status='active'
+        and invoice_document_id is null;
     end if;
   end if;
 
@@ -99,7 +132,8 @@ begin
       'penalty_action',v_action,
       'previous_penalty_amount',v_previous_penalty,
       'previous_penalty_status',v_previous_status,
-      'removed_penalty_services',v_removed_count
+      'removed_penalty_services',v_removed_count,
+      'voided_penalty_items',cardinality(v_penalty_item_ids)
     ),auth.uid()
   );
 
@@ -127,7 +161,8 @@ begin
       'penalty_action',v_action,
       'previous_penalty_amount',v_previous_penalty,
       'previous_penalty_status',v_previous_status,
-      'removed_penalty_services',v_removed_count
+      'removed_penalty_services',v_removed_count,
+      'voided_penalty_items',cardinality(v_penalty_item_ids)
     ),auth.uid()
   );
 
