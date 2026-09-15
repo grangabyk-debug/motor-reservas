@@ -1,9 +1,23 @@
 "use client"
 
+import{useEffect,useState}from"react"
+import{supabase}from"../../../../lib/supabase"
+
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:0}).format(Number(value)||0)
 const date=value=>{if(!value)return"—";const[y,m,d]=String(value).split("-").map(Number);return new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short",year:"numeric"}).format(new Date(y,m-1,d,12)).replace(".","")}
 
 export default function PlanningRateChangeDialog({change,onKeep,onReprice,onCancel,saving=false}){
+  const[checkoutMaintenance,setCheckoutMaintenance]=useState(null)
+  useEffect(()=>{
+    let cancelled=false
+    async function load(){
+      setCheckoutMaintenance(null)
+      if(!change||change.kind!=="duration"||!change.roomId||!change.end||change.newNights<=change.oldNights)return
+      const{data,error}=await supabase.from("bloqueos").select("id,habitacion_id,fecha_desde,fecha_hasta,motivo,detalle").eq("habitacion_id",Number(change.roomId)).eq("fecha_desde",change.end).ilike("motivo","manten%").limit(1)
+      if(!cancelled&&!error)setCheckoutMaintenance(data?.[0]||null)
+    }
+    load();return()=>{cancelled=true}
+  },[change?.kind,change?.roomId,change?.end,change?.newNights,change?.oldNights])
   if(!change)return null
   const duration=change.kind==="duration"
   const{sourceRoom,targetRoom,currentRate,targetRate,currency="ARS"}=change
@@ -29,7 +43,8 @@ export default function PlanningRateChangeDialog({change,onKeep,onReprice,onCanc
       {duration?<>
         <div style={route}><div style={roomBox}><span style={roomName}>{date(change.oldStart)} → {date(change.oldEnd)}</span><span style={roomType}>{change.oldNights} noche{change.oldNights===1?"":"s"}</span></div><b style={{fontSize:18,color:"var(--muted)"}}>→</b><div style={{...roomBox,textAlign:"right"}}><span style={roomName}>{date(change.start)} → {date(change.end)}</span><span style={roomType}>{change.newNights} noche{change.newNights===1?"":"s"}</span></div></div>
         <div style={rates}><div style={rateCard}><small style={{display:"block",fontSize:10,color:"var(--muted)"}}>Tarifa por noche</small><b style={{display:"block",marginTop:3,fontSize:15}}>{money(currentRate,currency)}</b><small style={{fontSize:10,color:"var(--muted)"}}>se mantiene</small></div><div style={rateCard}><small style={{display:"block",fontSize:10,color:"var(--muted)"}}>Total estimado de habitación</small><b style={{display:"block",marginTop:3,fontSize:15,color:"var(--accent)"}}>{money(Number(currentRate||0)*Number(change.newNights||1),currency)}</b><small style={{fontSize:10,color:"var(--muted)"}}>{change.newNights} noche{change.newNights===1?"":"s"}</small></div></div>
-        <div style={{display:"grid",gap:8,marginTop:14}}><button type="button" disabled={saving} onClick={onKeep} style={{...buttonBase,border:"0",background:"linear-gradient(145deg,var(--accent),var(--accent2))",color:"#fff",boxShadow:"0 9px 22px color-mix(in srgb,var(--accent) 24%,transparent)"}}>{saving?"Guardando…":direction==="extend"?`Confirmar ${change.newNights} noches`:`Confirmar reducción a ${change.newNights} noche${change.newNights===1?"":"s"}`}</button><button type="button" disabled={saving} onClick={onCancel} style={{...buttonBase,minHeight:36,border:"0",background:"transparent",color:"var(--muted)"}}>Cancelar cambio</button></div>
+        {checkoutMaintenance?<div style={{marginTop:10,padding:"11px 12px",borderRadius:11,border:"1px solid color-mix(in srgb,#d99424 42%,var(--line))",background:"color-mix(in srgb,#d99424 8%,var(--panelSolid))"}}><b style={{display:"block",fontSize:11.5,color:"#b87917"}}>Mantenimiento el día de salida</b><p style={{margin:"4px 0 0",fontSize:10.5,lineHeight:1.45,color:"var(--muted)"}}>La habitación queda bloqueada por mantenimiento el {date(change.end)}. Podés alojar al huésped hasta ese día si el mantenimiento comienza después del check-out. Al confirmar este cambio estás confirmando ese orden operativo.</p></div>:null}
+        <div style={{display:"grid",gap:8,marginTop:14}}><button type="button" disabled={saving} onClick={onKeep} style={{...buttonBase,border:"0",background:"linear-gradient(145deg,var(--accent),var(--accent2))",color:"#fff",boxShadow:"0 9px 22px color-mix(in srgb,var(--accent) 24%,transparent)"}}>{saving?"Guardando…":checkoutMaintenance?`Confirmar ${change.newNights} noches · mantenimiento después`:(direction==="extend"?`Confirmar ${change.newNights} noches`:`Confirmar reducción a ${change.newNights} noche${change.newNights===1?"":"s"}`)}</button><button type="button" disabled={saving} onClick={onCancel} style={{...buttonBase,minHeight:36,border:"0",background:"transparent",color:"var(--muted)"}}>Cancelar cambio</button></div>
       </>:<>
         <div style={route}><div style={roomBox}><span style={roomName}>Hab. {sourceRoom?.nombre||"—"}</span><span style={roomType}>{sourceRoom?.tipo||"Sin categoría"}</span></div><b style={{fontSize:18,color:"var(--muted)"}}>→</b><div style={{...roomBox,textAlign:"right"}}><span style={roomName}>Hab. {targetRoom?.nombre||"—"}</span><span style={roomType}>{targetRoom?.tipo||"Sin categoría"}</span></div></div>
         <div style={rates}><div style={rateCard}><small style={{display:"block",fontSize:10,color:"var(--muted)"}}>Tarifa actual</small><b style={{display:"block",marginTop:3,fontSize:15}}>{money(currentRate,currency)}</b><small style={{fontSize:10,color:"var(--muted)"}}>por noche</small></div><div style={rateCard}><small style={{display:"block",fontSize:10,color:"var(--muted)"}}>Tarifa habitación destino</small><b style={{display:"block",marginTop:3,fontSize:15,color:"var(--accent)"}}>{money(targetRate,currency)}</b><small style={{fontSize:10,color:"var(--muted)"}}>por noche</small></div></div>
