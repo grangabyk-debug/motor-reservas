@@ -1,6 +1,5 @@
 export const PRIMARY_NAV=[
   {id:"dashboard",label:"Dashboard",icon:"grid"},
-  {id:"portfolio",label:"Cartera",icon:"grid"},
   {id:"planning",label:"Planning",icon:"calendar"},
   {id:"reservations",label:"Reservas",icon:"booking"},
   {id:"quotes",label:"Presupuestos",icon:"quote"},
@@ -27,6 +26,7 @@ export const OPERATIONS_NAV=[
 ]
 
 export const MANAGEMENT_NAV=[
+  {id:"portfolio",label:"Cartera de propiedades",icon:"building"},
   {id:"revenue",label:"Rendimiento",icon:"rates"},
   {id:"growth",label:"Ventas y crecimiento",icon:"growth"},
   {id:"onboarding",label:"Puesta en marcha",icon:"activity"},
