@@ -13,6 +13,15 @@ export default function usePmsSession(){
     const membershipMap=Object.fromEntries((membershipResult.data||[]).map(item=>[item.property_id,item.role])),controlMap=Object.fromEntries((controlResult.data||[]).map(item=>[item.property_id,item]));const allowed=(Array.isArray(propertyResult.data)?propertyResult.data:[]).filter(item=>controlMap[item.id]?.account_enabled!==false&&controlMap[item.id]?.maintenance_mode!==true).map(item=>({...item,role:item.owner_id===currentUser.id?"owner":membershipMap[item.id]||"member"}));setProperties(allowed);if(!allowed.length){setPropertyId(null);setStatus("no-property");return}const stored=typeof window!=="undefined"?window.localStorage.getItem(STORAGE_KEY):null,selected=allowed.some(item=>item.id===stored)?stored:allowed[0].id;setPropertyId(selected);if(typeof window!=="undefined")window.localStorage.setItem(STORAGE_KEY,selected);setStatus("ready")
   }catch(err){setStatus("error");setError(err?.message||"No se pudo cargar la cuenta del PMS.")}},[])
   useEffect(()=>{load()},[load])
+  useEffect(()=>{
+    if(status!=="ready"||!propertyId||typeof window==="undefined")return
+    let cancelled=false,busy=false
+    const verify=async()=>{if(busy||cancelled)return;busy=true;try{const{data,error:controlError}=await supabase.rpc("hl_my_property_controls");if(cancelled||controlError)return;const current=(data||[]).find(row=>String(row.property_id)===String(propertyId));if(!current||current.account_enabled===false||current.maintenance_mode===true)await load()}finally{busy=false}}
+    const onFocus=()=>verify(),onVisibility=()=>{if(document.visibilityState==="visible")verify()},onCommercialChange=()=>verify()
+    const timer=window.setInterval(verify,60000)
+    window.addEventListener("focus",onFocus);window.addEventListener("hl:subscription-updated",onCommercialChange);document.addEventListener("visibilitychange",onVisibility)
+    return()=>{cancelled=true;window.clearInterval(timer);window.removeEventListener("focus",onFocus);window.removeEventListener("hl:subscription-updated",onCommercialChange);document.removeEventListener("visibilitychange",onVisibility)}
+  },[status,propertyId,load])
   const selectProperty=useCallback(id=>{if(!properties.some(item=>item.id===id))return;setPropertyId(id);if(typeof window!=="undefined")window.localStorage.setItem(STORAGE_KEY,id)},[properties])
   const property=useMemo(()=>properties.find(item=>item.id===propertyId)||null,[properties,propertyId])
   return{user,properties,property,propertyId,role:property?.role||null,status,error,selectProperty,reload:load}
