@@ -6,6 +6,7 @@ import{supabase}from"../../../../lib/supabase"
 const PAGE_SIZE=200
 const roomIds=item=>[...new Set([item?.habitacion_id,...(item?.habitaciones_ids||[])].filter(Boolean).map(Number))]
 const validDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(String(value||""))
+const paymentIsVoid=row=>["anulado","anulada","cancelado","cancelada","cancelled","void","rechazado","rechazada","rejected"].includes(String(row?.estado||"").trim().toLowerCase())
 const roomDetail=(item,roomId)=>(Array.isArray(item?.habitaciones_detalle)?item.habitaciones_detalle:[]).find(row=>Number(row?.habitacion_id)===Number(roomId))||{}
 const roomStart=(item,roomId)=>{const value=roomDetail(item,roomId)?.fecha_entrada;return validDate(value)?value:item?.fecha_entrada}
 const roomPlannedEnd=(item,roomId)=>{const value=roomDetail(item,roomId)?.fecha_salida;return validDate(value)?value:item?.fecha_salida}
@@ -40,7 +41,7 @@ export default function useReservationsData(propertyId){
   useEffect(()=>{if(typeof window==="undefined")return;const refresh=()=>load();window.addEventListener("hl:pms-reservation-updated",refresh);window.addEventListener("hl:pms-payment-updated",refresh);return()=>{window.removeEventListener("hl:pms-reservation-updated",refresh);window.removeEventListener("hl:pms-payment-updated",refresh)}},[load])
   const loadMore=useCallback(async()=>{if(!propertyId||loading||loadingMore||!hasMore)return;setLoadingMore(true);setError("");try{await fetchPage(pageRef.current+1)}catch(err){setError(err?.message||"No se pudo cargar más historial.")}finally{setLoadingMore(false)}},[propertyId,loading,loadingMore,hasMore,fetchPage])
 
-  const paymentByReservation=useMemo(()=>{const map=new Map();for(const payment of payments){if(['anulado','cancelado','void'].includes(String(payment.estado||'').toLowerCase()))continue;const net=Math.max(0,Number(payment.monto||0)-Number(payment.refunded_amount||0));map.set(Number(payment.reserva_id),(map.get(Number(payment.reserva_id))||0)+net)}return map},[payments])
+  const paymentByReservation=useMemo(()=>{const map=new Map();for(const payment of payments){if(paymentIsVoid(payment))continue;const net=Math.max(0,Number(payment.monto||0)-Number(payment.refunded_amount||0));map.set(Number(payment.reserva_id),(map.get(Number(payment.reserva_id))||0)+net)}return map},[payments])
   const notifyUpdate=id=>{if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("hl:pms-reservation-updated",{detail:{reservationId:Number(id)}}))}
   const updateReservation=useCallback(async(id,patch)=>{const{data,error:updateError}=await supabase.from("reservas").update(patch).eq("id",id).eq("property_id",propertyId).select().single();if(updateError)throw updateError;setReservations(list=>list.map(item=>item.id===data.id?{...item,...data}:item));notifyUpdate(id);return data},[propertyId])
   const previewMove=useCallback(async({reservationId,roomId,start,end})=>{
@@ -63,7 +64,20 @@ export default function useReservationsData(propertyId){
   const mergeReservations=useCallback(async(primaryId,secondaryId)=>{const{data,error:rpcError}=await supabase.rpc("hl_merge_reservations_atomic",{p_primary_id:Number(primaryId),p_secondary_id:Number(secondaryId)});if(rpcError)throw rpcError;await load();notifyUpdate(primaryId);if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("hl:pms-toast",{detail:{title:"Reservas fusionadas",message:`La reserva ${secondaryId} quedó consolidada dentro de ${data?.numero_reserva||primaryId}, incluido su folio y sus pagos.`}}));return data},[load])
   const moveReservation=useCallback(async({reservationId,roomId,start,end,reprice=false})=>{const{data,error:rpcError}=await supabase.rpc("hl_planning_move_reservation_priced_atomic",{p_reserva_id:Number(reservationId),p_habitacion_id:Number(roomId),p_fecha_entrada:start,p_fecha_salida:end,p_reprice:Boolean(reprice)});if(rpcError)throw rpcError;setReservations(list=>list.map(item=>Number(item.id)===Number(data.id)?{...item,...data}:item));notifyUpdate(data.id);return data},[])
   const checkin=useCallback(async id=>{const{data,error:rpcError}=await supabase.rpc("hl_checkin_reservation_atomic",{p_reserva_id:Number(id)});if(rpcError)throw rpcError;setReservations(list=>list.map(item=>item.id===data.id?{...item,...data}:item));notifyUpdate(id);return data},[])
-  const checkout=useCallback(async id=>{const{data,error:rpcError}=await supabase.rpc("hl_checkout_reservation_atomic",{p_reserva_id:Number(id)});if(rpcError)throw rpcError;setReservations(list=>list.map(item=>item.id===data.id?{...item,...data}:item));notifyUpdate(id);return data},[])
+  const checkout=useCallback(async id=>{
+    const reservationId=Number(id)
+    const ensure=await supabase.rpc("hl_ensure_reservation_folios",{p_reservation_id:reservationId});if(ensure.error)throw ensure.error
+    const[itemRes,payRes,resRes]=await Promise.all([
+      supabase.from("hotel_folio_items").select("total,currency,status").eq("property_id",propertyId).eq("reservation_id",reservationId).eq("status","active"),
+      supabase.from("pagos").select("monto,refunded_amount,estado,moneda").eq("property_id",propertyId).eq("reserva_id",reservationId),
+      supabase.from("reservas").select("precio_total,moneda").eq("property_id",propertyId).eq("id",reservationId).single(),
+    ])
+    for(const result of[itemRes,payRes,resRes])if(result.error)throw result.error
+    const folioTotal=(itemRes.data||[]).reduce((sum,row)=>sum+Number(row.total||0),0),reservationTotal=Math.max(0,Number(resRes.data?.precio_total)||0),total=(itemRes.data||[]).length?folioTotal:reservationTotal
+    const paid=(payRes.data||[]).filter(row=>!paymentIsVoid(row)).reduce((sum,row)=>sum+Math.max(0,Number(row.monto||0)-Number(row.refunded_amount||0)),0),balance=Math.max(0,total-paid),currency=resRes.data?.moneda||itemRes.data?.[0]?.currency||"ARS"
+    if(balance>.01)throw new Error(`La reserva tiene ${new Intl.NumberFormat("es-AR",{style:"currency",currency,maximumFractionDigits:2}).format(balance)} pendientes en el folio. Cobrá o conciliá ese saldo antes del check-out.`)
+    const{data,error:rpcError}=await supabase.rpc("hl_checkout_reservation_atomic",{p_reserva_id:reservationId});if(rpcError)throw rpcError;setReservations(list=>list.map(item=>item.id===data.id?{...item,...data}:item));notifyUpdate(reservationId);return data
+  },[propertyId])
   const markNoShow=useCallback(async(id,{releaseDate,penaltyAmount=0,penaltyStatus="none",note=""}={})=>{const{data,error:rpcError}=await supabase.rpc("hl_mark_no_show_atomic",{p_reserva_id:Number(id),p_release_date:releaseDate||null,p_penalty_amount:Number(penaltyAmount)||0,p_penalty_status:penaltyStatus||"none",p_note:note||null});if(rpcError)throw rpcError;setReservations(list=>list.map(item=>Number(item.id)===Number(data.id)?{...item,...data}:item));notifyUpdate(id);return data},[])
   const restoreNoShow=useCallback(async(id,{penaltyAction="remove",note=""}={})=>{const{data,error:rpcError}=await supabase.rpc("hl_restore_no_show_atomic",{p_reserva_id:Number(id),p_note:note||null,p_penalty_action:penaltyAction||"remove"});if(rpcError)throw rpcError;setReservations(list=>list.map(item=>Number(item.id)===Number(data.id)?{...item,...data}:item));notifyUpdate(id);return data},[])
   const cancelReservation=useCallback(async(id,{penaltyStatus="none",note=""}={})=>{const{data,error:rpcError}=await supabase.rpc("hl_cancel_reservation_policy_atomic",{p_reserva_id:Number(id),p_penalty_status:penaltyStatus||"none",p_note:note||null});if(rpcError)throw rpcError;setReservations(list=>list.map(item=>Number(item.id)===Number(data.id)?{...item,...data}:item));notifyUpdate(id);return data},[])
