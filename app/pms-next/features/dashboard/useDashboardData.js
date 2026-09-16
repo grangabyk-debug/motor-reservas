@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { supabase } from "../../../../lib/supabase"
 import usePmsAutoRefresh from "../../core/usePmsAutoRefresh"
 
@@ -36,13 +36,22 @@ export default function useDashboardData(propertyId) {
   const [guestProfiles, setGuestProfiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const inFlightRef = useRef(false)
+  const queuedRefreshRef = useRef(false)
+  const mountedRef = useRef(true)
 
-  const load = useCallback(async () => {
+  useEffect(() => () => { mountedRef.current = false }, [])
+
+  const load = useCallback(async (silent = false) => {
     if (!propertyId) return
-    setLoading(true)
+    if (inFlightRef.current) {
+      queuedRefreshRef.current = true
+      return
+    }
+    inFlightRef.current = true
+    if (!silent) setLoading(true)
     setError("")
     const yesterday = dateKey(-1)
-    const today = dateKey(0)
     const dayAfter = dateKey(2)
     const todayStart = localDayStartISO(0)
     const tomorrowStart = localDayStartISO(1)
@@ -75,6 +84,7 @@ export default function useDashboardData(propertyId) {
         profiles = profileRes.data || []
       }
 
+      if (!mountedRef.current) return
       setRooms(roomRes.data || [])
       setReservations(reservationRows)
       setBookingActivity((pickupRes.data || []).filter(validReservation))
@@ -84,9 +94,14 @@ export default function useDashboardData(propertyId) {
       setReservationPayments(allPayments)
       setGuestProfiles(profiles)
     } catch (err) {
-      setError(err?.message || "No se pudo cargar la operación de recepción.")
+      if (mountedRef.current) setError(err?.message || "No se pudo cargar la operación de recepción.")
     } finally {
-      setLoading(false)
+      inFlightRef.current = false
+      if (!silent && mountedRef.current) setLoading(false)
+      if (queuedRefreshRef.current && mountedRef.current) {
+        queuedRefreshRef.current = false
+        window.setTimeout(() => load(true), 80)
+      }
     }
   }, [propertyId])
 
@@ -146,11 +161,7 @@ export default function useDashboardData(propertyId) {
       const offset = index - 6
       const key = dateKey(offset)
       const date = new Date(`${key}T12:00:00`)
-      return {
-        key,
-        label: offset === 0 ? "Hoy" : new Intl.DateTimeFormat("es-AR", { weekday: "short" }).format(date).replace(".", ""),
-        value: 0,
-      }
+      return { key, label: offset === 0 ? "Hoy" : new Intl.DateTimeFormat("es-AR", { weekday: "short" }).format(date).replace(".", ""), value: 0 }
     })
     const dayMap = new Map(days.map((day) => [day.key, day]))
     const channelMap = new Map()
@@ -161,18 +172,9 @@ export default function useDashboardData(propertyId) {
       const channel = String(reservation.canal_reserva || "Directa").trim() || "Directa"
       channelMap.set(channel, (channelMap.get(channel) || 0) + 1)
     }
-    const channels = [...channelMap.entries()]
-      .map(([label, value]) => ({ label, value }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 5)
+    const channels = [...channelMap.entries()].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value).slice(0, 5)
     const total = bookingActivity.length
-    return {
-      days,
-      channels: channels.map((item) => ({ ...item, pct: total ? Math.round((item.value / total) * 100) : 0 })),
-      total,
-      today: days[days.length - 1]?.value || 0,
-      previousSix: days.slice(0, 6).reduce((sum, day) => sum + day.value, 0),
-    }
+    return { days, channels: channels.map((item) => ({ ...item, pct: total ? Math.round((item.value / total) * 100) : 0 })), total, today: days[days.length - 1]?.value || 0, previousSix: days.slice(0, 6).reduce((sum, day) => sum + day.value, 0) }
   }, [bookingActivity])
 
   const metrics = useMemo(() => {
