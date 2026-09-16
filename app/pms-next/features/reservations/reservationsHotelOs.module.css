@@ -1,6 +1,6 @@
 .reservationsOs{min-width:0}
 
-/* Cabecera de reservas: carpeta + búsqueda + orden dentro de una barra de mando. */
+/* Cabecera de reservas: una sola familia visual para carpetas, orden y pago. */
 .reservationsOs :global(section>header[class*="heading"]){
   align-items:flex-end!important;
   gap:18px!important;
@@ -25,6 +25,16 @@
   background:transparent!important;
   box-shadow:none!important;
   color:var(--muted)!important;
+  font-family:inherit!important;
+  font-size:13px!important;
+  font-weight:800!important;
+  line-height:1!important;
+  letter-spacing:0!important;
+}
+.reservationsOs :global([class*="tools"]>select){
+  min-width:154px!important;
+  padding-left:13px!important;
+  padding-right:32px!important;
 }
 .reservationsOs :global([class*="tools"]>button:hover),
 .reservationsOs :global([class*="tools"]>select:hover){
@@ -38,26 +48,21 @@
   background:linear-gradient(145deg,rgba(255,255,255,.97),color-mix(in srgb,var(--accent) 8%,#f6f5fb))!important;
   box-shadow:inset 0 1px rgba(255,255,255,.88),0 5px 15px color-mix(in srgb,var(--accent) 10%,transparent)!important;
 }
-.reservationsOs :global([class*="tools"]>label[class*="search"]){
-  min-height:34px!important;
-  margin-left:5px;
-  border:1px solid color-mix(in srgb,var(--lineStrong) 72%,transparent)!important;
-  border-radius:11px!important;
-  background:rgba(252,250,247,.92)!important;
-  box-shadow:inset 0 1px rgba(255,255,255,.72)!important;
+.reservationsOs :global([class*="tools"]>button:last-child){
+  display:inline-flex!important;
+  align-items:center!important;
+  gap:6px!important;
 }
-.reservationsOs :global([class*="tools"]>label[class*="search"]:focus-within){
-  border-color:color-mix(in srgb,var(--accent) 32%,var(--line))!important;
-  box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 7%,transparent),inset 0 1px rgba(255,255,255,.74)!important;
+.reservationsOs :global([class*="tools"]>button:last-child:before){
+  content:"";
+  width:14px;
+  height:14px;
+  flex:0 0 14px;
+  background:currentColor;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6h6M14 6h6M4 12h2M10 12h10M4 18h9M17 18h3'/%3E%3Ccircle cx='12' cy='6' r='2'/%3E%3Ccircle cx='8' cy='12' r='2'/%3E%3Ccircle cx='15' cy='18' r='2'/%3E%3C/svg%3E") center/contain no-repeat;
 }
 
-/* Iconografía SVG en acciones de alto uso. Los textos originales siguen en DOM para accesibilidad. */
-.reservationsOs :global([class*="tools"]>label[class*="search"]){font-size:0!important;display:flex!important;align-items:center!important;gap:7px!important}
-.reservationsOs :global([class*="tools"]>label[class*="search"]:before){content:"";width:14px;height:14px;flex:0 0 14px;background:currentColor;opacity:.72;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'%3E%3Ccircle cx='10.5' cy='10.5' r='6.2'/%3E%3Cpath d='m15.2 15.2 4.3 4.3'/%3E%3C/svg%3E") center/contain no-repeat}
-.reservationsOs :global([class*="tools"]>label[class*="search"] input){font-size:11.5px!important}
-.reservationsOs :global([class*="tools"]>button:last-child){font-size:0!important;display:inline-flex!important;align-items:center!important;gap:6px!important}
-.reservationsOs :global([class*="tools"]>button:last-child:before){content:"";width:14px;height:14px;background:currentColor;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6h6M14 6h6M4 12h2M10 12h10M4 18h9M17 18h3'/%3E%3Ccircle cx='12' cy='6' r='2'/%3E%3Ccircle cx='8' cy='12' r='2'/%3E%3Ccircle cx='15' cy='18' r='2'/%3E%3C/svg%3E") center/contain no-repeat}
-.reservationsOs :global([class*="tools"]>button:last-child:after){content:"Filtrar";font-size:10.5px;font-weight:850}
+/* Iconografía SVG en acciones de alto uso. */
 .reservationsOs :global([class*="actions"]>button[title="Abrir ficha completa"]),
 .reservationsOs :global([class*="actions"]>button[title="Marcar No Show"]),
 .reservationsOs :global([class*="actions"]>button[title="Reabrir No Show"]),
@@ -87,6 +92,11 @@
   box-shadow:inset 0 1px rgba(255,255,255,.8),0 14px 38px rgba(22,33,53,.065)!important;
 }
 .reservationsOs :global([class*="filterPanel"]){
+  width:max-content;
+  max-width:100%;
+  margin-left:auto!important;
+  padding:7px 8px!important;
+  gap:5px!important;
   border-color:color-mix(in srgb,var(--lineStrong) 76%,transparent)!important;
   border-radius:14px!important;
   background:linear-gradient(155deg,rgba(252,250,247,.97),rgba(247,248,250,.95))!important;
@@ -94,6 +104,7 @@
   backdrop-filter:blur(20px) saturate(1.14)!important;
   box-shadow:inset 0 1px rgba(255,255,255,.76),0 10px 28px rgba(23,35,56,.065)!important;
 }
+.reservationsOs :global([class*="filterPanel"]>span:first-child){margin-right:2px!important}
 
 :global([data-theme="dark"]) .reservationsOs :global([class*="tools"]),
 :global([data-theme="dark"]) .reservationsOs :global([class*="tableWrap"]),
@@ -110,16 +121,17 @@
   background:linear-gradient(145deg,rgba(39,44,72,.98),rgba(25,32,54,.97))!important;
   box-shadow:inset 0 1px rgba(255,255,255,.06),0 6px 16px rgba(92,84,215,.14)!important;
 }
-:global([data-theme="dark"]) .reservationsOs :global([class*="tools"]>label[class*="search"]){
-  border-color:rgba(166,184,220,.11)!important;
-  background:rgba(10,18,31,.94)!important;
-}
 
 @media(max-width:1180px){
   .reservationsOs :global(section>header[class*="heading"]){align-items:flex-start!important;flex-direction:column!important}
-  .reservationsOs :global([class*="tools"]){width:100%;overflow:auto;justify-content:flex-start}
+  .reservationsOs :global([class*="tools"]){width:100%;overflow:visible!important;flex-wrap:wrap!important;justify-content:flex-start}
+  .reservationsOs :global([class*="filterPanel"]){margin-left:0!important}
 }
 @media(max-width:760px){
   .reservationsOs :global([class*="tools"]){border-radius:14px;padding:4px!important}
-  .reservationsOs :global([class*="tools"]>label[class*="search"]){min-width:220px}
+}
+@media(max-width:640px){
+  .reservationsOs :global([class*="tools"]>button),
+  .reservationsOs :global([class*="tools"]>select){flex:1 1 auto!important;min-width:0!important}
+  .reservationsOs :global([class*="filterPanel"]){width:100%!important;overflow:auto!important;justify-content:flex-start!important}
 }
