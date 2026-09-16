@@ -21,7 +21,9 @@ const shortcuts = [
 ]
 
 const DEFAULT_WIDGETS = ["occupancy", "arrivals", "departures", "inhouse", "ready", "collected"]
+const AVAILABLE_BLOCKS = ["metrics", "insights", "commercial", "frontdesk", "shortcuts"]
 const DEFAULT_BLOCKS = ["metrics", "insights", "commercial", "frontdesk", "shortcuts"]
+const DEFAULT_HIDDEN_BLOCKS = ["shortcuts"]
 const BLOCK_LABELS = {
   metrics: ["Indicadores", "Ocupación, llegadas, salidas, huéspedes, habitaciones y cobros"],
   insights: ["Centro operativo", "Ocupación comparada, próximas llegadas y prioridades"],
@@ -70,7 +72,7 @@ function GuestRow({ item, kind, onOpen }) {
 function ReservationPreview({ item, onOpen }) {
   const state = String(item.estado || "reservada").toLowerCase()
   const label = state === "confirmada" ? "Confirmada" : state === "pendiente" ? "Pendiente" : "Próxima"
-  return <button type="button" className={s.reservationPreview} onClick={onOpen}><span className={s.reservationAvatar}>{initials(item.nombre_huesped)}</span><span className={s.reservationCopy}><strong>{item.nombre_huesped || "Huésped"}</strong><small>{item.fecha_entrada} → {item.fecha_salida} · {item.roomNames?.[0] || "Sin habitación"}</small></span><span className={s.reservationStatus} data-state={state}>{label}</span></button>
+  return <button type="button" className={s.reservationPreview} onClick={onOpen} aria-label={`Abrir reserva de ${item.nombre_huesped||"huésped"}`}><span className={s.reservationAvatar}>{initials(item.nombre_huesped)}</span><span className={s.reservationCopy}><strong>{item.nombre_huesped || "Huésped"}</strong><small>{item.fecha_entrada} → {item.fecha_salida} · {item.roomNames?.[0] || "Sin habitación"}</small></span><span className={s.reservationStatus} data-state={state}>{label}</span><PmsIcon name="chevronRight" size={13}/></button>
 }
 
 export default function DashboardWorkspace({ propertyId, property, onNavigate, allowedViews = [] }) {
@@ -81,7 +83,7 @@ export default function DashboardWorkspace({ propertyId, property, onNavigate, a
   const [widgetOrder, setWidgetOrder] = useState(DEFAULT_WIDGETS)
   const [hiddenWidgets, setHiddenWidgets] = useState([])
   const [blockOrder, setBlockOrder] = useState(DEFAULT_BLOCKS)
-  const [hiddenBlocks, setHiddenBlocks] = useState([])
+  const [hiddenBlocks, setHiddenBlocks] = useState(DEFAULT_HIDDEN_BLOCKS)
   const [dragging, setDragging] = useState("")
   const [draggingBlock, setDraggingBlock] = useState("")
   const [oliviaHidden, setOliviaHidden] = useState(false)
@@ -109,17 +111,20 @@ export default function DashboardWorkspace({ propertyId, property, onNavigate, a
         if (!alive) return
         setWidgetOrder(normalizeOrder(source.metric_order, DEFAULT_WIDGETS))
         setHiddenWidgets(Array.isArray(source.metric_hidden) ? source.metric_hidden.filter((id) => DEFAULT_WIDGETS.includes(id)) : [])
-        setBlockOrder(normalizeOrder(source.block_order, DEFAULT_BLOCKS))
-        setHiddenBlocks(Array.isArray(source.block_hidden) ? source.block_hidden.filter((id) => DEFAULT_BLOCKS.includes(id)) : [])
+        setBlockOrder(normalizeOrder(source.block_order, AVAILABLE_BLOCKS))
+        const storedHidden = Array.isArray(source.block_hidden) ? source.block_hidden.filter((id) => AVAILABLE_BLOCKS.includes(id)) : []
+        const shortcutsExplicitlyEnabled = source.shortcuts_enabled === true
+        setHiddenBlocks(shortcutsExplicitlyEnabled ? storedHidden.filter((id) => id !== "shortcuts") : [...new Set([...storedHidden, "shortcuts"])])
       } catch {
         try { const old = JSON.parse(localStorage.getItem(`hl:dashboard-widgets:${propertyId}`) || "null"); if (Array.isArray(old)) setWidgetOrder(normalizeOrder(old, DEFAULT_WIDGETS)) } catch {}
+        setHiddenBlocks(DEFAULT_HIDDEN_BLOCKS)
       } finally { if (alive) setLayoutLoaded(true) }
     })()
     return () => { alive = false }
   }, [propertyId])
   useEffect(() => { try { setOliviaHidden(localStorage.getItem(`hl:olivia-hidden:${propertyId}`) === "1") } catch { setOliviaHidden(false) } }, [propertyId])
 
-  const snapshotLayout = () => ({ metric_order: widgetOrder, metric_hidden: hiddenWidgets, block_order: blockOrder, block_hidden: hiddenBlocks })
+  const snapshotLayout = () => ({ metric_order: widgetOrder, metric_hidden: hiddenWidgets, block_order: blockOrder, block_hidden: hiddenBlocks, shortcuts_enabled: !hiddenBlocks.includes("shortcuts") })
   function cacheLayout(next) { try { localStorage.setItem(`hl:dashboard-layout:${propertyId}`, JSON.stringify(next)); localStorage.setItem(`hl:dashboard-widgets:${propertyId}`, JSON.stringify(next.metric_order)) } catch {} }
   async function persistLayout(next, message = "Dashboard guardado para esta propiedad.") {
     cacheLayout(next)
@@ -140,7 +145,7 @@ export default function DashboardWorkspace({ propertyId, property, onNavigate, a
   function dropBlock(target) { if (!draggingBlock || draggingBlock === target) return; const next = blockOrder.filter((id) => id !== draggingBlock); const index = next.indexOf(target); next.splice(index, 0, draggingBlock); setBlockOrder(next); setDraggingBlock(""); cacheLayout({ ...snapshotLayout(), block_order: next }) }
   function toggleWidget(id) { setHiddenWidgets((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]) }
   function toggleBlock(id) { setHiddenBlocks((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]) }
-  function resetLayout() { setWidgetOrder(DEFAULT_WIDGETS); setHiddenWidgets([]); setBlockOrder(DEFAULT_BLOCKS); setHiddenBlocks([]); persistLayout({ metric_order: DEFAULT_WIDGETS, metric_hidden: [], block_order: DEFAULT_BLOCKS, block_hidden: [] }, "Dashboard restablecido.") }
+  function resetLayout() { setWidgetOrder(DEFAULT_WIDGETS); setHiddenWidgets([]); setBlockOrder(DEFAULT_BLOCKS); setHiddenBlocks(DEFAULT_HIDDEN_BLOCKS); persistLayout({ metric_order: DEFAULT_WIDGETS, metric_hidden: [], block_order: DEFAULT_BLOCKS, block_hidden: DEFAULT_HIDDEN_BLOCKS, shortcuts_enabled: false }, "Dashboard restablecido.") }
   function setOliviaVisibility(hidden) { setOliviaHidden(hidden); try { if (hidden) localStorage.setItem(`hl:olivia-hidden:${propertyId}`, "1"); else localStorage.removeItem(`hl:olivia-hidden:${propertyId}`) } catch {} }
 
   const quickLinks = shortcuts.filter((item) => can(item.id))
@@ -167,7 +172,7 @@ export default function DashboardWorkspace({ propertyId, property, onNavigate, a
   const bookingInsights = data.bookingInsights || { days: [], channels: [], total: 0, today: 0, previousSix: 0 }
   const paceMax = Math.max(1, ...bookingInsights.days.map((day) => Number(day.value) || 0))
   const previousAverage = bookingInsights.previousSix ? bookingInsights.previousSix / 6 : 0
-  const reservationPreviewRows = (() => { const unique = new Map(); for (const offset of [0, 1]) { const item = data.operationsByOffset?.[offset] || { arrivals: [] }; (item.arrivals || []).filter(isPendingArrival).forEach((row) => unique.set(row.id, row)) } return [...unique.values()].sort((a, b) => `${a.fecha_entrada || ""} ${a.hora_llegada_estimada || "23:59"}`.localeCompare(`${b.fecha_entrada || ""} ${b.hora_llegada_estimada || "23:59"}`)).slice(0, 4) })()
+  const reservationPreviewRows = (() => { const unique = new Map(); for (const offset of [0, 1]) { const item = data.operationsByOffset?.[offset] || { arrivals: [] }; (item.arrivals || []).filter(isPendingArrival).forEach((row) => unique.set(row.id, row)) } return [...unique.values()].sort((a, b) => `${a.fecha_entrada || ""} ${a.hora_llegada_estimada || "23:59"}`.localeCompare(`${b.fecha_entrada || ""} ${b.hora_llegada_estimada || "23:59"}`)).slice(0, 7) })()
 
   const blockNodes = {
     metrics: <div className={s.metricGrid}>{visibleWidgets.map((id) => { const widget = widgets[id]; return <button key={id} type="button" draggable={editing} onDragStart={() => editing && setDragging(id)} onDragEnd={() => setDragging("")} onDragOver={(event) => editing && event.preventDefault()} onDrop={() => editing && dropOn(id)} data-tone={widget.tone} className={`${s.metricCard} ${dragging === id ? s.dragging : ""}`} onClick={() => !editing && onNavigate?.(widget.view)}><span className={s.metricIcon}><MetricIcon type={widget.icon}/></span><span className={s.metricBody}><small>{widget.label}</small><strong className={id === "collected" ? s.moneyValue : ""}>{widget.value}</strong><em>{widget.note}</em></span>{editing ? <i className={s.dragHandle}><PmsIcon name="grip" size={13}/></i> : null}</button> })}</div>,
@@ -178,12 +183,12 @@ export default function DashboardWorkspace({ propertyId, property, onNavigate, a
   }
 
   return <section className={s.page}>
-    {welcomeVisible ? <div className={u.welcomeToast} role="status"><span className={u.welcomeMark}>HL</span><div><b>Bienvenido. Así está tu hotel hoy.</b><span>{property?.name || "Tu alojamiento"} · datos operativos en vivo</span></div><button type="button" onClick={() => setWelcomeVisible(false)} aria-label="Cerrar bienvenida"><PmsIcon name="close" size={13}/></button></div> : null}
-    <div className={u.compactTools}>{oliviaHidden ? <button type="button" onClick={() => setOliviaVisibility(false)}>Mostrar OlivIA</button> : null}{canEditDashboard ? <button type="button" className={editing ? e.editActive : ""} onClick={() => setEditing((value) => !value)}><PmsIcon name="sliders" size={14}/>{editing ? "Salir de edición" : "Editar dashboard"}</button> : null}<button type="button" onClick={resetLayout}>Restablecer widgets</button><button type="button" data-live="true" onClick={data.load}>{data.loading ? "Actualizando…" : "Actualizar datos"}</button></div>
+    {welcomeVisible ? <div className={u.welcomeToast} role="status"><span className={u.welcomeMark}><PmsIcon name="olivia" size={25}/></span><div><b>Bienvenido. Así está tu hotel hoy.</b><span>{property?.name || "Tu alojamiento"} · datos operativos en vivo</span></div><button type="button" onClick={() => setWelcomeVisible(false)} aria-label="Cerrar bienvenida"><PmsIcon name="close" size={13}/></button></div> : null}
+    <div className={u.compactTools}>{oliviaHidden ? <button type="button" onClick={() => setOliviaVisibility(false)}>Mostrar OlivIA</button> : null}{canEditDashboard ? <button type="button" className={editing ? e.editActive : ""} onClick={() => setEditing((value) => !value)}><PmsIcon name="sliders" size={14}/>{editing ? "Salir de edición" : "Editar dashboard"}</button> : null}<button type="button" onClick={resetLayout}>Restablecer widgets</button><button type="button" data-live="true" onClick={() => data.load(false)}>{data.loading ? "Actualizando…" : "Actualizar datos"}</button></div>
     {data.error ? <div className={s.notice}>{data.error}</div> : null}
     {layoutError ? <div className={e.layoutError}>{layoutError}</div> : null}
     {layoutNotice ? <div className={e.layoutNotice}>{layoutNotice}</div> : null}
-    {editing && canEditDashboard ? <section className={e.editor}><header><div><small>MODO EDICIÓN</small><h2>Armá el Dashboard de este hotel</h2><p>Mové bloques, ocultá lo que no necesitás y guardá una vista común para toda la propiedad.</p></div><div><button type="button" className={e.reset} onClick={resetLayout}>Restablecer</button><button type="button" className={e.save} disabled={layoutSaving} onClick={() => persistLayout(snapshotLayout())}><PmsIcon name="check" size={14}/>{layoutSaving ? "Guardando…" : "Guardar cambios"}</button></div></header><div className={e.catalog}><div><b>Indicadores</b><span>Mostrá sólo los KPI útiles para este hotel.</span><div className={e.toggleGrid}>{DEFAULT_WIDGETS.map((id) => <button type="button" key={id} data-on={!hiddenWidgets.includes(id)} onClick={() => toggleWidget(id)}><span>{widgets[id].label}</span><i/></button>)}</div></div><div><b>Bloques</b><span>Estos módulos usan datos reales del PMS.</span><div className={e.toggleGrid}>{DEFAULT_BLOCKS.map((id) => <button type="button" key={id} data-on={!hiddenBlocks.includes(id)} onClick={() => toggleBlock(id)}><span>{BLOCK_LABELS[id][0]}</span><i/></button>)}</div></div></div></section> : null}
+    {editing && canEditDashboard ? <section className={e.editor}><header><div><small>MODO EDICIÓN</small><h2>Armá el Dashboard de este hotel</h2><p>Mové bloques, ocultá lo que no necesitás y guardá una vista común para toda la propiedad.</p></div><div><button type="button" className={e.reset} onClick={resetLayout}>Restablecer</button><button type="button" className={e.save} disabled={layoutSaving} onClick={() => persistLayout(snapshotLayout())}><PmsIcon name="check" size={14}/>{layoutSaving ? "Guardando…" : "Guardar cambios"}</button></div></header><div className={e.catalog}><div><b>Indicadores</b><span>Mostrá sólo los KPI útiles para este hotel.</span><div className={e.toggleGrid}>{DEFAULT_WIDGETS.map((id) => <button type="button" key={id} data-on={!hiddenWidgets.includes(id)} onClick={() => toggleWidget(id)}><span>{widgets[id].label}</span><i/></button>)}</div></div><div><b>Bloques</b><span>Estos módulos usan datos reales del PMS.</span><div className={e.toggleGrid}>{AVAILABLE_BLOCKS.map((id) => <button type="button" key={id} data-on={!hiddenBlocks.includes(id)} onClick={() => toggleBlock(id)}><span>{BLOCK_LABELS[id][0]}</span><i/></button>)}</div></div></div></section> : null}
     {layoutLoaded ? blockOrder.filter((id) => !hiddenBlocks.includes(id) && blockNodes[id]).map((id) => <div key={id} className={`${editing ? e.editableBlock : ""} ${draggingBlock === id ? e.draggingBlock : ""}`} draggable={editing} onDragStart={() => editing && setDraggingBlock(id)} onDragEnd={() => setDraggingBlock("")} onDragOver={(event) => editing && event.preventDefault()} onDrop={() => editing && dropBlock(id)}>{editing ? <div className={e.blockHandle}><PmsIcon name="grip" size={14}/><span><b>{BLOCK_LABELS[id][0]}</b><small>{BLOCK_LABELS[id][1]}</small></span><button type="button" onClick={() => toggleBlock(id)}>Ocultar</button></div> : null}{blockNodes[id]}</div>) : null}
     {!oliviaHidden ? <OliviaAssistant propertyId={propertyId} propertyName={property?.name} context={assistantContext} onHide={() => setOliviaVisibility(true)}/> : null}
   </section>
