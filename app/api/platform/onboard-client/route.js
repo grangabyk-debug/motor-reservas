@@ -31,14 +31,15 @@ export async function POST(request){
     let ownerId,invited=false
     if(existing)ownerId=existing.id
     else{
-      const redirectTo=`${request.nextUrl.origin}/reset-password`,{data,error}=await adminClient.auth.admin.inviteUserByEmail(ownerEmail,{redirectTo,data:{full_name:ownerName||propertyName}})
+      const resetUrl=new URL("/reset-password",request.nextUrl.origin);resetUrl.searchParams.set("next","/pms-next?view=onboarding")
+      const{data,error}=await adminClient.auth.admin.inviteUserByEmail(ownerEmail,{redirectTo:resetUrl.toString(),data:{full_name:ownerName||propertyName}})
       if(error)return json({error:error.message||"No se pudo enviar la invitación al propietario."},400)
       ownerId=data.user.id;invited=true;invitedUserId=ownerId
     }
 
     const{data,error}=await userClient.rpc("hl_platform_admin_onboard_property",{p_owner_id:ownerId,p_owner_name:ownerName||ownerEmail,p_owner_email:ownerEmail,p_property_name:propertyName,p_city:city||null,p_plan_code:planCode,p_billing_cycle:billingCycle,p_room_tier:roomTier,p_room_limit:roomLimit,p_price_amount:priceAmount,p_price_currency:priceCurrency,p_trial_days:trialDays,p_enabled_modules:modules,p_notes:notes})
     if(error||data?.error){if(invitedUserId)await adminClient.auth.admin.deleteUser(invitedUserId);return json({error:error?.message||data?.error||"No se pudo completar el alta del cliente."},400)}
-    return json({success:true,...data,owner:{id:ownerId,email:ownerEmail,invited},message:invited?"Cliente creado e invitación enviada.":"Cliente creado y vinculado a un usuario existente."})
+    return json({success:true,...data,owner:{id:ownerId,email:ownerEmail,invited},message:invited?"Cliente creado e invitación enviada. Su primer ingreso lo llevará a Puesta en marcha.":"Cliente creado y vinculado a un usuario existente."})
   }catch(error){
     if(invitedUserId){try{const supabaseUrl=process.env.NEXT_PUBLIC_SUPABASE_URL,secretKey=process.env.SUPABASE_SECRET_KEY;if(supabaseUrl&&secretKey){const adminClient=createClient(supabaseUrl,secretKey,{auth:{autoRefreshToken:false,persistSession:false}});await adminClient.auth.admin.deleteUser(invitedUserId)}}catch{}}
     console.error("PLATFORM ONBOARD CLIENT ERROR:",error)
