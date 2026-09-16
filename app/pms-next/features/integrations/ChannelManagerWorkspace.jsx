@@ -23,7 +23,7 @@ export default function ChannelManagerWorkspace({propertyId,property}){
       [data-distribution-body]>section{padding:0!important;min-height:0!important}
       @media(max-width:760px){[data-distribution]{padding:16px 12px 32px}[data-distribution-head]{align-items:flex-start;flex-direction:column}[data-distribution-head] h1{font-size:29px}[data-distribution-tabs]{width:100%}[data-distribution-tabs] button{flex:1}}
     `}</style>
-    <header data-distribution-head><div><small>GESTIÓN · DISTRIBUCIÓN</small><h1>Distribución</h1></div><nav data-distribution-tabs aria-label="Canales de distribución"><button type="button" data-active={tab==="channels"} onClick={()=>chooseTab("channels")}>Canales</button><button type="button" data-active={tab==="website"} onClick={()=>chooseTab("website")}>Sitio web</button></nav></header>
+    <header data-distribution-head><div><small>VENTA ONLINE</small><h1>Distribución</h1></div><nav data-distribution-tabs aria-label="Áreas de distribución"><button type="button" data-active={tab==="channels"} onClick={()=>chooseTab("channels")}>Canales y sincronización</button><button type="button" data-active={tab==="website"} onClick={()=>chooseTab("website")}>Venta directa</button></nav></header>
     <div data-distribution-body>{tab==="channels"?<ChannelManagerCore propertyId={propertyId} property={property}/>:<WebsitePanel propertyId={propertyId} property={property}/>}</div>
   </section>
 }
