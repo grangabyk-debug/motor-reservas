@@ -1,0 +1,117 @@
+.financeOs{}
+
+/* Navegación principal: una sola pieza segmentada, no cinco botones sueltos. */
+.financeOs>header>div:last-child{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  padding:5px;
+  border:1px solid color-mix(in srgb,var(--lineStrong) 82%,transparent);
+  border-radius:16px;
+  background:linear-gradient(155deg,rgba(252,250,247,.96),rgba(246,247,250,.94));
+  -webkit-backdrop-filter:blur(22px) saturate(1.18);
+  backdrop-filter:blur(22px) saturate(1.18);
+  box-shadow:inset 0 1px rgba(255,255,255,.78),0 10px 28px rgba(27,38,58,.07);
+}
+.financeOs>header>div:last-child>div{
+  display:flex;
+  gap:2px;
+  flex-wrap:nowrap;
+}
+.financeOs>header>div:last-child button{
+  min-height:34px!important;
+  border:1px solid transparent!important;
+  border-radius:11px!important;
+  padding:7px 11px!important;
+  background:transparent!important;
+  color:var(--muted)!important;
+  box-shadow:none!important;
+  font-weight:760;
+  white-space:nowrap;
+}
+.financeOs>header>div:last-child button:hover{
+  color:var(--text)!important;
+  background:rgba(255,255,255,.52)!important;
+  border-color:color-mix(in srgb,var(--lineStrong) 70%,transparent)!important;
+}
+.financeOs>header>div:last-child button[aria-pressed="true"]{
+  color:var(--accent)!important;
+  border-color:color-mix(in srgb,var(--accent) 23%,var(--line))!important;
+  background:linear-gradient(145deg,rgba(255,255,255,.96),color-mix(in srgb,var(--accent) 8%,#f7f6fb))!important;
+  box-shadow:inset 0 1px rgba(255,255,255,.9),0 6px 18px color-mix(in srgb,var(--accent) 11%,transparent)!important;
+}
+.financeOs>header>div:last-child select{
+  min-height:34px!important;
+  width:auto;
+  min-width:144px;
+  border:1px solid transparent!important;
+  border-left-color:var(--line)!important;
+  border-radius:10px!important;
+  padding:6px 28px 6px 10px!important;
+  background:transparent!important;
+  color:var(--muted)!important;
+  box-shadow:none!important;
+}
+
+/* Selector de período: misma gramática, escala menor. */
+.financeOs>div:not([data-finance-cash-embed])>div:first-child:has(>button){
+  align-self:flex-end;
+  gap:2px!important;
+  padding:4px;
+  border:1px solid color-mix(in srgb,var(--lineStrong) 76%,transparent);
+  border-radius:14px;
+  background:linear-gradient(155deg,rgba(252,250,247,.95),rgba(246,247,249,.92));
+  -webkit-backdrop-filter:blur(18px) saturate(1.14);
+  backdrop-filter:blur(18px) saturate(1.14);
+  box-shadow:inset 0 1px rgba(255,255,255,.76),0 7px 20px rgba(25,37,58,.055);
+}
+.financeOs>div:not([data-finance-cash-embed])>div:first-child:has(>button)>button{
+  min-height:32px!important;
+  border:1px solid transparent!important;
+  border-radius:10px!important;
+  padding:6px 10px!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+
+/* Modales: blur de ambiente, cuerpo prácticamente sólido. */
+.financeOs :global([role="dialog"]),
+.financeOs :global([aria-modal="true"]){
+  border:1px solid color-mix(in srgb,var(--lineStrong) 86%,transparent)!important;
+  background:linear-gradient(155deg,rgba(252,250,247,.985),rgba(247,248,250,.975))!important;
+  -webkit-backdrop-filter:blur(30px) saturate(1.16)!important;
+  backdrop-filter:blur(30px) saturate(1.16)!important;
+  box-shadow:inset 0 1px rgba(255,255,255,.82),0 30px 90px rgba(18,28,48,.2)!important;
+}
+
+:global([data-theme="dark"]) .financeOs>header>div:last-child,
+:global([data-theme="dark"]) .financeOs>div:not([data-finance-cash-embed])>div:first-child:has(>button){
+  border-color:rgba(166,184,220,.13);
+  background:linear-gradient(155deg,rgba(18,28,47,.97),rgba(12,21,36,.95));
+  box-shadow:inset 0 1px rgba(255,255,255,.045),0 10px 28px rgba(0,0,0,.17);
+}
+:global([data-theme="dark"]) .financeOs>header>div:last-child button:hover{
+  background:rgba(255,255,255,.045)!important;
+}
+:global([data-theme="dark"]) .financeOs>header>div:last-child button[aria-pressed="true"]{
+  color:#b6b8ff!important;
+  border-color:rgba(141,145,255,.22)!important;
+  background:linear-gradient(145deg,rgba(38,43,72,.98),rgba(24,31,53,.97))!important;
+  box-shadow:inset 0 1px rgba(255,255,255,.07),0 7px 20px rgba(92,84,215,.15)!important;
+}
+:global([data-theme="dark"]) .financeOs :global([role="dialog"]),
+:global([data-theme="dark"]) .financeOs :global([aria-modal="true"]){
+  border-color:rgba(166,184,220,.15)!important;
+  background:linear-gradient(155deg,rgba(18,28,47,.99),rgba(11,19,33,.985))!important;
+  box-shadow:inset 0 1px rgba(255,255,255,.05),0 32px 90px rgba(0,0,0,.44)!important;
+}
+
+@media(max-width:1100px){
+  .financeOs>header>div:last-child{width:100%;overflow:auto;justify-content:flex-start}
+}
+@media(max-width:720px){
+  .financeOs>header>div:last-child{border-radius:14px;padding:4px}
+  .financeOs>header>div:last-child>div{min-width:max-content}
+  .financeOs>header>div:last-child button{padding-inline:9px!important}
+  .financeOs>header>div:last-child select{min-width:110px}
+}
