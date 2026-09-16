@@ -21,16 +21,16 @@ export default function PmsTopbar({title,info,theme,onToggleTheme,onNewReservati
       <small>HABITACIÓN LLENA</small>
       <span style={{display:"flex",alignItems:"center",gap:6}}><b>{title}</b>{info?<button type="button" aria-label={`Información sobre ${title}`} title={info} className={glass.toolGlass} style={{width:18,height:18,padding:0,border:"1px solid var(--lineStrong)",borderRadius:"50%",background:"color-mix(in srgb,var(--panelSolid) 60%,transparent)",color:"var(--muted)",fontSize:10,fontWeight:900,lineHeight:1,cursor:"help"}}>i</button>:null}</span>
     </div>
-    <button className={`${s.globalSearch} ${glass.searchGlass}`} type="button" onClick={onOpenSearch}><span>⌕</span><span>Buscar huésped, reserva o habitación…</span><kbd>Ctrl K</kbd></button>
+    <button className={`${s.globalSearch} ${glass.searchGlass}`} type="button" onClick={onOpenSearch}><span style={{display:"grid",placeItems:"center"}}><PmsIcon name="search" size={15}/></span><span>Buscar huésped, reserva o habitación…</span><kbd>Ctrl K</kbd></button>
     <div className={s.topbarActions}>
       <time title={timeZone||"Zona horaria del dispositivo"} style={{display:"grid",textAlign:"right",lineHeight:1.08,minWidth:76}}><b>{clock.time}</b><small style={{opacity:.6,textTransform:"capitalize"}}>{clock.date}</small></time>
       <div className={c.hotelToolGroup} aria-label="Acciones rápidas del hotel">
         <button className={`${s.iconButton} ${c.hotelTool} ${glass.toolGlass}`} data-kind="theme" data-tooltip={theme==="dark"?"Modo día":"Modo noche"} type="button" onClick={onToggleTheme} aria-label={theme==="dark"?"Activar modo día":"Activar modo noche"}><PmsIcon name={theme==="dark"?"sun":"moon"}/></button>
-        {onOpenSupport&&<button className={`${s.iconButton} ${c.hotelTool} ${glass.toolGlass}`} data-kind="support" data-tooltip="Ayuda y soporte" type="button" onClick={onOpenSupport} aria-label="Abrir ayuda y soporte" style={{fontWeight:900,fontSize:14,color:"#20a18f"}}>?</button>}
+        {onOpenSupport&&<button className={`${s.iconButton} ${c.hotelTool} ${glass.toolGlass}`} data-kind="support" data-tooltip="Ayuda y soporte" type="button" onClick={onOpenSupport} aria-label="Abrir ayuda y soporte" style={{color:"#20a18f"}}><PmsIcon name="help"/></button>}
         {alertHandler&&<button className={`${s.iconButton} ${c.hotelTool} ${glass.toolGlass} ${notificationCount>0?c.alerting:""}`} data-kind="activity" data-tooltip={alertTooltip} type="button" onClick={openAlerts} aria-label={alertLabel} aria-haspopup="dialog" style={{color:notificationCount>0?"#d94149":"#596f9d",position:"relative"}}><PmsIcon name="bell"/>{notificationCount>0?<span className={c.notificationBadge}>{notificationCount>99?"99+":notificationCount}</span>:null}</button>}
         {onNewQuote&&<button className={`${s.iconButton} ${c.hotelTool} ${glass.toolGlass}`} data-kind="quote" data-tooltip="Presupuesto" type="button" onClick={onNewQuote} aria-label="Crear presupuesto" style={{color:"#d79a31"}}><PmsIcon name="quote"/></button>}
       </div>
-      {onNewReservation&&<button className={s.primaryButton} type="button" onClick={onNewReservation}>＋ Nueva reserva</button>}
+      {onNewReservation&&<button className={s.primaryButton} type="button" onClick={onNewReservation} style={{display:"inline-flex",alignItems:"center",gap:7}}><PmsIcon name="plus" size={14}/>Nueva reserva</button>}
     </div>
   </header>
 }
