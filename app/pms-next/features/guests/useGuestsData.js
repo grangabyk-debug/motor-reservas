@@ -10,7 +10,7 @@ const SEARCH_LIMIT=60
 function canonicalKey(draft){const email=draft.email?.trim().toLowerCase();if(email)return`email:${email}`;const phone=draft.phone?.replace(/\D/g,"");if(phone)return`phone:${phone}`;return`manual:${crypto.randomUUID()}`}
 const todayKey=()=>new Date().toLocaleDateString("en-CA")
 const nightsBetween=(from,to)=>{const a=new Date(`${from}T12:00:00`),b=new Date(`${to}T12:00:00`);return Number.isNaN(a.getTime())||Number.isNaN(b.getTime())?0:Math.max(0,Math.round((b-a)/86400000))}
-const emptyStats=profile=>({stays:0,nights:0,spent:0,spentByCurrency:{},lastStay:profile?.last_stay_at||null,nextStay:null,currentStay:null,channelCounts:{},dominantChannel:"",lastChannel:"",otaStays:0,bookingStays:0,directStays:0})
+const emptyStats=profile=>({stays:0,nights:0,spent:0,spentByCurrency:{},lastStay:profile?.last_stay_at||null,nextStay:null,currentStay:null,channelCounts:{},dominantChannel:"",lastChannel:"",otaStays:0,bookingStays:0,directStays:0,groupStays:0})
 const cleanSearch=value=>String(value||"").trim().replace(/[,%()]/g," ").replace(/\s+/g," ").slice(0,80)
 
 export default function useGuestsData(propertyId,searchTerm=""){
@@ -34,7 +34,7 @@ export default function useGuestsData(propertyId,searchTerm=""){
       const ids=nextProfiles.map(item=>item.id).filter(Boolean)
       let nextReservations=[]
       if(ids.length){
-        const reservationRes=await supabase.from("reservas").select("id,guest_profile_id,nombre_huesped,email_huesped,telefono_huesped,fecha_entrada,fecha_salida,estado,precio_total,moneda,canal_reserva,habitacion_id").eq("property_id",propertyId).in("guest_profile_id",ids).neq("estado","cancelada").order("fecha_salida",{ascending:false}).limit(600)
+        const reservationRes=await supabase.from("reservas").select("id,guest_profile_id,group_id,nombre_huesped,email_huesped,telefono_huesped,fecha_entrada,fecha_salida,estado,precio_total,moneda,canal_reserva,habitacion_id").eq("property_id",propertyId).in("guest_profile_id",ids).neq("estado","cancelada").order("fecha_salida",{ascending:false}).limit(600)
         if(reservationRes.error)throw reservationRes.error
         nextReservations=reservationRes.data||[]
       }
@@ -56,6 +56,7 @@ export default function useGuestsData(propertyId,searchTerm=""){
       if(!start)continue
       const isFuture=start>today,isCurrent=!isFuture&&Boolean(end)&&end>today
       const channel=String(reservation.canal_reserva||"Directa").trim()||"Directa"
+      if(reservation.group_id)existing.groupStays+=1
       if(isFuture){if(!existing.nextStay||start<existing.nextStay)existing.nextStay=start;map.set(key,existing);continue}
       existing.stays+=1;existing.nights+=nightsBetween(start,end)
       const currency=String(reservation.moneda||"ARS").toUpperCase(),amount=Number(reservation.precio_total)||0
