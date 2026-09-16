@@ -75,7 +75,23 @@ export default function useGuestsData(propertyId){
   const guests=useMemo(()=>profiles.map(profile=>({...profile,...(statsByProfile.get(profile.id)||emptyStats(profile))})),[profiles,statsByProfile])
 
   const createGuest=useCallback(async draft=>{
-    const payload={property_id:propertyId,canonical_key:canonicalKey(draft),full_name:draft.full_name.trim(),email:draft.email?.trim()||null,phone:draft.phone?.trim()||null,country:draft.country?.trim()||null,nationality:draft.nationality?.trim()||null,language:draft.language||"es",preferences:{},tags:[],vip_level:draft.vip_level||"standard",status:"active",notes:draft.notes?.trim()||null}
+    const payload={
+      property_id:propertyId,
+      canonical_key:canonicalKey(draft),
+      full_name:draft.full_name.trim(),
+      email:draft.email?.trim()||null,
+      phone:draft.phone?.trim()||null,
+      birth_date:draft.birth_date||null,
+      document_type:draft.document_type||null,
+      document_number:draft.document_number?.trim()||null,
+      country:draft.country?.trim()||null,
+      nationality:draft.nationality?.trim()||null,
+      language:draft.language||"es",
+      address:draft.address?.trim()||null,
+      city:draft.city?.trim()||null,
+      province:draft.province?.trim()||null,
+      preferences:{},tags:[],vip_level:draft.vip_level||"standard",status:"active",notes:draft.notes?.trim()||null,
+    }
     const{data,error:insertError}=await supabase.from("hotel_guest_profiles").insert(payload).select().single();if(insertError)throw insertError
     setProfiles(list=>[data,...list]);return data
   },[propertyId])
