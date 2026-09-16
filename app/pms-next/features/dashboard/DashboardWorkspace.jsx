@@ -29,8 +29,7 @@ const BLOCK_LABELS = {
   frontdesk: ["Movimiento del hotel", "Llegadas, huéspedes en casa y salidas"],
   shortcuts: ["Accesos rápidos", "Atajos frecuentes del PMS"],
 }
-const money = (value, currency = "ARS") =>
-  new Intl.NumberFormat("es-AR", { style: "currency", currency: currency || "ARS", maximumFractionDigits: 0 }).format(Number(value) || 0)
+const money = (value, currency = "ARS") => new Intl.NumberFormat("es-AR", { style: "currency", currency: currency || "ARS", maximumFractionDigits: 0 }).format(Number(value) || 0)
 const initials = (value) => String(value || "H").trim().split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase()
 const actualVip = (value) => {
   const normalized = String(value || "").trim()
@@ -65,11 +64,7 @@ function GuestRow({ item, kind, onOpen }) {
   const roomLabel = item.roomNames?.length ? item.roomNames.join(", ") : "Sin habitación"
   const vip = actualVip(item.vipLevel)
   const tags = (item.guestTags || []).slice(0, 2)
-  return <button type="button" className={d.guestRow} onClick={onOpen} title={item.guestProfileNotes || undefined}>
-    <span className={d.guestAvatar}>{initials(item.nombre_huesped)}</span>
-    <span className={d.guestMain}><b>{item.nombre_huesped}</b><small>{roomLabel} · {item.canal_reserva || "Directa"}{time ? ` · ${time}` : ""}</small><span className={d.guestFlags}>{vip ? <em data-kind="vip">VIP {vip}</em> : null}{item.guestLanguage ? <em data-kind="info">{item.guestLanguage}</em> : null}{tags.map((tag) => <em data-kind="info" key={tag}>{tag}</em>)}{item.roomMaintenance ? <em data-kind="danger">Mantenimiento</em> : item.roomDirty && kind === "arrival" ? <em data-kind="warn">Habitación sucia</em> : null}{item.balance > 0 ? <em data-kind="money">Saldo {money(item.balance, item.moneda)}</em> : <em data-kind="ok">Pago cubierto</em>}</span></span>
-    <span className={d.guestPax}>{item.cantidad_huespedes || 1} pax<br/><small><PmsIcon name="chevronRight" size={12}/></small></span>
-  </button>
+  return <button type="button" className={d.guestRow} onClick={onOpen} title={item.guestProfileNotes || undefined}><span className={d.guestAvatar}>{initials(item.nombre_huesped)}</span><span className={d.guestMain}><b>{item.nombre_huesped}</b><small>{roomLabel} · {item.canal_reserva || "Directa"}{time ? ` · ${time}` : ""}</small><span className={d.guestFlags}>{vip ? <em data-kind="vip">VIP {vip}</em> : null}{item.guestLanguage ? <em data-kind="info">{item.guestLanguage}</em> : null}{tags.map((tag) => <em data-kind="info" key={tag}>{tag}</em>)}{item.roomMaintenance ? <em data-kind="danger">Mantenimiento</em> : item.roomDirty && kind === "arrival" ? <em data-kind="warn">Habitación sucia</em> : null}{item.balance > 0 ? <em data-kind="money">Saldo {money(item.balance, item.moneda)}</em> : <em data-kind="ok">Pago cubierto</em>}</span></span><span className={d.guestPax}>{item.cantidad_huespedes || 1} pax<br/><small><PmsIcon name="chevronRight" size={12}/></small></span></button>
 }
 
 function ReservationPreview({ item, onOpen }) {
@@ -117,10 +112,7 @@ export default function DashboardWorkspace({ propertyId, property, onNavigate, a
         setBlockOrder(normalizeOrder(source.block_order, DEFAULT_BLOCKS))
         setHiddenBlocks(Array.isArray(source.block_hidden) ? source.block_hidden.filter((id) => DEFAULT_BLOCKS.includes(id)) : [])
       } catch {
-        try {
-          const old = JSON.parse(localStorage.getItem(`hl:dashboard-widgets:${propertyId}`) || "null")
-          if (Array.isArray(old)) setWidgetOrder(normalizeOrder(old, DEFAULT_WIDGETS))
-        } catch {}
+        try { const old = JSON.parse(localStorage.getItem(`hl:dashboard-widgets:${propertyId}`) || "null"); if (Array.isArray(old)) setWidgetOrder(normalizeOrder(old, DEFAULT_WIDGETS)) } catch {}
       } finally { if (alive) setLayoutLoaded(true) }
     })()
     return () => { alive = false }
@@ -144,14 +136,8 @@ export default function DashboardWorkspace({ propertyId, property, onNavigate, a
       if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("hl:property-settings-updated", { detail: { propertyId, settings: { ...settings, dashboard } } }))
     } catch (err) { setLayoutError(err?.message || "No se pudo guardar el dashboard.") } finally { setLayoutSaving(false) }
   }
-  function dropOn(target) {
-    if (!dragging || dragging === target) return
-    const next = widgetOrder.filter((id) => id !== dragging); const index = next.indexOf(target); next.splice(index, 0, dragging); setWidgetOrder(next); setDragging(""); cacheLayout({ ...snapshotLayout(), metric_order: next })
-  }
-  function dropBlock(target) {
-    if (!draggingBlock || draggingBlock === target) return
-    const next = blockOrder.filter((id) => id !== draggingBlock); const index = next.indexOf(target); next.splice(index, 0, draggingBlock); setBlockOrder(next); setDraggingBlock(""); cacheLayout({ ...snapshotLayout(), block_order: next })
-  }
+  function dropOn(target) { if (!dragging || dragging === target) return; const next = widgetOrder.filter((id) => id !== dragging); const index = next.indexOf(target); next.splice(index, 0, dragging); setWidgetOrder(next); setDragging(""); cacheLayout({ ...snapshotLayout(), metric_order: next }) }
+  function dropBlock(target) { if (!draggingBlock || draggingBlock === target) return; const next = blockOrder.filter((id) => id !== draggingBlock); const index = next.indexOf(target); next.splice(index, 0, draggingBlock); setBlockOrder(next); setDraggingBlock(""); cacheLayout({ ...snapshotLayout(), block_order: next }) }
   function toggleWidget(id) { setHiddenWidgets((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]) }
   function toggleBlock(id) { setHiddenBlocks((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]) }
   function resetLayout() { setWidgetOrder(DEFAULT_WIDGETS); setHiddenWidgets([]); setBlockOrder(DEFAULT_BLOCKS); setHiddenBlocks([]); persistLayout({ metric_order: DEFAULT_WIDGETS, metric_hidden: [], block_order: DEFAULT_BLOCKS, block_hidden: [] }, "Dashboard restablecido.") }
@@ -162,7 +148,7 @@ export default function DashboardWorkspace({ propertyId, property, onNavigate, a
   const assistantContext = useMemo(() => {
     const current = data.operationsByOffset?.[0] || { arrivals: [], inhouse: [], departures: [] }
     const unique = new Map(); [...(current.arrivals || []), ...(current.inhouse || []), ...(current.departures || [])].forEach((item) => unique.set(item.id, item))
-    return { plataforma: "HabitaciónLlena.com · PMS hotelero", hoy: new Date().toLocaleDateString("en-CA"), alojamientos: propertyId ? [{ id: propertyId, nombre: property?.name || "Alojamiento actual" }] : [], metricas: { llegadasHoy: m.arrivals, salidasHoy: m.departures, huespedesAlojados: m.guestsInhouse ?? m.inhouse, habitacionesOcupadas: m.inhouse, ocupacion: Number(m.occupancy || 0), habitacionesActivas: m.totalRooms, habitacionesSucias: m.dirty, habitacionesListas: m.ready, mantenimiento: m.maintenance, mantenimientoUrgente: m.urgent, checklistCompletado: m.checkPct, cobradoHoy: m.collected }, reservas: [...unique.values()].slice(0, 80).map((item) => ({ id: item.id, numero: item.numero_reserva || null, nombre: item.nombre_huesped || "Huésped", entrada: item.fecha_entrada, salida: item.fecha_salida, estado: item.estado, habitaciones: item.roomNames || [], canal: item.canal_reserva || "Directa", huespedes: item.cantidad_huespedes || 1, saldo: Number(item.balance || 0), moneda: item.moneda || "ARS", vip: actualVip(item.vipLevel) || null, alertaHabitacion: item.roomMaintenance ? "mantenimiento" : item.roomDirty ? "sucia" : null }) }
+    return { plataforma: "HabitaciónLlena.com · PMS hotelero", hoy: new Date().toLocaleDateString("en-CA"), alojamientos: propertyId ? [{ id: propertyId, nombre: property?.name || "Alojamiento actual" }] : [], metricas: { llegadasHoy: m.arrivals, salidasHoy: m.departures, huespedesAlojados: m.guestsInhouse ?? m.inhouse, habitacionesOcupadas: m.inhouse, ocupacion: Number(m.occupancy || 0), habitacionesActivas: m.totalRooms, habitacionesSucias: m.dirty, habitacionesListas: m.ready, mantenimiento: m.maintenance, mantenimientoUrgente: m.urgent, checklistCompletado: m.checkPct, cobradoHoy: m.collected }, reservas: [...unique.values()].slice(0, 80).map((item) => ({ id: item.id, numero: item.numero_reserva || null, nombre: item.nombre_huesped || "Huésped", entrada: item.fecha_entrada, salida: item.fecha_salida, estado: item.estado, habitaciones: item.roomNames || [], canal: item.canal_reserva || "Directa", huespedes: item.cantidad_huespedes || 1, saldo: Number(item.balance || 0), moneda: item.moneda || "ARS", vip: actualVip(item.vipLevel) || null, alertaHabitacion: item.roomMaintenance ? "mantenimiento" : item.roomDirty ? "sucia" : null })) }
   }, [data.operationsByOffset, m, propertyId, property?.name])
   const filterRows = (rows) => { const term = opsQuery.trim().toLowerCase(); return term ? rows.filter((item) => `${item.nombre_huesped} ${item.numero_reserva || ""} ${(item.roomNames || []).join(" ")} ${item.canal_reserva || ""} ${actualVip(item.vipLevel)} ${(item.guestTags || []).join(" ")}`.toLowerCase().includes(term)) : rows }
   const columns = [{ key: "arrivals", title: "Llegadas", kind: "arrival" }, { key: "inhouse", title: "En casa", kind: "inhouse" }, { key: "departures", title: "Salidas", kind: "departure" }]
