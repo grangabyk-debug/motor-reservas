@@ -56,8 +56,8 @@ export default function ReservationRecord(props){
     onNavigate?.(target,options)
   }
   return <div className={hotel.recordLayer}>
-    <ReservationRecordBase key={`${item?.id||"reservation"}:${paymentRevision}`} {...props} item={displayItem} onNavigate={navigateFromRecord} onPrimaryAction={primaryAction}/>
     <ReservationCommercialAccountPanel item={item} propertyId={propertyId} onChanged={()=>setPaymentRevision(value=>value+1)}/>
+    <ReservationRecordBase key={`${item?.id||"reservation"}:${paymentRevision}`} {...props} item={displayItem} onNavigate={navigateFromRecord} onPrimaryAction={primaryAction}/>
     <ReservationAttachmentsPanel item={item} propertyId={propertyId}/>
     <ReservationPaymentRequestPanel item={item} propertyId={propertyId} onChanged={()=>setPaymentRevision(value=>value+1)}/>
     {operationsMode?<ReservationInlineOperationsDialog mode={operationsMode} item={item} rooms={rooms} propertyId={propertyId} onClose={()=>setOperationsMode(null)}/>:null}
