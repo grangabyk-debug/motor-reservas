@@ -1,0 +1,62 @@
+.hook{}
+
+/* Tokens de identidad Habitación Llena · Hotel OS */
+:global([data-theme]){
+  --hl-porcelain:#fbfaf7;
+  --hl-linen:#f2efe9;
+  --hl-midnight:#0b1422;
+  --hl-violet:#6658e8;
+  --hl-violet-soft:#8971ee;
+  --hl-teal:#318f8b;
+  --hl-champagne:#c79a4a;
+  --hl-radius-control:12px;
+  --hl-radius-panel:20px;
+  --hl-blur-panel:22px;
+  --hl-blur-modal:28px;
+  --hl-motion-fast:140ms;
+  --hl-motion-normal:190ms;
+  --hl-ease:cubic-bezier(.2,.8,.2,1);
+  --hl-focus:color-mix(in srgb,var(--accent) 22%,transparent);
+}
+
+/* Comportamiento común. Planning queda fuera para no alterar su herramienta densa. */
+:global([data-workspace]:not([data-workspace="planning"])) button,
+:global([data-workspace]:not([data-workspace="planning"])) input,
+:global([data-workspace]:not([data-workspace="planning"])) select,
+:global([data-workspace]:not([data-workspace="planning"])) textarea{
+  -webkit-tap-highlight-color:transparent;
+  transition:border-color var(--hl-motion-fast) var(--hl-ease),background var(--hl-motion-fast) var(--hl-ease),box-shadow var(--hl-motion-fast) var(--hl-ease),color var(--hl-motion-fast) var(--hl-ease),opacity var(--hl-motion-fast) var(--hl-ease),transform var(--hl-motion-fast) var(--hl-ease);
+}
+
+:global([data-workspace]:not([data-workspace="planning"])) button:not(:disabled){cursor:pointer}
+:global([data-workspace]:not([data-workspace="planning"])) button:not(:disabled):active{transform:translateY(1px) scale(.995)}
+:global([data-workspace]:not([data-workspace="planning"])) button:disabled{cursor:not-allowed;opacity:.48}
+
+:global([data-workspace]:not([data-workspace="planning"])) :is(button,input,select,textarea):focus-visible{
+  outline:none!important;
+  border-color:color-mix(in srgb,var(--accent) 42%,var(--lineStrong))!important;
+  box-shadow:0 0 0 3px var(--hl-focus),inset 0 1px color-mix(in srgb,#fff 24%,transparent)!important;
+}
+
+:global([data-workspace]:not([data-workspace="planning"])) :is(input,select,textarea):focus{
+  border-color:color-mix(in srgb,var(--accent) 34%,var(--lineStrong))!important;
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 7%,transparent),inset 0 1px color-mix(in srgb,#fff 20%,transparent)!important;
+}
+
+/* Herramientas del shell reciben el mismo feedback táctil sin modificar su geometría. */
+:global([data-theme])>main>header button,
+:global([data-theme])>aside button{
+  transition:border-color var(--hl-motion-fast) var(--hl-ease),background var(--hl-motion-fast) var(--hl-ease),box-shadow var(--hl-motion-fast) var(--hl-ease),color var(--hl-motion-fast) var(--hl-ease),opacity var(--hl-motion-fast) var(--hl-ease),transform var(--hl-motion-fast) var(--hl-ease);
+}
+:global([data-theme])>main>header button:focus-visible,
+:global([data-theme])>aside button:focus-visible{
+  outline:2px solid color-mix(in srgb,var(--accent) 55%,#fff)!important;
+  outline-offset:2px!important;
+}
+
+@media(prefers-reduced-motion:reduce){
+  :global([data-workspace]:not([data-workspace="planning"])) :is(button,input,select,textarea),
+  :global([data-theme])>main>header button,
+  :global([data-theme])>aside button{transition:none!important}
+  :global([data-workspace]:not([data-workspace="planning"])) button:not(:disabled):active{transform:none}
+}
