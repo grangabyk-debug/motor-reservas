@@ -1,6 +1,6 @@
 "use client"
 
-import{useCallback,useMemo,useState}from"react"
+import{useCallback,useEffect,useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 import usePmsAutoRefresh from"../../core/usePmsAutoRefresh"
 import{isBookingChannel,isOtaChannel}from"./guestCrm"
@@ -45,6 +45,7 @@ export default function useGuestsData(propertyId,searchTerm=""){
     finally{if(!silent)setLoading(false)}
   },[propertyId,searchTerm])
 
+  useEffect(()=>{load(false)},[load])
   usePmsAutoRefresh(propertyId,load,["reservas","hotel_guest_profiles"])
 
   const statsByProfile=useMemo(()=>{
