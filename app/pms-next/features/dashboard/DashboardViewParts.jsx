@@ -1,8 +1,8 @@
 "use client"
 
 import PmsIcon from"../../components/shell/PmsIcons"
-import s from"./dashboard.module.css"
 import d from"./frontDesk.module.css"
+import a from"./dashboardArrivalList.module.css"
 
 export const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:0}).format(Number(value)||0)
 export const initials=value=>String(value||"H").trim().split(/\s+/).map(part=>part[0]).join("").slice(0,2).toUpperCase()
@@ -29,5 +29,5 @@ export function GuestRow({item,kind,onOpen}){
 
 export function ReservationPreview({item,onOpen}){
   const state=String(item.estado||"reservada").toLowerCase(),label=state==="confirmada"?"Confirmada":state==="pendiente"?"Pendiente":"Próxima"
-  return <button type="button" className={s.reservationPreview} onClick={onOpen} aria-label={`Abrir reserva de ${item.nombre_huesped||"huésped"}`}><span className={s.reservationAvatar}>{initials(item.nombre_huesped)}</span><span className={s.reservationCopy}><strong>{item.nombre_huesped||"Huésped"}</strong><small>{item.fecha_entrada} → {item.fecha_salida} · {item.roomNames?.[0]||"Sin habitación"}</small></span><span className={s.reservationStatus} data-state={state}>{label}</span></button>
+  return <button type="button" className={a.row} onClick={onOpen} aria-label={`Abrir reserva de ${item.nombre_huesped||"huésped"}`}><span className={a.avatar}>{initials(item.nombre_huesped)}</span><span className={a.copy}><strong>{item.nombre_huesped||"Huésped"}</strong><small>{item.fecha_entrada} → {item.fecha_salida} · {item.roomNames?.[0]||"Sin habitación"}</small></span><span className={a.status} data-state={state}>{label}</span></button>
 }
