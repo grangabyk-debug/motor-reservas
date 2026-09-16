@@ -43,7 +43,7 @@ export async function POST(request){
     if(!propertyId)throw new Error("El alta no devolvió la propiedad creada.")
     const{error:membershipError}=await adminClient.from("property_members").upsert({property_id:propertyId,user_id:ownerId,role:"owner"},{onConflict:"property_id,user_id"})
     if(membershipError){
-      await adminClient.from("properties").delete().eq("id",propertyId).catch(()=>{})
+      try{await adminClient.from("properties").delete().eq("id",propertyId)}catch{}
       throw new Error("No se pudo completar la membresía del propietario. El alta fue revertida.")
     }
     return json({success:true,...data,owner:{id:ownerId,email:ownerEmail,invited},message:invited?"Cliente creado e invitación enviada. Su primer ingreso lo llevará a Puesta en marcha.":"Cliente creado y vinculado a un usuario existente."})
