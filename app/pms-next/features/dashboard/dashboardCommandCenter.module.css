@@ -1,98 +1,120 @@
 .hook{}
 
-/* La primera fila deja de ser seis cards independientes y funciona como una banda de estado. */
+/* Estado del hotel: seis instrumentos con entidad propia. Ocupación y cobros dominan. */
 :global([data-workspace="dashboard"])>section>div:has(>button[data-tone]){
   display:grid!important;
-  grid-template-columns:repeat(14,minmax(0,1fr))!important;
-  gap:5px!important;
-  padding:6px!important;
-  border:1px solid color-mix(in srgb,var(--lineStrong) 78%,transparent);
-  border-radius:20px;
-  background:
-    radial-gradient(circle at 8% 0,color-mix(in srgb,var(--accent) 7%,transparent),transparent 26%),
-    linear-gradient(145deg,color-mix(in srgb,var(--panelSolid) 72%,transparent),color-mix(in srgb,var(--panel) 58%,transparent));
-  -webkit-backdrop-filter:blur(22px) saturate(1.22);
-  backdrop-filter:blur(22px) saturate(1.22);
-  box-shadow:inset 0 1px color-mix(in srgb,#fff 19%,transparent),0 13px 38px rgba(9,19,36,.08);
-}
-:global([data-workspace="dashboard"]) button[data-tone]{
-  grid-column:span 2;
-  min-height:108px!important;
-  border:1px solid transparent!important;
-  border-radius:15px!important;
-  padding:14px 12px!important;
+  grid-template-columns:repeat(8,minmax(0,1fr))!important;
+  gap:10px!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:0!important;
   background:transparent!important;
   box-shadow:none!important;
-  transition:transform .17s cubic-bezier(.2,.8,.2,1),background .17s ease,border-color .17s ease,box-shadow .17s ease!important;
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important;
+}
+:global([data-workspace="dashboard"]) button[data-tone]{
+  grid-column:span 1;
+  min-width:0;
+  min-height:116px!important;
+  border:1px solid color-mix(in srgb,var(--lineStrong) 82%,transparent)!important;
+  border-radius:18px!important;
+  padding:15px 13px!important;
+  background:
+    radial-gradient(circle at 88% 8%,color-mix(in srgb,var(--tone) 8%,transparent),transparent 34%),
+    linear-gradient(155deg,rgba(252,250,247,.985),rgba(247,248,250,.965))!important;
+  -webkit-backdrop-filter:blur(20px) saturate(1.12)!important;
+  backdrop-filter:blur(20px) saturate(1.12)!important;
+  box-shadow:inset 0 1px rgba(255,255,255,.8),0 12px 32px rgba(28,39,61,.075)!important;
+  transition:transform .17s cubic-bezier(.2,.8,.2,1),border-color .17s ease,box-shadow .17s ease,background .17s ease!important;
 }
 :global([data-workspace="dashboard"]) button[data-tone="violet"],
 :global([data-workspace="dashboard"]) button[data-tone="emerald"]{
-  grid-column:span 3;
-  background:
-    radial-gradient(circle at 12% 0,color-mix(in srgb,var(--tone) 16%,transparent),transparent 40%),
-    linear-gradient(145deg,color-mix(in srgb,var(--tone) 7%,var(--panelSolid)),color-mix(in srgb,var(--panelSolid) 66%,transparent))!important;
-  border-color:color-mix(in srgb,var(--tone) 18%,var(--line))!important;
-  box-shadow:inset 0 1px color-mix(in srgb,#fff 20%,transparent),0 7px 22px color-mix(in srgb,var(--tone) 6%,transparent)!important;
+  grid-column:span 2;
+  min-height:124px!important;
+}
+:global([data-workspace="dashboard"]) button[data-tone="violet"]{
+  background:radial-gradient(circle at 90% 6%,rgba(102,88,232,.14),transparent 37%),linear-gradient(150deg,#fbfaf8,#f1effc)!important;
+  border-color:rgba(102,88,232,.2)!important;
+}
+:global([data-workspace="dashboard"]) button[data-tone="emerald"]{
+  background:radial-gradient(circle at 90% 6%,rgba(43,155,118,.14),transparent 37%),linear-gradient(150deg,#fbfaf8,#edf7f3)!important;
+  border-color:rgba(43,155,118,.2)!important;
+}
+:global([data-workspace="dashboard"]) button[data-tone]:before{
+  content:"";
+  position:absolute;
+  left:15px;
+  right:15px;
+  bottom:-1px;
+  height:2px;
+  border-radius:999px 999px 0 0;
+  background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--tone) 74%,transparent),transparent);
+  opacity:.66;
 }
 :global([data-workspace="dashboard"]) button[data-tone]:hover{
   transform:translateY(-2px)!important;
-  border-color:color-mix(in srgb,var(--tone) 24%,var(--line))!important;
-  background:color-mix(in srgb,var(--tone) 5%,var(--panelSolid))!important;
-  box-shadow:0 10px 26px color-mix(in srgb,var(--tone) 9%,transparent)!important;
+  border-color:color-mix(in srgb,var(--tone) 34%,var(--line))!important;
+  box-shadow:inset 0 1px rgba(255,255,255,.84),0 17px 38px color-mix(in srgb,var(--tone) 9%,rgba(20,32,52,.08))!important;
 }
 :global([data-workspace="dashboard"]) button[data-tone]>span:first-child{
   width:38px!important;
   height:38px!important;
-  flex-basis:38px!important;
+  flex:0 0 38px!important;
   border-radius:12px!important;
-  box-shadow:inset 0 1px color-mix(in srgb,#fff 18%,transparent),0 5px 14px color-mix(in srgb,var(--tone) 8%,transparent);
+  border:1px solid color-mix(in srgb,var(--tone) 13%,transparent);
+  box-shadow:inset 0 1px rgba(255,255,255,.62),0 5px 14px color-mix(in srgb,var(--tone) 8%,transparent);
 }
-:global([data-workspace="dashboard"]) button[data-tone]>span:nth-child(2)>small{
-  font-size:11px!important;
-  letter-spacing:.01em;
-}
-:global([data-workspace="dashboard"]) button[data-tone]>span:nth-child(2)>strong{
-  margin-top:7px!important;
-  font-variant-numeric:tabular-nums;
-}
+:global([data-workspace="dashboard"]) button[data-tone]>span:nth-child(2)>small{font-size:11px!important;letter-spacing:.01em}
+:global([data-workspace="dashboard"]) button[data-tone]>span:nth-child(2)>strong{margin-top:7px!important;font-variant-numeric:tabular-nums}
 :global([data-workspace="dashboard"]) button[data-tone="violet"]>span:nth-child(2)>strong,
-:global([data-workspace="dashboard"]) button[data-tone="emerald"]>span:nth-child(2)>strong{
-  font-size:31px!important;
-}
-:global([data-workspace="dashboard"]) button[data-tone]>i:last-child{opacity:.12!important}
+:global([data-workspace="dashboard"]) button[data-tone="emerald"]>span:nth-child(2)>strong{font-size:31px!important}
+:global([data-workspace="dashboard"]) button[data-tone]>i:last-child{opacity:.14!important}
 
-/* Los tres bloques operativos se leen como niveles del mismo centro de mando. */
+/* Los tres bloques principales forman un centro de mando, con superficies opacas y blur. */
 :global([data-workspace="dashboard"])>section>div:has(>article)>article{
-  border-color:color-mix(in srgb,var(--lineStrong) 78%,transparent)!important;
-  border-radius:19px!important;
-  background:
-    radial-gradient(circle at 92% 0,color-mix(in srgb,var(--accent) 4%,transparent),transparent 31%),
-    linear-gradient(145deg,color-mix(in srgb,var(--panelSolid) 88%,transparent),color-mix(in srgb,var(--panel) 74%,transparent))!important;
-  -webkit-backdrop-filter:blur(18px) saturate(1.16);
-  backdrop-filter:blur(18px) saturate(1.16);
-  box-shadow:inset 0 1px color-mix(in srgb,#fff 13%,transparent),0 12px 34px rgba(9,19,36,.065)!important;
+  border-color:color-mix(in srgb,var(--lineStrong) 82%,transparent)!important;
+  border-radius:20px!important;
+  background:radial-gradient(circle at 92% 0,color-mix(in srgb,var(--accent) 4%,transparent),transparent 31%),linear-gradient(145deg,rgba(252,250,247,.97),rgba(247,248,250,.95))!important;
+  -webkit-backdrop-filter:blur(20px) saturate(1.14)!important;
+  backdrop-filter:blur(20px) saturate(1.14)!important;
+  box-shadow:inset 0 1px rgba(255,255,255,.74),0 14px 38px rgba(22,33,53,.075)!important;
 }
 
-:global([data-theme="dark"]) :global([data-workspace="dashboard"])>section>div:has(>button[data-tone]){
-  border-color:rgba(160,180,220,.105);
-  background:radial-gradient(circle at 8% 0,rgba(121,101,255,.09),transparent 28%),linear-gradient(145deg,rgba(15,25,43,.82),rgba(10,18,32,.67));
-  box-shadow:inset 0 1px rgba(255,255,255,.035),0 15px 44px rgba(0,0,0,.15);
+:global([data-theme="dark"]) :global([data-workspace="dashboard"]) button[data-tone]{
+  border-color:rgba(160,180,220,.12)!important;
+  background:radial-gradient(circle at 88% 8%,color-mix(in srgb,var(--tone) 10%,transparent),transparent 35%),linear-gradient(155deg,rgba(18,28,47,.98),rgba(13,22,38,.965))!important;
+  box-shadow:inset 0 1px rgba(255,255,255,.045),0 13px 34px rgba(0,0,0,.2)!important;
+}
+:global([data-theme="dark"]) :global([data-workspace="dashboard"]) button[data-tone="violet"]{
+  border-color:rgba(141,145,255,.2)!important;
+  background:radial-gradient(circle at 90% 6%,rgba(133,111,255,.18),transparent 38%),linear-gradient(150deg,#141d31,#11182a)!important;
+}
+:global([data-theme="dark"]) :global([data-workspace="dashboard"]) button[data-tone="emerald"]{
+  border-color:rgba(97,209,154,.18)!important;
+  background:radial-gradient(circle at 90% 6%,rgba(60,180,133,.15),transparent 38%),linear-gradient(150deg,#121e2c,#101a28)!important;
 }
 :global([data-theme="dark"]) :global([data-workspace="dashboard"])>section>div:has(>article)>article{
-  border-color:rgba(160,180,220,.095)!important;
-  background:radial-gradient(circle at 92% 0,rgba(113,92,255,.055),transparent 32%),linear-gradient(145deg,rgba(16,26,44,.86),rgba(11,20,35,.74))!important;
-  box-shadow:inset 0 1px rgba(255,255,255,.035),0 15px 40px rgba(0,0,0,.13)!important;
+  border-color:rgba(160,180,220,.11)!important;
+  background:radial-gradient(circle at 92% 0,rgba(113,92,255,.055),transparent 32%),linear-gradient(145deg,rgba(17,27,46,.97),rgba(12,21,36,.955))!important;
+  box-shadow:inset 0 1px rgba(255,255,255,.04),0 16px 42px rgba(0,0,0,.19)!important;
 }
 
 @media(max-width:1320px){
-  :global([data-workspace="dashboard"])>section>div:has(>button[data-tone]){grid-template-columns:repeat(3,minmax(0,1fr))!important}
+  :global([data-workspace="dashboard"])>section>div:has(>button[data-tone]){grid-template-columns:repeat(4,minmax(0,1fr))!important}
+  :global([data-workspace="dashboard"]) button[data-tone]{grid-column:span 1}
+  :global([data-workspace="dashboard"]) button[data-tone="violet"],
+  :global([data-workspace="dashboard"]) button[data-tone="emerald"]{grid-column:span 2}
+}
+@media(max-width:900px){
+  :global([data-workspace="dashboard"])>section>div:has(>button[data-tone]){grid-template-columns:repeat(2,minmax(0,1fr))!important}
   :global([data-workspace="dashboard"]) button[data-tone],
   :global([data-workspace="dashboard"]) button[data-tone="violet"],
-  :global([data-workspace="dashboard"]) button[data-tone="emerald"]{grid-column:auto}
+  :global([data-workspace="dashboard"]) button[data-tone="emerald"]{grid-column:span 1}
 }
 @media(max-width:680px){
-  :global([data-workspace="dashboard"])>section>div:has(>button[data-tone]){grid-template-columns:repeat(2,minmax(0,1fr))!important;padding:5px!important}
-  :global([data-workspace="dashboard"]) button[data-tone]{min-height:100px!important;padding:11px 9px!important}
+  :global([data-workspace="dashboard"])>section>div:has(>button[data-tone]){gap:8px!important}
+  :global([data-workspace="dashboard"]) button[data-tone]{min-height:104px!important;padding:12px 10px!important}
   :global([data-workspace="dashboard"]) button[data-tone="violet"]>span:nth-child(2)>strong,
   :global([data-workspace="dashboard"]) button[data-tone="emerald"]>span:nth-child(2)>strong{font-size:23px!important}
 }
