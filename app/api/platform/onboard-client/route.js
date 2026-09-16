@@ -39,6 +39,13 @@ export async function POST(request){
 
     const{data,error}=await userClient.rpc("hl_platform_admin_onboard_property",{p_owner_id:ownerId,p_owner_name:ownerName||ownerEmail,p_owner_email:ownerEmail,p_property_name:propertyName,p_city:city||null,p_plan_code:planCode,p_billing_cycle:billingCycle,p_room_tier:roomTier,p_room_limit:roomLimit,p_price_amount:priceAmount,p_price_currency:priceCurrency,p_trial_days:trialDays,p_enabled_modules:modules,p_notes:notes})
     if(error||data?.error){if(invitedUserId)await adminClient.auth.admin.deleteUser(invitedUserId);return json({error:error?.message||data?.error||"No se pudo completar el alta del cliente."},400)}
+    const propertyId=data?.property?.id
+    if(!propertyId)throw new Error("El alta no devolvió la propiedad creada.")
+    const{error:membershipError}=await adminClient.from("property_members").upsert({property_id:propertyId,user_id:ownerId,role:"owner"},{onConflict:"property_id,user_id"})
+    if(membershipError){
+      await adminClient.from("properties").delete().eq("id",propertyId).catch(()=>{})
+      throw new Error("No se pudo completar la membresía del propietario. El alta fue revertida.")
+    }
     return json({success:true,...data,owner:{id:ownerId,email:ownerEmail,invited},message:invited?"Cliente creado e invitación enviada. Su primer ingreso lo llevará a Puesta en marcha.":"Cliente creado y vinculado a un usuario existente."})
   }catch(error){
     if(invitedUserId){try{const supabaseUrl=process.env.NEXT_PUBLIC_SUPABASE_URL,secretKey=process.env.SUPABASE_SECRET_KEY;if(supabaseUrl&&secretKey){const adminClient=createClient(supabaseUrl,secretKey,{auth:{autoRefreshToken:false,persistSession:false}});await adminClient.auth.admin.deleteUser(invitedUserId)}}catch{}}
