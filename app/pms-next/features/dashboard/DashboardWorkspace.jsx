@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { supabase } from "../../../../lib/supabase"
 import OliviaAssistant from "../../components/OliviaAssistant"
 import PmsIcon from "../../components/shell/PmsIcons"
 import useDashboardData from "./useDashboardData"
@@ -9,6 +10,7 @@ import s from "./dashboard.module.css"
 import d from "./frontDesk.module.css"
 import v from "./dashboardViz.module.css"
 import u from "./dashboardUnified.module.css"
+import e from "./dashboardEditor.module.css"
 
 const shortcuts = [
   { id: "planning", label: "Planning", icon: "calendar" },
@@ -19,41 +21,33 @@ const shortcuts = [
 ]
 
 const DEFAULT_WIDGETS = ["occupancy", "arrivals", "departures", "inhouse", "ready", "collected"]
+const DEFAULT_BLOCKS = ["metrics", "insights", "commercial", "frontdesk", "shortcuts"]
+const BLOCK_LABELS = {
+  metrics: ["Indicadores", "Ocupación, llegadas, salidas, huéspedes, habitaciones y cobros"],
+  insights: ["Centro operativo", "Ocupación comparada, próximas llegadas y prioridades"],
+  commercial: ["Rendimiento comercial", "Ritmo de reservas y canales de venta"],
+  frontdesk: ["Movimiento del hotel", "Llegadas, huéspedes en casa y salidas"],
+  shortcuts: ["Accesos rápidos", "Atajos frecuentes del PMS"],
+}
 const money = (value, currency = "ARS") =>
-  new Intl.NumberFormat("es-AR", {
-    style: "currency",
-    currency: currency || "ARS",
-    maximumFractionDigits: 0,
-  }).format(Number(value) || 0)
-
-const initials = (value) =>
-  String(value || "H")
-    .trim()
-    .split(/\s+/)
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase()
-
+  new Intl.NumberFormat("es-AR", { style: "currency", currency: currency || "ARS", maximumFractionDigits: 0 }).format(Number(value) || 0)
+const initials = (value) => String(value || "H").trim().split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase()
 const actualVip = (value) => {
   const normalized = String(value || "").trim()
-  return normalized && !["standard", "normal", "none", "sin vip", "default"].includes(normalized.toLowerCase())
-    ? normalized
-    : ""
+  return normalized && !["standard", "normal", "none", "sin vip", "default"].includes(normalized.toLowerCase()) ? normalized : ""
 }
-
 const uniqueOccupiedRooms = (rows = []) => {
   const ids = new Set()
-  rows.forEach((row) => (row.rooms || []).forEach((room) => {
-    const id = Number(room?.id)
-    if (id) ids.add(id)
-  }))
+  rows.forEach((row) => (row.rooms || []).forEach((room) => { const id = Number(room?.id); if (id) ids.add(id) }))
   return ids.size
 }
-
 const isPendingArrival = (item) => {
   const state = String(item?.estado || "").trim().toLowerCase()
   return !item?.no_show && !["alojado", "checkin", "en_casa", "finalizada", "cancelada", "cancelado", "cancelled"].includes(state)
+}
+const normalizeOrder = (value, defaults) => {
+  const source = Array.isArray(value) ? value : []
+  return [...source.filter((id) => defaults.includes(id)), ...defaults.filter((id) => !source.includes(id))]
 }
 
 function MetricIcon({ type }) {
@@ -71,38 +65,17 @@ function GuestRow({ item, kind, onOpen }) {
   const roomLabel = item.roomNames?.length ? item.roomNames.join(", ") : "Sin habitación"
   const vip = actualVip(item.vipLevel)
   const tags = (item.guestTags || []).slice(0, 2)
-  return (
-    <button type="button" className={d.guestRow} onClick={onOpen} title={item.guestProfileNotes || undefined}>
-      <span className={d.guestAvatar}>{initials(item.nombre_huesped)}</span>
-      <span className={d.guestMain}>
-        <b>{item.nombre_huesped}</b>
-        <small>{roomLabel} · {item.canal_reserva || "Directa"}{time ? ` · ${time}` : ""}</small>
-        <span className={d.guestFlags}>
-          {vip ? <em data-kind="vip">VIP {vip}</em> : null}
-          {item.guestLanguage ? <em data-kind="info">{item.guestLanguage}</em> : null}
-          {tags.map((tag) => <em data-kind="info" key={tag}>{tag}</em>)}
-          {item.roomMaintenance ? <em data-kind="danger">Mantenimiento</em> : item.roomDirty && kind === "arrival" ? <em data-kind="warn">Habitación sucia</em> : null}
-          {item.balance > 0 ? <em data-kind="money">Saldo {money(item.balance, item.moneda)}</em> : <em data-kind="ok">Pago cubierto</em>}
-        </span>
-      </span>
-      <span className={d.guestPax}>{item.cantidad_huespedes || 1} pax<br/><small><PmsIcon name="chevronRight" size={12}/></small></span>
-    </button>
-  )
+  return <button type="button" className={d.guestRow} onClick={onOpen} title={item.guestProfileNotes || undefined}>
+    <span className={d.guestAvatar}>{initials(item.nombre_huesped)}</span>
+    <span className={d.guestMain}><b>{item.nombre_huesped}</b><small>{roomLabel} · {item.canal_reserva || "Directa"}{time ? ` · ${time}` : ""}</small><span className={d.guestFlags}>{vip ? <em data-kind="vip">VIP {vip}</em> : null}{item.guestLanguage ? <em data-kind="info">{item.guestLanguage}</em> : null}{tags.map((tag) => <em data-kind="info" key={tag}>{tag}</em>)}{item.roomMaintenance ? <em data-kind="danger">Mantenimiento</em> : item.roomDirty && kind === "arrival" ? <em data-kind="warn">Habitación sucia</em> : null}{item.balance > 0 ? <em data-kind="money">Saldo {money(item.balance, item.moneda)}</em> : <em data-kind="ok">Pago cubierto</em>}</span></span>
+    <span className={d.guestPax}>{item.cantidad_huespedes || 1} pax<br/><small><PmsIcon name="chevronRight" size={12}/></small></span>
+  </button>
 }
 
 function ReservationPreview({ item, onOpen }) {
   const state = String(item.estado || "reservada").toLowerCase()
   const label = state === "confirmada" ? "Confirmada" : state === "pendiente" ? "Pendiente" : "Próxima"
-  return (
-    <button type="button" className={s.reservationPreview} onClick={onOpen}>
-      <span className={s.reservationAvatar}>{initials(item.nombre_huesped)}</span>
-      <span className={s.reservationCopy}>
-        <strong>{item.nombre_huesped || "Huésped"}</strong>
-        <small>{item.fecha_entrada} → {item.fecha_salida} · {item.roomNames?.[0] || "Sin habitación"}</small>
-      </span>
-      <span className={s.reservationStatus} data-state={state}>{label}</span>
-    </button>
-  )
+  return <button type="button" className={s.reservationPreview} onClick={onOpen}><span className={s.reservationAvatar}>{initials(item.nombre_huesped)}</span><span className={s.reservationCopy}><strong>{item.nombre_huesped || "Huésped"}</strong><small>{item.fecha_entrada} → {item.fecha_salida} · {item.roomNames?.[0] || "Sin habitación"}</small></span><span className={s.reservationStatus} data-state={state}>{label}</span></button>
 }
 
 export default function DashboardWorkspace({ propertyId, property, onNavigate, allowedViews = [] }) {
@@ -111,115 +84,88 @@ export default function DashboardWorkspace({ propertyId, property, onNavigate, a
   const [opsDay, setOpsDay] = useState(0)
   const [opsQuery, setOpsQuery] = useState("")
   const [widgetOrder, setWidgetOrder] = useState(DEFAULT_WIDGETS)
+  const [hiddenWidgets, setHiddenWidgets] = useState([])
+  const [blockOrder, setBlockOrder] = useState(DEFAULT_BLOCKS)
+  const [hiddenBlocks, setHiddenBlocks] = useState([])
   const [dragging, setDragging] = useState("")
+  const [draggingBlock, setDraggingBlock] = useState("")
   const [oliviaHidden, setOliviaHidden] = useState(false)
   const [welcomeVisible, setWelcomeVisible] = useState(true)
+  const [editing, setEditing] = useState(() => typeof window !== "undefined" && new URL(window.location.href).searchParams.get("dashboard_edit") === "1")
+  const [layoutLoaded, setLayoutLoaded] = useState(false)
+  const [layoutSaving, setLayoutSaving] = useState(false)
+  const [layoutNotice, setLayoutNotice] = useState("")
+  const [layoutError, setLayoutError] = useState("")
   const allowed = useMemo(() => new Set(allowedViews), [allowedViews])
   const can = (id) => allowed.size === 0 || allowed.has(id)
+  const canEditDashboard = ["owner", "manager"].includes(String(property?.role || "").toLowerCase())
 
+  useEffect(() => { const timer = window.setTimeout(() => setWelcomeVisible(false), 4200); return () => window.clearTimeout(timer) }, [])
   useEffect(() => {
-    const timer = window.setTimeout(() => setWelcomeVisible(false), 4200)
-    return () => window.clearTimeout(timer)
-  }, [])
-
-  useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(`hl:dashboard-widgets:${propertyId}`) || "null")
-      if (Array.isArray(saved) && saved.length) {
-        setWidgetOrder([
-          ...saved.filter((id) => DEFAULT_WIDGETS.includes(id)),
-          ...DEFAULT_WIDGETS.filter((id) => !saved.includes(id)),
-        ])
-      }
-    } catch {}
+    let alive = true
+    if (!propertyId) return
+    ;(async () => {
+      try {
+        const { data: row, error } = await supabase.from("property_settings").select("settings").eq("property_id", propertyId).maybeSingle()
+        if (error) throw error
+        const saved = row?.settings?.dashboard || {}
+        const fallback = (() => { try { return JSON.parse(localStorage.getItem(`hl:dashboard-layout:${propertyId}`) || "null") } catch { return null } })()
+        const source = saved && Object.keys(saved).length ? saved : fallback || {}
+        if (!alive) return
+        setWidgetOrder(normalizeOrder(source.metric_order, DEFAULT_WIDGETS))
+        setHiddenWidgets(Array.isArray(source.metric_hidden) ? source.metric_hidden.filter((id) => DEFAULT_WIDGETS.includes(id)) : [])
+        setBlockOrder(normalizeOrder(source.block_order, DEFAULT_BLOCKS))
+        setHiddenBlocks(Array.isArray(source.block_hidden) ? source.block_hidden.filter((id) => DEFAULT_BLOCKS.includes(id)) : [])
+      } catch {
+        try {
+          const old = JSON.parse(localStorage.getItem(`hl:dashboard-widgets:${propertyId}`) || "null")
+          if (Array.isArray(old)) setWidgetOrder(normalizeOrder(old, DEFAULT_WIDGETS))
+        } catch {}
+      } finally { if (alive) setLayoutLoaded(true) }
+    })()
+    return () => { alive = false }
   }, [propertyId])
+  useEffect(() => { try { setOliviaHidden(localStorage.getItem(`hl:olivia-hidden:${propertyId}`) === "1") } catch { setOliviaHidden(false) } }, [propertyId])
 
-  useEffect(() => {
+  const snapshotLayout = () => ({ metric_order: widgetOrder, metric_hidden: hiddenWidgets, block_order: blockOrder, block_hidden: hiddenBlocks })
+  function cacheLayout(next) { try { localStorage.setItem(`hl:dashboard-layout:${propertyId}`, JSON.stringify(next)); localStorage.setItem(`hl:dashboard-widgets:${propertyId}`, JSON.stringify(next.metric_order)) } catch {} }
+  async function persistLayout(next, message = "Dashboard guardado para esta propiedad.") {
+    cacheLayout(next)
+    if (!canEditDashboard) return
+    setLayoutSaving(true); setLayoutError(""); setLayoutNotice("")
     try {
-      setOliviaHidden(localStorage.getItem(`hl:olivia-hidden:${propertyId}`) === "1")
-    } catch {
-      setOliviaHidden(false)
-    }
-  }, [propertyId])
-
-  function saveOrder(next) {
-    setWidgetOrder(next)
-    try {
-      localStorage.setItem(`hl:dashboard-widgets:${propertyId}`, JSON.stringify(next))
-    } catch {}
+      const [{ data: row, error: readError }, { data: userRes }] = await Promise.all([supabase.from("property_settings").select("settings").eq("property_id", propertyId).maybeSingle(), supabase.auth.getUser()])
+      if (readError) throw readError
+      const settings = row?.settings || {}
+      const dashboard = { ...next, updated_at: new Date().toISOString(), updated_by: userRes?.user?.id || null }
+      const { error: writeError } = await supabase.from("property_settings").upsert({ property_id: propertyId, settings: { ...settings, dashboard }, updated_at: new Date().toISOString(), updated_by: userRes?.user?.id || null }, { onConflict: "property_id" })
+      if (writeError) throw writeError
+      setLayoutNotice(message)
+      if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("hl:property-settings-updated", { detail: { propertyId, settings: { ...settings, dashboard } } }))
+    } catch (err) { setLayoutError(err?.message || "No se pudo guardar el dashboard.") } finally { setLayoutSaving(false) }
   }
-
   function dropOn(target) {
     if (!dragging || dragging === target) return
-    const next = widgetOrder.filter((id) => id !== dragging)
-    const index = next.indexOf(target)
-    next.splice(index, 0, dragging)
-    saveOrder(next)
-    setDragging("")
+    const next = widgetOrder.filter((id) => id !== dragging); const index = next.indexOf(target); next.splice(index, 0, dragging); setWidgetOrder(next); setDragging(""); cacheLayout({ ...snapshotLayout(), metric_order: next })
   }
-
-  function setOliviaVisibility(hidden) {
-    setOliviaHidden(hidden)
-    try {
-      if (hidden) localStorage.setItem(`hl:olivia-hidden:${propertyId}`, "1")
-      else localStorage.removeItem(`hl:olivia-hidden:${propertyId}`)
-    } catch {}
+  function dropBlock(target) {
+    if (!draggingBlock || draggingBlock === target) return
+    const next = blockOrder.filter((id) => id !== draggingBlock); const index = next.indexOf(target); next.splice(index, 0, draggingBlock); setBlockOrder(next); setDraggingBlock(""); cacheLayout({ ...snapshotLayout(), block_order: next })
   }
+  function toggleWidget(id) { setHiddenWidgets((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]) }
+  function toggleBlock(id) { setHiddenBlocks((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]) }
+  function resetLayout() { setWidgetOrder(DEFAULT_WIDGETS); setHiddenWidgets([]); setBlockOrder(DEFAULT_BLOCKS); setHiddenBlocks([]); persistLayout({ metric_order: DEFAULT_WIDGETS, metric_hidden: [], block_order: DEFAULT_BLOCKS, block_hidden: [] }, "Dashboard restablecido.") }
+  function setOliviaVisibility(hidden) { setOliviaHidden(hidden); try { if (hidden) localStorage.setItem(`hl:olivia-hidden:${propertyId}`, "1"); else localStorage.removeItem(`hl:olivia-hidden:${propertyId}`) } catch {} }
 
   const quickLinks = shortcuts.filter((item) => can(item.id))
   const ops = data.operationsByOffset?.[opsDay] || { arrivals: [], inhouse: [], departures: [] }
   const assistantContext = useMemo(() => {
     const current = data.operationsByOffset?.[0] || { arrivals: [], inhouse: [], departures: [] }
-    const unique = new Map()
-    ;[...(current.arrivals || []), ...(current.inhouse || []), ...(current.departures || [])].forEach((item) => unique.set(item.id, item))
-    return {
-      plataforma: "HabitaciónLlena.com · PMS hotelero",
-      hoy: new Date().toLocaleDateString("en-CA"),
-      alojamientos: propertyId ? [{ id: propertyId, nombre: property?.name || "Alojamiento actual" }] : [],
-      metricas: {
-        llegadasHoy: m.arrivals,
-        salidasHoy: m.departures,
-        huespedesAlojados: m.guestsInhouse ?? m.inhouse,
-        habitacionesOcupadas: m.inhouse,
-        ocupacion: Number(m.occupancy || 0),
-        habitacionesActivas: m.totalRooms,
-        habitacionesSucias: m.dirty,
-        habitacionesListas: m.ready,
-        mantenimiento: m.maintenance,
-        mantenimientoUrgente: m.urgent,
-        checklistCompletado: m.checkPct,
-        cobradoHoy: m.collected,
-      },
-      reservas: [...unique.values()].slice(0, 80).map((item) => ({
-        id: item.id,
-        numero: item.numero_reserva || null,
-        nombre: item.nombre_huesped || "Huésped",
-        entrada: item.fecha_entrada,
-        salida: item.fecha_salida,
-        estado: item.estado,
-        habitaciones: item.roomNames || [],
-        canal: item.canal_reserva || "Directa",
-        huespedes: item.cantidad_huespedes || 1,
-        saldo: Number(item.balance || 0),
-        moneda: item.moneda || "ARS",
-        vip: actualVip(item.vipLevel) || null,
-        alertaHabitacion: item.roomMaintenance ? "mantenimiento" : item.roomDirty ? "sucia" : null,
-      })),
-    }
+    const unique = new Map(); [...(current.arrivals || []), ...(current.inhouse || []), ...(current.departures || [])].forEach((item) => unique.set(item.id, item))
+    return { plataforma: "HabitaciónLlena.com · PMS hotelero", hoy: new Date().toLocaleDateString("en-CA"), alojamientos: propertyId ? [{ id: propertyId, nombre: property?.name || "Alojamiento actual" }] : [], metricas: { llegadasHoy: m.arrivals, salidasHoy: m.departures, huespedesAlojados: m.guestsInhouse ?? m.inhouse, habitacionesOcupadas: m.inhouse, ocupacion: Number(m.occupancy || 0), habitacionesActivas: m.totalRooms, habitacionesSucias: m.dirty, habitacionesListas: m.ready, mantenimiento: m.maintenance, mantenimientoUrgente: m.urgent, checklistCompletado: m.checkPct, cobradoHoy: m.collected }, reservas: [...unique.values()].slice(0, 80).map((item) => ({ id: item.id, numero: item.numero_reserva || null, nombre: item.nombre_huesped || "Huésped", entrada: item.fecha_entrada, salida: item.fecha_salida, estado: item.estado, habitaciones: item.roomNames || [], canal: item.canal_reserva || "Directa", huespedes: item.cantidad_huespedes || 1, saldo: Number(item.balance || 0), moneda: item.moneda || "ARS", vip: actualVip(item.vipLevel) || null, alertaHabitacion: item.roomMaintenance ? "mantenimiento" : item.roomDirty ? "sucia" : null }) }
   }, [data.operationsByOffset, m, propertyId, property?.name])
-
-  const filterRows = (rows) => {
-    const term = opsQuery.trim().toLowerCase()
-    return term
-      ? rows.filter((item) => `${item.nombre_huesped} ${item.numero_reserva || ""} ${(item.roomNames || []).join(" ")} ${item.canal_reserva || ""} ${actualVip(item.vipLevel)} ${(item.guestTags || []).join(" ")}`.toLowerCase().includes(term))
-      : rows
-  }
-
-  const columns = [
-    { key: "arrivals", title: "Llegadas", kind: "arrival" },
-    { key: "inhouse", title: "En casa", kind: "inhouse" },
-    { key: "departures", title: "Salidas", kind: "departure" },
-  ]
+  const filterRows = (rows) => { const term = opsQuery.trim().toLowerCase(); return term ? rows.filter((item) => `${item.nombre_huesped} ${item.numero_reserva || ""} ${(item.roomNames || []).join(" ")} ${item.canal_reserva || ""} ${actualVip(item.vipLevel)} ${(item.guestTags || []).join(" ")}`.toLowerCase().includes(term)) : rows }
+  const columns = [{ key: "arrivals", title: "Llegadas", kind: "arrival" }, { key: "inhouse", title: "En casa", kind: "inhouse" }, { key: "departures", title: "Salidas", kind: "departure" }]
   const openReservation = (item) => onNavigate?.("reservations", { reservationId: item.id })
 
   const widgets = {
@@ -230,183 +176,29 @@ export default function DashboardWorkspace({ propertyId, property, onNavigate, a
     ready: { label: "Habitaciones listas", value: m.ready, note: `${m.dirty} requieren limpieza`, view: "housekeeping", tone: "cyan", icon: "ready" },
     collected: { label: "Cobros del día", value: money(m.collected), note: "pagos confirmados hoy", view: "finance", tone: "emerald", icon: "collected" },
   }
-
-  const visibleWidgets = widgetOrder.filter((id) => widgets[id] && can(widgets[id].view))
-  const occupancyBars = [-1, 0, 1].map((offset) => {
-    const item = data.operationsByOffset?.[offset] || { inhouse: [] }
-    const labels = { [-1]: "Ayer", [0]: "Hoy", [1]: "Mañana" }
-    const rooms = uniqueOccupiedRooms(item.inhouse)
-    return {
-      offset,
-      label: labels[offset],
-      rooms,
-      pct: m.totalRooms ? Math.min(100, Math.round((rooms / m.totalRooms) * 100)) : 0,
-      today: offset === 0,
-    }
-  })
+  const visibleWidgets = widgetOrder.filter((id) => widgets[id] && can(widgets[id].view) && !hiddenWidgets.includes(id))
+  const occupancyBars = [-1, 0, 1].map((offset) => { const item = data.operationsByOffset?.[offset] || { inhouse: [] }; const labels = { [-1]: "Ayer", [0]: "Hoy", [1]: "Mañana" }; const rooms = uniqueOccupiedRooms(item.inhouse); return { offset, label: labels[offset], rooms, pct: m.totalRooms ? Math.min(100, Math.round((rooms / m.totalRooms) * 100)) : 0, today: offset === 0 } })
   const bookingInsights = data.bookingInsights || { days: [], channels: [], total: 0, today: 0, previousSix: 0 }
   const paceMax = Math.max(1, ...bookingInsights.days.map((day) => Number(day.value) || 0))
   const previousAverage = bookingInsights.previousSix ? bookingInsights.previousSix / 6 : 0
-  const reservationPreviewRows = (() => {
-    const unique = new Map()
-    for (const offset of [0, 1]) {
-      const item = data.operationsByOffset?.[offset] || { arrivals: [] }
-      ;(item.arrivals || []).filter(isPendingArrival).forEach((row) => unique.set(row.id, row))
-    }
-    return [...unique.values()]
-      .sort((a, b) => `${a.fecha_entrada || ""} ${a.hora_llegada_estimada || "23:59"}`.localeCompare(`${b.fecha_entrada || ""} ${b.hora_llegada_estimada || "23:59"}`))
-      .slice(0, 4)
-  })()
+  const reservationPreviewRows = (() => { const unique = new Map(); for (const offset of [0, 1]) { const item = data.operationsByOffset?.[offset] || { arrivals: [] }; (item.arrivals || []).filter(isPendingArrival).forEach((row) => unique.set(row.id, row)) } return [...unique.values()].sort((a, b) => `${a.fecha_entrada || ""} ${a.hora_llegada_estimada || "23:59"}`.localeCompare(`${b.fecha_entrada || ""} ${b.hora_llegada_estimada || "23:59"}`)).slice(0, 4) })()
 
-  return (
-    <section className={s.page}>
-      {welcomeVisible ? <div className={u.welcomeToast} role="status"><span className={u.welcomeMark}>HL</span><div><b>Bienvenido. Así está tu hotel hoy.</b><span>{property?.name || "Tu alojamiento"} · datos operativos en vivo</span></div><button type="button" onClick={() => setWelcomeVisible(false)} aria-label="Cerrar bienvenida"><PmsIcon name="close" size={13}/></button></div> : null}
+  const blockNodes = {
+    metrics: <div className={s.metricGrid}>{visibleWidgets.map((id) => { const widget = widgets[id]; return <button key={id} type="button" draggable={editing} onDragStart={() => editing && setDragging(id)} onDragEnd={() => setDragging("")} onDragOver={(event) => editing && event.preventDefault()} onDrop={() => editing && dropOn(id)} data-tone={widget.tone} className={`${s.metricCard} ${dragging === id ? s.dragging : ""}`} onClick={() => !editing && onNavigate?.(widget.view)}><span className={s.metricIcon}><MetricIcon type={widget.icon}/></span><span className={s.metricBody}><small>{widget.label}</small><strong className={id === "collected" ? s.moneyValue : ""}>{widget.value}</strong><em>{widget.note}</em></span>{editing ? <i className={s.dragHandle}><PmsIcon name="grip" size={13}/></i> : null}</button> })}</div>,
+    insights: <div className={s.insightGrid}><article className={`${s.panelCard} ${s.occupancyCard}`}><header className={s.panelHeader}><div><strong>Ocupación</strong><small>Ayer, hoy y mañana · habitaciones reales</small></div><button type="button" onClick={() => onNavigate?.("planning")}>Ver planning</button></header><div className={s.occupancyChart}><div className={s.chartScale}><span>100%</span><span>75%</span><span>50%</span><span>25%</span><span>0%</span></div><div className={s.barPlot}>{occupancyBars.map((item) => <div className={s.barColumn} key={item.offset} data-today={item.today ? "1" : "0"}><span className={s.barValue}>{item.pct}%</span><div className={s.barTrack}><i style={{ height: `${Math.max(item.pct, 4)}%` }}/></div><b>{item.label}</b><small>{item.rooms} hab.</small></div>)}</div></div></article><article className={s.panelCard}><header className={s.panelHeader}><div><strong>Próximas llegadas</strong><small>Check-ins pendientes de hoy y mañana</small></div><button type="button" onClick={() => onNavigate?.("reservations")}>Ver todas</button></header><div className={s.reservationList}>{reservationPreviewRows.length ? reservationPreviewRows.map((item) => <ReservationPreview key={item.id} item={item} onOpen={() => openReservation(item)}/>) : <div className={s.emptyPanel}>No hay check-ins pendientes para hoy ni mañana.</div>}</div></article><DashboardOperationsPulse propertyId={propertyId} data={data} onNavigate={onNavigate} allowedViews={allowedViews}/></div>,
+    commercial: can("reservations") ? <section className={v.vizGrid} aria-label="Rendimiento comercial reciente"><article className={v.vizCard}><header className={v.vizHeader}><div className={v.vizTitle}><strong>Ritmo de reservas</strong><small>Nuevas reservas creadas · últimos 7 días</small></div><span className={v.vizMeta}>{bookingInsights.total} en 7 días</span></header>{bookingInsights.total ? <div className={v.paceChart} role="img" aria-label={`Reservas creadas en los últimos siete días. Hoy: ${bookingInsights.today}.`}>{bookingInsights.days.map((day, index) => <div className={v.paceDay} data-today={index === bookingInsights.days.length - 1 ? "1" : "0"} key={day.key}><span className={v.paceValue}>{day.value}</span><div className={v.paceTrack}><i style={{ height: `${Math.max(4, (day.value / paceMax) * 100)}%` }}/></div><b>{day.label}</b></div>)}</div> : <div className={v.emptyViz}>Todavía no hay reservas nuevas registradas en los últimos 7 días.</div>}<div className={v.dataNote}>Hoy ingresaron {bookingInsights.today} reservas nuevas. Promedio de los 6 días anteriores: {previousAverage.toLocaleString("es-AR", { maximumFractionDigits: 1 })} por día.</div></article><article className={v.vizCard}><header className={v.vizHeader}><div className={v.vizTitle}><strong>Canales de venta</strong><small>Origen de las reservas nuevas · 7 días</small></div></header>{bookingInsights.channels.length ? <div className={v.channelList}>{bookingInsights.channels.map((channel) => <div className={v.channelRow} key={channel.label}><span className={v.channelLabel}>{channel.label}</span><span className={v.channelValue}>{channel.value} · {channel.pct}%</span><div className={v.channelTrack}><i style={{ width: `${Math.max(2, channel.pct)}%` }}/></div></div>)}</div> : <div className={v.emptyViz}>Sin actividad suficiente para comparar canales.</div>}<div className={v.dataNote}>Se cuentan reservas creadas realmente en el PMS; canceladas y no-show quedan fuera.</div></article></section> : null,
+    frontdesk: can("reservations") ? <section className={`${d.frontDesk} ${s.frontDeskWrap}`}><header className={d.frontDeskHead}><div><small>RECEPCIÓN</small><h2>Movimiento del hotel</h2><p>Entradas, huéspedes alojados y salidas con alertas operativas.</p></div><div className={d.frontDeskTools}><div className={d.dayTabs}>{[[-1, "Ayer"], [0, "Hoy"], [1, "Mañana"]].map(([value, label]) => <button type="button" key={value} className={opsDay === value ? d.dayActive : ""} onClick={() => setOpsDay(value)}>{label}</button>)}</div><label className={d.deskSearch}><PmsIcon name="search" size={14}/><input value={opsQuery} onChange={(event) => setOpsQuery(event.target.value)} placeholder="Huésped, habitación o reserva"/></label></div></header><div className={d.frontDeskGrid}>{columns.map((column) => { const rows = filterRows(ops[column.key] || []); return <article className={d.deskColumn} key={column.key}><header><b>{column.title}</b><span>{rows.length}</span></header><div className={d.guestList}>{rows.length ? rows.map((item) => <GuestRow key={`${column.key}-${item.id}`} item={item} kind={column.kind} onOpen={() => openReservation(item)}/>) : <div className={d.emptyOps}>Sin movimientos para esta vista.</div>}</div></article> })}</div></section> : null,
+    shortcuts: quickLinks.length > 0 ? <section className={s.quickSection}><header><strong>Accesos rápidos</strong><small>Atajos frecuentes del PMS</small></header><div className={s.quickGrid}>{quickLinks.map((item) => <button key={item.id} className={s.quickLink} type="button" onClick={() => onNavigate?.(item.id)}><span><PmsIcon name={item.icon} size={15}/></span>{item.label}</button>)}</div></section> : null,
+  }
 
-      <div className={u.compactTools}>
-        {oliviaHidden ? <button type="button" onClick={() => setOliviaVisibility(false)}>Mostrar OlivIA</button> : null}
-        <button type="button" onClick={() => saveOrder(DEFAULT_WIDGETS)}>Restablecer widgets</button>
-        <button type="button" data-live="true" onClick={data.load}>{data.loading ? "Actualizando…" : "Actualizar datos"}</button>
-      </div>
-
-      {data.error ? <div className={s.notice}>{data.error}</div> : null}
-
-      <div className={s.metricGrid}>
-        {visibleWidgets.map((id) => {
-          const widget = widgets[id]
-          return (
-            <button
-              key={id}
-              type="button"
-              draggable
-              onDragStart={() => setDragging(id)}
-              onDragEnd={() => setDragging("")}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={() => dropOn(id)}
-              data-tone={widget.tone}
-              className={`${s.metricCard} ${dragging === id ? s.dragging : ""}`}
-              onClick={() => onNavigate?.(widget.view)}
-            >
-              <span className={s.metricIcon}><MetricIcon type={widget.icon}/></span>
-              <span className={s.metricBody}>
-                <small>{widget.label}</small>
-                <strong className={id === "collected" ? s.moneyValue : ""}>{widget.value}</strong>
-                <em>{widget.note}</em>
-              </span>
-              <i className={s.dragHandle}><PmsIcon name="grip" size={13}/></i>
-            </button>
-          )
-        })}
-      </div>
-
-      <div className={s.insightGrid}>
-        <article className={`${s.panelCard} ${s.occupancyCard}`}>
-          <header className={s.panelHeader}>
-            <div><strong>Ocupación</strong><small>Ayer, hoy y mañana · habitaciones reales</small></div>
-            <button type="button" onClick={() => onNavigate?.("planning")}>Ver planning</button>
-          </header>
-          <div className={s.occupancyChart}>
-            <div className={s.chartScale}><span>100%</span><span>75%</span><span>50%</span><span>25%</span><span>0%</span></div>
-            <div className={s.barPlot}>
-              {occupancyBars.map((item) => (
-                <div className={s.barColumn} key={item.offset} data-today={item.today ? "1" : "0"}>
-                  <span className={s.barValue}>{item.pct}%</span>
-                  <div className={s.barTrack}><i style={{ height: `${Math.max(item.pct, 4)}%` }}/></div>
-                  <b>{item.label}</b>
-                  <small>{item.rooms} hab.</small>
-                </div>
-              ))}
-            </div>
-          </div>
-        </article>
-
-        <article className={s.panelCard}>
-          <header className={s.panelHeader}>
-            <div><strong>Próximas llegadas</strong><small>Check-ins pendientes de hoy y mañana</small></div>
-            <button type="button" onClick={() => onNavigate?.("reservations")}>Ver todas</button>
-          </header>
-          <div className={s.reservationList}>
-            {reservationPreviewRows.length ? reservationPreviewRows.map((item) => (
-              <ReservationPreview key={item.id} item={item} onOpen={() => openReservation(item)}/>
-            )) : <div className={s.emptyPanel}>No hay check-ins pendientes para hoy ni mañana.</div>}
-          </div>
-        </article>
-
-        <DashboardOperationsPulse propertyId={propertyId} data={data} onNavigate={onNavigate} allowedViews={allowedViews}/>
-      </div>
-
-      {can("reservations") ? (
-        <section className={v.vizGrid} aria-label="Rendimiento comercial reciente">
-          <article className={v.vizCard}>
-            <header className={v.vizHeader}>
-              <div className={v.vizTitle}>
-                <strong>Ritmo de reservas</strong>
-                <small>Nuevas reservas creadas · últimos 7 días</small>
-              </div>
-              <span className={v.vizMeta}>{bookingInsights.total} en 7 días</span>
-            </header>
-            {bookingInsights.total ? (
-              <div className={v.paceChart} role="img" aria-label={`Reservas creadas en los últimos siete días. Hoy: ${bookingInsights.today}.`}>
-                {bookingInsights.days.map((day, index) => (
-                  <div className={v.paceDay} data-today={index === bookingInsights.days.length - 1 ? "1" : "0"} key={day.key}>
-                    <span className={v.paceValue}>{day.value}</span>
-                    <div className={v.paceTrack}><i style={{ height: `${Math.max(4, (day.value / paceMax) * 100)}%` }}/></div>
-                    <b>{day.label}</b>
-                  </div>
-                ))}
-              </div>
-            ) : <div className={v.emptyViz}>Todavía no hay reservas nuevas registradas en los últimos 7 días.</div>}
-            <div className={v.dataNote}>
-              Hoy ingresaron {bookingInsights.today} reservas nuevas. Promedio de los 6 días anteriores: {previousAverage.toLocaleString("es-AR", { maximumFractionDigits: 1 })} por día.
-            </div>
-          </article>
-
-          <article className={v.vizCard}>
-            <header className={v.vizHeader}>
-              <div className={v.vizTitle}>
-                <strong>Canales de venta</strong>
-                <small>Origen de las reservas nuevas · 7 días</small>
-              </div>
-            </header>
-            {bookingInsights.channels.length ? (
-              <div className={v.channelList}>
-                {bookingInsights.channels.map((channel) => (
-                  <div className={v.channelRow} key={channel.label}>
-                    <span className={v.channelLabel}>{channel.label}</span>
-                    <span className={v.channelValue}>{channel.value} · {channel.pct}%</span>
-                    <div className={v.channelTrack}><i style={{ width: `${Math.max(2, channel.pct)}%` }}/></div>
-                  </div>
-                ))}
-              </div>
-            ) : <div className={v.emptyViz}>Sin actividad suficiente para comparar canales.</div>}
-            <div className={v.dataNote}>Se cuentan reservas creadas realmente en el PMS; canceladas y no-show quedan fuera.</div>
-          </article>
-        </section>
-      ) : null}
-
-      {can("reservations") ? (
-        <section className={`${d.frontDesk} ${s.frontDeskWrap}`}>
-          <header className={d.frontDeskHead}>
-            <div><small>RECEPCIÓN</small><h2>Movimiento del hotel</h2><p>Entradas, huéspedes alojados y salidas con alertas operativas.</p></div>
-            <div className={d.frontDeskTools}>
-              <div className={d.dayTabs}>{[[-1, "Ayer"], [0, "Hoy"], [1, "Mañana"]].map(([value, label]) => <button type="button" key={value} className={opsDay === value ? d.dayActive : ""} onClick={() => setOpsDay(value)}>{label}</button>)}</div>
-              <label className={d.deskSearch}><PmsIcon name="search" size={14}/><input value={opsQuery} onChange={(event) => setOpsQuery(event.target.value)} placeholder="Huésped, habitación o reserva"/></label>
-            </div>
-          </header>
-          <div className={d.frontDeskGrid}>{columns.map((column) => {
-            const rows = filterRows(ops[column.key] || [])
-            return <article className={d.deskColumn} key={column.key}><header><b>{column.title}</b><span>{rows.length}</span></header><div className={d.guestList}>{rows.length ? rows.map((item) => <GuestRow key={`${column.key}-${item.id}`} item={item} kind={column.kind} onOpen={() => openReservation(item)}/>) : <div className={d.emptyOps}>Sin movimientos para esta vista.</div>}</div></article>
-          })}</div>
-        </section>
-      ) : null}
-
-      {quickLinks.length > 0 ? (
-        <section className={s.quickSection}>
-          <header><strong>Accesos rápidos</strong><small>Atajos frecuentes del PMS</small></header>
-          <div className={s.quickGrid}>{quickLinks.map((item) => <button key={item.id} className={s.quickLink} type="button" onClick={() => onNavigate?.(item.id)}><span><PmsIcon name={item.icon} size={15}/></span>{item.label}</button>)}</div>
-        </section>
-      ) : null}
-
-      {!oliviaHidden ? <OliviaAssistant propertyId={propertyId} propertyName={property?.name} context={assistantContext} onHide={() => setOliviaVisibility(true)}/> : null}
-    </section>
-  )
+  return <section className={s.page}>
+    {welcomeVisible ? <div className={u.welcomeToast} role="status"><span className={u.welcomeMark}>HL</span><div><b>Bienvenido. Así está tu hotel hoy.</b><span>{property?.name || "Tu alojamiento"} · datos operativos en vivo</span></div><button type="button" onClick={() => setWelcomeVisible(false)} aria-label="Cerrar bienvenida"><PmsIcon name="close" size={13}/></button></div> : null}
+    <div className={u.compactTools}>{oliviaHidden ? <button type="button" onClick={() => setOliviaVisibility(false)}>Mostrar OlivIA</button> : null}{canEditDashboard ? <button type="button" className={editing ? e.editActive : ""} onClick={() => setEditing((value) => !value)}><PmsIcon name="sliders" size={14}/>{editing ? "Salir de edición" : "Editar dashboard"}</button> : null}<button type="button" onClick={resetLayout}>Restablecer widgets</button><button type="button" data-live="true" onClick={data.load}>{data.loading ? "Actualizando…" : "Actualizar datos"}</button></div>
+    {data.error ? <div className={s.notice}>{data.error}</div> : null}
+    {layoutError ? <div className={e.layoutError}>{layoutError}</div> : null}
+    {layoutNotice ? <div className={e.layoutNotice}>{layoutNotice}</div> : null}
+    {editing && canEditDashboard ? <section className={e.editor}><header><div><small>MODO EDICIÓN</small><h2>Armá el Dashboard de este hotel</h2><p>Mové bloques, ocultá lo que no necesitás y guardá una vista común para toda la propiedad.</p></div><div><button type="button" className={e.reset} onClick={resetLayout}>Restablecer</button><button type="button" className={e.save} disabled={layoutSaving} onClick={() => persistLayout(snapshotLayout())}><PmsIcon name="check" size={14}/>{layoutSaving ? "Guardando…" : "Guardar cambios"}</button></div></header><div className={e.catalog}><div><b>Indicadores</b><span>Mostrá sólo los KPI útiles para este hotel.</span><div className={e.toggleGrid}>{DEFAULT_WIDGETS.map((id) => <button type="button" key={id} data-on={!hiddenWidgets.includes(id)} onClick={() => toggleWidget(id)}><span>{widgets[id].label}</span><i/></button>)}</div></div><div><b>Bloques</b><span>Estos módulos usan datos reales del PMS.</span><div className={e.toggleGrid}>{DEFAULT_BLOCKS.map((id) => <button type="button" key={id} data-on={!hiddenBlocks.includes(id)} onClick={() => toggleBlock(id)}><span>{BLOCK_LABELS[id][0]}</span><i/></button>)}</div></div></div></section> : null}
+    {layoutLoaded ? blockOrder.filter((id) => !hiddenBlocks.includes(id) && blockNodes[id]).map((id) => <div key={id} className={`${editing ? e.editableBlock : ""} ${draggingBlock === id ? e.draggingBlock : ""}`} draggable={editing} onDragStart={() => editing && setDraggingBlock(id)} onDragEnd={() => setDraggingBlock("")} onDragOver={(event) => editing && event.preventDefault()} onDrop={() => editing && dropBlock(id)}>{editing ? <div className={e.blockHandle}><PmsIcon name="grip" size={14}/><span><b>{BLOCK_LABELS[id][0]}</b><small>{BLOCK_LABELS[id][1]}</small></span><button type="button" onClick={() => toggleBlock(id)}>Ocultar</button></div> : null}{blockNodes[id]}</div>) : null}
+    {!oliviaHidden ? <OliviaAssistant propertyId={propertyId} propertyName={property?.name} context={assistantContext} onHide={() => setOliviaVisibility(true)}/> : null}
+  </section>
 }
