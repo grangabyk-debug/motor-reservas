@@ -1,0 +1,9 @@
+export const initials=name=>String(name||"H").trim().split(/\s+/).map(part=>part[0]).join("").slice(0,2).toUpperCase()
+export const fmtDate=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short",year:"numeric"}).format(new Date(`${String(value).slice(0,10)}T12:00:00`)).replace(".",""):"—"
+export const vipLabel=value=>value==="signature"?"Signature":value==="vip"?"VIP":value==="frequent"?"Habitual":"Estándar"
+export const statusLabel=value=>value==="alojado"?"En hotel":value==="finalizada"?"Finalizada":value==="cancelada"?"Cancelada":value==="pendiente"?"Pendiente":value==="tentativa"?"Tentativa":"Confirmada"
+export const todayKey=()=>new Date().toLocaleDateString("en-CA")
+export const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:0}).format(Number(value)||0)
+export const COMMON_PREFERENCES=[["quiet_room","Habitación silenciosa"],["high_floor","Piso alto"],["extra_pillows","Almohadas extra"],["double_bed","Cama doble"],["twin_beds","Camas twin"],["early_checkin","Early check-in"],["late_checkout","Late check-out"],["parking","Cochera"],["pet","Mascota"],["vegetarian","Vegetariano/a"]]
+export function guestState(guest){if(guest?.currentStay)return{label:"En casa",tone:"green",detail:`Hasta ${fmtDate(guest.currentStay.checkOut)}`};if(guest?.nextStay)return{label:"Próxima llegada",tone:"violet",detail:fmtDate(guest.nextStay)};if((guest?.stays||0)>=3)return{label:"Huésped habitual",tone:"gold",detail:`${guest.stays} estadías`};if((guest?.stays||0)>0)return{label:"Con historial",tone:"blue",detail:`${guest.stays} estadía${guest.stays===1?"":"s"}`};return{label:"Nuevo perfil",tone:"neutral",detail:"Sin estadías"}}
+export function safePreferenceRows(preferences={}){return Object.entries(preferences||{}).filter(([key,value])=>key!=="marketing"&&value!=null&&["string","number","boolean"].includes(typeof value)).slice(0,12)}
