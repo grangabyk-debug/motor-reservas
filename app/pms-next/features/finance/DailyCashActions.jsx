@@ -84,7 +84,7 @@ export default function DailyCashActions(props){
       </div>
     </div>
 
-    <div className={s.legacyHost} ref={legacyRef} aria-hidden="true">
+    <div className={s.legacyHost} ref={legacyRef}>
       <DailyCashActionsMultiCurrency {...props}/>
     </div>
   </>
