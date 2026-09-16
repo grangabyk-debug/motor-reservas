@@ -12,6 +12,7 @@ import ExpensesPanel from"./ExpensesPanel"
 import FiscalLatamPanel from"./FiscalLatamPanel"
 import AccountsReceivablePanel from"./AccountsReceivablePanel"
 import s from"./finance.module.css"
+import hotel from"./financeHotelOs.module.css"
 
 const PRIMARY_TABS=[
   ["cash","Caja"],
@@ -41,9 +42,9 @@ export default function FinanceWorkspace({propertyId,property,onNavigate,focusRe
   function chooseTab(next){if(!validTab(next))return;setTab(next);if(typeof window!=="undefined"){const url=new URL(window.location.href);if(next==="cash")url.searchParams.delete("finance_tab");else url.searchParams.set("finance_tab",next);window.history.replaceState({},"",url)}}
   function navigate(next,options={}){if(onNavigate)return onNavigate(next,options);if(typeof window==="undefined")return;const url=new URL(window.location.href);url.searchParams.set("view",next);if(next==="reservations"&&options.reservationId!=null)url.searchParams.set("reservation",String(options.reservationId));window.history.pushState({pmsView:next},"",url);window.dispatchEvent(new PopStateEvent("popstate"))}
 
-  return <section className={s.page}>
+  return <section className={`${s.page} ${hotel.financeOs}`}>
     <style>{`[data-finance-cash-embed] > section{padding:0!important;min-height:0!important}[data-finance-cash-embed] > section > header{margin-bottom:14px!important;justify-content:flex-end!important}[data-finance-cash-embed] > section > header > div:first-child{display:none!important}`}</style>
-    <header className={s.header}><div><small>CAJA Y FINANZAS</small><h1>Caja y finanzas</h1><p>{property?.name||"Propiedad activa"} · caja diaria, cobros, facturación, gastos y control financiero desde un solo lugar.</p></div><div className={s.toolbar}><div className={s.tabs}>{PRIMARY_TABS.map(([id,label])=><button key={id} className={tab===id?s.active:""} onClick={()=>chooseTab(id)}>{label}</button>)}</div><select aria-label="Más herramientas financieras" value={advancedActive?tab:""} onChange={event=>event.target.value&&chooseTab(event.target.value)}><option value="">Más</option>{advancedTabs.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></div></header>
+    <header className={s.header}><div><small>CAJA Y FINANZAS</small><h1>Caja y finanzas</h1><p>{property?.name||"Propiedad activa"} · caja diaria, cobros, facturación, gastos y control financiero desde un solo lugar.</p></div><div className={s.toolbar}><div className={s.tabs}>{PRIMARY_TABS.map(([id,label])=><button key={id} aria-pressed={tab===id} className={tab===id?s.active:""} onClick={()=>chooseTab(id)}>{label}</button>)}</div><select aria-label="Más herramientas financieras" value={advancedActive?tab:""} onChange={event=>event.target.value&&chooseTab(event.target.value)}><option value="">Más</option>{advancedTabs.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></div></header>
     {tab==="cash"?<div data-finance-cash-embed><DailyCashWorkspace propertyId={propertyId} property={property} onNavigate={navigate} focusReservationId={focusReservationId} onFocusHandled={onFocusHandled}/></div>:tab==="dashboard"?<FinanceDashboard propertyId={propertyId}/>:tab==="payments"?<PaymentsPanel propertyId={propertyId}/>:tab==="accounts"?<AccountsReceivablePanel propertyId={propertyId} onNavigate={navigate}/>:tab==="automation"&&automationAllowed!==false?<PaymentAutomationPanel propertyId={propertyId}/>:tab==="online"?<OnlinePaymentsPanel propertyId={propertyId}/>:tab==="documents"?<DocumentsPanel propertyId={propertyId}/>:tab==="fiscal"?<FiscalLatamPanel propertyId={propertyId}/>:<ExpensesPanel propertyId={propertyId}/>} 
   </section>
 }
