@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import OliviaAssistant from "../../components/OliviaAssistant"
+import PmsIcon from "../../components/shell/PmsIcons"
 import useDashboardData from "./useDashboardData"
 import DashboardOperationsPulse from "./DashboardOperationsPulse"
 import s from "./dashboard.module.css"
@@ -10,11 +11,11 @@ import v from "./dashboardViz.module.css"
 import u from "./dashboardUnified.module.css"
 
 const shortcuts = [
-  { id: "planning", label: "Planning", icon: "▦" },
-  { id: "quotes", label: "Presupuestar", icon: "◇" },
-  { id: "messages", label: "Mensajes", icon: "◌" },
-  { id: "finance", label: "Finanzas", icon: "▤" },
-  { id: "rates", label: "Tarifas y disponibilidad", icon: "↗" },
+  { id: "planning", label: "Planning", icon: "calendar" },
+  { id: "quotes", label: "Presupuestar", icon: "quote" },
+  { id: "messages", label: "Mensajes", icon: "message" },
+  { id: "finance", label: "Finanzas", icon: "cash" },
+  { id: "rates", label: "Tarifas y disponibilidad", icon: "rates" },
 ]
 
 const DEFAULT_WIDGETS = ["occupancy", "arrivals", "departures", "inhouse", "ready", "collected"]
@@ -39,6 +40,20 @@ const actualVip = (value) => {
   return normalized && !["standard", "normal", "none", "sin vip", "default"].includes(normalized.toLowerCase())
     ? normalized
     : ""
+}
+
+const uniqueOccupiedRooms = (rows = []) => {
+  const ids = new Set()
+  rows.forEach((row) => (row.rooms || []).forEach((room) => {
+    const id = Number(room?.id)
+    if (id) ids.add(id)
+  }))
+  return ids.size
+}
+
+const isPendingArrival = (item) => {
+  const state = String(item?.estado || "").trim().toLowerCase()
+  return !item?.no_show && !["alojado", "checkin", "en_casa", "finalizada", "cancelada", "cancelado", "cancelled"].includes(state)
 }
 
 function MetricIcon({ type }) {
@@ -70,14 +85,14 @@ function GuestRow({ item, kind, onOpen }) {
           {item.balance > 0 ? <em data-kind="money">Saldo {money(item.balance, item.moneda)}</em> : <em data-kind="ok">Pago cubierto</em>}
         </span>
       </span>
-      <span className={d.guestPax}>{item.cantidad_huespedes || 1} pax<br/><small>›</small></span>
+      <span className={d.guestPax}>{item.cantidad_huespedes || 1} pax<br/><small><PmsIcon name="chevronRight" size={12}/></small></span>
     </button>
   )
 }
 
 function ReservationPreview({ item, onOpen }) {
   const state = String(item.estado || "reservada").toLowerCase()
-  const label = state === "checkin" || state === "alojado" || state === "en_casa" ? "En estadía" : state === "confirmada" ? "Confirmada" : "Próxima"
+  const label = state === "confirmada" ? "Confirmada" : state === "pendiente" ? "Pendiente" : "Próxima"
   return (
     <button type="button" className={s.reservationPreview} onClick={onOpen}>
       <span className={s.reservationAvatar}>{initials(item.nombre_huesped)}</span>
@@ -219,7 +234,7 @@ export default function DashboardWorkspace({ propertyId, property, onNavigate, a
   const occupancyBars = [-1, 0, 1].map((offset) => {
     const item = data.operationsByOffset?.[offset] || { inhouse: [] }
     const labels = { [-1]: "Ayer", [0]: "Hoy", [1]: "Mañana" }
-    const rooms = item.inhouse?.length || 0
+    const rooms = uniqueOccupiedRooms(item.inhouse)
     return {
       offset,
       label: labels[offset],
@@ -234,15 +249,17 @@ export default function DashboardWorkspace({ propertyId, property, onNavigate, a
   const reservationPreviewRows = (() => {
     const unique = new Map()
     for (const offset of [0, 1]) {
-      const item = data.operationsByOffset?.[offset] || { arrivals: [], inhouse: [], departures: [] }
-      ;[...(item.arrivals || []), ...(item.inhouse || []), ...(item.departures || [])].forEach((row) => unique.set(row.id, row))
+      const item = data.operationsByOffset?.[offset] || { arrivals: [] }
+      ;(item.arrivals || []).filter(isPendingArrival).forEach((row) => unique.set(row.id, row))
     }
-    return [...unique.values()].slice(0, 4)
+    return [...unique.values()]
+      .sort((a, b) => `${a.fecha_entrada || ""} ${a.hora_llegada_estimada || "23:59"}`.localeCompare(`${b.fecha_entrada || ""} ${b.hora_llegada_estimada || "23:59"}`))
+      .slice(0, 4)
   })()
 
   return (
     <section className={s.page}>
-      {welcomeVisible ? <div className={u.welcomeToast} role="status"><span className={u.welcomeMark}>HL</span><div><b>Bienvenido. Así está tu hotel hoy.</b><span>{property?.name || "Tu alojamiento"} · datos operativos en vivo</span></div><button type="button" onClick={() => setWelcomeVisible(false)} aria-label="Cerrar bienvenida">×</button></div> : null}
+      {welcomeVisible ? <div className={u.welcomeToast} role="status"><span className={u.welcomeMark}>HL</span><div><b>Bienvenido. Así está tu hotel hoy.</b><span>{property?.name || "Tu alojamiento"} · datos operativos en vivo</span></div><button type="button" onClick={() => setWelcomeVisible(false)} aria-label="Cerrar bienvenida"><PmsIcon name="close" size={13}/></button></div> : null}
 
       <div className={u.compactTools}>
         {oliviaHidden ? <button type="button" onClick={() => setOliviaVisibility(false)}>Mostrar OlivIA</button> : null}
@@ -274,7 +291,7 @@ export default function DashboardWorkspace({ propertyId, property, onNavigate, a
                 <strong className={id === "collected" ? s.moneyValue : ""}>{widget.value}</strong>
                 <em>{widget.note}</em>
               </span>
-              <i className={s.dragHandle}>⋮⋮</i>
+              <i className={s.dragHandle}><PmsIcon name="grip" size={13}/></i>
             </button>
           )
         })}
@@ -283,7 +300,7 @@ export default function DashboardWorkspace({ propertyId, property, onNavigate, a
       <div className={s.insightGrid}>
         <article className={`${s.panelCard} ${s.occupancyCard}`}>
           <header className={s.panelHeader}>
-            <div><strong>Ocupación</strong><small>Ayer, hoy y mañana</small></div>
+            <div><strong>Ocupación</strong><small>Ayer, hoy y mañana · habitaciones reales</small></div>
             <button type="button" onClick={() => onNavigate?.("planning")}>Ver planning</button>
           </header>
           <div className={s.occupancyChart}>
@@ -303,13 +320,13 @@ export default function DashboardWorkspace({ propertyId, property, onNavigate, a
 
         <article className={s.panelCard}>
           <header className={s.panelHeader}>
-            <div><strong>Reservas próximas</strong><small>Lo que viene ahora</small></div>
+            <div><strong>Próximas llegadas</strong><small>Check-ins pendientes de hoy y mañana</small></div>
             <button type="button" onClick={() => onNavigate?.("reservations")}>Ver todas</button>
           </header>
           <div className={s.reservationList}>
             {reservationPreviewRows.length ? reservationPreviewRows.map((item) => (
               <ReservationPreview key={item.id} item={item} onOpen={() => openReservation(item)}/>
-            )) : <div className={s.emptyPanel}>No hay reservas próximas para mostrar.</div>}
+            )) : <div className={s.emptyPanel}>No hay check-ins pendientes para hoy ni mañana.</div>}
           </div>
         </article>
 
@@ -371,7 +388,7 @@ export default function DashboardWorkspace({ propertyId, property, onNavigate, a
             <div><small>RECEPCIÓN</small><h2>Movimiento del hotel</h2><p>Entradas, huéspedes alojados y salidas con alertas operativas.</p></div>
             <div className={d.frontDeskTools}>
               <div className={d.dayTabs}>{[[-1, "Ayer"], [0, "Hoy"], [1, "Mañana"]].map(([value, label]) => <button type="button" key={value} className={opsDay === value ? d.dayActive : ""} onClick={() => setOpsDay(value)}>{label}</button>)}</div>
-              <label className={d.deskSearch}>⌕<input value={opsQuery} onChange={(event) => setOpsQuery(event.target.value)} placeholder="Huésped, habitación o reserva"/></label>
+              <label className={d.deskSearch}><PmsIcon name="search" size={14}/><input value={opsQuery} onChange={(event) => setOpsQuery(event.target.value)} placeholder="Huésped, habitación o reserva"/></label>
             </div>
           </header>
           <div className={d.frontDeskGrid}>{columns.map((column) => {
@@ -384,7 +401,7 @@ export default function DashboardWorkspace({ propertyId, property, onNavigate, a
       {quickLinks.length > 0 ? (
         <section className={s.quickSection}>
           <header><strong>Accesos rápidos</strong><small>Atajos frecuentes del PMS</small></header>
-          <div className={s.quickGrid}>{quickLinks.map((item) => <button key={item.id} className={s.quickLink} type="button" onClick={() => onNavigate?.(item.id)}><span>{item.icon}</span>{item.label}</button>)}</div>
+          <div className={s.quickGrid}>{quickLinks.map((item) => <button key={item.id} className={s.quickLink} type="button" onClick={() => onNavigate?.(item.id)}><span><PmsIcon name={item.icon} size={15}/></span>{item.label}</button>)}</div>
         </section>
       ) : null}
 

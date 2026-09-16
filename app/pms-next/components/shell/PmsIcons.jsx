@@ -21,6 +21,9 @@ export default function PmsIcon({name,size=17,className=""}){
   if(name==="payment")return <svg {...common}><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h4"/></svg>
   if(name==="chevronLeft")return <svg {...common}><path d="m14.5 6-6 6 6 6"/></svg>
   if(name==="chevronRight")return <svg {...common}><path d="m9.5 6 6 6-6 6"/></svg>
+  if(name==="close")return <svg {...common}><path d="m7 7 10 10M17 7 7 17"/></svg>
+  if(name==="check")return <svg {...common}><path d="m5 12.5 4.2 4.2L19 7"/></svg>
+  if(name==="grip")return <svg {...common}><circle cx="8" cy="7" r="1" fill="currentColor" stroke="none"/><circle cx="16" cy="7" r="1" fill="currentColor" stroke="none"/><circle cx="8" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="8" cy="17" r="1" fill="currentColor" stroke="none"/><circle cx="16" cy="17" r="1" fill="currentColor" stroke="none"/></svg>
   const paths={
     grid:<><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></>,
     calendar:<><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M7.5 3v4M16.5 3v4M3.5 9h17M7 13h3M14 13h3M7 17h3"/></>,
