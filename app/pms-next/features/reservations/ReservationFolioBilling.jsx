@@ -278,10 +278,6 @@ export default function ReservationFolioBilling({reservation,propertyId,property
       }
       const res=await supabase.from("hotel_finance_documents").insert(payload).select("id").single()
       if(res.error)throw res.error
-      if(billingStatus==="issued"&&itemIds.length&&res.data?.id){
-        const mark=await supabase.from("hotel_folio_items").update({invoice_document_id:res.data.id}).eq("property_id",propertyId).eq("reservation_id",Number(reservation.id)).in("id",itemIds)
-        if(mark.error)throw mark.error
-      }
       setInvoiceOpen(false);setSelectedItems(new Set());setInvoicePaymentId("");setInvoiceLines([]);await load(true)
       window.dispatchEvent(new CustomEvent("hl:pms-data-updated",{detail:{propertyId,tables:["hotel_finance_documents","hotel_folio_items"]}}))
     }catch(err){setError(err?.message||"No se pudo crear el documento.")}
