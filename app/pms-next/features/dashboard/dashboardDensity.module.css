@@ -1,0 +1,105 @@
+.hook{}
+
+/* Dashboard compacto: más señal, menos aire muerto. */
+:global([data-workspace="dashboard"]) [class*="insightGrid"]{
+  grid-template-columns:minmax(0,1.05fr) minmax(300px,1fr) minmax(300px,.82fr)!important;
+  align-items:start!important;
+  gap:10px!important;
+}
+
+/* Ocupación: mismo dato real, visualización más densa. */
+:global([data-workspace="dashboard"]) [class*="occupancyChart"]{
+  grid-template-columns:1fr!important;
+  min-height:0!important;
+  padding:10px 14px 12px!important;
+}
+:global([data-workspace="dashboard"]) [class*="chartScale"]{display:none!important}
+:global([data-workspace="dashboard"]) [class*="barPlot"]{
+  height:132px!important;
+  gap:18px!important;
+  padding:0 8px!important;
+  align-items:start!important;
+  background:linear-gradient(to bottom,transparent 31%,color-mix(in srgb,var(--line) 66%,transparent) 31% 32%,transparent 32% 64%,color-mix(in srgb,var(--line) 55%,transparent) 64% 65%,transparent 65%)!important;
+}
+:global([data-workspace="dashboard"]) [class*="barColumn"]{
+  height:132px!important;
+  grid-template-rows:18px 82px 16px 14px!important;
+  gap:0!important;
+}
+:global([data-workspace="dashboard"]) [class*="barTrack"]{
+  width:min(54px,62%)!important;
+  height:82px!important;
+  border:1px solid color-mix(in srgb,var(--lineStrong) 58%,transparent)!important;
+  border-radius:9px 9px 4px 4px!important;
+  background:linear-gradient(to top,color-mix(in srgb,var(--accent) 4%,var(--panelSolid)),color-mix(in srgb,var(--line) 18%,transparent))!important;
+}
+:global([data-workspace="dashboard"]) [class*="barTrack"] i{
+  border-radius:8px 8px 3px 3px!important;
+}
+:global([data-workspace="dashboard"]) [class*="panelHeader"]{
+  padding:11px 14px 9px!important;
+}
+:global([data-workspace="dashboard"]) [class*="panelHeader"] strong{font-size:13px!important}
+:global([data-workspace="dashboard"]) [class*="panelHeader"] small,
+:global([data-workspace="dashboard"]) [class*="panelHeader"] button{font-size:10.5px!important}
+
+/* Reservas próximas: cuatro filas útiles, sin estirar la tarjeta. */
+:global([data-workspace="dashboard"]) [class*="reservationList"]{padding:2px 12px 7px!important}
+:global([data-workspace="dashboard"]) [class*="reservationPreview"]{
+  grid-template-columns:30px minmax(0,1fr) auto!important;
+  gap:8px!important;
+  padding:7px 2px!important;
+}
+:global([data-workspace="dashboard"]) [class*="reservationAvatar"]{width:30px!important;height:30px!important}
+:global([data-workspace="dashboard"]) [class*="reservationCopy"]{gap:1px!important}
+:global([data-workspace="dashboard"]) [class*="reservationCopy"] strong{font-size:11.5px!important}
+:global([data-workspace="dashboard"]) [class*="reservationCopy"] small{font-size:9.8px!important}
+:global([data-workspace="dashboard"]) [class*="reservationStatus"]{padding:3px 6px!important;font-size:9.5px!important}
+
+/* Operación ahora: alertas compactas y 100% accionables. */
+:global([data-workspace="dashboard"]) [class*="operationHead"]{padding:10px 12px 8px!important}
+:global([data-workspace="dashboard"]) [class*="operationHead"]>div{gap:4px!important}
+:global([data-workspace="dashboard"]) [class*="operationHead"] strong{font-size:12.5px!important}
+:global([data-workspace="dashboard"]) [class*="operationStatus"]{font-size:9.5px!important}
+:global([data-workspace="dashboard"]) [class*="operationSignals"]{padding:2px 10px!important}
+:global([data-workspace="dashboard"]) [class*="operationSignals"]>button{
+  grid-template-columns:24px minmax(0,1fr) 10px!important;
+  gap:7px!important;
+  min-height:40px!important;
+  padding:3px 1px!important;
+}
+:global([data-workspace="dashboard"]) [class*="operationSignals"]>button>span{width:23px!important;height:23px!important;border-radius:8px!important}
+:global([data-workspace="dashboard"]) [class*="operationSignals"] b{font-size:10.5px!important}
+:global([data-workspace="dashboard"]) [class*="operationSignals"] small{font-size:9.5px!important}
+:global([data-workspace="dashboard"]) [data-operation-resolved="true"]{display:none!important}
+:global([data-workspace="dashboard"]) [class*="operationClear"],
+:global([data-workspace="dashboard"]) [class*="operationLoading"]{min-height:74px!important;padding:8px 3px!important}
+:global([data-workspace="dashboard"]) [class*="operationFoot"]>span{padding:6px 9px!important}
+:global([data-workspace="dashboard"]) [class*="operationFoot"] b{font-size:9.8px!important}
+:global([data-workspace="dashboard"]) [class*="operationFoot"] small{font-size:9px!important}
+:global([data-workspace="dashboard"]) [class*="operationFoot"]>button{min-height:29px!important;padding:0 9px!important;font-size:9.7px!important}
+
+/* Las superficies no se mezclan con el fondo. */
+:global([data-workspace="dashboard"]) [class*="panelCard"],
+:global([data-workspace="dashboard"]) [class*="operationCard"]{
+  background:linear-gradient(155deg,rgba(252,250,247,.985),rgba(247,248,250,.975))!important;
+  -webkit-backdrop-filter:blur(20px) saturate(1.1)!important;
+  backdrop-filter:blur(20px) saturate(1.1)!important;
+}
+:global([data-theme="dark"]) :global([data-workspace="dashboard"]) [class*="panelCard"],
+:global([data-theme="dark"]) :global([data-workspace="dashboard"]) [class*="operationCard"]{
+  background:linear-gradient(155deg,rgba(18,28,47,.985),rgba(12,21,36,.975))!important;
+}
+
+@media(max-width:1320px){
+  :global([data-workspace="dashboard"]) [class*="insightGrid"]{grid-template-columns:1fr 1fr!important}
+  :global([data-workspace="dashboard"]) [class*="operationCard"]{grid-column:1/-1!important}
+  :global([data-workspace="dashboard"]) [class*="operationSignals"]{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:6px!important;padding:8px 10px!important}
+  :global([data-workspace="dashboard"]) [class*="operationSignals"]>button{border:1px solid color-mix(in srgb,var(--line) 75%,transparent)!important;border-radius:11px!important;padding:6px!important}
+}
+@media(max-width:900px){
+  :global([data-workspace="dashboard"]) [class*="insightGrid"]{grid-template-columns:1fr!important}
+  :global([data-workspace="dashboard"]) [class*="operationCard"]{grid-column:auto!important}
+  :global([data-workspace="dashboard"]) [class*="operationSignals"]{grid-template-columns:1fr!important;gap:0!important;padding:2px 10px!important}
+  :global([data-workspace="dashboard"]) [class*="operationSignals"]>button{border:0!important;border-bottom:1px solid color-mix(in srgb,var(--line) 70%,transparent)!important;border-radius:0!important;padding:3px 1px!important}
+}

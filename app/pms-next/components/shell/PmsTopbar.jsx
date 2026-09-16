@@ -4,6 +4,7 @@ import{useEffect,useMemo,useState}from"react"
 import s from"../../pms-next.module.css"
 import os from"../../pms-hotel-os.module.css"
 import dashboardOs from"../../features/dashboard/dashboardCommandCenter.module.css"
+import density from"../../features/dashboard/dashboardDensity.module.css"
 import c from"./pmsTopbarControls.module.css"
 import glass from"./pmsGlassShell.module.css"
 import PmsIcon from"./PmsIcons"
@@ -16,7 +17,7 @@ export default function PmsTopbar({title,info,theme,onToggleTheme,onNewReservati
   const alertTooltip=notificationCount>0?`${notificationCount} notificación${notificationCount===1?"":"es"} sin leer`:alertLabel
   const openAlerts=()=>{if(onOpenNotifications)onOpenNotifications();else alertHandler?.()}
 
-  return <header className={`${s.topbar} ${glass.topbarGlass} ${os.shellHook} ${dashboardOs.hook}`}>
+  return <header className={`${s.topbar} ${glass.topbarGlass} ${os.shellHook} ${dashboardOs.hook} ${density.hook}`}>
     <div className={s.topbarTitle}>
       <small>HABITACIÓN LLENA</small>
       <span style={{display:"flex",alignItems:"center",gap:6}}><b>{title}</b>{info?<button type="button" aria-label={`Información sobre ${title}`} title={info} className={glass.toolGlass} style={{width:18,height:18,padding:0,border:"1px solid var(--lineStrong)",borderRadius:"50%",background:"color-mix(in srgb,var(--panelSolid) 60%,transparent)",color:"var(--muted)",lineHeight:1,cursor:"help",display:"grid",placeItems:"center"}}><PmsIcon name="info" size={12}/></button>:null}</span>
