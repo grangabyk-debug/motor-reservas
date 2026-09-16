@@ -53,14 +53,14 @@
 :global([data-workspace="dashboard"]) [class*="reservationAvatar"]{width:30px!important;height:30px!important}
 :global([data-workspace="dashboard"]) [class*="reservationCopy"]{gap:1px!important}
 :global([data-workspace="dashboard"]) [class*="reservationCopy"] strong{font-size:11.5px!important}
-:global([data-workspace="dashboard"]) [class*="reservationCopy"] small{font-size:9.8px!important}
-:global([data-workspace="dashboard"]) [class*="reservationStatus"]{padding:3px 6px!important;font-size:9.5px!important}
+:global([data-workspace="dashboard"]) [class*="reservationCopy"] small{font-size:10px!important}
+:global([data-workspace="dashboard"]) [class*="reservationStatus"]{padding:3px 6px!important;font-size:10px!important}
 
 /* Operación ahora: alertas compactas y 100% accionables. */
 :global([data-workspace="dashboard"]) [class*="operationHead"]{padding:10px 12px 8px!important}
 :global([data-workspace="dashboard"]) [class*="operationHead"]>div{gap:4px!important}
 :global([data-workspace="dashboard"]) [class*="operationHead"] strong{font-size:12.5px!important}
-:global([data-workspace="dashboard"]) [class*="operationStatus"]{font-size:9.5px!important}
+:global([data-workspace="dashboard"]) [class*="operationStatus"]{font-size:10px!important}
 :global([data-workspace="dashboard"]) [class*="operationSignals"]{padding:2px 10px!important}
 :global([data-workspace="dashboard"]) [class*="operationSignals"]>button{
   grid-template-columns:24px minmax(0,1fr) 10px!important;
@@ -70,14 +70,14 @@
 }
 :global([data-workspace="dashboard"]) [class*="operationSignals"]>button>span{width:23px!important;height:23px!important;border-radius:8px!important}
 :global([data-workspace="dashboard"]) [class*="operationSignals"] b{font-size:10.5px!important}
-:global([data-workspace="dashboard"]) [class*="operationSignals"] small{font-size:9.5px!important}
+:global([data-workspace="dashboard"]) [class*="operationSignals"] small{font-size:10px!important}
 :global([data-workspace="dashboard"]) [data-operation-resolved="true"]{display:none!important}
 :global([data-workspace="dashboard"]) [class*="operationClear"],
 :global([data-workspace="dashboard"]) [class*="operationLoading"]{min-height:74px!important;padding:8px 3px!important}
 :global([data-workspace="dashboard"]) [class*="operationFoot"]>span{padding:6px 9px!important}
-:global([data-workspace="dashboard"]) [class*="operationFoot"] b{font-size:9.8px!important}
-:global([data-workspace="dashboard"]) [class*="operationFoot"] small{font-size:9px!important}
-:global([data-workspace="dashboard"]) [class*="operationFoot"]>button{min-height:29px!important;padding:0 9px!important;font-size:9.7px!important}
+:global([data-workspace="dashboard"]) [class*="operationFoot"] b{font-size:10px!important}
+:global([data-workspace="dashboard"]) [class*="operationFoot"] small{font-size:10px!important}
+:global([data-workspace="dashboard"]) [class*="operationFoot"]>button{min-height:29px!important;padding:0 9px!important;font-size:10px!important}
 
 /* Las superficies no se mezclan con el fondo. */
 :global([data-workspace="dashboard"]) [class*="panelCard"],
