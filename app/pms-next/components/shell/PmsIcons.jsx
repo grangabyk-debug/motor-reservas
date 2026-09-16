@@ -7,6 +7,19 @@ export default function PmsIcon({name,size=17,className=""}){
   if(name==="filter")return <svg {...common}><path d="M3.5 5h17l-6.6 7.4v5.3l-3.8 1.8v-7.1L3.5 5Z"/></svg>
   if(name==="refresh")return <svg {...common}><path d="M19.5 7.6A8 8 0 0 0 6.3 5.2L4.5 7M4.5 3.8V7H7.7M4.5 16.4a8 8 0 0 0 13.2 2.4l1.8-1.8M19.5 20.2V17h-3.2"/></svg>
   if(name==="sliders")return <svg {...common}><path d="M4 6h6M14 6h6M4 12h2M10 12h10M4 18h9M17 18h3"/><circle cx="12" cy="6" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="15" cy="18" r="2"/></svg>
+  if(name==="search")return <svg {...common}><circle cx="10.5" cy="10.5" r="6.2"/><path d="m15.2 15.2 4.3 4.3"/></svg>
+  if(name==="plus")return <svg {...common}><path d="M12 5v14M5 12h14"/></svg>
+  if(name==="eye")return <svg {...common}><path d="M2.8 12s3.3-5.4 9.2-5.4 9.2 5.4 9.2 5.4-3.3 5.4-9.2 5.4S2.8 12 2.8 12Z"/><circle cx="12" cy="12" r="2.4"/></svg>
+  if(name==="ban")return <svg {...common}><circle cx="12" cy="12" r="8.5"/><path d="m6 6 12 12"/></svg>
+  if(name==="recycle")return <svg {...common}><path d="M7.2 7.1A7.5 7.5 0 0 1 19 9M19 5.5V9h-3.5M16.8 16.9A7.5 7.5 0 0 1 5 15M5 18.5V15h3.5"/></svg>
+  if(name==="trash")return <svg {...common}><path d="M4.5 7h15M9 7V4.5h6V7M7 7l.8 12.5h8.4L17 7M10 10.5v5.5M14 10.5v5.5"/></svg>
+  if(name==="edit")return <svg {...common}><path d="M4 20h4l10.7-10.7a2.1 2.1 0 0 0-3-3L5 17v3Z"/><path d="m14.5 7.5 2 2"/></svg>
+  if(name==="checkin")return <svg {...common}><path d="M4 5h8v14H4zM12 12h8M17 8l4 4-4 4"/><path d="M7.5 12h.01"/></svg>
+  if(name==="checkout")return <svg {...common}><path d="M12 5h8v14h-8M12 12H4M7 8l-4 4 4 4"/><path d="M16.5 12h.01"/></svg>
+  if(name==="attachment")return <svg {...common}><path d="m9.5 12.8 5.8-5.8a3 3 0 0 1 4.2 4.2l-7.3 7.3a5 5 0 0 1-7.1-7.1l7-7a3.4 3.4 0 0 1 4.8 4.8l-7 7a1.8 1.8 0 0 1-2.6-2.6l5.8-5.8"/></svg>
+  if(name==="payment")return <svg {...common}><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h4"/></svg>
+  if(name==="chevronLeft")return <svg {...common}><path d="m14.5 6-6 6 6 6"/></svg>
+  if(name==="chevronRight")return <svg {...common}><path d="m9.5 6 6 6-6 6"/></svg>
   const paths={
     grid:<><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></>,
     calendar:<><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M7.5 3v4M16.5 3v4M3.5 9h17M7 13h3M14 13h3M7 17h3"/></>,
@@ -26,7 +39,7 @@ export default function PmsIcon({name,size=17,className=""}){
     growth:<><path d="M4 18 9 13l3 3 8-9"/><path d="M15 7h5v5"/></>,
     report:<><path d="M5 20V10M10 20V4M15 20v-7M20 20V7"/></>,
     team:<><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.3"/><path d="M3.5 20c.6-4 2.5-6 5.5-6s4.9 2 5.5 6M14 15c3.5-.4 5.7 1.2 6.5 4.5"/></>,
-    settings:<><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.4 1a7 7 0 0 0-1.8-1L14.4 3h-4.8l-.4 3.1a7 7 0 0 0-1.8 1l-2.4-1-2 3.4L5 11a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.4-1a7 7 0 0 0 1.8 1l.4 3.1h4.8l.4-3.1a7 7 0 0 0 1.8-1l2.4 1 2-3.4L19 13a7 7 0 0 0 0-1Z"/></>,
+    settings:<><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.4 1a7 7 0 0 0-1.8-1L14.4 3h-4.8l-.4 3.1a7 7 0 0 0-1.8 1l-2.4-1-2 3.4L5 11a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.4-1a7 7 0 0 0 1.8 1l.4 3.1h4.8l.4-3.1a7 7 0 0 0 1.8-1l2.4 1 2 3.4L19 13a7 7 0 0 0 0-1Z"/></>,
     help:<><circle cx="12" cy="12" r="9"/><path d="M9.8 9a2.4 2.4 0 1 1 3.6 2.1c-1 .6-1.4 1.1-1.4 2.2M12 17h.01"/></>,
   }
   return <svg {...common}>{paths[name]||<circle cx="12" cy="12" r="8"/>}</svg>
