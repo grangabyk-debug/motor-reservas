@@ -25,36 +25,50 @@ export const OPERATIONS_NAV=[
   {id:"rates",label:"Tarifas y disponibilidad",icon:"rates"},
 ]
 
-export const MANAGEMENT_NAV=[
-  {id:"portfolio",label:"Cartera de propiedades",icon:"building"},
+export const BUSINESS_NAV=[
   {id:"revenue",label:"Rendimiento",icon:"rates"},
   {id:"growth",label:"Ventas y crecimiento",icon:"growth"},
+  {id:"reports",label:"Informes",icon:"report"},
+  {id:"intelligence",label:"Inteligencia",icon:"report"},
+]
+
+export const MANAGEMENT_NAV=[
+  {id:"portfolio",label:"Cartera de propiedades",icon:"building"},
   {id:"onboarding",label:"Puesta en marcha",icon:"activity"},
-  {id:"channelmanager",label:"Distribución",icon:"link"},
   {id:"staff",label:"Equipo",icon:"team"},
+]
+
+export const DISTRIBUTION_NAV=[
+  {id:"channelmanager",label:"Channel Manager",icon:"link"},
+  {id:"website",label:"Sitio web y motor",icon:"link"},
+  {id:"rates",label:"Tarifas y disponibilidad",icon:"rates"},
+]
+
+export const SETTINGS_INTEGRATIONS_NAV=[
+  {id:"integrations",label:"Apps externas",icon:"link"},
+  {id:"integrationapi",label:"REST API",icon:"link"},
+  {id:"integrationmessages",label:"Mensajería",icon:"message"},
+  {id:"integrationpayments",label:"Pagos online",icon:"cash"},
+]
+
+// Alias de compatibilidad: conserva imports y deep links existentes mientras la UI migra
+// a Configuración → Integraciones sin duplicar vistas ni backend.
+export const INTEGRATIONS_NAV=SETTINGS_INTEGRATIONS_NAV
+
+export const SECONDARY_NAV=[
   {id:"settings",label:"Configuración",icon:"settings"},
   {id:"help",label:"Centro de ayuda",icon:"help"},
   {id:"support",label:"Feedback y soporte",icon:"help"},
 ]
 
-export const INTEGRATIONS_NAV=[
-  {id:"integrations",label:"Apps externas",icon:"link"},
-  {id:"integrationapi",label:"REST API",icon:"link"},
-  {id:"integrationmessages",label:"Mensajería",icon:"message"},
-  {id:"integrationpayments",label:"Pagos",icon:"cash"},
-]
-
 export const HIDDEN_NAV=[
   {id:"dailycash",label:"Caja diaria",icon:"cash"},
-  {id:"intelligence",label:"Inteligencia",icon:"report"},
-  {id:"reports",label:"Informes",icon:"report"},
-  {id:"website",label:"Sitio web",icon:"link"},
   {id:"tasks",label:"Control de Operación",icon:"activity"},
   {id:"requests",label:"Solicitudes",icon:"request"},
   {id:"subscription",label:"Mi suscripción",icon:"settings"},
 ]
 
-export const NAV_LABELS=[...PRIMARY_NAV,...RECEPTION_NAV,...HOUSEKEEPING_NAV,...OPERATIONS_NAV,...MANAGEMENT_NAV,...INTEGRATIONS_NAV,...HIDDEN_NAV].reduce((acc,item)=>{acc[item.id]=item.label;return acc},{})
+export const NAV_LABELS=[...PRIMARY_NAV,...RECEPTION_NAV,...HOUSEKEEPING_NAV,...OPERATIONS_NAV,...BUSINESS_NAV,...MANAGEMENT_NAV,...DISTRIBUTION_NAV,...SETTINGS_INTEGRATIONS_NAV,...SECONDARY_NAV,...HIDDEN_NAV].reduce((acc,item)=>{acc[item.id]=item.label;return acc},{})
 
 export const VIEW_MODULES={
   dashboard:"core_pms",portfolio:"core_pms",tasks:"core_pms",planning:"core_pms",reservations:"core_pms",quotes:"core_pms",guests:"core_pms",messages:"core_pms",
@@ -67,7 +81,7 @@ export const VIEW_MODULES={
 }
 
 export const VIEW_DESCRIPTIONS={
-  dashboard:"Resumen operativo del hotel: llegadas, huéspedes alojados, salidas, ocupación, habitaciones y alertas que requieren atención.",portfolio:"Vista central de todas las propiedades autorizadas: ocupación, llegadas, salidas, mantenimiento y acceso directo a cada operación sin mezclar inventarios.",tasks:"Detalle operativo para investigar excepciones, próximas horas, integraciones y recomendaciones explicables desde una sola vista.",planning:"Calendario operativo para crear, mover, extender y revisar reservas y disponibilidad por habitación.",reservations:"Listado y ficha completa de cada reserva, con huéspedes, estadía, pagos, documentos, historial y acciones de recepción.",quotes:"Creá y seguí presupuestos antes de convertirlos en reservas, con fechas, habitaciones, tarifas y condiciones.",guests:"Historial y perfil de huéspedes para reconocer repetidores, preferencias, idioma, etiquetas y datos de contacto.",messages:"Centraliza comunicaciones vinculadas a huéspedes y reservas para que el seguimiento quede asociado a la operación.",dailycash:"Acceso compatible a la caja operativa diaria.",dailycontrol:"Registro diario de visitantes, vehículos y guarda equipajes, con entradas, salidas, entregas y trazabilidad vinculada a reservas.",finance:"Caja diaria, cobros, facturación, gastos y control financiero de la propiedad desde un solo lugar.",receptionreports:"Informes operativos de recepción para llegadas, salidas, desayunos y housekeeping, editables antes de imprimir o exportar a Excel.",housekeeping:"Panel operativo de Housekeeping: habitaciones, prioridades, limpieza, inspección, peticiones asignadas al área y cola de trabajo en tiempo real.",requests:"Vista interna de peticiones; cada petición se enruta al área responsable.",maintenance:"Órdenes de trabajo, preventivos, activos, proveedores y habitaciones fuera de venta.",inventory:"Stock operativo, movimientos y niveles de reposición de insumos utilizados por el hotel.",services:"Catálogo y cargos de servicios y extras que pueden agregarse a reservas y cuentas de huéspedes.",rates:"Tarifas, disponibilidad y restricciones comerciales por fecha para controlar lo que se vende.",onboarding:"Checklist de implementación para saber qué falta antes de operar y vender con una propiedad.",website:"Construí y publicá la web del hotel y su motor de reservas desde un único estudio visual conectado al inventario real.",growth:"Indicadores y herramientas comerciales para entender origen de reservas, producción y oportunidades de venta.",revenue:"Ocupación, ADR, RevPAR, pickup, demanda, inteligencia comercial e informes del hotel reunidos en una sola sección.",intelligence:"KPIs, canales, finanzas, pickup, booking window y rendimiento por tipo de habitación.",channelmanager:"Canales OTA, salud de sincronización, web del hotel y motor de reservas reunidos en una sola sección de distribución.",reports:"Informes operativos, comerciales y financieros construidos con los datos reales de la propiedad.",audit:"Cierre del día operativo con control de llegadas, salidas, caja y saldos, más historial de actividad y trazabilidad.",staff:"Usuarios, roles, permisos y procedimientos operativos de la propiedad.",integrations:"Conectores externos útiles para ampliar el PMS sin mezclar la operación diaria.",integrationapi:"Acceso programático seguro a Habitación Llena para integraciones propias.",integrationmessages:"Canales de mensajería conectados a la operación y a los huéspedes.",integrationpayments:"Pasarelas de pago y estado de las conexiones de cobro online.",subscription:"Plan contratado, habitaciones incluidas, módulos habilitados y solicitudes de cambio.",settings:"Configuración de la propiedad, preferencias operativas, branding, reglas y funciones habilitadas.",help:"Guía navegable por área y procedimiento para aprender el PMS y resolver tareas habituales sin salir del sistema.",support:"Asistente, soporte humano e ideas de producto para reportar problemas, hacer preguntas y enviar sugerencias."
+  dashboard:"Resumen operativo del hotel: llegadas, huéspedes alojados, salidas, ocupación, habitaciones y alertas que requieren atención.",portfolio:"Vista central de todas las propiedades autorizadas: ocupación, llegadas, salidas, mantenimiento y acceso directo a cada operación sin mezclar inventarios.",tasks:"Detalle operativo para investigar excepciones, próximas horas, integraciones y recomendaciones explicables desde una sola vista.",planning:"Calendario operativo para crear, mover, extender y revisar reservas y disponibilidad por habitación.",reservations:"Listado y ficha completa de cada reserva, con huéspedes, estadía, pagos, documentos, historial y acciones de recepción.",quotes:"Creá y seguí presupuestos antes de convertirlos en reservas, con fechas, habitaciones, tarifas y condiciones.",guests:"Historial y perfil de huéspedes para reconocer repetidores, preferencias, idioma, etiquetas y datos de contacto.",messages:"Centraliza comunicaciones vinculadas a huéspedes y reservas para que el seguimiento quede asociado a la operación.",dailycash:"Acceso compatible a la caja operativa diaria.",dailycontrol:"Registro diario de visitantes, vehículos y guarda equipajes, con entradas, salidas, entregas y trazabilidad vinculada a reservas.",finance:"Caja diaria, cobros, facturación, gastos y control financiero de la propiedad desde un solo lugar.",receptionreports:"Informes operativos de recepción para llegadas, salidas, desayunos y housekeeping, editables antes de imprimir o exportar a Excel.",housekeeping:"Panel operativo de Housekeeping: habitaciones, prioridades, limpieza, inspección, peticiones asignadas al área y cola de trabajo en tiempo real.",requests:"Vista interna de peticiones; cada petición se enruta al área responsable.",maintenance:"Órdenes de trabajo, preventivos, activos, proveedores y habitaciones fuera de venta.",inventory:"Stock operativo, movimientos y niveles de reposición de insumos utilizados por el hotel.",services:"Catálogo y cargos de servicios y extras que pueden agregarse a reservas y cuentas de huéspedes.",rates:"Tarifas, disponibilidad y restricciones comerciales por fecha para controlar lo que se vende.",onboarding:"Checklist de implementación para saber qué falta antes de operar y vender con una propiedad.",website:"Construí y publicá la web del hotel y su motor de reservas desde un único estudio visual conectado al inventario real.",growth:"Indicadores y herramientas comerciales para entender origen de reservas, producción y oportunidades de venta.",revenue:"Ocupación, ADR, RevPAR, pickup, demanda, inteligencia comercial e informes del hotel reunidos en una sola sección.",intelligence:"KPIs, canales, finanzas, pickup, booking window y rendimiento por tipo de habitación.",channelmanager:"Canales OTA, salud de sincronización, mapeos y conexiones reunidos en el espacio de Distribución.",reports:"Informes operativos, comerciales y financieros construidos con los datos reales de la propiedad.",audit:"Cierre del día operativo con control de llegadas, salidas, caja y saldos, más historial de actividad y trazabilidad.",staff:"Usuarios, roles, permisos y procedimientos operativos de la propiedad.",integrations:"Apps externas configurables desde Integraciones, fuera de la navegación operativa diaria.",integrationapi:"Acceso programático seguro a Habitación Llena desde Configuración e Integraciones.",integrationmessages:"Canales de mensajería conectados a la operación y a los huéspedes desde Integraciones.",integrationpayments:"Pasarelas de pago y estado de conexiones de cobro online desde Integraciones.",subscription:"Plan contratado, habitaciones incluidas, módulos habilitados y solicitudes de cambio.",settings:"Configuración de la propiedad, preferencias operativas, branding, reglas y funciones habilitadas.",help:"Guía navegable por área y procedimiento para aprender el PMS y resolver tareas habituales sin salir del sistema.",support:"Asistente, soporte humano e ideas de producto para reportar problemas, hacer preguntas y enviar sugerencias."
 }
 export const ALL_VIEWS=Object.keys(NAV_LABELS)
 
