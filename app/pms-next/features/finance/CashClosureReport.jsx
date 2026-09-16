@@ -26,15 +26,6 @@ export default function CashClosureReport({propertyId,report,onBack,onClose,onEr
     link.href=url;link.download=cashClosureFileName(normalized);link.click()
     setTimeout(()=>URL.revokeObjectURL(url),1000)
   }
-  async function share(){
-    try{
-      const file=new File([cashClosurePdf(normalized)],cashClosureFileName(normalized),{type:"application/pdf"})
-      if(!navigator.share||(navigator.canShare&&!navigator.canShare({files:[file]}))){download();return}
-      await navigator.share({title:`Cierre de caja #${report.session.id}`,files:[file]})
-    }catch(error){
-      if(error?.name!=="AbortError")onError?.("No se pudo compartir desde este dispositivo. Podés descargar el PDF y adjuntarlo manualmente.")
-    }
-  }
   async function sendEmail(){
     setEmailSending(true);setEmailStatus("")
     try{
@@ -88,7 +79,6 @@ export default function CashClosureReport({propertyId,report,onBack,onClose,onEr
       <div className={r.actions}>
         <button type="button" className={s.secondary} onClick={print}>Imprimir</button>
         <button type="button" className={s.save} onClick={download}>Descargar PDF</button>
-        <button type="button" className={s.secondary} onClick={share}>Compartir PDF</button>
         <button type="button" className={s.secondary} onClick={()=>{setEmailOpen(value=>!value);setEmailStatus("")}}>Enviar por email</button>
       </div>
     </div>
@@ -132,7 +122,6 @@ export default function CashClosureReport({propertyId,report,onBack,onClose,onEr
 
     <div className={r.bottom}>
       {onBack?<button type="button" className={s.secondary} onClick={onBack}>Ver otros cierres</button>:null}
-      <button type="button" className={s.save} onClick={download}>Descargar PDF</button>
       {onClose?<button type="button" className={s.secondary} onClick={onClose}>Cerrar</button>:null}
     </div>
   </div>
