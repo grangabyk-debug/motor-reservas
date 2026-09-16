@@ -19,7 +19,7 @@ export default function PmsTopbar({title,info,theme,onToggleTheme,onNewReservati
   return <header className={`${s.topbar} ${glass.topbarGlass} ${os.shellHook} ${dashboardOs.hook}`}>
     <div className={s.topbarTitle}>
       <small>HABITACIÓN LLENA</small>
-      <span style={{display:"flex",alignItems:"center",gap:6}}><b>{title}</b>{info?<button type="button" aria-label={`Información sobre ${title}`} title={info} className={glass.toolGlass} style={{width:18,height:18,padding:0,border:"1px solid var(--lineStrong)",borderRadius:"50%",background:"color-mix(in srgb,var(--panelSolid) 60%,transparent)",color:"var(--muted)",fontSize:10,fontWeight:900,lineHeight:1,cursor:"help"}}>i</button>:null}</span>
+      <span style={{display:"flex",alignItems:"center",gap:6}}><b>{title}</b>{info?<button type="button" aria-label={`Información sobre ${title}`} title={info} className={glass.toolGlass} style={{width:18,height:18,padding:0,border:"1px solid var(--lineStrong)",borderRadius:"50%",background:"color-mix(in srgb,var(--panelSolid) 60%,transparent)",color:"var(--muted)",lineHeight:1,cursor:"help",display:"grid",placeItems:"center"}}><PmsIcon name="info" size={12}/></button>:null}</span>
     </div>
     <button className={`${s.globalSearch} ${glass.searchGlass}`} type="button" onClick={onOpenSearch}><span style={{display:"grid",placeItems:"center"}}><PmsIcon name="search" size={15}/></span><span>Buscar huésped, reserva o habitación…</span><kbd>Ctrl K</kbd></button>
     <div className={s.topbarActions}>
