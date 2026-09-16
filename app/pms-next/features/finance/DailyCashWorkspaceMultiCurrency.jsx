@@ -25,7 +25,7 @@ function physicalPayment(row){const accountingGross=Math.max(0,Number(row.monto|
 
 export default function DailyCashWorkspaceMultiCurrency({propertyId,property,onNavigate,focusReservationId,onFocusHandled}){
   const[day,setDay]=useState(()=>dateKey(new Date()))
-  const[payments,setPayments]=useState([]),[manual,setManual]=useState([]),[documents,setDocuments]=useState([]),[reservations,setReservations]=useState(new Map()),[profiles,setProfiles]=useState(new Map()),[session,setSession]=useState(null),[sessionLedger,setSessionLedger]=useState({payments:[],movements:[]})
+  const[payments,setPayments]=useState([]),[manual,setManual]=useState([]),[documents,setDocuments]=useState([]),[reservations,setReservations]=useState(new Map()),[profiles,setProfiles]=useState(new Map()),[session,setSession]=useState(null),[sessionLedger,setSessionLedger]=useState({sessionId:null,payments:[],movements:[]})
   const[loading,setLoading]=useState(true),[error,setError]=useState(""),[tab,setTab]=useState("movements")
 
   const load=useCallback(async()=>{
@@ -41,14 +41,14 @@ export default function DailyCashWorkspaceMultiCurrency({propertyId,property,onN
       ])
       for(const result of[paymentRes,movementRes,documentRes,sessionRes])if(result.error)throw result.error
       const pay=paymentRes.data||[],mov=movementRes.data||[],docs=documentRes.data||[],active=sessionRes.data?.[0]||null
-      setPayments(pay);setManual(mov);setDocuments(docs);setSession(active)
+      setPayments(pay);setManual(mov);setDocuments(docs);setSession(active);setSessionLedger({sessionId:active?.id||null,payments:[],movements:[]})
 
       let ledgerPayments=[],ledgerMovements=[]
       if(active){const[ledgerPaymentRes,ledgerMovementRes]=await Promise.all([
         supabase.from("pagos").select("id,reserva_id,monto,metodo,created_at,moneda,payment_currency,payment_amount,fx_rate,fx_source,fx_as_of,estado,source,provider,referencia,external_ref,refunded_amount,created_by,nota").eq("property_id",propertyId).gte("created_at",active.opened_at).order("created_at",{ascending:false}),
         supabase.from("hotel_cash_movements").select("id,reservation_id,movement_type,method,amount,currency,concept,reference,created_by,created_at,session_id").eq("property_id",propertyId).eq("session_id",active.id).order("created_at",{ascending:false}),
       ]);if(ledgerPaymentRes.error)throw ledgerPaymentRes.error;if(ledgerMovementRes.error)throw ledgerMovementRes.error;ledgerPayments=ledgerPaymentRes.data||[];ledgerMovements=ledgerMovementRes.data||[]}
-      setSessionLedger({payments:ledgerPayments,movements:ledgerMovements})
+      setSessionLedger({sessionId:active?.id||null,payments:ledgerPayments,movements:ledgerMovements})
 
       const reservationIds=[...new Set([...pay.map(row=>row.reserva_id),...mov.map(row=>row.reservation_id),...docs.map(row=>row.reservation_id),...ledgerPayments.map(row=>row.reserva_id),...ledgerMovements.map(row=>row.reservation_id)].filter(Boolean).map(Number))],profileIds=[...new Set([...pay.map(row=>row.created_by),...mov.map(row=>row.created_by),...docs.map(row=>row.created_by),...ledgerPayments.map(row=>row.created_by),...ledgerMovements.map(row=>row.created_by),active?.opened_by].filter(Boolean))]
       const[reservationRes,profileRes]=await Promise.all([reservationIds.length?supabase.from("reservas").select("id,numero_reserva,nombre_huesped,habitacion_id").eq("property_id",propertyId).in("id",reservationIds):Promise.resolve({data:[],error:null}),profileIds.length?supabase.from("profiles").select("id,full_name").in("id",profileIds):Promise.resolve({data:[],error:null})])
@@ -61,8 +61,9 @@ export default function DailyCashWorkspaceMultiCurrency({propertyId,property,onN
 
   const isToday=day===dateKey(new Date())
   const validPayments=useMemo(()=>payments.filter(row=>!isVoid(row)),[payments]),manualOnly=useMemo(()=>manual.filter(row=>!isPaymentMirror(row)),[manual])
-  const scopedPayments=useMemo(()=>session&&isToday?sessionLedger.payments.filter(row=>!isVoid(row)):validPayments,[session,isToday,sessionLedger,validPayments])
-  const scopedManual=useMemo(()=>session&&isToday?sessionLedger.movements.filter(row=>!isPaymentMirror(row)):manualOnly,[session,isToday,sessionLedger,manualOnly])
+  const ledgerMatches=Boolean(session&&sessionLedger.sessionId===session.id)
+  const scopedPayments=useMemo(()=>session&&isToday?(ledgerMatches?sessionLedger.payments.filter(row=>!isVoid(row)):[]):validPayments,[session,isToday,ledgerMatches,sessionLedger,validPayments])
+  const scopedManual=useMemo(()=>session&&isToday?(ledgerMatches?sessionLedger.movements.filter(row=>!isPaymentMirror(row)):[]):manualOnly,[session,isToday,ledgerMatches,sessionLedger,manualOnly])
   const totals=useMemo(()=>{
     const byMethod={cash:blankPair(),transfer:blankPair(),mp:blankPair(),card:blankPair(),other:blankPair()},income=blankPair(),expense=blankPair()
     for(const row of scopedPayments){const actual=physicalPayment(row);income[actual.currency]+=actual.amount;byMethod[methodGroup(row.metodo)][actual.currency]+=actual.amount}
@@ -71,11 +72,11 @@ export default function DailyCashWorkspaceMultiCurrency({propertyId,property,onN
   },[scopedPayments,scopedManual])
   const sessionCash=useMemo(()=>{
     if(!session)return null
-    const income=blankPair(),expense=blankPair()
-    for(const row of sessionLedger.payments){if(isVoid(row)||methodGroup(row.metodo)!=="cash")continue;const actual=physicalPayment(row);income[actual.currency]+=actual.amount}
-    for(const row of sessionLedger.movements){if(isPaymentMirror(row)||methodGroup(row.method)!=="cash")continue;const code=currency(row.currency),amount=Number(row.amount||0);if(["expense","refund"].includes(normalize(row.movement_type)))expense[code]+=amount;else income[code]+=amount}
+    const income=blankPair(),expense=blankPair(),ledger=ledgerMatches?sessionLedger:{payments:[],movements:[]}
+    for(const row of ledger.payments){if(isVoid(row)||methodGroup(row.metodo)!=="cash")continue;const actual=physicalPayment(row);income[actual.currency]+=actual.amount}
+    for(const row of ledger.movements){if(isPaymentMirror(row)||methodGroup(row.method)!=="cash")continue;const code=currency(row.currency),amount=Number(row.amount||0);if(["expense","refund"].includes(normalize(row.movement_type)))expense[code]+=amount;else income[code]+=amount}
     return{income,expense,expected:{ARS:round(Number(session.opening_amount||0)+income.ARS-expense.ARS),USD:round(Number(session.opening_amount_usd||0)+income.USD-expense.USD)}}
-  },[session,sessionLedger])
+  },[session,sessionLedger,ledgerMatches])
   const movements=useMemo(()=>{
     const paymentRows=scopedPayments.map(row=>{const actual=physicalPayment(row),cross=currency(row.payment_currency||row.moneda)!==currency(row.moneda);return{key:`p-${row.id}`,created_at:row.created_at,reservation_id:row.reserva_id,concept:row.nota||"Pago de reserva",method:row.metodo,amount:actual.amount,currency:actual.currency,direction:"in",created_by:row.created_by,reference:row.referencia||row.external_ref||"",source:cross?`Reserva · aplica ${money(Math.max(0,Number(row.monto||0)-Number(row.refunded_amount||0)),currency(row.moneda))}`:"Reserva"}})
     const manualRows=scopedManual.map(row=>({key:`m-${row.id}`,created_at:row.created_at,reservation_id:row.reservation_id,concept:row.concept||"Movimiento de caja",method:row.method,amount:Number(row.amount||0),currency:currency(row.currency),direction:["expense","refund"].includes(normalize(row.movement_type))?"out":"in",created_by:row.created_by,reference:row.reference||"",source:"Caja"}))
