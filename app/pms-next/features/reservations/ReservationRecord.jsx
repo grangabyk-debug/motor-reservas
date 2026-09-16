@@ -8,6 +8,7 @@ import ReservationInlineOperationsDialog from"./ReservationInlineOperationsDialo
 import ReservationPaymentRequestPanel from"./ReservationPaymentRequestPanel"
 import ReservationAttachmentsPanel from"./ReservationAttachmentsPanel"
 import ReservationCommercialAccountPanel from"./ReservationCommercialAccountPanel"
+import hotel from"./reservationHotelOs.module.css"
 
 const DAY_MS=86400000
 const dateNights=(start,end)=>{
@@ -54,12 +55,12 @@ export default function ReservationRecord(props){
     if(["tasks","requests","housekeeping"].includes(target)){setOperationsMode(target);return}
     onNavigate?.(target,options)
   }
-  return <>
+  return <div className={hotel.recordLayer}>
     <ReservationRecordBase key={`${item?.id||"reservation"}:${paymentRevision}`} {...props} item={displayItem} onNavigate={navigateFromRecord} onPrimaryAction={primaryAction}/>
     <ReservationCommercialAccountPanel item={item} propertyId={propertyId} onChanged={()=>setPaymentRevision(value=>value+1)}/>
     <ReservationAttachmentsPanel item={item} propertyId={propertyId}/>
     <ReservationPaymentRequestPanel item={item} propertyId={propertyId} onChanged={()=>setPaymentRevision(value=>value+1)}/>
     {operationsMode?<ReservationInlineOperationsDialog mode={operationsMode} item={item} rooms={rooms} propertyId={propertyId} onClose={()=>setOperationsMode(null)}/>:null}
     {groupCheckoutOpen?<ReservationGroupCheckoutDialog item={item} rooms={rooms} propertyId={propertyId} onClose={()=>setGroupCheckoutOpen(false)} onCheckoutAll={()=>{setGroupCheckoutOpen(false);onPrimaryAction?.()}}/>:null}
-  </>
+  </div>
 }
