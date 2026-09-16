@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { supabase } from "../../../../lib/supabase"
 import usePmsAutoRefresh from "../../core/usePmsAutoRefresh"
 
+const POSITIVE_PAYMENT_STATES = new Set(["confirmado", "confirmed", "approved", "paid", "settled", "completed", "success", "succeeded", "acreditado"])
 const dateKey = (offset) => {
   const date = new Date()
   date.setHours(12, 0, 0, 0)
@@ -20,7 +21,7 @@ const localDateKey = (value) => {
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString("en-CA")
 }
-const validPayment = (payment) => !["void", "cancelado", "anulado", "cancelled"].includes(String(payment.estado || "").toLowerCase())
+const validPayment = (payment) => POSITIVE_PAYMENT_STATES.has(String(payment.estado || "").trim().toLowerCase())
 const validReservation = (reservation) => !reservation.no_show && !["cancelada", "cancelado", "cancelled"].includes(String(reservation.estado || "").toLowerCase())
 const roomIds = (item) => [...new Set([item.habitacion_id, ...(item.habitaciones_ids || [])].filter(Boolean).map(Number))]
 
@@ -42,18 +43,19 @@ export default function useDashboardData(propertyId) {
     setError("")
     const yesterday = dateKey(-1)
     const today = dateKey(0)
-    const tomorrow = dateKey(1)
     const dayAfter = dateKey(2)
+    const todayStart = localDayStartISO(0)
+    const tomorrowStart = localDayStartISO(1)
     const pickupStart = localDayStartISO(-6)
-    const pickupEnd = localDayStartISO(1)
+    const pickupEnd = tomorrowStart
     try {
       const [roomRes, resRes, pickupRes, maintRes, hkRes, payTodayRes] = await Promise.all([
         supabase.from("habitaciones").select("id,nombre,tipo,estado,activa").eq("property_id", propertyId).eq("activa", true),
         supabase.from("reservas").select("id,numero_reserva,nombre_huesped,habitacion_id,habitaciones_ids,fecha_entrada,fecha_salida,estado,no_show,precio_total,moneda,cantidad_huespedes,canal_reserva,hora_llegada_estimada,hora_salida_estimada,notas,guest_profile_id").eq("property_id", propertyId).lte("fecha_entrada", dayAfter).gte("fecha_salida", yesterday).neq("estado", "cancelada"),
         supabase.from("reservas").select("id,created_at,estado,no_show,canal_reserva").eq("property_id", propertyId).gte("created_at", pickupStart).lt("created_at", pickupEnd),
         supabase.from("hotel_maintenance_tickets").select("id,status,priority,due_at").eq("property_id", propertyId).not("status", "in", "(resolved,cancelled)"),
-        supabase.from("hotel_housekeeping_tasks").select("id,status,checklist,scheduled_for").eq("property_id", propertyId).gte("scheduled_for", `${today}T00:00:00`).lt("scheduled_for", `${tomorrow}T00:00:00`),
-        supabase.from("pagos").select("id,reserva_id,monto,refunded_amount,estado,moneda,created_at").eq("property_id", propertyId).gte("created_at", `${today}T00:00:00`).lt("created_at", `${tomorrow}T00:00:00`),
+        supabase.from("hotel_housekeeping_tasks").select("id,status,checklist,scheduled_for").eq("property_id", propertyId).gte("scheduled_for", todayStart).lt("scheduled_for", tomorrowStart),
+        supabase.from("pagos").select("id,reserva_id,monto,refunded_amount,estado,moneda,created_at").eq("property_id", propertyId).gte("created_at", todayStart).lt("created_at", tomorrowStart),
       ])
       for (const result of [roomRes, resRes, pickupRes, maintRes, hkRes, payTodayRes]) if (result.error) throw result.error
 
@@ -178,9 +180,11 @@ export default function useDashboardData(propertyId) {
     const valid = reservations.filter(validReservation)
     const arrivals = valid.filter((r) => r.fecha_entrada === today).length
     const departures = valid.filter((r) => r.fecha_salida === today).length
+    const inhouseReservations = valid.filter((r) => r.fecha_entrada <= today && r.fecha_salida > today && r.estado !== "finalizada")
     const occupiedIds = new Set()
-    for (const reservation of valid.filter((r) => r.fecha_entrada <= today && r.fecha_salida > today && r.estado !== "finalizada")) roomIds(reservation).forEach((id) => occupiedIds.add(id))
+    for (const reservation of inhouseReservations) roomIds(reservation).forEach((id) => occupiedIds.add(id))
     const inhouse = occupiedIds.size
+    const guestsInhouse = inhouseReservations.reduce((sum, reservation) => sum + Math.max(1, Number(reservation.cantidad_huespedes) || 1), 0)
     const occupancy = rooms.length ? Math.min(100, (inhouse / rooms.length) * 100) : 0
     let checkDone = 0
     let checkTotal = 0
@@ -199,6 +203,7 @@ export default function useDashboardData(propertyId) {
       arrivals,
       departures,
       inhouse,
+      guestsInhouse,
       occupancy,
       maintenance: maintenance.length,
       urgent: maintenance.filter((ticket) => ticket.priority === "urgent").length,

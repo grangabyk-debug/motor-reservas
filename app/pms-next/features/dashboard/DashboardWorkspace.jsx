@@ -179,7 +179,8 @@ export default function DashboardWorkspace({ propertyId, property, onNavigate, a
       metricas: {
         llegadasHoy: m.arrivals,
         salidasHoy: m.departures,
-        alojados: m.inhouse,
+        huespedesAlojados: m.guestsInhouse ?? m.inhouse,
+        habitacionesOcupadas: m.inhouse,
         ocupacion: Number(m.occupancy || 0),
         habitacionesActivas: m.totalRooms,
         habitacionesSucias: m.dirty,
@@ -225,9 +226,9 @@ export default function DashboardWorkspace({ propertyId, property, onNavigate, a
     occupancy: { label: "Ocupación hoy", value: `${m.occupancy.toFixed(0)}%`, note: `${m.inhouse} / ${m.totalRooms} habitaciones`, view: "planning", tone: "violet", icon: "occupancy" },
     arrivals: { label: "Llegadas hoy", value: m.arrivals, note: "check-in programados", view: "reservations", tone: "green", icon: "arrivals" },
     departures: { label: "Salidas hoy", value: m.departures, note: "check-out programados", view: "reservations", tone: "rose", icon: "departures" },
-    inhouse: { label: "Huéspedes", value: m.inhouse, note: "habitaciones ocupadas", view: "guests", tone: "blue", icon: "inhouse" },
+    inhouse: { label: "Huéspedes", value: m.guestsInhouse ?? m.inhouse, note: `${m.inhouse} habitaciones ocupadas`, view: "guests", tone: "blue", icon: "inhouse" },
     ready: { label: "Habitaciones listas", value: m.ready, note: `${m.dirty} requieren limpieza`, view: "housekeeping", tone: "cyan", icon: "ready" },
-    collected: { label: "Cobros del día", value: money(m.collected), note: "pagos registrados hoy", view: "finance", tone: "emerald", icon: "collected" },
+    collected: { label: "Cobros del día", value: money(m.collected), note: "pagos confirmados hoy", view: "finance", tone: "emerald", icon: "collected" },
   }
 
   const visibleWidgets = widgetOrder.filter((id) => widgets[id] && can(widgets[id].view))
@@ -264,7 +265,7 @@ export default function DashboardWorkspace({ propertyId, property, onNavigate, a
       <div className={u.compactTools}>
         {oliviaHidden ? <button type="button" onClick={() => setOliviaVisibility(false)}>Mostrar OlivIA</button> : null}
         <button type="button" onClick={() => saveOrder(DEFAULT_WIDGETS)}>Restablecer widgets</button>
-        <button type="button" data-live="true" onClick={data.load}>{data.loading ? "Actualizando…" : "Datos en vivo"}</button>
+        <button type="button" data-live="true" onClick={data.load}>{data.loading ? "Actualizando…" : "Actualizar datos"}</button>
       </div>
 
       {data.error ? <div className={s.notice}>{data.error}</div> : null}
