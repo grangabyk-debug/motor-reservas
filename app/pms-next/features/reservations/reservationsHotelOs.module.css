@@ -1,0 +1,100 @@
+.reservationsOs{min-width:0}
+
+/* Cabecera de reservas: carpeta + búsqueda + orden dentro de una barra de mando. */
+.reservationsOs :global(section>header[class*="heading"]){
+  align-items:flex-end!important;
+  gap:18px!important;
+}
+.reservationsOs :global([class*="tools"]){
+  display:flex!important;
+  align-items:center!important;
+  gap:4px!important;
+  padding:5px!important;
+  border:1px solid color-mix(in srgb,var(--lineStrong) 80%,transparent)!important;
+  border-radius:16px!important;
+  background:linear-gradient(155deg,rgba(252,250,247,.965),rgba(246,247,250,.945))!important;
+  -webkit-backdrop-filter:blur(22px) saturate(1.16)!important;
+  backdrop-filter:blur(22px) saturate(1.16)!important;
+  box-shadow:inset 0 1px rgba(255,255,255,.78),0 10px 28px rgba(25,37,58,.07)!important;
+}
+.reservationsOs :global([class*="tools"]>button),
+.reservationsOs :global([class*="tools"]>select){
+  min-height:34px!important;
+  border:1px solid transparent!important;
+  border-radius:10px!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  color:var(--muted)!important;
+}
+.reservationsOs :global([class*="tools"]>button:hover),
+.reservationsOs :global([class*="tools"]>select:hover){
+  color:var(--text)!important;
+  border-color:color-mix(in srgb,var(--lineStrong) 68%,transparent)!important;
+  background:rgba(255,255,255,.52)!important;
+}
+.reservationsOs :global([class*="tools"]>button[class*="toolActive"]){
+  color:var(--accent)!important;
+  border-color:color-mix(in srgb,var(--accent) 22%,var(--line))!important;
+  background:linear-gradient(145deg,rgba(255,255,255,.97),color-mix(in srgb,var(--accent) 8%,#f6f5fb))!important;
+  box-shadow:inset 0 1px rgba(255,255,255,.88),0 5px 15px color-mix(in srgb,var(--accent) 10%,transparent)!important;
+}
+.reservationsOs :global([class*="tools"]>label[class*="search"]){
+  min-height:34px!important;
+  margin-left:5px;
+  border:1px solid color-mix(in srgb,var(--lineStrong) 72%,transparent)!important;
+  border-radius:11px!important;
+  background:rgba(252,250,247,.92)!important;
+  box-shadow:inset 0 1px rgba(255,255,255,.72)!important;
+}
+.reservationsOs :global([class*="tools"]>label[class*="search"]:focus-within){
+  border-color:color-mix(in srgb,var(--accent) 32%,var(--line))!important;
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 7%,transparent),inset 0 1px rgba(255,255,255,.74)!important;
+}
+
+/* La grilla es una superficie operativa, no fondo transparente. */
+.reservationsOs :global([class*="tableWrap"]){
+  overflow:hidden!important;
+  border-color:color-mix(in srgb,var(--lineStrong) 84%,transparent)!important;
+  border-radius:18px!important;
+  background:linear-gradient(155deg,rgba(252,250,247,.985),rgba(247,248,250,.975))!important;
+  -webkit-backdrop-filter:blur(20px) saturate(1.1)!important;
+  backdrop-filter:blur(20px) saturate(1.1)!important;
+  box-shadow:inset 0 1px rgba(255,255,255,.8),0 14px 38px rgba(22,33,53,.065)!important;
+}
+.reservationsOs :global([class*="filterPanel"]){
+  border-color:color-mix(in srgb,var(--lineStrong) 76%,transparent)!important;
+  border-radius:14px!important;
+  background:linear-gradient(155deg,rgba(252,250,247,.97),rgba(247,248,250,.95))!important;
+  -webkit-backdrop-filter:blur(20px) saturate(1.14)!important;
+  backdrop-filter:blur(20px) saturate(1.14)!important;
+  box-shadow:inset 0 1px rgba(255,255,255,.76),0 10px 28px rgba(23,35,56,.065)!important;
+}
+
+:global([data-theme="dark"]) .reservationsOs :global([class*="tools"]),
+:global([data-theme="dark"]) .reservationsOs :global([class*="tableWrap"]),
+:global([data-theme="dark"]) .reservationsOs :global([class*="filterPanel"]){
+  border-color:rgba(166,184,220,.12)!important;
+  background:linear-gradient(155deg,rgba(18,28,47,.98),rgba(12,21,36,.965))!important;
+  box-shadow:inset 0 1px rgba(255,255,255,.045),0 14px 38px rgba(0,0,0,.2)!important;
+}
+:global([data-theme="dark"]) .reservationsOs :global([class*="tools"]>button:hover),
+:global([data-theme="dark"]) .reservationsOs :global([class*="tools"]>select:hover){background:rgba(255,255,255,.04)!important}
+:global([data-theme="dark"]) .reservationsOs :global([class*="tools"]>button[class*="toolActive"]){
+  color:#b6b8ff!important;
+  border-color:rgba(141,145,255,.2)!important;
+  background:linear-gradient(145deg,rgba(39,44,72,.98),rgba(25,32,54,.97))!important;
+  box-shadow:inset 0 1px rgba(255,255,255,.06),0 6px 16px rgba(92,84,215,.14)!important;
+}
+:global([data-theme="dark"]) .reservationsOs :global([class*="tools"]>label[class*="search"]){
+  border-color:rgba(166,184,220,.11)!important;
+  background:rgba(10,18,31,.94)!important;
+}
+
+@media(max-width:1180px){
+  .reservationsOs :global(section>header[class*="heading"]){align-items:flex-start!important;flex-direction:column!important}
+  .reservationsOs :global([class*="tools"]){width:100%;overflow:auto;justify-content:flex-start}
+}
+@media(max-width:760px){
+  .reservationsOs :global([class*="tools"]){border-radius:14px;padding:4px!important}
+  .reservationsOs :global([class*="tools"]>label[class*="search"]){min-width:220px}
+}
