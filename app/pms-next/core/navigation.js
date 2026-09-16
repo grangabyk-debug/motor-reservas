@@ -41,7 +41,6 @@ export const MANAGEMENT_NAV=[
 export const DISTRIBUTION_NAV=[
   {id:"channelmanager",label:"Channel Manager",icon:"link"},
   {id:"website",label:"Sitio web y motor",icon:"link"},
-  {id:"rates",label:"Tarifas y disponibilidad",icon:"rates"},
 ]
 
 export const SETTINGS_INTEGRATIONS_NAV=[
