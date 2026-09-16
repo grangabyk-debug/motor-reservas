@@ -10,6 +10,7 @@ import OnlinePaymentsPanel from"./OnlinePaymentsPanel"
 import DocumentsPanel from"./DocumentsPanel"
 import ExpensesPanel from"./ExpensesPanel"
 import FiscalLatamPanel from"./FiscalLatamPanel"
+import AccountsReceivablePanel from"./AccountsReceivablePanel"
 import s from"./finance.module.css"
 
 const PRIMARY_TABS=[
@@ -20,6 +21,7 @@ const PRIMARY_TABS=[
   ["expenses","Gastos"],
 ]
 const ADVANCED_TABS=[
+  ["accounts","Empresas y cuentas"],
   ["automation","Automatización"],
   ["online","Cobros online"],
   ["fiscal","Fiscal"],
@@ -42,6 +44,6 @@ export default function FinanceWorkspace({propertyId,property,onNavigate,focusRe
   return <section className={s.page}>
     <style>{`[data-finance-cash-embed] > section{padding:0!important;min-height:0!important}[data-finance-cash-embed] > section > header{margin-bottom:14px!important;justify-content:flex-end!important}[data-finance-cash-embed] > section > header > div:first-child{display:none!important}`}</style>
     <header className={s.header}><div><small>CAJA Y FINANZAS</small><h1>Caja y finanzas</h1><p>{property?.name||"Propiedad activa"} · caja diaria, cobros, facturación, gastos y control financiero desde un solo lugar.</p></div><div className={s.toolbar}><div className={s.tabs}>{PRIMARY_TABS.map(([id,label])=><button key={id} className={tab===id?s.active:""} onClick={()=>chooseTab(id)}>{label}</button>)}</div><select aria-label="Más herramientas financieras" value={advancedActive?tab:""} onChange={event=>event.target.value&&chooseTab(event.target.value)}><option value="">Más</option>{advancedTabs.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></div></header>
-    {tab==="cash"?<div data-finance-cash-embed><DailyCashWorkspace propertyId={propertyId} property={property} onNavigate={navigate} focusReservationId={focusReservationId} onFocusHandled={onFocusHandled}/></div>:tab==="dashboard"?<FinanceDashboard propertyId={propertyId}/>:tab==="payments"?<PaymentsPanel propertyId={propertyId}/>:tab==="automation"&&automationAllowed!==false?<PaymentAutomationPanel propertyId={propertyId}/>:tab==="online"?<OnlinePaymentsPanel propertyId={propertyId}/>:tab==="documents"?<DocumentsPanel propertyId={propertyId}/>:tab==="fiscal"?<FiscalLatamPanel propertyId={propertyId}/>:<ExpensesPanel propertyId={propertyId}/>} 
+    {tab==="cash"?<div data-finance-cash-embed><DailyCashWorkspace propertyId={propertyId} property={property} onNavigate={navigate} focusReservationId={focusReservationId} onFocusHandled={onFocusHandled}/></div>:tab==="dashboard"?<FinanceDashboard propertyId={propertyId}/>:tab==="payments"?<PaymentsPanel propertyId={propertyId}/>:tab==="accounts"?<AccountsReceivablePanel propertyId={propertyId}/>:tab==="automation"&&automationAllowed!==false?<PaymentAutomationPanel propertyId={propertyId}/>:tab==="online"?<OnlinePaymentsPanel propertyId={propertyId}/>:tab==="documents"?<DocumentsPanel propertyId={propertyId}/>:tab==="fiscal"?<FiscalLatamPanel propertyId={propertyId}/>:<ExpensesPanel propertyId={propertyId}/>} 
   </section>
 }
