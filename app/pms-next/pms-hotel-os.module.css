@@ -1,0 +1,189 @@
+.hotelOs{
+  --surface:var(--panelSolid);
+  --surface-soft:var(--panel);
+  --border:var(--line);
+  --hl-os-radius:20px;
+  --hl-os-radius-small:14px;
+  --hl-os-glow:color-mix(in srgb,var(--accent) 15%,transparent);
+  position:relative;
+  isolation:isolate;
+  background:
+    radial-gradient(circle at 72% -12%,color-mix(in srgb,var(--accent2) 10%,transparent),transparent 29%),
+    radial-gradient(circle at 20% 12%,color-mix(in srgb,#2f8fff 7%,transparent),transparent 24%),
+    linear-gradient(180deg,var(--bg),var(--bg2))!important;
+}
+.hotelOs:before{
+  content:"";
+  position:fixed;
+  z-index:-1;
+  inset:0;
+  pointer-events:none;
+  opacity:.7;
+  background-image:
+    linear-gradient(color-mix(in srgb,var(--text) 1.5%,transparent) 1px,transparent 1px),
+    linear-gradient(90deg,color-mix(in srgb,var(--text) 1.5%,transparent) 1px,transparent 1px);
+  background-size:44px 44px;
+  mask-image:linear-gradient(180deg,rgba(0,0,0,.58),transparent 68%);
+}
+.hotelOs:after{
+  content:"";
+  position:fixed;
+  z-index:-1;
+  width:46vw;
+  height:46vw;
+  right:-18vw;
+  bottom:-28vw;
+  border-radius:50%;
+  pointer-events:none;
+  background:radial-gradient(circle,color-mix(in srgb,var(--accent) 7%,transparent),transparent 67%);
+  filter:blur(10px);
+}
+
+/* Rail lateral: una pieza flotante, no una columna de dashboard. */
+.hotelOs>aside{
+  height:calc(100dvh - 16px)!important;
+  top:8px!important;
+  margin:0 5px 8px 8px;
+  border:1px solid color-mix(in srgb,var(--lineStrong) 88%,transparent)!important;
+  border-radius:22px!important;
+  overflow:visible;
+  background:
+    radial-gradient(circle at 22% 0,color-mix(in srgb,var(--accent) 9%,transparent),transparent 25%),
+    linear-gradient(180deg,color-mix(in srgb,var(--panelSolid) 87%,transparent),color-mix(in srgb,var(--panelSolid) 73%,transparent))!important;
+  -webkit-backdrop-filter:blur(34px) saturate(1.48)!important;
+  backdrop-filter:blur(34px) saturate(1.48)!important;
+  box-shadow:
+    inset 0 1px color-mix(in srgb,#fff 28%,transparent),
+    inset -1px 0 color-mix(in srgb,#fff 8%,transparent),
+    0 18px 54px rgba(11,20,38,.14)!important;
+}
+.hotelOs>aside:before{
+  border-radius:22px 22px 0 0;
+  opacity:.8;
+}
+.hotelOs>aside>div:first-child{
+  border-bottom-color:color-mix(in srgb,var(--line) 70%,transparent)!important;
+}
+.hotelOs>aside nav{
+  scrollbar-width:thin;
+  scrollbar-color:color-mix(in srgb,var(--accent) 22%,transparent) transparent;
+}
+.hotelOs>aside nav small{
+  letter-spacing:.16em!important;
+  opacity:.72;
+}
+.hotelOs>aside nav button{
+  -webkit-tap-highlight-color:transparent;
+}
+.hotelOs>aside nav button:focus-visible{
+  outline:2px solid color-mix(in srgb,var(--accent) 52%,transparent);
+  outline-offset:2px;
+}
+.hotelOs>aside>div:last-child{
+  border-top-color:color-mix(in srgb,var(--line) 70%,transparent)!important;
+}
+
+/* Barra de mando: flotante, compacta y siempre contextual. */
+.hotelOs>main>header{
+  top:7px!important;
+  height:58px!important;
+  margin:7px 10px 2px 4px;
+  border:1px solid color-mix(in srgb,var(--lineStrong) 86%,transparent)!important;
+  border-radius:18px!important;
+  background:
+    radial-gradient(circle at 86% -60%,color-mix(in srgb,var(--accent2) 11%,transparent),transparent 28%),
+    linear-gradient(90deg,color-mix(in srgb,var(--panelSolid) 86%,transparent),color-mix(in srgb,var(--panelSolid) 72%,transparent))!important;
+  -webkit-backdrop-filter:blur(34px) saturate(1.5)!important;
+  backdrop-filter:blur(34px) saturate(1.5)!important;
+  box-shadow:
+    inset 0 1px color-mix(in srgb,#fff 34%,transparent),
+    0 12px 36px rgba(12,23,43,.11)!important;
+}
+.hotelOs>main>header:after{
+  content:"";
+  position:absolute;
+  left:16px;
+  right:16px;
+  bottom:-1px;
+  height:1px;
+  pointer-events:none;
+  background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--accent) 22%,transparent),transparent);
+}
+.hotelOs>main>header>div:first-child b{
+  letter-spacing:-.02em;
+}
+.hotelOs>main>header>button{
+  border-color:color-mix(in srgb,var(--lineStrong) 86%,transparent)!important;
+  border-radius:14px!important;
+  background:color-mix(in srgb,var(--panelSolid) 58%,transparent)!important;
+  box-shadow:inset 0 1px color-mix(in srgb,#fff 25%,transparent)!important;
+}
+.hotelOs>main>header>button:hover{
+  border-color:color-mix(in srgb,var(--accent) 30%,var(--line))!important;
+  background:color-mix(in srgb,var(--accent) 4%,var(--panelSolid))!important;
+  box-shadow:inset 0 1px color-mix(in srgb,#fff 34%,transparent),0 7px 20px var(--hl-os-glow)!important;
+}
+
+/* Acciones principales: cápsulas táctiles, no botones genéricos. */
+.hotelOs>main>header>div:last-child>button:last-child{
+  position:relative;
+  overflow:hidden;
+  min-height:38px;
+  border-radius:13px!important;
+  border:1px solid color-mix(in srgb,#fff 20%,transparent)!important;
+  background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 94%,#fff),var(--accent2))!important;
+  box-shadow:0 10px 25px color-mix(in srgb,var(--accent) 26%,transparent),inset 0 1px rgba(255,255,255,.36)!important;
+}
+.hotelOs>main>header>div:last-child>button:last-child:before{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:linear-gradient(115deg,rgba(255,255,255,.18),transparent 34%,transparent 66%,rgba(255,255,255,.08));
+}
+.hotelOs>main>header>div:last-child>button:last-child:hover{
+  transform:translateY(-1px) scale(1.01);
+  box-shadow:0 13px 32px color-mix(in srgb,var(--accent) 34%,transparent),inset 0 1px rgba(255,255,255,.42)!important;
+}
+
+/* En modo oscuro el vidrio gana profundidad en vez de quedar negro plano. */
+.hotelOs:global([data-theme="dark"]){
+  --surface:var(--panelSolid);
+  --surface-soft:var(--panel);
+  --border:var(--line);
+  background:
+    radial-gradient(circle at 72% -10%,rgba(113,92,255,.15),transparent 30%),
+    radial-gradient(circle at 20% 18%,rgba(37,114,214,.09),transparent 26%),
+    radial-gradient(circle at 86% 74%,rgba(25,145,128,.045),transparent 25%),
+    linear-gradient(180deg,#070c15,#09111e 53%,#08101b)!important;
+}
+.hotelOs:global([data-theme="dark"])>aside{
+  border-color:rgba(159,179,218,.14)!important;
+  background:
+    radial-gradient(circle at 24% -2%,rgba(122,104,255,.13),transparent 27%),
+    linear-gradient(180deg,rgba(17,27,46,.9),rgba(12,20,35,.82))!important;
+  box-shadow:inset 0 1px rgba(255,255,255,.055),0 22px 60px rgba(0,0,0,.28)!important;
+}
+.hotelOs:global([data-theme="dark"])>main>header{
+  border-color:rgba(159,179,218,.13)!important;
+  background:
+    radial-gradient(circle at 84% -55%,rgba(126,105,255,.14),transparent 30%),
+    linear-gradient(90deg,rgba(16,26,44,.9),rgba(13,22,38,.82))!important;
+  box-shadow:inset 0 1px rgba(255,255,255,.05),0 15px 42px rgba(0,0,0,.22)!important;
+}
+.hotelOs:global([data-theme="dark"])>main>header>button{
+  background:rgba(8,15,27,.48)!important;
+}
+
+@media(max-width:900px){
+  .hotelOs>aside{margin-left:6px;margin-right:3px;border-radius:18px!important}
+  .hotelOs>main>header{margin-right:7px;margin-left:3px;border-radius:16px!important}
+}
+@media(max-width:640px){
+  .hotelOs>aside{display:none!important}
+  .hotelOs>main>header{top:0!important;height:58px!important;margin:0;border-width:0 0 1px!important;border-radius:0!important}
+  .hotelOs:before{display:none}
+}
+@media(prefers-reduced-motion:reduce){
+  .hotelOs>main>header>div:last-child>button:last-child:hover{transform:none}
+}
