@@ -9,6 +9,7 @@ export default function PmsIcon({name,size=17,className=""}){
   if(name==="sliders")return <svg {...common}><path d="M4 6h6M14 6h6M4 12h2M10 12h10M4 18h9M17 18h3"/><circle cx="12" cy="6" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="15" cy="18" r="2"/></svg>
   if(name==="search")return <svg {...common}><circle cx="10.5" cy="10.5" r="6.2"/><path d="m15.2 15.2 4.3 4.3"/></svg>
   if(name==="plus")return <svg {...common}><path d="M12 5v14M5 12h14"/></svg>
+  if(name==="info")return <svg {...common}><circle cx="12" cy="12" r="9"/><path d="M12 10.5V17M12 7h.01"/></svg>
   if(name==="eye")return <svg {...common}><path d="M2.8 12s3.3-5.4 9.2-5.4 9.2 5.4 9.2 5.4-3.3 5.4-9.2 5.4S2.8 12 2.8 12Z"/><circle cx="12" cy="12" r="2.4"/></svg>
   if(name==="ban")return <svg {...common}><circle cx="12" cy="12" r="8.5"/><path d="m6 6 12 12"/></svg>
   if(name==="recycle")return <svg {...common}><path d="M7.2 7.1A7.5 7.5 0 0 1 19 9M19 5.5V9h-3.5M16.8 16.9A7.5 7.5 0 0 1 5 15M5 18.5V15h3.5"/></svg>
