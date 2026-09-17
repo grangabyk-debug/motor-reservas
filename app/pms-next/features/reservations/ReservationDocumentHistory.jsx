@@ -1,6 +1,7 @@
 "use client"
 
-import{useMemo,useState}from"react"
+import{useEffect,useMemo,useState}from"react"
+import{createPortal}from"react-dom"
 import{supabase}from"../../../../lib/supabase"
 import s from"./reservationFolioBilling.module.css"
 
@@ -104,6 +105,8 @@ export default function ReservationDocumentHistory({documents,selected,reservati
 }
 
 function DocumentPreview({doc,reservation,onClose}){
+  const[portalRoot,setPortalRoot]=useState(null)
+  useEffect(()=>{if(typeof document==="undefined"){setPortalRoot(null);return}setPortalRoot(document.querySelector("[data-theme]")||document.body)},[])
   const rows=Array.isArray(doc?.items)?doc.items:[]
   const currency=doc?.currency||reservation?.moneda||"ARS"
   const total=Math.max(0,Number(doc?.total)||0)
@@ -111,7 +114,8 @@ function DocumentPreview({doc,reservation,onClose}){
   const applied=Math.max(0,total-balance)
   const billing=doc?.billing_to||{}
   const title=doc?.status==="draft"?`Borrador de ${docLabel(doc).toLowerCase()}`:`${docLabel(doc)} ${docNumber(doc)}`
-  return <div className={s.overlay} onMouseDown={event=>event.target===event.currentTarget&&onClose?.()}><div className={`${s.modal} ${s.invoiceModal}`} role="dialog" aria-modal="true" aria-label={title}>
+  if(!portalRoot)return null
+  const preview=<div className={s.overlay} onMouseDown={event=>event.target===event.currentTarget&&onClose?.()}><div className={`${s.modal} ${s.invoiceModal}`} role="dialog" aria-modal="true" aria-label={title} style={{width:"min(1180px,calc(100vw - 40px))",maxHeight:"calc(100dvh - 40px)",padding:24}}>
     <button className={s.close} type="button" onClick={onClose}>×</button>
     <small>{docLabel(doc).toUpperCase()} · {STATUS_LABELS[doc.status]||doc.status||"Documento"}</small>
     <h2>{title}</h2>
@@ -124,6 +128,7 @@ function DocumentPreview({doc,reservation,onClose}){
     {doc.status==="draft"?<div style={{marginTop:10,padding:"9px 11px",border:"1px solid var(--line)",borderRadius:11,fontSize:9.5,color:"var(--muted)",lineHeight:1.45}}>Este comprobante está en <b style={{color:"var(--text)"}}>borrador</b>. Podés revisarlo, pero todavía no tiene numeración fiscal ni se considera emitido.</div>:null}
     <div className={s.documentActions}><button type="button" className={s.primary} onClick={onClose}>Cerrar</button></div>
   </div></div>
+  return createPortal(preview,portalRoot)
 }
 
 function PreviewStat({label,value,strong=false}){return <div style={{padding:"8px 10px",border:"1px solid var(--line)",borderRadius:11,background:"var(--panelSolid)",display:"flex",justifyContent:"space-between",gap:8,alignItems:"center",fontSize:9.5}}><span style={{color:"var(--muted)",fontWeight:800}}>{label}</span>{strong?<strong style={{fontSize:11}}>{value}</strong>:<b>{value}</b>}</div>}
