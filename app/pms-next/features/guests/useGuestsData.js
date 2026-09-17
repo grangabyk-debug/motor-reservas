@@ -12,6 +12,7 @@ const todayKey=()=>new Date().toLocaleDateString("en-CA")
 const nightsBetween=(from,to)=>{const a=new Date(`${from}T12:00:00`),b=new Date(`${to}T12:00:00`);return Number.isNaN(a.getTime())||Number.isNaN(b.getTime())?0:Math.max(0,Math.round((b-a)/86400000))}
 const emptyStats=profile=>({stays:0,nights:0,spent:0,spentByCurrency:{},lastStay:profile?.last_stay_at||null,nextStay:null,currentStay:null,channelCounts:{},dominantChannel:"",lastChannel:"",otaStays:0,bookingStays:0,directStays:0,groupStays:0})
 const cleanSearch=value=>String(value||"").trim().replace(/[,%()]/g," ").replace(/\s+/g," ").slice(0,80)
+const PROFILE_FIELDS="id,full_name,email,phone,document_type,document_number,birth_date,nationality,language,address,city,province,country,preferences,tags,vip_level,status,notes,last_stay_at,created_at,updated_at,merged_into_id"
 
 export default function useGuestsData(propertyId,searchTerm=""){
   const[profiles,setProfiles]=useState([])
@@ -26,7 +27,7 @@ export default function useGuestsData(propertyId,searchTerm=""){
     setError("")
     try{
       const term=cleanSearch(searchTerm)
-      let profileQuery=supabase.from("hotel_guest_profiles").select("id,full_name,email,phone,document_type,document_number,birth_date,nationality,language,address,city,province,country,preferences,tags,vip_level,status,notes,last_stay_at,created_at,updated_at",{count:"exact"}).eq("property_id",propertyId).order("last_stay_at",{ascending:false,nullsFirst:false}).order("full_name").limit(term?SEARCH_LIMIT:LIST_LIMIT)
+      let profileQuery=supabase.from("hotel_guest_profiles").select(PROFILE_FIELDS,{count:"exact"}).eq("property_id",propertyId).is("merged_into_id",null).order("last_stay_at",{ascending:false,nullsFirst:false}).order("full_name").limit(term?SEARCH_LIMIT:LIST_LIMIT)
       if(term.length>=2)profileQuery=profileQuery.or(`full_name.ilike.%${term}%,email.ilike.%${term}%,phone.ilike.%${term}%,document_number.ilike.%${term}%`)
       const profileRes=await profileQuery
       if(profileRes.error)throw profileRes.error
@@ -82,9 +83,26 @@ export default function useGuestsData(propertyId,searchTerm=""){
   },[propertyId])
 
   const updateGuest=useCallback(async(id,patch)=>{
-    const{data,error:updateError}=await supabase.from("hotel_guest_profiles").update({...patch,updated_at:new Date().toISOString()}).eq("id",id).eq("property_id",propertyId).select().single();if(updateError)throw updateError
+    const{data,error:updateError}=await supabase.from("hotel_guest_profiles").update({...patch,updated_at:new Date().toISOString()}).eq("id",id).eq("property_id",propertyId).is("merged_into_id",null).select().single();if(updateError)throw updateError
     setProfiles(list=>list.map(item=>item.id===data.id?data:item));return data
   },[propertyId])
 
-  return{guests,reservations,totalProfiles,limited:totalProfiles>profiles.length,loading,error,setError,load,createGuest,updateGuest}
+  const searchMergeCandidates=useCallback(async(term,excludeId)=>{
+    const needle=cleanSearch(term)
+    let query=supabase.from("hotel_guest_profiles").select(PROFILE_FIELDS).eq("property_id",propertyId).is("merged_into_id",null).neq("id",excludeId).order("last_stay_at",{ascending:false,nullsFirst:false}).limit(30)
+    if(needle.length>=2)query=query.or(`full_name.ilike.%${needle}%,email.ilike.%${needle}%,phone.ilike.%${needle}%,document_number.ilike.%${needle}%`)
+    const{data,error:searchError}=await query
+    if(searchError)throw searchError
+    return data||[]
+  },[propertyId])
+
+  const mergeGuest=useCallback(async(primaryId,duplicateId)=>{
+    setError("")
+    const{data:result,error:mergeError}=await supabase.rpc("hl_merge_guest_profiles",{p_property_id:propertyId,p_primary_profile_id:primaryId,p_duplicate_profile_id:duplicateId})
+    if(mergeError)throw mergeError
+    await load(true)
+    return result
+  },[propertyId,load])
+
+  return{guests,reservations,totalProfiles,limited:totalProfiles>profiles.length,loading,error,setError,load,createGuest,updateGuest,searchMergeCandidates,mergeGuest}
 }
