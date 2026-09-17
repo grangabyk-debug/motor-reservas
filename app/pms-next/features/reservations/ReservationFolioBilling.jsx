@@ -317,12 +317,9 @@ export default function ReservationFolioBilling({reservation,propertyId,property
         <div data-tone={balance>.01?"rose":"green"}><span>Saldo</span><b>{money(balance,selected.currency)}</b></div>
       </div>
 
-      <div className={s.folioMeta}>
-        <span><b>{selected.label}</b> · {payerLabels[selected.payer_type]||selected.payer_type}{selected.payer_name?` · ${selected.payer_name}`:""}</span>
-        <div>
-          {selected.folio_type==="master"&&folios.length>2?<button type="button" onClick={consolidate} disabled={saving}>Consolidar grupo</button>:null}
-          <small>{selectedItems.size?`${selectedItems.size} consumo${selectedItems.size===1?"":"s"} seleccionado${selectedItems.size===1?"":"s"} para facturar parcialmente`:"Seleccioná consumos si querés facturar sólo una parte."}</small>
-        </div>
+      <div className={s.folioMeta} style={{display:"flex",alignItems:"center",justifyContent:"flex-start",gap:10,minHeight:36,padding:"6px 9px"}}>
+        {selected.folio_type==="master"&&folios.length>2?<button type="button" onClick={consolidate} disabled={saving} style={{flex:"0 0 auto",margin:0}}>Consolidar grupo</button>:null}
+        <small style={{whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",textAlign:"left",margin:0}}>{selectedItems.size?`${selectedItems.size} consumo${selectedItems.size===1?"":"s"} seleccionado${selectedItems.size===1?"":"s"} para facturar parcialmente`:"Seleccioná consumos si querés facturar sólo una parte."}</small>
       </div>
 
       <div className={s.itemList}>
