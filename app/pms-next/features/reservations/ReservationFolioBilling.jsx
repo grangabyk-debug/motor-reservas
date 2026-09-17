@@ -6,6 +6,7 @@ import s from"./reservationFolioBilling.module.css"
 import ReservationInvoiceDialog from"./ReservationInvoiceDialog"
 import ReservationDocumentHistory from"./ReservationDocumentHistory"
 import{printReservationFolio}from"./reservationFolioPrint"
+import{buildFolioInvoiceCoverage,folioItemBillingState,remainingInvoiceGross}from"./reservationBillingCoverage"
 
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:2}).format(Number(value)||0)
 const fmtDate=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short"}).format(new Date(`${String(value).slice(0,10)}T12:00:00`)).replace(".",""):"—"
@@ -114,8 +115,8 @@ export default function ReservationFolioBilling({reservation,propertyId,property
   const folioAllocations=selected?allocations.filter(row=>row.folio_id===selected.id):[]
   const folioPaymentIds=new Set(folioAllocations.map(row=>Number(row.payment_id)))
   const folioPayments=payments.filter(row=>folioPaymentIds.has(Number(row.id)))
-  const draftReservedIds=useMemo(()=>new Set(documents.filter(doc=>doc.status==="draft"&&doc.document_type==="invoice").flatMap(doc=>Array.isArray(doc.folio_item_ids)?doc.folio_item_ids:[])),[documents])
-  const invoiceableItems=folioItems.filter(row=>!row.invoice_document_id&&!draftReservedIds.has(row.id))
+  const invoiceCoverage=useMemo(()=>buildFolioInvoiceCoverage({items:activeItems,documents,folioId:selected?.id}),[activeItems,documents,selected?.id])
+  const invoiceableItems=folioItems.filter(row=>remainingInvoiceGross(row,invoiceCoverage.get(row.id))>.009)
   const checkedInvoiceItems=invoiceableItems.filter(row=>selectedItems.has(row.id))
   const unallocatedPayments=payments.map(row=>({...row,remaining:Math.max(0,netPayment(row)-(allocationByPayment.get(Number(row.id))||0))})).filter(row=>row.remaining>.009)
   const balance=selectedStats.charges-selectedStats.paid
@@ -140,8 +141,10 @@ export default function ReservationFolioBilling({reservation,propertyId,property
       const quantity=Math.max(.0001,Number(row.quantity||1))
       const taxRate=Math.max(0,Number(row.tax_rate||0))
       const storedSubtotal=Number(row.subtotal)
+      const remainingGross=remainingInvoiceGross(row,invoiceCoverage.get(row.id))
       let unitPrice=Number(row.unit_price||0)
-      if(Number.isFinite(storedSubtotal)&&storedSubtotal!==0)unitPrice=storedSubtotal/quantity
+      if(remainingGross>0&&remainingGross<Math.max(0,Number(row.total||0))-.009)unitPrice=remainingGross/(1+taxRate/100)/quantity
+      else if(Number.isFinite(storedSubtotal)&&storedSubtotal!==0)unitPrice=storedSubtotal/quantity
       else if(!unitPrice&&Number(row.total||0)!==0)unitPrice=Number(row.total||0)/(1+taxRate/100)/quantity
       return{folio_item_id:row.id,description:row.description||typeLabels[row.source_type]||"Cargo",detail:row.detail||null,source_type:row.source_type,quantity,unit_price:unitPrice,tax_rate:taxRate}
     })
@@ -324,13 +327,14 @@ export default function ReservationFolioBilling({reservation,propertyId,property
 
       <div className={s.itemList}>
         {folioItems.length?folioItems.map(row=>{
-          const invoiceable=!row.invoice_document_id&&!draftReservedIds.has(row.id)
+          const coverage=invoiceCoverage.get(row.id),billing=folioItemBillingState(row,coverage),invoiceable=billing.remaining>.009,movable=billing.covered<=.009&&!row.invoice_document_id
+          const title=billing.key==="draft"?`${money(billing.draft,row.currency)} en factura borrador`:billing.key==="partial"?`${money(billing.issued,row.currency)} facturado de ${money(row.total,row.currency)}`:billing.label
           return <div className={s.itemRow} key={row.id}>
             <label className={s.check}><input type="checkbox" checked={selectedItems.has(row.id)} disabled={!invoiceable} onChange={()=>toggleItem(row.id)}/></label>
             <div className={s.itemMain}><b>{row.description}</b><small>{fmtDate(row.service_date)} · {typeLabels[row.source_type]||row.source_type}{row.detail?` · ${row.detail}`:""}</small></div>
             <strong>{money(row.total,row.currency)}</strong>
-            <span className={`${s.itemStatus} ${row.invoice_document_id?s.invoiced:draftReservedIds.has(row.id)?s.draft:""}`}>{row.invoice_document_id?"Facturado":draftReservedIds.has(row.id)?"En borrador":"Pendiente"}</span>
-            {invoiceable&&folios.length>1?<select value={row.folio_id} disabled={saving} onChange={event=>moveItem(row,event.target.value)} aria-label="Mover consumo a otro folio">{folios.map(folio=><option key={folio.id} value={folio.id}>{folio.label}</option>)}</select>:<span/>}
+            <span title={title} className={`${s.itemStatus} ${billing.key==="invoiced"?s.invoiced:billing.key==="draft"?s.draft:billing.key==="partial"?s.partial:""}`}>{billing.label}</span>
+            {movable&&folios.length>1?<select value={row.folio_id} disabled={saving} onChange={event=>moveItem(row,event.target.value)} aria-label="Mover consumo a otro folio">{folios.map(folio=><option key={folio.id} value={folio.id}>{folio.label}</option>)}</select>:<span/>}
           </div>
         }):<div className={s.empty}>Este folio todavía no tiene consumos. Podés mover cargos desde otra habitación o usarlo como folio de empresa/grupo.</div>}
       </div>
