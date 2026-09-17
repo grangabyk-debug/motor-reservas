@@ -41,6 +41,7 @@
 .itemStatus{padding:4px 6px;border-radius:999px;background:color-mix(in srgb,var(--gold) 12%,var(--panelSolid));color:#8a6500;font-size:10px;font-weight:900;text-transform:uppercase;white-space:nowrap}
 .itemStatus.invoiced{background:color-mix(in srgb,var(--green) 12%,var(--panelSolid));color:#18794e}
 .itemStatus.draft{background:color-mix(in srgb,var(--accent) 10%,var(--panelSolid));color:var(--accent)}
+.itemStatus.partial{background:color-mix(in srgb,#5d8df6 10%,var(--panelSolid));color:#4169b8}
 .itemRow select{min-width:0;width:100%;height:27px;border:1px solid var(--line);border-radius:7px;padding:0 6px;background:var(--panelSolid);color:var(--text);font:inherit;font-size:10px;outline:none}
 .unallocated{margin:8px 10px 0;border:1px solid color-mix(in srgb,var(--gold) 22%,var(--line));border-radius:11px;background:linear-gradient(145deg,color-mix(in srgb,#ffe9a9 18%,var(--panelSolid)),var(--panelSolid));overflow:hidden}
 .unallocated header{padding:7px 9px;border-bottom:1px solid color-mix(in srgb,var(--gold) 16%,var(--line))}
