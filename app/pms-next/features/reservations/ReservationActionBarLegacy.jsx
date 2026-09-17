@@ -13,7 +13,6 @@ const roomNames=rooms=>(rooms||[]).map(room=>room.nombre).filter(Boolean).join("
 
 function Icon({name}){
   const common={viewBox:"0 0 24 24",width:18,height:18,fill:"none",stroke:"currentColor",strokeWidth:1.8,strokeLinecap:"round",strokeLinejoin:"round","aria-hidden":true}
-  if(name==="group")return <svg {...common}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
   if(name==="key")return <svg {...common}><circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 8-8M15 8l2 2M17 6l2 2"/></svg>
   if(name==="guest")return <svg {...common}><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/><path d="M17.5 4.5 20 7"/></svg>
   if(name==="card")return <svg {...common}><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 9h19M6 15h4"/></svg>
@@ -29,10 +28,8 @@ function Modal({title,subtitle,onClose,children}){
 
 export default function ReservationActionBar({item,rooms=[],propertyId,onRefresh}){
   const[panel,setPanel]=useState(""),[notice,setNotice]=useState(""),[error,setError]=useState(""),[busy,setBusy]=useState(""),[guestRows,setGuestRows]=useState([]),[access,setAccess]=useState({points:[],grants:[]})
-  const isGroup=(rooms||[]).length>1||((item.habitaciones_ids||[]).length>1)
-  const styles={group:"#7257d9",key:"#b47a18",guest:"#3d72d9",card:"#59677f",email:"#4e6b86",whatsapp:"#1c9b60",phone:"#3b95c8",police:"#a34c58"}
+  const styles={key:"#b47a18",guest:"#3d72d9",card:"#59677f",email:"#4e6b86",whatsapp:"#1c9b60",phone:"#3b95c8",police:"#a34c58"}
   const actions=[
-    ["group","Gestionar grupo","group"],
     ["key","Control de accesos","key"],
     ["guest","Huéspedes y acompañantes","guest"],
     ["card","Tarjeta / garantía","card"],
@@ -106,8 +103,6 @@ export default function ReservationActionBar({item,rooms=[],propertyId,onRefresh
     {panel==="email"?<ReservationEmailDialog item={item} rooms={rooms} propertyId={propertyId} onClose={()=>setPanel("")} onSent={message=>{setPanel("");setError("");setNotice(message||"Email enviado al huésped.")}}/>:null}
     {panel==="guest"?<ReservationGuestPanel item={item} rooms={rooms} propertyId={propertyId} onClose={()=>setPanel("")} onSaved={()=>{onRefresh?.();loadGuests().catch(()=>{})}}/>:null}
     {panel==="card"?<ReservationGuaranteePanel item={item} propertyId={propertyId} onClose={()=>setPanel("")} onChanged={onRefresh}/>:null}
-
-    {panel==="group"?<Modal title="Gestionar grupo" subtitle="Resumen operativo del conjunto de habitaciones y huéspedes vinculados a esta reserva." onClose={()=>setPanel("")}><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>{[["Habitaciones",rooms.length||1],["Huéspedes",item.cantidad_huespedes||1],["Tipo",isGroup?"Reserva grupal":"Reserva individual"]].map(([label,value])=><div key={label} style={{padding:11,border:"1px solid var(--line)",borderRadius:11,background:"var(--panelSolid)"}}><small style={{display:"block",fontSize:9,color:"var(--muted)"}}>{label}</small><b style={{display:"block",marginTop:4,fontSize:12}}>{value}</b></div>)}</div><p style={{margin:"11px 0 0",fontSize:10.5,lineHeight:1.5,color:"var(--muted)"}}>{isGroup?`Habitaciones vinculadas: ${roomNames(rooms)}. La edición detallada del grupo la dejamos para el siguiente paso, sin tocar ahora la ficha.`:"Esta reserva no pertenece a un grupo. El botón queda disponible para cuando armemos la gestión grupal completa."}</p></Modal>:null}
 
     {panel==="key"?<Modal title="Control de accesos" subtitle="Estado de llaves/PIN asociados a las habitaciones de la reserva." onClose={()=>setPanel("")}>{error?<div style={{padding:9,borderRadius:9,background:"color-mix(in srgb,var(--red) 7%,var(--panelSolid))",color:"var(--red)",fontSize:10.5,fontWeight:800}}>{error}</div>:null}<div style={{display:"grid",gap:8}}>{rooms.map(room=>{const point=access.points.find(p=>Number(p.room_id)===Number(room.id));return <div key={room.id} style={{padding:11,border:"1px solid var(--line)",borderRadius:11,background:"var(--panelSolid)",display:"flex",justifyContent:"space-between",gap:12}}><span><b style={{fontSize:11.5}}>Hab. {room.nombre}</b><small style={{display:"block",marginTop:3,fontSize:9.5,color:"var(--muted)"}}>{point?`${point.name||"Acceso"} · ${point.provider||"manual"}`:"Sin punto de acceso configurado"}</small></span><strong style={{fontSize:10,color:point?.active!==false?"#278452":"var(--muted)"}}>{point?.active!==false&&point?"Disponible":"Pendiente"}</strong></div>})}</div>{access.grants.length?<div style={{marginTop:10,padding:10,border:"1px solid var(--line)",borderRadius:11}}><b style={{fontSize:11}}>Llaves/PIN emitidos</b>{access.grants.map(grant=><div key={grant.id} style={{display:"flex",justifyContent:"space-between",gap:10,marginTop:7,fontSize:10}}><span>{grant.pin_code?`PIN ${grant.pin_code}`:"Acceso digital"}</span><span style={{color:"var(--muted)"}}>{grant.status}</span></div>)}</div>:<p style={{margin:"10px 0 0",fontSize:10.5,color:"var(--muted)"}}>Todavía no hay una llave o PIN emitido. La emisión completa la hacemos cuando terminemos este bloque de reservas.</p>}</Modal>:null}
 
