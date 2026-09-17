@@ -226,6 +226,30 @@ export default function PmsNextPage(){
         100%{opacity:0;visibility:hidden;pointer-events:none}
       }
     }
+    [aria-label="Rooming por habitación"] select:focus,
+    [aria-label="Rooming por habitación"] select:focus-visible{
+      outline:none!important;
+      box-shadow:none!important;
+    }
+    [aria-label="Rooming por habitación"] article>div:nth-child(2)>label>select:focus,
+    [aria-label="Rooming por habitación"] article>div:nth-child(2)>label>select:focus-visible{
+      border-color:var(--line)!important;
+      outline:none!important;
+      box-shadow:none!important;
+    }
+    [aria-label="Rooming por habitación"] [data-bed-control]:focus-within{
+      border-color:var(--line)!important;
+      box-shadow:none!important;
+      outline:none!important;
+    }
+    [aria-label="Rooming por habitación"] [data-bed-control] select:focus,
+    [aria-label="Rooming por habitación"] [data-bed-control] select:focus-visible{
+      border:0!important;
+      border-radius:0!important;
+      background:transparent!important;
+      outline:none!important;
+      box-shadow:none!important;
+    }
     @media(min-width:761px){
       [aria-label="Rooming por habitación"] article>div:nth-child(2){
         display:grid!important;
