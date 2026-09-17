@@ -1,0 +1,40 @@
+"use client"
+
+import{useEffect,useRef,useState}from"react"
+
+export default function ReservationStayActions({item,saving=false,onPrimary,onNoShow,onCancel}){
+  const[open,setOpen]=useState(false)
+  const rootRef=useRef(null)
+  const isCheckout=item?.estado==="alojado"
+  const isClosed=item?.estado==="finalizada"||item?.estado==="cancelada"
+  const primaryDisabled=saving||Boolean(item?.no_show)||isClosed
+  const noShowDisabled=saving||isCheckout||item?.estado==="finalizada"||item?.estado==="cancelada"
+  const canCancel=item?.estado!=="cancelada"&&!item?.no_show&&item?.estado!=="finalizada"
+
+  useEffect(()=>{setOpen(false)},[item?.id])
+  useEffect(()=>{
+    if(!open)return
+    const onPointer=event=>{if(!rootRef.current?.contains(event.target))setOpen(false)}
+    const onKey=event=>{if(event.key==="Escape")setOpen(false)}
+    document.addEventListener("mousedown",onPointer)
+    document.addEventListener("keydown",onKey)
+    return()=>{document.removeEventListener("mousedown",onPointer);document.removeEventListener("keydown",onKey)}
+  },[open])
+
+  const mainStyle={height:36,minWidth:108,padding:"0 12px",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:7,border:"1px solid color-mix(in srgb,var(--accent) 34%,var(--line))",borderRadius:10,background:isCheckout?"linear-gradient(145deg,#ec6370,#bd3947)":"linear-gradient(145deg,#31bc6b,#159447)",color:"#fff",font:"inherit",fontSize:11,fontWeight:900,cursor:primaryDisabled?"not-allowed":"pointer",boxShadow:isCheckout?"0 7px 18px rgba(189,57,71,.20)":"0 7px 18px rgba(21,148,71,.18)",opacity:primaryDisabled?.5:1}
+  const menuButton={width:"100%",minHeight:36,padding:"8px 10px",border:0,borderRadius:8,background:"transparent",color:"var(--text)",font:"inherit",fontSize:10.5,fontWeight:800,textAlign:"left",cursor:"pointer"}
+
+  function run(callback){setOpen(false);callback?.()}
+
+  return <div ref={rootRef} style={{position:"relative",display:"inline-flex"}}>
+    <button type="button" aria-haspopup="menu" aria-expanded={open} disabled={primaryDisabled} onClick={()=>setOpen(value=>!value)} style={mainStyle}>
+      <span>{isCheckout?"Check-out":"Check-in"}</span>
+      <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+    </button>
+    {open?<div role="menu" style={{position:"absolute",right:0,top:"calc(100% + 7px)",zIndex:260,width:190,padding:6,border:"1px solid var(--line)",borderRadius:12,background:"color-mix(in srgb,var(--panelSolid) 97%,transparent)",boxShadow:"0 18px 46px rgba(18,30,52,.18)",backdropFilter:"blur(18px)",WebkitBackdropFilter:"blur(18px)"}}>
+      <button type="button" role="menuitem" onClick={()=>run(onPrimary)} style={menuButton}>{isCheckout?"Hacer check-out":"Hacer check-in"}</button>
+      <button type="button" role="menuitem" disabled={noShowDisabled&&!item?.no_show} onClick={()=>run(onNoShow)} style={{...menuButton,color:item?.no_show?"var(--text)":"#9a5b18",opacity:noShowDisabled&&!item?.no_show?.45:1,cursor:noShowDisabled&&!item?.no_show?"not-allowed":"pointer"}}>{item?.no_show?"Reabrir No Show":"Marcar No Show"}</button>
+      {canCancel?<><div style={{height:1,margin:"4px 3px",background:"var(--line)"}}/><button type="button" role="menuitem" disabled={saving} onClick={()=>run(onCancel)} style={{...menuButton,color:"#c24850",cursor:saving?"not-allowed":"pointer",opacity:saving?.5:1}}>Cancelar reserva</button></>:null}
+    </div>:null}
+  </div>
+}
