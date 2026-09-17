@@ -319,7 +319,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
 
       <div className={s.folioMeta} style={{display:"flex",alignItems:"center",justifyContent:"flex-start",gap:10,minHeight:36,padding:"6px 9px"}}>
         {selected.folio_type==="master"&&folios.length>2?<button type="button" onClick={consolidate} disabled={saving} style={{flex:"0 0 auto",margin:0}}>Consolidar grupo</button>:null}
-        <small style={{whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",textAlign:"left",margin:0}}>{selectedItems.size?`${selectedItems.size} consumo${selectedItems.size===1?"":"s"} seleccionado${selectedItems.size===1?"":"s"} para facturar parcialmente`:"Seleccioná consumos si querés facturar sólo una parte."}</small>
+        <small style={{flex:"1 1 auto",minWidth:0,whiteSpace:"nowrap",textAlign:"left",margin:0,fontSize:"9px",letterSpacing:"-.01em"}}>{selectedItems.size?`${selectedItems.size} consumo${selectedItems.size===1?"":"s"} seleccionado${selectedItems.size===1?"":"s"} para facturar parcialmente`:"Seleccioná consumos si querés facturar sólo una parte."}</small>
       </div>
 
       <div className={s.itemList}>
