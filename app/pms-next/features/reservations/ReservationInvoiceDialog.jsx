@@ -1,6 +1,7 @@
 "use client"
 
 import{useEffect,useState}from"react"
+import{createPortal}from"react-dom"
 import{supabase}from"../../../../lib/supabase"
 import s from"./reservationFolioBilling.module.css"
 
@@ -45,10 +46,10 @@ export default function ReservationInvoiceDialog({
     loadTax()
     return()=>{cancelled=true}
   },[open,reservation?.id,reservation?.property_id])
-  if(!open||!selected)return null
+  if(!open||!selected||typeof document==="undefined")return null
   function changeTaxCondition(value){const rate=taxRateFor(value,reservation,taxConfig);setTaxCondition(value);setInvoiceLines(current=>current.map(line=>({...line,tax_rate:rate})))}
-  return <div className={s.overlay} onMouseDown={event=>event.target===event.currentTarget&&onClose()}>
-    <div className={`${s.modal} ${s.invoiceModal}`}>
+  const dialog=<div className={s.overlay} role="dialog" aria-modal="true" aria-label="Crear factura o documento" onMouseDown={event=>event.target===event.currentTarget&&onClose()}>
+    <div className={`${s.modal} ${s.invoiceModal}`} style={{width:"min(1180px,calc(100vw - 40px))",maxHeight:"calc(100dvh - 40px)",padding:24}}>
       <button className={s.close} onClick={onClose}>×</button>
       <small>NUEVO DOCUMENTO</small>
       <h2>Crear factura / documento</h2>
@@ -97,4 +98,5 @@ export default function ReservationInvoiceDialog({
       <div className={s.documentActions}><button className={s.primary} type="button" onClick={()=>prepareInvoice({taxCondition})} disabled={saving||(invoiceMode==="payment"&&!invoicePaymentId)}>{saving?"Guardando…":"Crear documento"}</button></div>
     </div>
   </div>
+  return createPortal(dialog,document.body)
 }
