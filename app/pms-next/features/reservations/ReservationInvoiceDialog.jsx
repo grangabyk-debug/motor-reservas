@@ -26,6 +26,11 @@ export default function ReservationInvoiceDialog({
 }){
   const[taxCondition,setTaxCondition]=useState("consumidor_final")
   const[taxConfig,setTaxConfig]=useState({enabled:true,rate:21})
+  const[portalRoot,setPortalRoot]=useState(null)
+  useEffect(()=>{
+    if(!open||typeof document==="undefined"){setPortalRoot(null);return}
+    setPortalRoot(document.querySelector("[data-theme]")||document.body)
+  },[open])
   useEffect(()=>{
     if(!open)return
     let cancelled=false
@@ -46,7 +51,7 @@ export default function ReservationInvoiceDialog({
     loadTax()
     return()=>{cancelled=true}
   },[open,reservation?.id,reservation?.property_id])
-  if(!open||!selected||typeof document==="undefined")return null
+  if(!open||!selected||!portalRoot)return null
   function changeTaxCondition(value){const rate=taxRateFor(value,reservation,taxConfig);setTaxCondition(value);setInvoiceLines(current=>current.map(line=>({...line,tax_rate:rate})))}
   const dialog=<div className={s.overlay} role="dialog" aria-modal="true" aria-label="Crear factura o documento" onMouseDown={event=>event.target===event.currentTarget&&onClose()}>
     <div className={`${s.modal} ${s.invoiceModal}`} style={{width:"min(1180px,calc(100vw - 40px))",maxHeight:"calc(100dvh - 40px)",padding:24}}>
@@ -98,5 +103,5 @@ export default function ReservationInvoiceDialog({
       <div className={s.documentActions}><button className={s.primary} type="button" onClick={()=>prepareInvoice({taxCondition})} disabled={saving||(invoiceMode==="payment"&&!invoicePaymentId)}>{saving?"Guardando…":"Crear documento"}</button></div>
     </div>
   </div>
-  return createPortal(dialog,document.body)
+  return createPortal(dialog,portalRoot)
 }
