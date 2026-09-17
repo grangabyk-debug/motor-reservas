@@ -7,7 +7,6 @@ import ReservationGroupCheckoutDialog from"./ReservationGroupCheckoutDialog"
 import ReservationInlineOperationsDialog from"./ReservationInlineOperationsDialog"
 import ReservationPaymentRequestPanel from"./ReservationPaymentRequestPanel"
 import ReservationAttachmentsPanel from"./ReservationAttachmentsPanel"
-import ReservationCommercialAccountPanel from"./ReservationCommercialAccountPanel"
 import ReservationDockActions from"./ReservationDockActions"
 import hotel from"./reservationHotelOs.module.css"
 
@@ -24,7 +23,6 @@ export default function ReservationRecord(props){
   function primaryAction(){if(isGroupCheckout){setGroupCheckoutOpen(true);return}onPrimaryAction?.()}
   function navigateFromRecord(target,options){if(["tasks","requests","housekeeping"].includes(target)){setOperationsMode(target);return}onNavigate?.(target,options)}
   return <div className={hotel.recordLayer}>
-    <ReservationCommercialAccountPanel item={item} propertyId={propertyId} onChanged={()=>setPaymentRevision(value=>value+1)}/>
     <ReservationRecordBase key={`${item?.id||"reservation"}:${paymentRevision}`} {...props} item={displayItem} onNavigate={navigateFromRecord} onPrimaryAction={primaryAction}/>
     <ReservationAttachmentsPanel item={item} propertyId={propertyId}/>
     <ReservationPaymentRequestPanel item={item} propertyId={propertyId} onChanged={()=>setPaymentRevision(value=>value+1)}/>
