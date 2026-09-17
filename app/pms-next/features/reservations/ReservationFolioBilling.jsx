@@ -114,7 +114,8 @@ export default function ReservationFolioBilling({reservation,propertyId,property
   const folioItems=selected?activeItems.filter(row=>row.folio_id===selected.id):[]
   const folioAllocations=selected?allocations.filter(row=>row.folio_id===selected.id):[]
   const folioPaymentIds=new Set(folioAllocations.map(row=>Number(row.payment_id)))
-  const folioPayments=payments.filter(row=>folioPaymentIds.has(Number(row.id)))
+  const usedInvoicePaymentIds=useMemo(()=>new Set(documents.filter(doc=>doc.document_type==="invoice"&&!["void","cancelled","cancelada","anulado","anulada"].includes(String(doc.status||"").toLowerCase())&&doc.payment_id).map(doc=>Number(doc.payment_id))),[documents])
+  const folioPayments=payments.filter(row=>folioPaymentIds.has(Number(row.id))&&!usedInvoicePaymentIds.has(Number(row.id)))
   const invoiceCoverage=useMemo(()=>buildFolioInvoiceCoverage({items:activeItems,documents,folioId:selected?.id}),[activeItems,documents,selected?.id])
   const invoiceableItems=folioItems.filter(row=>remainingInvoiceGross(row,invoiceCoverage.get(row.id))>.009)
   const checkedInvoiceItems=invoiceableItems.filter(row=>selectedItems.has(row.id))
