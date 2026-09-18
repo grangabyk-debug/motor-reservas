@@ -8,7 +8,7 @@ import{buildCashClosureReport,cashDual,cashFmt,cashMoney}from"./cashClosureRepor
 import{parseCashSessionMeta,serializeCashSessionMeta,suggestedCashShift}from"./cashSessionMeta"
 import s from"./cashActions.module.css"
 
-export default function DailyCashActionsMultiCurrency({propertyId,session,expectedArs=0,expectedUsd=0,focusReservationId,onFocusHandled,onChanged}){
+export default function DailyCashActionsMultiCurrency({propertyId,session,expectedArs=0,expectedUsd=0,focusReservationId,onFocusHandled,onChanged,onNavigate}){
   const[paymentOpen,setPaymentOpen]=useState(false)
   const[paymentReservationId,setPaymentReservationId]=useState(null)
   const[mode,setMode]=useState(null),[saving,setSaving]=useState(false),[error,setError]=useState("")
@@ -153,7 +153,7 @@ export default function DailyCashActionsMultiCurrency({propertyId,session,expect
       <button type="button" className={s.action} onClick={()=>{setError("");setMode("history")}}>Cierres</button>
       <button type="button" className={s.primary} onClick={openClose}>{session?"Arqueo / cerrar caja":"Abrir caja"}</button>
     </div>
-    {paymentOpen?<ReservationPaymentPanel propertyId={propertyId} reservationId={paymentReservationId} session={session} onClose={()=>{setPaymentOpen(false);setPaymentReservationId(null)}} onSaved={()=>{setPaymentOpen(false);setPaymentReservationId(null);onChanged?.()}}/>:null}
+    {paymentOpen?<ReservationPaymentPanel propertyId={propertyId} reservationId={paymentReservationId} session={session} onNavigate={onNavigate} onClose={()=>{setPaymentOpen(false);setPaymentReservationId(null)}} onSaved={()=>{setPaymentOpen(false);setPaymentReservationId(null);onChanged?.()}}/>:null}
     {mode?<div className={s.overlay} role="dialog" aria-modal="true" aria-label={title}><section className={`${s.panel} ${mode==="report"?s.panelWide:""}`}>
       <header className={s.panelHeader}><div><small>CAJA DIARIA · TURNO MULTIMONEDA</small><h2>{title}</h2><p>{subtitle}</p></div><button type="button" className={s.close} onClick={()=>{setMode(null);setError("")}}>×</button></header>
       <div className={s.body}>
