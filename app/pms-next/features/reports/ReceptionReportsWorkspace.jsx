@@ -72,7 +72,16 @@ export default function ReceptionReportsWorkspace({propertyId,property}){
     finally{setLoading(false)}
   },[propertyId,day])
   useEffect(()=>{load()},[load])
-  useEffect(()=>{setActiveReport("")},[propertyId])
+  useEffect(()=>{
+    const read=()=>{if(typeof window==="undefined")return"";const value=new URL(window.location.href).searchParams.get("report")||"";return["arrivals","departures","breakfasts","housekeeping"].includes(value)?value:""}
+    const sync=()=>setActiveReport(read())
+    const home=()=>setActiveReport("")
+    sync()
+    window.addEventListener("popstate",sync)
+    window.addEventListener("hl:reception-reports-home",home)
+    return()=>{window.removeEventListener("popstate",sync);window.removeEventListener("hl:reception-reports-home",home)}
+  },[])
+  useEffect(()=>{setActiveReport("");if(typeof window!=="undefined"){const url=new URL(window.location.href);url.searchParams.delete("report");window.history.replaceState({...window.history.state,pmsView:"receptionreports"},"",url)}},[propertyId])
   usePmsAutoRefresh(propertyId,load,["reservas","habitaciones","hotel_housekeeping_tasks","hotel_reservation_guests"])
 
   const savePreference=useCallback((reportKey,settings)=>{
@@ -108,11 +117,13 @@ export default function ReceptionReportsWorkspace({propertyId,property}){
     {key:"housekeeping",title:"Housekeeping",subtitle:"Estado de habitaciones, camas, reservas y tareas del día.",columns:HOUSEKEEPING_COLUMNS,rows:housekeepingRows,totals:HOUSEKEEPING_TOTALS,defaultTotals:["rooms","tasks"],summary:`${housekeepingRows.length} habitaciones · ${tasks.length} tareas`,fileName:`informe-housekeeping-${day}`,layoutVersion:3},
   ]
   const selected=definitions.find(item=>item.key===activeReport)
+  const openReport=useCallback(key=>{setActiveReport(key);if(typeof window!=="undefined"){const url=new URL(window.location.href);url.searchParams.set("view","receptionreports");url.searchParams.set("report",key);window.history.pushState({pmsView:"receptionreports",report:key},"",url);window.scrollTo({top:0,behavior:"auto"})}},[])
+  const closeReport=useCallback(()=>{setActiveReport("");if(typeof window!=="undefined"){const url=new URL(window.location.href);url.searchParams.set("view","receptionreports");url.searchParams.delete("report");window.history.pushState({pmsView:"receptionreports"},"",url);window.scrollTo({top:0,behavior:"auto"})}},[])
 
   return <section className={s.page}>
-    <header className={s.header}><div><small>RECEPCIÓN · INFORMES</small><h1>{selected?selected.title:"Informes de recepción"}</h1><p>{selected?selected.subtitle:`${property?.name||"Propiedad activa"} · elegí un informe para abrirlo, editarlo y prepararlo para imprimir o Excel.`}</p></div><div className={s.actions}>{selected?<button type="button" onClick={()=>setActiveReport("")}>← Volver a informes</button>:null}<input type="date" value={day} onChange={event=>setDay(event.target.value)}/><button type="button" onClick={load}>↻ Actualizar</button></div></header>
+    <header className={s.header}><div><small>RECEPCIÓN · INFORMES</small><h1>{selected?selected.title:"Informes de recepción"}</h1><p>{selected?selected.subtitle:`${property?.name||"Propiedad activa"} · elegí un informe para abrirlo, editarlo y prepararlo para imprimir o Excel.`}</p></div><div className={s.actions}>{selected?<button type="button" onClick={closeReport}>← Volver a informes</button>:null}<input type="date" value={day} onChange={event=>setDay(event.target.value)}/><button type="button" onClick={load}>↻ Actualizar</button></div></header>
     {error?<div className={s.notice}>{error}</div>:null}{loading?<div className={s.notice}>Actualizando informes…</div>:null}
-    {!selected?<><div className={s.metrics}><Metric label="Llegadas" value={arrivals.length} note="Check-in previstos"/><Metric label="Salidas" value={departures.length} note="Check-out previstos"/><Metric label="Desayunos" value={breakfastPax} note={`${breakfastRows.length} reservas`}/><Metric label="Housekeeping" value={housekeepingRows.length} note={`${tasks.length} tareas programadas`}/></div><div className={s.reportList}>{definitions.map(item=><button type="button" className={s.reportCard} key={item.key} onClick={()=>setActiveReport(item.key)}><div><small>INFORME OPERATIVO</small><h2>{item.title}</h2><p>{item.subtitle}</p></div><div className={s.reportCardMeta}><span>{item.summary}</span><b>Abrir informe →</b></div></button>)}</div></>:<div className={s.detailWorkspace}><Sheet reportKey={selected.key} title={selected.title} subtitle={selected.subtitle} day={day} propertyName={property?.name||"Propiedad activa"} fileName={selected.fileName} columns={selected.columns} rows={selected.rows} totalOptions={selected.totals} defaultTotals={selected.defaultTotals} preference={sheetPrefs[selected.key]} rowState={sheetRows} layoutVersion={selected.layoutVersion} onPreferenceChange={savePreference} onRowStateChange={saveRowState}/></div>}
+    {!selected?<><div className={s.metrics}><Metric label="Llegadas" value={arrivals.length} note="Check-in previstos"/><Metric label="Salidas" value={departures.length} note="Check-out previstos"/><Metric label="Desayunos" value={breakfastPax} note={`${breakfastRows.length} reservas`}/><Metric label="Housekeeping" value={housekeepingRows.length} note={`${tasks.length} tareas programadas`}/></div><div className={s.reportList}>{definitions.map(item=><button type="button" className={s.reportCard} key={item.key} onClick={()=>openReport(item.key)}><div><small>INFORME OPERATIVO</small><h2>{item.title}</h2><p>{item.subtitle}</p></div><div className={s.reportCardMeta}><span>{item.summary}</span><b>Abrir informe →</b></div></button>)}</div></>:<div className={s.detailWorkspace}><Sheet reportKey={selected.key} title={selected.title} subtitle={selected.subtitle} day={day} propertyName={property?.name||"Propiedad activa"} fileName={selected.fileName} columns={selected.columns} rows={selected.rows} totalOptions={selected.totals} defaultTotals={selected.defaultTotals} preference={sheetPrefs[selected.key]} rowState={sheetRows} layoutVersion={selected.layoutVersion} onPreferenceChange={savePreference} onRowStateChange={saveRowState}/></div>}
   </section>
 }
 
