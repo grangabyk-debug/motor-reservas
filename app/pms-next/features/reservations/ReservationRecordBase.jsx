@@ -43,7 +43,15 @@ function serviceLines(item,room,rooms=[]){
   const lines=[],assigned=rooms.length?rooms:[room].filter(Boolean)
   const nights=Math.max(1,Number(item.noches)||Math.round((new Date(`${item.fecha_salida}T12:00:00`)-new Date(`${item.fecha_entrada}T12:00:00`))/86400000)||1)
   const stayAmount=Number(item.tarifa_noche||0)*nights||Number(item.subtotal||item.precio_sin_impuestos_nacionales||item.precio_total||0)
-  if(assigned.length>1)lines.push({key:"stay",title:`Alojamiento grupal · ${assigned.length} habitaciones`,meta:`${item.regimen||"Alojamiento"} · ${nights} noche${nights===1?"":"s"}`,detail:`${assigned.map(item=>item.nombre).join(", ")} · ${fmtDate(item.fecha_entrada)} al ${fmtDate(item.fecha_salida)}`,amount:stayAmount})
+  const details=Array.isArray(item.habitaciones_detalle)?item.habitaciones_detalle:[]
+  const segmented=details.filter(detail=>detail?.habitacion_id&&detail?.fecha_entrada&&detail?.fecha_salida&&Number(detail?.tarifa_noche)>=0&&(detail?.segment_role==="previous_room"||detail?.segment_role==="active_room"))
+  if(segmented.length>1){
+    segmented.forEach((detail,index)=>{
+      const segmentNights=Math.max(1,Math.round((new Date(`${detail.fecha_salida}T12:00:00`)-new Date(`${detail.fecha_entrada}T12:00:00`))/86400000)||1)
+      const amount=Number(detail.tarifa_noche||0)*segmentNights
+      lines.push({key:`stay-segment-${detail.habitacion_id}-${index}`,title:`Alojamiento · Habitación ${detail.nombre||detail.habitacion_id}`,meta:`${item.regimen||"Alojamiento"} · ${segmentNights} noche${segmentNights===1?"":"s"}`,detail:`${fmtDate(detail.fecha_entrada)} → ${fmtDate(detail.fecha_salida)}${detail.segment_role==="previous_room"?" · tramo anterior":" · habitación actual"}`,amount})
+    })
+  }else if(assigned.length>1)lines.push({key:"stay",title:`Alojamiento grupal · ${assigned.length} habitaciones`,meta:`${item.regimen||"Alojamiento"} · ${nights} noche${nights===1?"":"s"}`,detail:`${assigned.map(item=>item.nombre).join(", ")} · ${fmtDate(item.fecha_entrada)} al ${fmtDate(item.fecha_salida)}`,amount:stayAmount})
   else lines.push({key:"stay",title:`${room?.tipo||"Habitación"} ${room?.nombre||""}`.trim(),meta:`${item.regimen||"Alojamiento"} · ${nights} noche${nights===1?"":"s"}`,detail:`Estadía del ${fmtDate(item.fecha_entrada)} al ${fmtDate(item.fecha_salida)}`,amount:stayAmount})
   const services=Array.isArray(item.servicios)?item.servicios:[]
   services.forEach((service,index)=>{const qty=Number(service?.cantidad||service?.qty||1)||1,unit=Number(service?.precio||service?.price||service?.importe||0),total=Number(service?.total||service?.precio_total||unit*qty),chargedNights=Number(service?.noches||0),metaParts=[];if(qty>1)metaParts.push(`${qty} unidades`);if(chargedNights>0)metaParts.push(`${chargedNights} noche${chargedNights===1?"":"s"}`);lines.push({key:`service-${service?.id||index}`,title:service?.nombre||service?.name||service?.descripcion||"Servicio",meta:metaParts.join(" · ")||"Servicio",detail:service?.detalle||service?.detail||"",amount:total})})
