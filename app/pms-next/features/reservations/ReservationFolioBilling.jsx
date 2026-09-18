@@ -7,15 +7,11 @@ import ReservationInvoiceDialog from"./ReservationInvoiceDialog"
 import ReservationDocumentHistory from"./ReservationDocumentHistory"
 import{printReservationFolio}from"./reservationFolioPrint"
 import{buildFolioInvoiceCoverage,folioItemBillingState,remainingInvoiceGross}from"./reservationBillingCoverage"
+import{validPayment,netPayment,paymentCurrency,allocatedPhysicalAmount}from"./reservationPaymentInvoiceUtils"
 
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:2}).format(Number(value)||0)
 const fmtDate=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short"}).format(new Date(`${String(value).slice(0,10)}T12:00:00`)).replace(".",""):"—"
 const fmtDateTime=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}).format(new Date(value)).replace(".",""):"—"
-const validPayment=row=>!["anulado","cancelado","void","rechazado","cancelled"].includes(String(row?.estado||"").toLowerCase())
-const netPayment=row=>validPayment(row)?Math.max(0,Number(row?.monto||0)-Number(row?.refunded_amount||0)):0
-const paymentCurrency=row=>String(row?.payment_currency||row?.moneda||"ARS").toUpperCase()
-const paymentPhysicalNet=row=>{const accountingGross=Math.max(0,Number(row?.monto||0)),accountingNet=netPayment(row),physicalGross=Math.max(0,Number(row?.payment_amount??row?.monto)||0);return accountingGross>0?physicalGross*Math.min(1,accountingNet/accountingGross):physicalGross}
-const allocatedPhysicalAmount=(payment,allocationAmount)=>{const accountingNet=netPayment(payment),physicalNet=paymentPhysicalNet(payment),allocated=Math.max(0,Number(allocationAmount)||0);return accountingNet>0?physicalNet*Math.min(1,allocated/accountingNet):0}
 const payerLabels={guest:"Huésped",company:"Empresa",agency:"Agencia",group:"Grupo",other:"Otro"}
 const typeLabels={lodging:"Alojamiento",parking:"Cochera",pet:"Mascotas",service:"Servicio",extra:"Extra",discount:"Descuento",adjustment:"Ajuste",fee:"Cargo"}
 
