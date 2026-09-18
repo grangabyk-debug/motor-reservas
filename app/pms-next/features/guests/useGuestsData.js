@@ -35,7 +35,7 @@ export default function useGuestsData(propertyId,searchTerm=""){
       const ids=nextProfiles.map(item=>item.id).filter(Boolean)
       let nextReservations=[]
       if(ids.length){
-        const reservationRes=await supabase.from("reservas").select("id,guest_profile_id,group_id,nombre_huesped,email_huesped,telefono_huesped,fecha_entrada,fecha_salida,estado,precio_total,moneda,canal_reserva,habitacion_id").eq("property_id",propertyId).in("guest_profile_id",ids).neq("estado","cancelada").order("fecha_salida",{ascending:false}).limit(600)
+        const reservationRes=await supabase.from("reservas").select("id,guest_profile_id,group_id,nombre_huesped,email_huesped,telefono_huesped,fecha_entrada,fecha_salida,estado,precio_total,moneda,canal_reserva,habitacion_id,habitaciones_ids,merged_into_id").eq("property_id",propertyId).in("guest_profile_id",ids).not("estado","in","(cancelada,fusionada)").order("fecha_salida",{ascending:false}).limit(600)
         if(reservationRes.error)throw reservationRes.error
         nextReservations=reservationRes.data||[]
       }
