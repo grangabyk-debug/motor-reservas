@@ -58,6 +58,7 @@ export default function ReservationMergeDialog({ item, propertyId, rooms = [], o
     setError("")
     try {
       const updated = await onMerge(Number(item.id), Number(selected.id))
+      if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("hl:pms-data-updated", { detail: { propertyId, tables: ["reservas", "hotel_folios", "hotel_folio_items", "hotel_folio_payment_allocations", "pagos", "hotel_finance_documents"] } }))
       onMerged?.(updated, selected)
     } catch (err) {
       setError(err?.message || "No se pudieron fusionar las reservas.")
