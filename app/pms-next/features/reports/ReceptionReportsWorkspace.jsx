@@ -16,14 +16,16 @@ const nextDay=value=>{const date=new Date(`${value}T12:00:00`);date.setDate(date
 const normalize=value=>String(value||"").trim().toLowerCase()
 const cancelled=row=>["cancelada","cancelled","anulada","anulado","fusionada","fusionado","merged"].includes(normalize(row?.estado))
 const roomIds=row=>activeReservationRoomIds(row).map(Number)
+const confirmedPayment=row=>["confirmado","confirmed","approved","aprobado","paid","completed","completado"].includes(normalize(row?.estado))
+const money=(value,currency="ARS")=>{const amount=Number(value)||0,code=String(currency||"ARS").toUpperCase();try{return new Intl.NumberFormat("es-AR",{style:"currency",currency:code,minimumFractionDigits:2,maximumFractionDigits:2}).format(amount)}catch{return`${code} ${amount.toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2})}`}}
 
 const ARRIVAL_COLUMNS=[
-  {key:"guest",label:"Huésped",required:true},{key:"room",label:"Habitación",required:true},{key:"pax",label:"Pax",required:true},{key:"note",label:"Notas",required:true},
-  {key:"reservation",label:"Reserva"},{key:"time",label:"Hora"},{key:"phone",label:"Teléfono",defaultVisible:false},{key:"status",label:"Estado",defaultVisible:false},{key:"regime",label:"Régimen",defaultVisible:false},{key:"arrival",label:"Llegada",defaultVisible:false},{key:"departure",label:"Salida",defaultVisible:false},
+  {key:"guest",label:"Huésped",required:true},{key:"room",label:"Habitación",required:true},{key:"pax",label:"Pax",required:true},{key:"balance",label:"Saldo",required:true},{key:"note",label:"Notas",required:true},
+  {key:"reservation",label:"Reserva"},{key:"time",label:"Hora"},{key:"total",label:"Total estadía"},{key:"paid",label:"Abonado"},{key:"phone",label:"Teléfono",defaultVisible:false},{key:"status",label:"Estado",defaultVisible:false},{key:"regime",label:"Régimen",defaultVisible:false},{key:"arrival",label:"Llegada",defaultVisible:false},{key:"departure",label:"Salida",defaultVisible:false},
 ]
 const DEPARTURE_COLUMNS=[
-  {key:"guest",label:"Huésped",required:true},{key:"room",label:"Habitación",required:true},{key:"pax",label:"Pax",required:true},{key:"note",label:"Notas",required:true},
-  {key:"reservation",label:"Reserva"},{key:"time",label:"Hora"},{key:"phone",label:"Teléfono",defaultVisible:false},{key:"status",label:"Estado",defaultVisible:false},{key:"regime",label:"Régimen",defaultVisible:false},{key:"arrival",label:"Llegada",defaultVisible:false},{key:"departure",label:"Salida",defaultVisible:false},
+  {key:"guest",label:"Huésped",required:true},{key:"room",label:"Habitación",required:true},{key:"pax",label:"Pax",required:true},{key:"balance",label:"Saldo",required:true},{key:"note",label:"Notas",required:true},
+  {key:"reservation",label:"Reserva"},{key:"time",label:"Hora"},{key:"total",label:"Total estadía"},{key:"paid",label:"Abonado"},{key:"channel",label:"Canal"},{key:"currency",label:"Moneda"},{key:"phone",label:"Teléfono",defaultVisible:false},{key:"status",label:"Estado",defaultVisible:false},{key:"regime",label:"Régimen",defaultVisible:false},{key:"arrival",label:"Llegada",defaultVisible:false},{key:"departure",label:"Salida",defaultVisible:false},
 ]
 const BREAKFAST_COLUMNS=[
   {key:"guest",label:"Huésped",required:true},{key:"room",label:"Habitación",required:true},{key:"pax",label:"Pax",required:true},{key:"composition",label:"Composición"},{key:"note",label:"Notas",required:true},
@@ -41,7 +43,7 @@ export default function ReceptionReportsWorkspace({propertyId,property}){
   const[day,setDay]=useState(()=>dateKey(new Date()))
   const[activeReport,setActiveReport]=useState("")
   const previousPropertyId=useRef(propertyId)
-  const[rooms,setRooms]=useState([]),[floors,setFloors]=useState([]),[reservations,setReservations]=useState([]),[reservationGuests,setReservationGuests]=useState([]),[tasks,setTasks]=useState([]),[profiles,setProfiles]=useState(new Map())
+  const[rooms,setRooms]=useState([]),[floors,setFloors]=useState([]),[reservations,setReservations]=useState([]),[reservationGuests,setReservationGuests]=useState([]),[payments,setPayments]=useState([]),[tasks,setTasks]=useState([]),[profiles,setProfiles]=useState(new Map())
   const[sheetPrefs,setSheetPrefs]=useState({}),[sheetRows,setSheetRows]=useState({})
   const[loading,setLoading]=useState(true),[error,setError]=useState("")
 
@@ -53,20 +55,22 @@ export default function ReceptionReportsWorkspace({propertyId,property}){
       const[roomRes,floorRes,reservationRes,taskRes,prefRes,rowStateRes]=await Promise.all([
         supabase.from("habitaciones").select("id,nombre,tipo,estado,sort_order,floor_id,bed_configuration,capacidad").eq("property_id",propertyId).eq("activa",true),
         supabase.from("hotel_floors").select("id,name,sort_order,active").eq("property_id",propertyId).eq("active",true).order("sort_order").order("name"),
-        supabase.from("reservas").select("id,numero_reserva,nombre_huesped,telefono_huesped,habitacion_id,habitaciones_ids,habitaciones_detalle,room_checkout_dates,fecha_entrada,fecha_salida,estado,no_show,cantidad_huespedes,regimen,hora_llegada_estimada,hora_salida_estimada,notas").eq("property_id",propertyId).lte("fecha_entrada",day).gte("fecha_salida",day).order("fecha_entrada").order("id"),
+        supabase.from("reservas").select("id,numero_reserva,nombre_huesped,telefono_huesped,habitacion_id,habitaciones_ids,habitaciones_detalle,room_checkout_dates,fecha_entrada,fecha_salida,estado,no_show,cantidad_huespedes,regimen,hora_llegada_estimada,hora_salida_estimada,notas,moneda,precio_total,subtotal,canal_reserva,codigo_canal").eq("property_id",propertyId).lte("fecha_entrada",day).gte("fecha_salida",day).order("fecha_entrada").order("id"),
         supabase.from("hotel_housekeeping_tasks").select("id,room_id,task_type,status,assigned_to,scheduled_for,notes,updated_at").eq("property_id",propertyId).gte("scheduled_for",`${day}T00:00:00`).lt("scheduled_for",`${tomorrow}T00:00:00`).order("updated_at",{ascending:false}),
         supabase.from("hotel_report_sheet_preferences").select("report_key,settings").eq("property_id",propertyId),
         supabase.from("hotel_report_sheet_rows").select("report_key,row_key,note,hidden,overrides").eq("property_id",propertyId).eq("report_date",day),
       ])
       for(const result of[roomRes,floorRes,reservationRes,taskRes,prefRes,rowStateRes])if(result.error)throw result.error
       const taskRows=taskRes.data||[],reservationRows=reservationRes.data||[],profileIds=[...new Set(taskRows.map(row=>row.assigned_to).filter(Boolean))],reservationIds=reservationRows.map(row=>row.id).filter(Boolean)
-      const[profileRes,guestRes]=await Promise.all([
+      const[profileRes,guestRes,paymentRes]=await Promise.all([
         profileIds.length?supabase.from("profiles").select("id,full_name").in("id",profileIds):Promise.resolve({data:[],error:null}),
         reservationIds.length?supabase.from("hotel_reservation_guests").select("id,reservation_id,room_id,guest_profile_id,role,sort_order,full_name,birth_date,stay_from,stay_to,checked_out_at").in("reservation_id",reservationIds):Promise.resolve({data:[],error:null}),
+        reservationIds.length?supabase.from("pagos").select("id,reserva_id,monto,moneda,estado,refunded_amount").in("reserva_id",reservationIds):Promise.resolve({data:[],error:null}),
       ])
       if(profileRes.error)throw profileRes.error
       if(guestRes.error)throw guestRes.error
-      setRooms(roomRes.data||[]);setFloors(floorRes.data||[]);setReservations(reservationRows);setReservationGuests(guestRes.data||[]);setTasks(taskRows);setProfiles(new Map((profileRes.data||[]).map(row=>[row.id,row.full_name])))
+      if(paymentRes.error)throw paymentRes.error
+      setRooms(roomRes.data||[]);setFloors(floorRes.data||[]);setReservations(reservationRows);setReservationGuests(guestRes.data||[]);setPayments(paymentRes.data||[]);setTasks(taskRows);setProfiles(new Map((profileRes.data||[]).map(row=>[row.id,row.full_name])))
       setSheetPrefs(Object.fromEntries((prefRes.data||[]).map(row=>[row.report_key,row.settings||{}])))
       setSheetRows(Object.fromEntries((rowStateRes.data||[]).map(row=>[`${row.report_key}:${row.row_key}`,row])))
     }catch(err){setError(err?.message||"No se pudieron cargar los informes de recepción.")}
@@ -83,7 +87,7 @@ export default function ReceptionReportsWorkspace({propertyId,property}){
     return()=>{window.removeEventListener("popstate",sync);window.removeEventListener("hl:reception-reports-home",home)}
   },[])
   useEffect(()=>{if(previousPropertyId.current===propertyId)return;previousPropertyId.current=propertyId;setActiveReport("");if(typeof window!=="undefined"){const url=new URL(window.location.href);url.searchParams.delete("report");window.history.replaceState({...window.history.state,pmsView:"receptionreports"},"",url)}},[propertyId])
-  usePmsAutoRefresh(propertyId,load,["reservas","habitaciones","hotel_housekeeping_tasks","hotel_reservation_guests"])
+  usePmsAutoRefresh(propertyId,load,["reservas","habitaciones","hotel_housekeeping_tasks","hotel_reservation_guests","pagos"])
 
   const savePreference=useCallback((reportKey,settings)=>{
     setSheetPrefs(current=>({...current,[reportKey]:settings}))
@@ -104,16 +108,17 @@ export default function ReceptionReportsWorkspace({propertyId,property}){
   const reservationsByRoom=useMemo(()=>{const map=new Map();for(const reservation of activeReservations){for(const id of roomIds(reservation)){if(!map.has(id))map.set(id,[]);map.get(id).push(reservation)}}return map},[activeReservations])
   const taskByRoom=useMemo(()=>{const map=new Map();for(const task of tasks){const id=Number(task.room_id);if(id&&!map.has(id))map.set(id,task)}return map},[tasks])
   const guestsByReservation=useMemo(()=>{const map=new Map();for(const guest of reservationGuests){const id=Number(guest.reservation_id);if(!map.has(id))map.set(id,[]);map.get(id).push(guest)}return map},[reservationGuests])
+  const paidByReservation=useMemo(()=>{const map=new Map();for(const payment of payments){if(!confirmedPayment(payment))continue;const id=Number(payment.reserva_id),net=Math.max(0,(Number(payment.monto)||0)-(Number(payment.refunded_amount)||0));map.set(id,(map.get(id)||0)+net)}return map},[payments])
   const housekeepingRows=useMemo(()=>buildHousekeepingRows({rooms,floors,reservationsByRoom,taskByRoom,profiles,day}),[rooms,floors,reservationsByRoom,taskByRoom,profiles,day])
 
-  const reservationRow=useCallback(row=>({id:`res-${row.id}`,reservation:row.numero_reserva||row.id,guest:row.nombre_huesped||"—",room:roomLabel(row),roomCount:Math.max(roomIds(row).length,1),pax:Number(row.cantidad_huespedes)||1,phone:row.telefono_huesped||"—",status:row.estado||"—",regime:row.regimen||"—",arrival:row.fecha_entrada,departure:row.fecha_salida,note:row.notas||""}),[roomLabel])
+  const reservationRow=useCallback(row=>{const currency=String(row.moneda||"ARS").toUpperCase(),total=Math.max(0,Number(row.precio_total??row.subtotal)||0),paid=Math.max(0,paidByReservation.get(Number(row.id))||0),balance=Math.max(0,total-paid);return{id:`res-${row.id}`,reservation:row.numero_reserva||row.id,guest:row.nombre_huesped||"—",room:roomLabel(row),roomCount:Math.max(roomIds(row).length,1),pax:Number(row.cantidad_huespedes)||1,phone:row.telefono_huesped||"—",status:row.estado||"—",regime:row.regimen||"—",arrival:row.fecha_entrada,departure:row.fecha_salida,note:row.notas||"",currency,total:money(total,currency),paid:money(paid,currency),balance:balance>.005?`${money(balance,currency)} · Pendiente`:`${money(0,currency)} · Pagado`,channel:row.canal_reserva||row.codigo_canal||"Directa"}} ,[roomLabel,paidByReservation])
   const arrivalRows=useMemo(()=>arrivals.map(row=>({...reservationRow(row),time:row.hora_llegada_estimada||"—"})),[arrivals,reservationRow])
   const departureRows=useMemo(()=>departures.map(row=>({...reservationRow(row),time:row.hora_salida_estimada||"—"})),[departures,reservationRow])
   const breakfastRows=useMemo(()=>breakfasts.map(row=>{const occupancy=breakfastOccupancy({reservation:row,day,roomMap,guests:guestsByReservation.get(Number(row.id))||[]});return{...reservationRow(row),pax:occupancy.pax,composition:occupancy.composition,adults:occupancy.adults,minors:occupancy.minors,paxSource:occupancy.source,situation:row.fecha_salida===day?"Sale hoy":"Continúa"}}),[breakfasts,reservationRow,day,roomMap,guestsByReservation])
   const breakfastPax=breakfastRows.reduce((sum,row)=>sum+Number(row.pax||0),0),breakfastDepartures=breakfastRows.filter(row=>row.situation==="Sale hoy").length
   const definitions=[
-    {key:"arrivals",title:"Llegadas / check-in",subtitle:"Quién llega, a qué habitación y a qué hora.",columns:ARRIVAL_COLUMNS,rows:arrivalRows,totals:RESERVATION_TOTALS,defaultTotals:["pax","rooms"],summary:`${arrivalRows.length} reservas · ${arrivalRows.reduce((sum,row)=>sum+row.pax,0)} pasajeros`,fileName:`informe-llegadas-${day}`},
-    {key:"departures",title:"Salidas / check-out",subtitle:"Salidas previstas y horario estimado.",columns:DEPARTURE_COLUMNS,rows:departureRows,totals:RESERVATION_TOTALS,defaultTotals:["pax","rooms"],summary:`${departureRows.length} reservas · ${departureRows.reduce((sum,row)=>sum+row.pax,0)} pasajeros`,fileName:`informe-salidas-${day}`},
+    {key:"arrivals",title:"Llegadas / check-in",subtitle:"Quién llega, a qué habitación y a qué hora, con saldo operativo de la reserva.",columns:ARRIVAL_COLUMNS,rows:arrivalRows,totals:RESERVATION_TOTALS,defaultTotals:["pax","rooms"],summary:`${arrivalRows.length} reservas · ${arrivalRows.reduce((sum,row)=>sum+row.pax,0)} pasajeros`,fileName:`informe-llegadas-${day}`,layoutVersion:2},
+    {key:"departures",title:"Salidas / check-out",subtitle:"Salidas previstas, estado de cuenta, canal y moneda de cada reserva.",columns:DEPARTURE_COLUMNS,rows:departureRows,totals:RESERVATION_TOTALS,defaultTotals:["pax","rooms"],summary:`${departureRows.length} reservas · ${departureRows.reduce((sum,row)=>sum+row.pax,0)} pasajeros`,fileName:`informe-salidas-${day}`,layoutVersion:2},
     {key:"breakfasts",title:"Desayunos",subtitle:"Pasajeros previstos para desayunar según la ficha de cada reserva; si falta el dato, usa la capacidad configurada.",columns:BREAKFAST_COLUMNS,rows:breakfastRows,totals:RESERVATION_TOTALS,defaultTotals:["pax","rooms"],summary:`${breakfastPax} desayunos · ${breakfastDepartures} salen hoy`,fileName:`informe-desayunos-${day}`,layoutVersion:2},
     {key:"housekeeping",title:"Housekeeping",subtitle:"Estado de habitaciones, camas, reservas y tareas del día.",columns:HOUSEKEEPING_COLUMNS,rows:housekeepingRows,totals:HOUSEKEEPING_TOTALS,defaultTotals:["rooms","tasks"],summary:`${housekeepingRows.length} habitaciones · ${tasks.length} tareas`,fileName:`informe-housekeeping-${day}`,layoutVersion:3},
   ]
@@ -122,7 +127,7 @@ export default function ReceptionReportsWorkspace({propertyId,property}){
   const closeReport=useCallback(()=>{setActiveReport("");if(typeof window!=="undefined"){const url=new URL(window.location.href);url.searchParams.set("view","receptionreports");url.searchParams.delete("report");window.history.pushState({pmsView:"receptionreports"},"",url);window.scrollTo({top:0,behavior:"auto"})}},[])
 
   return <section className={s.page}>
-    <header className={s.header}><div><small>RECEPCIÓN · INFORMES</small><h1>{selected?selected.title:"Informes de recepción"}</h1><p>{selected?selected.subtitle:`${property?.name||"Propiedad activa"} · elegí un informe para abrirlo, editarlo y prepararlo para imprimir o Excel.`}</p></div><div className={s.actions}>{selected?<button type="button" onClick={closeReport}>← Volver a informes</button>:null}<input type="date" value={day} onChange={event=>setDay(event.target.value)}/><button type="button" onClick={load}>↻ Actualizar</button></div></header>
+    <header className={s.header}><div><small>RECEPCIÓN · INFORMES</small><h1>{selected?selected.title:"Informes de recepción"}</h1><p>{selected?selected.subtitle:`${property?.name||"Propiedad activa"} · elegí un informe para abrirlo, editarlo y prepararlo para imprimir o Excel.`}</p></div><div className={s.actions}>{selected?<button type="button" className={s.backButton} onClick={closeReport}>← Volver a informes</button>:null}<input type="date" value={day} onChange={event=>setDay(event.target.value)}/><button type="button" onClick={load}>↻ Actualizar</button></div></header>
     {error?<div className={s.notice}>{error}</div>:null}{loading?<div className={s.notice}>Actualizando informes…</div>:null}
     {!selected?<><div className={s.metrics}><Metric label="Llegadas" value={arrivals.length} note="Check-in previstos"/><Metric label="Salidas" value={departures.length} note="Check-out previstos"/><Metric label="Desayunos" value={breakfastPax} note={`${breakfastRows.length} reservas`}/><Metric label="Housekeeping" value={housekeepingRows.length} note={`${tasks.length} tareas programadas`}/></div><div className={s.reportList}>{definitions.map(item=><button type="button" className={s.reportCard} key={item.key} onClick={()=>openReport(item.key)}><div><small>INFORME OPERATIVO</small><h2>{item.title}</h2><p>{item.subtitle}</p></div><div className={s.reportCardMeta}><span>{item.summary}</span><b>Abrir informe →</b></div></button>)}</div></>:<div className={s.detailWorkspace}><Sheet reportKey={selected.key} title={selected.title} subtitle={selected.subtitle} day={day} propertyName={property?.name||"Propiedad activa"} fileName={selected.fileName} columns={selected.columns} rows={selected.rows} totalOptions={selected.totals} defaultTotals={selected.defaultTotals} preference={sheetPrefs[selected.key]} rowState={sheetRows} layoutVersion={selected.layoutVersion} onPreferenceChange={savePreference} onRowStateChange={saveRowState}/></div>}
   </section>
