@@ -4,14 +4,10 @@ import{useEffect,useState}from"react"
 import{createPortal}from"react-dom"
 import{supabase}from"../../../../lib/supabase"
 import s from"./reservationFolioBilling.module.css"
+import{paymentCurrency,allocatedPhysicalAmount}from"./reservationPaymentInvoiceUtils"
 
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:2}).format(Number(value)||0)
 const fmtDateTime=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}).format(new Date(value)).replace(".",""):"—"
-const validPayment=row=>!["anulado","cancelado","void","rechazado","cancelled"].includes(String(row?.estado||"").toLowerCase())
-const netPayment=row=>validPayment(row)?Math.max(0,Number(row?.monto||0)-Number(row?.refunded_amount||0)):0
-const paymentCurrency=row=>String(row?.payment_currency||row?.moneda||"ARS").toUpperCase()
-const paymentPhysicalNet=row=>{const accountingGross=Math.max(0,Number(row?.monto||0)),accountingNet=netPayment(row),physicalGross=Math.max(0,Number(row?.payment_amount??row?.monto)||0);return accountingGross>0?physicalGross*Math.min(1,accountingNet/accountingGross):physicalGross}
-const allocatedPhysicalAmount=(payment,allocationAmount)=>{const accountingNet=netPayment(payment),physicalNet=paymentPhysicalNet(payment),allocated=Math.max(0,Number(allocationAmount)||0);return accountingNet>0?physicalNet*Math.min(1,allocated/accountingNet):0}
 const today=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"America/Argentina/Buenos_Aires",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date())
 const TAX_CONDITIONS=[["consumidor_final","Consumidor final"],["responsable_inscripto","Responsable inscripto"],["monotributo","Monotributo"],["exento","Exento"],["cliente_exterior","Cliente del exterior"],["no_categorizado","No categorizado"]]
 const taxRateFor=(condition,reservation,taxConfig)=>{
