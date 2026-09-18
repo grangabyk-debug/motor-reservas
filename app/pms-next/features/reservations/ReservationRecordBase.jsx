@@ -9,6 +9,7 @@ import ReservationFolioBilling from"./ReservationFolioBilling"
 import ReservationRoomRateRow from"./ReservationRoomRateRow"
 import ReservationRoomJourney from"./ReservationRoomJourney"
 import ReservationCheckinProgressBanner from"./ReservationCheckinProgressBanner"
+import historyPresentation from"./reservationHistoryPresentation"
 import s from"./reservationRecord.module.css"
 
 const fmtDate=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short",year:"numeric"}).format(new Date(`${String(value).slice(0,10)}T12:00:00`)).replace(".",""):"—"
@@ -22,24 +23,6 @@ const RETURN_KEY="hl:pms:return-reservation"
 
 function EmptyCard({text,action,onAction}){return <div className={s.emptyCard}><span>{text}</span>{action&&onAction?<button type="button" onClick={onAction}>{action}</button>:null}</div>}
 function RecordCard({title,action,onAction,headerExtra,primaryAction=false,children}){return <section className={s.card}><header><h3>{title}</h3>{headerExtra||action&&onAction?<>{headerExtra||<button type="button" className={primaryAction?s.primaryCardAction:""} onClick={onAction}>＋ {action}</button>}</>:null}</header>{children}</section>}
-
-function historyPresentation(event,fallbackCurrency="ARS",reservation=null){
-  const payload=event?.payload||{},currency=payload.after_currency||payload.before_currency||payload.currency||fallbackCurrency||"ARS"
-  if(payload.invalidated===true||payload.correction===true||payload.repair===true)return{title:event?.title||"Corrección de cuenta",detail:event?.detail||"Se corrigió un cálculo anterior de la reserva."}
-  if(event?.event_type==="account"&&payload.before_rate!=null&&payload.after_rate!=null){
-    const beforeRate=Number(payload.before_rate)||0,afterRate=Number(payload.after_rate)||0,beforeTotal=Number(payload.before_total)||0,afterTotal=Number(payload.after_total)||0
-    if(afterRate===beforeRate){
-      const delta=Math.abs(afterTotal-beforeTotal),late=Math.max(0,Number(reservation?.late_checkout_importe)||0),early=Math.max(0,Number(reservation?.early_checkin_importe)||0),same=(a,b)=>Math.abs(a-b)<.02
-      const service=late>0&&same(delta,late)?" · Late check-out":early>0&&same(delta,early)?" · Early check-in":""
-      return{title:`Cambio de tarifa${service}`,detail:`Tarifa ${money(beforeRate,currency)} → ${money(afterRate,currency)} por noche · Total ${money(beforeTotal,currency)} → ${money(afterTotal,currency)}`}
-    }
-    const movement=afterRate>beforeRate?"Upgrade":"Downgrade"
-    return{title:`${afterRate>beforeRate?"↑ ":"↓ "}${movement} de tarifa`,detail:`Tarifa ${money(beforeRate,currency)} → ${money(afterRate,currency)} por noche · Total ${money(beforeTotal,currency)} → ${money(afterTotal,currency)}`}
-  }
-  if(event?.event_type==="room"&&payload.before_room_id!=null&&payload.after_room_id!=null)return{title:"Cambio de habitación",detail:`Habitación ${payload.before_room_id} → ${payload.after_room_id}`}
-  if(event?.event_type==="stay"&&(payload.before_start||payload.after_start)){const before=`${fmtDate(payload.before_start)} → ${fmtDate(payload.before_end)}`,after=`${fmtDate(payload.after_start)} → ${fmtDate(payload.after_end)}`;return{title:"Estadía modificada",detail:`${before} · ahora ${after}`}}
-  return{title:event?.title||event?.event_type||"Movimiento de reserva",detail:event?.detail||"Cambio registrado en la reserva."}
-}
 
 function serviceLines(item,room,rooms=[]){
   const lines=[],assigned=rooms.length?rooms:[room].filter(Boolean)
