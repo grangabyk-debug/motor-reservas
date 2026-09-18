@@ -1,6 +1,6 @@
 "use client"
 
-import{useCallback,useEffect,useMemo,useState}from"react"
+import{useCallback,useEffect,useMemo,useRef,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 import usePmsAutoRefresh from"../../core/usePmsAutoRefresh"
 import{activeReservationRoomIds}from"../reservations/reservationEditUtils"
@@ -40,6 +40,7 @@ const HOUSEKEEPING_TOTALS=[{key:"rooms",label:"Habitaciones",value:rows=>rows.le
 export default function ReceptionReportsWorkspace({propertyId,property}){
   const[day,setDay]=useState(()=>dateKey(new Date()))
   const[activeReport,setActiveReport]=useState("")
+  const previousPropertyId=useRef(propertyId)
   const[rooms,setRooms]=useState([]),[floors,setFloors]=useState([]),[reservations,setReservations]=useState([]),[reservationGuests,setReservationGuests]=useState([]),[tasks,setTasks]=useState([]),[profiles,setProfiles]=useState(new Map())
   const[sheetPrefs,setSheetPrefs]=useState({}),[sheetRows,setSheetRows]=useState({})
   const[loading,setLoading]=useState(true),[error,setError]=useState("")
@@ -81,7 +82,7 @@ export default function ReceptionReportsWorkspace({propertyId,property}){
     window.addEventListener("hl:reception-reports-home",home)
     return()=>{window.removeEventListener("popstate",sync);window.removeEventListener("hl:reception-reports-home",home)}
   },[])
-  useEffect(()=>{setActiveReport("");if(typeof window!=="undefined"){const url=new URL(window.location.href);url.searchParams.delete("report");window.history.replaceState({...window.history.state,pmsView:"receptionreports"},"",url)}},[propertyId])
+  useEffect(()=>{if(previousPropertyId.current===propertyId)return;previousPropertyId.current=propertyId;setActiveReport("");if(typeof window!=="undefined"){const url=new URL(window.location.href);url.searchParams.delete("report");window.history.replaceState({...window.history.state,pmsView:"receptionreports"},"",url)}},[propertyId])
   usePmsAutoRefresh(propertyId,load,["reservas","habitaciones","hotel_housekeeping_tasks","hotel_reservation_guests"])
 
   const savePreference=useCallback((reportKey,settings)=>{
