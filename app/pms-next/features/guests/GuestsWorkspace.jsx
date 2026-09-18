@@ -12,7 +12,7 @@ import{crmSignals,marketingState,segmentById,segmentCounts}from"./guestCrm"
 import{fmtDate,guestState,initials}from"./guestView"
 import s from"./guests.module.css"
 
-export default function GuestsWorkspace({propertyId,onNavigate,allowedViews=[]}){
+// Las señales CRM navegan dentro de Huéspedes para mantener separado este módulo de Reservas.\nexport default function GuestsWorkspace({propertyId,onNavigate,allowedViews=[]}){
   const[query,setQuery]=useState(""),[debouncedQuery,setDebouncedQuery]=useState("")
   const[activeSegment,setActiveSegment]=useState(""),[selectedId,setSelectedId]=useState(""),[selectedFallback,setSelectedFallback]=useState(null)
   const[overlay,setOverlay]=useState(""),[formOpen,setFormOpen]=useState(false),[saving,setSaving]=useState(false),[draft,setDraft]=useState(null)
