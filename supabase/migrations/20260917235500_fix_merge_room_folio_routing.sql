@@ -90,7 +90,7 @@ begin
    set folio_id=coalesce(master_folio,folio_id),
        room_id=case when master_folio is not null then null else room_id end,
        description=discount_title,
-       detail=coalesce(nullif(trim(r.descuento_motivo,''),'Descuento ingresado manualmente en la reserva.')),
+       detail=coalesce(nullif(trim(r.descuento_motivo),''),'Descuento ingresado manualmente en la reserva.'),
        metadata=coalesce(metadata,'{}'::jsonb)||jsonb_build_object('discount_type',r.descuento_tipo,'discount_value',r.descuento_valor,'discount_amount',r.descuento_importe,'discount_reason',r.descuento_motivo,'discount_origin',coalesce(r.descuento_origen,'manual'),'explicit_discount',true),
        updated_at=now()
    where reservation_id=p_reservation_id and source_key='legacy:discount' and invoice_document_id is null;
