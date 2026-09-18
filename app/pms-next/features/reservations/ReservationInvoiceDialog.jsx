@@ -7,6 +7,11 @@ import s from"./reservationFolioBilling.module.css"
 
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:2}).format(Number(value)||0)
 const fmtDateTime=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}).format(new Date(value)).replace(".",""):"—"
+const validPayment=row=>!["anulado","cancelado","void","rechazado","cancelled"].includes(String(row?.estado||"").toLowerCase())
+const netPayment=row=>validPayment(row)?Math.max(0,Number(row?.monto||0)-Number(row?.refunded_amount||0)):0
+const paymentCurrency=row=>String(row?.payment_currency||row?.moneda||"ARS").toUpperCase()
+const paymentPhysicalNet=row=>{const accountingGross=Math.max(0,Number(row?.monto||0)),accountingNet=netPayment(row),physicalGross=Math.max(0,Number(row?.payment_amount??row?.monto)||0);return accountingGross>0?physicalGross*Math.min(1,accountingNet/accountingGross):physicalGross}
+const allocatedPhysicalAmount=(payment,allocationAmount)=>{const accountingNet=netPayment(payment),physicalNet=paymentPhysicalNet(payment),allocated=Math.max(0,Number(allocationAmount)||0);return accountingNet>0?physicalNet*Math.min(1,allocated/accountingNet):0}
 const today=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"America/Argentina/Buenos_Aires",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date())
 const TAX_CONDITIONS=[["consumidor_final","Consumidor final"],["responsable_inscripto","Responsable inscripto"],["monotributo","Monotributo"],["exento","Exento"],["cliente_exterior","Cliente del exterior"],["no_categorizado","No categorizado"]]
 const taxRateFor=(condition,reservation,taxConfig)=>{
@@ -52,6 +57,7 @@ export default function ReservationInvoiceDialog({
     return()=>{cancelled=true}
   },[open,reservation?.id,reservation?.property_id])
   if(!open||!selected||!portalRoot)return null
+  const crossCurrencyPayment=folioPayments.find(payment=>paymentCurrency(payment)!==String(payment.moneda||selected.currency||reservation.moneda||"ARS").toUpperCase())
   function changeTaxCondition(value){const rate=taxRateFor(value,reservation,taxConfig);setTaxCondition(value);setInvoiceLines(current=>current.map(line=>({...line,tax_rate:rate})))}
   const dialog=<div className={s.overlay} role="dialog" aria-modal="true" aria-label="Crear factura o documento" onMouseDown={event=>event.target===event.currentTarget&&onClose()}>
     <div className={`${s.modal} ${s.invoiceModal}`} style={{width:"min(1180px,calc(100vw - 40px))",maxHeight:"calc(100dvh - 40px)",padding:24}}>
@@ -71,14 +77,16 @@ export default function ReservationInvoiceDialog({
         </div>
       </div>
 
-      {invoiceMode==="payment"?<label className={s.paymentPicker}><span>Pago a facturar</span><select value={invoicePaymentId} onChange={event=>chooseInvoicePayment(event.target.value)}><option value="">Elegir pago…</option>{folioPayments.map(payment=>{const alloc=folioAllocations.find(row=>Number(row.payment_id)===Number(payment.id));return <option key={payment.id} value={payment.id}>{payment.metodo||"Pago"} · {money(alloc?.amount||0,payment.moneda||selected.currency)} · {fmtDateTime(payment.created_at)}</option>})}</select></label>:null}
+      {invoiceMode==="folio"&&crossCurrencyPayment?<div style={{margin:"10px 0 0",padding:"10px 12px",border:"1px solid color-mix(in srgb,var(--accent) 22%,var(--line))",borderRadius:12,background:"color-mix(in srgb,var(--accent) 5%,var(--panelSolid))",fontSize:10.5,color:"var(--muted)"}}>Esta reserva está en <b style={{color:"var(--text)"}}>{reservation.moneda||selected.currency}</b>, pero hay un pago recibido en <b style={{color:"var(--accent)"}}>{paymentCurrency(crossCurrencyPayment)}</b>. Si querés que la factura salga en la moneda realmente cobrada, elegí <b style={{color:"var(--text)"}}>Pago registrado</b>.</div>:null}
+
+      {invoiceMode==="payment"?<label className={s.paymentPicker}><span>Pago a facturar</span><select value={invoicePaymentId} onChange={event=>chooseInvoicePayment(event.target.value)}><option value="">Elegir pago…</option>{folioPayments.map(payment=>{const alloc=folioAllocations.find(row=>Number(row.payment_id)===Number(payment.id)),physical=allocatedPhysicalAmount(payment,alloc?.amount||0),pCurrency=paymentCurrency(payment),accountingCurrency=String(payment.moneda||selected.currency||"ARS").toUpperCase(),cross=pCurrency!==accountingCurrency;return <option key={payment.id} value={payment.id}>{payment.metodo||"Pago"} · {money(physical,pCurrency)}{cross?` · aplica ${money(alloc?.amount||0,accountingCurrency)}`:""} · {fmtDateTime(payment.created_at)}</option>})}</select></label>:null}
 
       <div className={s.formGrid}>
         <label><span>Cliente</span><input value={billingName} onChange={event=>setBillingName(event.target.value)}/></label>
         <label><span>Email</span><input type="email" value={billingEmail} onChange={event=>setBillingEmail(event.target.value)}/></label>
         <label><span>Teléfono</span><input value={billingPhone} onChange={event=>setBillingPhone(event.target.value)}/></label>
         <label><span>Vencimiento</span><input type="date" value={billingDueAt} onChange={event=>setBillingDueAt(event.target.value)}/></label>
-        <label><span>Moneda</span><select value={billingCurrency} onChange={event=>setBillingCurrency(event.target.value)}><option value="ARS">ARS</option><option value="USD">USD</option></select></label>
+        <label><span>{invoiceMode==="payment"?"Moneda recibida":"Moneda"}</span><select value={billingCurrency} disabled={invoiceMode==="payment"&&Boolean(invoicePaymentId)} onChange={event=>setBillingCurrency(event.target.value)}><option value="ARS">ARS</option><option value="USD">USD</option></select>{invoiceMode==="payment"&&invoicePaymentId?<small style={{marginTop:4}}>Se toma de la moneda realmente recibida en el pago.</small>:null}</label>
         <label><span>Condición IVA</span><select value={taxCondition} onChange={event=>changeTaxCondition(event.target.value)}>{TAX_CONDITIONS.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
         <label><span>Estado inicial</span><select value={billingStatus} onChange={event=>setBillingStatus(event.target.value)}><option value="draft">Borrador</option><option value="issued">Emitido</option></select></label>
       </div>
