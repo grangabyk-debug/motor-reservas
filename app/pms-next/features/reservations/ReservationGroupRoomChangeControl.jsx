@@ -14,7 +14,7 @@ const roomPlannedEnd=(item,roomId)=>{const value=detailFor(item,roomId)?.fecha_s
 const roomEnd=(item,roomId)=>{const planned=roomPlannedEnd(item,roomId),release=item?.room_checkout_dates?.[String(roomId)];return validDate(release)&&String(release)<planned?String(release):planned}
 const round=value=>Math.round((Number(value)||0)*100)/100
 const pad=value=>String(value).padStart(2,"0")
-const todayKey=()=>{const date=new Date();return`${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`}
+const todayKey=()=>{const date=new Date();if(date.getHours()<12)date.setDate(date.getDate()-1);return`${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`}
 const prettyDate=value=>{if(!validDate(value))return value||"—";const[y,m,d]=String(value).split("-");return`${d}/${m}/${y}`}
 const inHouseState=value=>["alojado","inhouse","in_house","in house"].includes(normalize(value))
 
