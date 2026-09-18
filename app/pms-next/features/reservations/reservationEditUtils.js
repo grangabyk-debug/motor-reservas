@@ -52,3 +52,17 @@ export function buildReservationMetadataPatch({baseItem,draft,details,ids,effect
   const persistedDetails=[...(details||[]),...historyDetails],persistedIds=unique([...activeIds,...historyDetails.map(detail=>detail?.habitacion_id)])
   return{habitacion_id:Number(activeIds[0]),habitaciones_ids:persistedIds.map(Number),telefono_huesped:draft.phone.trim()||null,regimen:draft.regimen.trim()||null,cantidad_huespedes:Math.max(1,Number(draft.guests)||1),habitaciones_detalle:persistedDetails,tarifa_noche:effectiveNightly,noches:newNights,early_checkin:Boolean(draft.earlyCheckin),early_checkin_importe:nextEarly,late_checkout:Boolean(draft.lateCheckout),late_checkout_importe:nextLate,subtotal:nextNet,precio_sin_impuestos_nacionales:nextNet,iva_importe:nextVat,precio_total:nextTotal}
 }
+
+
+export function reservationCheckinProgress(item){
+  const roomIds=activeReservationRoomIds(item).map(Number).filter(Number.isFinite)
+  const activeSet=new Set(roomIds.map(String)),details=Array.isArray(item?.habitaciones_detalle)?item.habitaciones_detalle:[]
+  const checkedExplicit=unique(details.filter(detail=>{
+    const id=String(detail?.habitacion_id||""),role=String(detail?.segment_role||"active_room").toLowerCase()
+    return activeSet.has(id)&&role!=="previous_room"&&role!=="transient_room"&&Boolean(detail?.checked_in_at)
+  }).map(detail=>detail.habitacion_id)).map(Number)
+  const legacyComplete=item?.estado==="alojado"&&checkedExplicit.length===0
+  const checkedRoomIds=legacyComplete?[...roomIds]:checkedExplicit
+  const checkedSet=new Set(checkedRoomIds.map(Number)),pendingRoomIds=roomIds.filter(id=>!checkedSet.has(Number(id)))
+  return{roomIds,checkedRoomIds,pendingRoomIds,total:roomIds.length,checked:checkedRoomIds.length,pending:pendingRoomIds.length,partial:item?.estado==="alojado"&&checkedRoomIds.length>0&&pendingRoomIds.length>0,complete:item?.estado==="alojado"&&roomIds.length>0&&pendingRoomIds.length===0,started:item?.estado==="alojado"||checkedRoomIds.length>0,legacyComplete}
+}
