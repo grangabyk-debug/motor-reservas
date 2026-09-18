@@ -23,6 +23,7 @@ function RecordCard({title,action,onAction,headerExtra,primaryAction=false,child
 
 function historyPresentation(event,fallbackCurrency="ARS",reservation=null){
   const payload=event?.payload||{},currency=payload.after_currency||payload.before_currency||payload.currency||fallbackCurrency||"ARS"
+  if(payload.invalidated===true||payload.correction===true||payload.repair===true)return{title:event?.title||"Corrección de cuenta",detail:event?.detail||"Se corrigió un cálculo anterior de la reserva."}
   if(event?.event_type==="account"&&payload.before_rate!=null&&payload.after_rate!=null){
     const beforeRate=Number(payload.before_rate)||0,afterRate=Number(payload.after_rate)||0,beforeTotal=Number(payload.before_total)||0,afterTotal=Number(payload.after_total)||0
     if(afterRate===beforeRate){
