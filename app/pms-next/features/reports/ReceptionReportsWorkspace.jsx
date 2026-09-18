@@ -3,6 +3,8 @@
 import{useCallback,useEffect,useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 import usePmsAutoRefresh from"../../core/usePmsAutoRefresh"
+import{activeReservationRoomIds}from"../reservations/reservationEditUtils"
+import{breakfastOccupancy}from"./receptionReportBreakfast"
 import{buildHousekeepingRows,reportDateLabel}from"./receptionReportHousekeeping"
 import{downloadXlsx,printSheet}from"./reportDocumentExport"
 import useReportColumnDrag from"./useReportColumnDrag"
@@ -12,8 +14,8 @@ import s from"./receptionReports.module.css"
 const dateKey=date=>date.toLocaleDateString("en-CA")
 const nextDay=value=>{const date=new Date(`${value}T12:00:00`);date.setDate(date.getDate()+1);return dateKey(date)}
 const normalize=value=>String(value||"").trim().toLowerCase()
-const cancelled=row=>["cancelada","cancelled","anulada","anulado"].includes(normalize(row?.estado))
-const roomIds=row=>[...new Set([row?.habitacion_id,...(row?.habitaciones_ids||[])].filter(Boolean).map(Number))]
+const cancelled=row=>["cancelada","cancelled","anulada","anulado","fusionada","fusionado","merged"].includes(normalize(row?.estado))
+const roomIds=row=>activeReservationRoomIds(row).map(Number)
 
 const ARRIVAL_COLUMNS=[
   {key:"guest",label:"Huésped",required:true},{key:"room",label:"Habitación",required:true},{key:"pax",label:"Pax",required:true},{key:"note",label:"Notas",required:true},
@@ -24,11 +26,11 @@ const DEPARTURE_COLUMNS=[
   {key:"reservation",label:"Reserva"},{key:"time",label:"Hora"},{key:"phone",label:"Teléfono",defaultVisible:false},{key:"status",label:"Estado",defaultVisible:false},{key:"regime",label:"Régimen",defaultVisible:false},{key:"arrival",label:"Llegada",defaultVisible:false},{key:"departure",label:"Salida",defaultVisible:false},
 ]
 const BREAKFAST_COLUMNS=[
-  {key:"guest",label:"Huésped",required:true},{key:"room",label:"Habitación",required:true},{key:"pax",label:"Pax",required:true},{key:"note",label:"Notas",required:true},
+  {key:"guest",label:"Huésped",required:true},{key:"room",label:"Habitación",required:true},{key:"pax",label:"Pax",required:true},{key:"composition",label:"Composición"},{key:"note",label:"Notas",required:true},
   {key:"situation",label:"Situación"},{key:"reservation",label:"Reserva",defaultVisible:false},{key:"regime",label:"Régimen"},{key:"departure",label:"Salida",defaultVisible:false},{key:"phone",label:"Teléfono",defaultVisible:false},{key:"status",label:"Estado",defaultVisible:false},
 ]
 const HOUSEKEEPING_COLUMNS=[
-  {key:"room",label:"Habitación",required:true},{key:"reservation",label:"Reserva",required:true},{key:"guest",label:"Titular",required:true},
+  {key:"room",label:"Habitación",required:true},{key:"reservation",label:"Reserva"},{key:"guest",label:"Titular"},
   {key:"type",label:"Tipo",required:true},{key:"bedSetup",label:"Camas",required:true,editable:true},{key:"operation",label:"Operación",required:true},{key:"roomStatus",label:"Estado",required:true},{key:"note",label:"Notas",required:true},
   {key:"task",label:"Tarea"},{key:"taskStatus",label:"Estado tarea",defaultVisible:false},{key:"responsible",label:"Responsable",defaultVisible:false},
 ]
@@ -38,7 +40,7 @@ const HOUSEKEEPING_TOTALS=[{key:"rooms",label:"Habitaciones",value:rows=>rows.le
 export default function ReceptionReportsWorkspace({propertyId,property}){
   const[day,setDay]=useState(()=>dateKey(new Date()))
   const[activeReport,setActiveReport]=useState("")
-  const[rooms,setRooms]=useState([]),[floors,setFloors]=useState([]),[reservations,setReservations]=useState([]),[tasks,setTasks]=useState([]),[profiles,setProfiles]=useState(new Map())
+  const[rooms,setRooms]=useState([]),[floors,setFloors]=useState([]),[reservations,setReservations]=useState([]),[reservationGuests,setReservationGuests]=useState([]),[tasks,setTasks]=useState([]),[profiles,setProfiles]=useState(new Map())
   const[sheetPrefs,setSheetPrefs]=useState({}),[sheetRows,setSheetRows]=useState({})
   const[loading,setLoading]=useState(true),[error,setError]=useState("")
 
@@ -50,16 +52,20 @@ export default function ReceptionReportsWorkspace({propertyId,property}){
       const[roomRes,floorRes,reservationRes,taskRes,prefRes,rowStateRes]=await Promise.all([
         supabase.from("habitaciones").select("id,nombre,tipo,estado,sort_order,floor_id,bed_configuration,capacidad").eq("property_id",propertyId).eq("activa",true),
         supabase.from("hotel_floors").select("id,name,sort_order,active").eq("property_id",propertyId).eq("active",true).order("sort_order").order("name"),
-        supabase.from("reservas").select("id,numero_reserva,nombre_huesped,telefono_huesped,habitacion_id,habitaciones_ids,habitaciones_detalle,fecha_entrada,fecha_salida,estado,no_show,cantidad_huespedes,regimen,hora_llegada_estimada,hora_salida_estimada,notas").eq("property_id",propertyId).lte("fecha_entrada",day).gte("fecha_salida",day).order("fecha_entrada").order("id"),
+        supabase.from("reservas").select("id,numero_reserva,nombre_huesped,telefono_huesped,habitacion_id,habitaciones_ids,habitaciones_detalle,room_checkout_dates,fecha_entrada,fecha_salida,estado,no_show,cantidad_huespedes,regimen,hora_llegada_estimada,hora_salida_estimada,notas").eq("property_id",propertyId).lte("fecha_entrada",day).gte("fecha_salida",day).order("fecha_entrada").order("id"),
         supabase.from("hotel_housekeeping_tasks").select("id,room_id,task_type,status,assigned_to,scheduled_for,notes,updated_at").eq("property_id",propertyId).gte("scheduled_for",`${day}T00:00:00`).lt("scheduled_for",`${tomorrow}T00:00:00`).order("updated_at",{ascending:false}),
         supabase.from("hotel_report_sheet_preferences").select("report_key,settings").eq("property_id",propertyId),
         supabase.from("hotel_report_sheet_rows").select("report_key,row_key,note,hidden,overrides").eq("property_id",propertyId).eq("report_date",day),
       ])
       for(const result of[roomRes,floorRes,reservationRes,taskRes,prefRes,rowStateRes])if(result.error)throw result.error
-      const taskRows=taskRes.data||[],profileIds=[...new Set(taskRows.map(row=>row.assigned_to).filter(Boolean))]
-      const profileRes=profileIds.length?await supabase.from("profiles").select("id,full_name").in("id",profileIds):{data:[],error:null}
+      const taskRows=taskRes.data||[],reservationRows=reservationRes.data||[],profileIds=[...new Set(taskRows.map(row=>row.assigned_to).filter(Boolean))],reservationIds=reservationRows.map(row=>row.id).filter(Boolean)
+      const[profileRes,guestRes]=await Promise.all([
+        profileIds.length?supabase.from("profiles").select("id,full_name").in("id",profileIds):Promise.resolve({data:[],error:null}),
+        reservationIds.length?supabase.from("hotel_reservation_guests").select("id,reservation_id,room_id,guest_profile_id,full_name,birth_date,stay_from,stay_to,checked_out_at").in("reservation_id",reservationIds):Promise.resolve({data:[],error:null}),
+      ])
       if(profileRes.error)throw profileRes.error
-      setRooms(roomRes.data||[]);setFloors(floorRes.data||[]);setReservations(reservationRes.data||[]);setTasks(taskRows);setProfiles(new Map((profileRes.data||[]).map(row=>[row.id,row.full_name])))
+      if(guestRes.error)throw guestRes.error
+      setRooms(roomRes.data||[]);setFloors(floorRes.data||[]);setReservations(reservationRows);setReservationGuests(guestRes.data||[]);setTasks(taskRows);setProfiles(new Map((profileRes.data||[]).map(row=>[row.id,row.full_name])))
       setSheetPrefs(Object.fromEntries((prefRes.data||[]).map(row=>[row.report_key,row.settings||{}])))
       setSheetRows(Object.fromEntries((rowStateRes.data||[]).map(row=>[`${row.report_key}:${row.row_key}`,row])))
     }catch(err){setError(err?.message||"No se pudieron cargar los informes de recepción.")}
@@ -67,7 +73,7 @@ export default function ReceptionReportsWorkspace({propertyId,property}){
   },[propertyId,day])
   useEffect(()=>{load()},[load])
   useEffect(()=>{setActiveReport("")},[propertyId])
-  usePmsAutoRefresh(propertyId,load,["reservas","habitaciones","hotel_housekeeping_tasks"])
+  usePmsAutoRefresh(propertyId,load,["reservas","habitaciones","hotel_housekeeping_tasks","hotel_reservation_guests"])
 
   const savePreference=useCallback((reportKey,settings)=>{
     setSheetPrefs(current=>({...current,[reportKey]:settings}))
@@ -84,22 +90,22 @@ export default function ReceptionReportsWorkspace({propertyId,property}){
   const roomLabel=useCallback(row=>roomIds(row).map(id=>roomMap.get(id)?.nombre).filter(Boolean).join(", ")||"Sin asignar",[roomMap])
   const arrivals=useMemo(()=>activeReservations.filter(row=>row.fecha_entrada===day),[activeReservations,day])
   const departures=useMemo(()=>activeReservations.filter(row=>row.fecha_salida===day),[activeReservations,day])
-  const continuingInHouse=useMemo(()=>activeReservations.filter(row=>normalize(row.estado)==="alojado"&&row.fecha_entrada<day&&row.fecha_salida>day),[activeReservations,day])
-  const breakfasts=useMemo(()=>{const map=new Map();for(const row of departures)if(row.fecha_entrada<day)map.set(row.id,row);for(const row of continuingInHouse)map.set(row.id,row);return[...map.values()]},[departures,continuingInHouse])
+  const breakfasts=useMemo(()=>activeReservations.filter(row=>row.fecha_entrada<day&&row.fecha_salida>=day),[activeReservations,day])
   const reservationsByRoom=useMemo(()=>{const map=new Map();for(const reservation of activeReservations){for(const id of roomIds(reservation)){if(!map.has(id))map.set(id,[]);map.get(id).push(reservation)}}return map},[activeReservations])
   const taskByRoom=useMemo(()=>{const map=new Map();for(const task of tasks){const id=Number(task.room_id);if(id&&!map.has(id))map.set(id,task)}return map},[tasks])
+  const guestsByReservation=useMemo(()=>{const map=new Map();for(const guest of reservationGuests){const id=Number(guest.reservation_id);if(!map.has(id))map.set(id,[]);map.get(id).push(guest)}return map},[reservationGuests])
   const housekeepingRows=useMemo(()=>buildHousekeepingRows({rooms,floors,reservationsByRoom,taskByRoom,profiles,day}),[rooms,floors,reservationsByRoom,taskByRoom,profiles,day])
 
   const reservationRow=useCallback(row=>({id:`res-${row.id}`,reservation:row.numero_reserva||row.id,guest:row.nombre_huesped||"—",room:roomLabel(row),roomCount:Math.max(roomIds(row).length,1),pax:Number(row.cantidad_huespedes)||1,phone:row.telefono_huesped||"—",status:row.estado||"—",regime:row.regimen||"—",arrival:row.fecha_entrada,departure:row.fecha_salida,note:row.notas||""}),[roomLabel])
   const arrivalRows=useMemo(()=>arrivals.map(row=>({...reservationRow(row),time:row.hora_llegada_estimada||"—"})),[arrivals,reservationRow])
   const departureRows=useMemo(()=>departures.map(row=>({...reservationRow(row),time:row.hora_salida_estimada||"—"})),[departures,reservationRow])
-  const breakfastRows=useMemo(()=>breakfasts.map(row=>({...reservationRow(row),situation:row.fecha_salida===day?"Sale hoy":"Continúa"})),[breakfasts,reservationRow,day])
+  const breakfastRows=useMemo(()=>breakfasts.map(row=>{const occupancy=breakfastOccupancy({reservation:row,day,roomMap,guests:guestsByReservation.get(Number(row.id))||[]});return{...reservationRow(row),pax:occupancy.pax,composition:occupancy.composition,adults:occupancy.adults,minors:occupancy.minors,paxSource:occupancy.source,situation:row.fecha_salida===day?"Sale hoy":"Continúa"}}),[breakfasts,reservationRow,day,roomMap,guestsByReservation])
   const breakfastPax=breakfastRows.reduce((sum,row)=>sum+Number(row.pax||0),0),breakfastDepartures=breakfastRows.filter(row=>row.situation==="Sale hoy").length
   const definitions=[
     {key:"arrivals",title:"Llegadas / check-in",subtitle:"Quién llega, a qué habitación y a qué hora.",columns:ARRIVAL_COLUMNS,rows:arrivalRows,totals:RESERVATION_TOTALS,defaultTotals:["pax","rooms"],summary:`${arrivalRows.length} reservas · ${arrivalRows.reduce((sum,row)=>sum+row.pax,0)} pasajeros`,fileName:`informe-llegadas-${day}`},
     {key:"departures",title:"Salidas / check-out",subtitle:"Salidas previstas y horario estimado.",columns:DEPARTURE_COLUMNS,rows:departureRows,totals:RESERVATION_TOTALS,defaultTotals:["pax","rooms"],summary:`${departureRows.length} reservas · ${departureRows.reduce((sum,row)=>sum+row.pax,0)} pasajeros`,fileName:`informe-salidas-${day}`},
-    {key:"breakfasts",title:"Desayunos",subtitle:"Check-out del día y huéspedes in-house que continúan su estadía.",columns:BREAKFAST_COLUMNS,rows:breakfastRows,totals:RESERVATION_TOTALS,defaultTotals:["pax","rooms"],summary:`${breakfastPax} desayunos · ${breakfastDepartures} salen hoy`,fileName:`informe-desayunos-${day}`},
-    {key:"housekeeping",title:"Housekeeping",subtitle:"Estado de habitaciones, camas, reservas y tareas del día.",columns:HOUSEKEEPING_COLUMNS,rows:housekeepingRows,totals:HOUSEKEEPING_TOTALS,defaultTotals:["rooms","tasks"],summary:`${housekeepingRows.length} habitaciones · ${tasks.length} tareas`,fileName:`informe-housekeeping-${day}`,layoutVersion:2},
+    {key:"breakfasts",title:"Desayunos",subtitle:"Pasajeros previstos para desayunar según la ficha de cada reserva; si falta el dato, usa la capacidad configurada.",columns:BREAKFAST_COLUMNS,rows:breakfastRows,totals:RESERVATION_TOTALS,defaultTotals:["pax","rooms"],summary:`${breakfastPax} desayunos · ${breakfastDepartures} salen hoy`,fileName:`informe-desayunos-${day}`,layoutVersion:2},
+    {key:"housekeeping",title:"Housekeeping",subtitle:"Estado de habitaciones, camas, reservas y tareas del día.",columns:HOUSEKEEPING_COLUMNS,rows:housekeepingRows,totals:HOUSEKEEPING_TOTALS,defaultTotals:["rooms","tasks"],summary:`${housekeepingRows.length} habitaciones · ${tasks.length} tareas`,fileName:`informe-housekeeping-${day}`,layoutVersion:3},
   ]
   const selected=definitions.find(item=>item.key===activeReport)
 
