@@ -13,6 +13,9 @@ const fmtDate=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:
 const fmtDateTime=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}).format(new Date(value)).replace(".",""):"—"
 const validPayment=row=>!["anulado","cancelado","void","rechazado","cancelled"].includes(String(row?.estado||"").toLowerCase())
 const netPayment=row=>validPayment(row)?Math.max(0,Number(row?.monto||0)-Number(row?.refunded_amount||0)):0
+const paymentCurrency=row=>String(row?.payment_currency||row?.moneda||"ARS").toUpperCase()
+const paymentPhysicalNet=row=>{const accountingGross=Math.max(0,Number(row?.monto||0)),accountingNet=netPayment(row),physicalGross=Math.max(0,Number(row?.payment_amount??row?.monto)||0);return accountingGross>0?physicalGross*Math.min(1,accountingNet/accountingGross):physicalGross}
+const allocatedPhysicalAmount=(payment,allocationAmount)=>{const accountingNet=netPayment(payment),physicalNet=paymentPhysicalNet(payment),allocated=Math.max(0,Number(allocationAmount)||0);return accountingNet>0?physicalNet*Math.min(1,allocated/accountingNet):0}
 const payerLabels={guest:"Huésped",company:"Empresa",agency:"Agencia",group:"Grupo",other:"Otro"}
 const typeLabels={lodging:"Alojamiento",parking:"Cochera",pet:"Mascotas",service:"Servicio",extra:"Extra",discount:"Descuento",adjustment:"Ajuste",fee:"Cargo"}
 
@@ -52,7 +55,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
         supabase.from("hotel_folios").select("id,room_id,folio_type,label,payer_type,payer_name,currency,status,is_primary,sort_order,created_at").eq("property_id",propertyId).eq("reservation_id",Number(reservation.id)).neq("status","void").order("sort_order").order("created_at"),
         supabase.from("hotel_folio_items").select("id,folio_id,room_id,source_type,source_key,description,detail,service_date,quantity,unit_price,discount,tax_rate,tax,subtotal,total,currency,status,invoice_document_id,created_at").eq("property_id",propertyId).eq("reservation_id",Number(reservation.id)).order("service_date").order("created_at"),
         supabase.from("hotel_folio_payment_allocations").select("id,folio_id,payment_id,amount,currency,source,created_at").eq("property_id",propertyId).eq("reservation_id",Number(reservation.id)),
-        supabase.from("pagos").select("id,folio_id,monto,refunded_amount,moneda,metodo,estado,referencia,nota,created_at").eq("property_id",propertyId).eq("reserva_id",Number(reservation.id)).order("created_at",{ascending:false}),
+        supabase.from("pagos").select("id,folio_id,monto,refunded_amount,moneda,payment_currency,payment_amount,fx_rate,fx_source,fx_as_of,metodo,estado,referencia,nota,created_at").eq("property_id",propertyId).eq("reserva_id",Number(reservation.id)).order("created_at",{ascending:false}),
         supabase.from("hotel_finance_documents").select("id,folio_id,payment_id,document_type,number,status,currency,subtotal,tax,total,balance,billing_to,items,folio_item_ids,billing_mode,issued_at,created_at,related_document_id,adjustment_reason").eq("property_id",propertyId).eq("reservation_id",Number(reservation.id)).order("created_at",{ascending:false}),
       ])
       for(const result of[folioRes,itemRes,allocationRes,paymentRes,docRes])if(result.error)throw result.error
@@ -179,9 +182,10 @@ export default function ReservationFolioBilling({reservation,propertyId,property
     const allocation=folioAllocations.find(row=>Number(row.payment_id)===paymentId)
     const payment=payments.find(row=>Number(row.id)===paymentId)
     if(!allocation||!payment){setInvoiceLines([]);return}
-    const amount=Number(allocation.amount||0)
-    setInvoiceLines([{folio_item_id:null,description:`Pago registrado · ${payment.metodo||"Pago"}`,detail:null,source_type:"payment",quantity:1,unit_price:amount,tax_rate:0}])
-    setBillingCurrency(payment.moneda||selected?.currency||reservation.moneda||"ARS")
+    const physicalCurrency=paymentCurrency(payment)
+    const amount=allocatedPhysicalAmount(payment,allocation.amount)
+    setInvoiceLines([{folio_item_id:null,description:`Pago registrado · ${payment.metodo||"Pago"}`,detail:payment.fx_rate&&physicalCurrency!==String(payment.moneda||"").toUpperCase()?`Recibido en ${physicalCurrency} · TC ${Number(payment.fx_rate).toLocaleString("es-AR",{maximumFractionDigits:4})}`:null,source_type:"payment",quantity:1,unit_price:amount,tax_rate:0}])
+    setBillingCurrency(physicalCurrency)
   }
 
   function updateInvoiceLine(index,key,value){
@@ -240,6 +244,9 @@ export default function ReservationFolioBilling({reservation,propertyId,property
         const allocation=folioAllocations.find(row=>Number(row.payment_id)===paymentId)
         const payment=payments.find(row=>Number(row.id)===paymentId)
         if(!allocation||!payment)throw new Error("Elegí un pago asignado a este folio.")
+        const expectedCurrency=paymentCurrency(payment),expectedTotal=allocatedPhysicalAmount(payment,allocation.amount)
+        if(String(billingCurrency||"").toUpperCase()!==expectedCurrency)throw new Error(`La factura de este pago debe emitirse en ${expectedCurrency}, que fue la moneda realmente recibida.`)
+        if(Math.abs(invoiceCalc.total-expectedTotal)>.02)throw new Error(`El total debe coincidir con el importe recibido: ${money(expectedTotal,expectedCurrency)}.`)
         billingMode="payment"
       }else{
         const source=checkedInvoiceItems.length?checkedInvoiceItems:invoiceableItems
