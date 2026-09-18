@@ -5,6 +5,8 @@ import useGuestsData from"./useGuestsData"
 import GuestDossier from"./GuestDossier"
 import GuestJourneyPanel from"./GuestJourneyPanel"
 import GuestSegmentsPanel from"./GuestSegmentsPanel"
+import GuestAttentionPanel from"./GuestAttentionPanel"
+import GuestDuplicateWatch from"./GuestDuplicateWatch"
 import PmsIcon from"../../components/shell/PmsIcons"
 import{crmSignals,marketingState,segmentById,segmentCounts}from"./guestCrm"
 import{fmtDate,guestState,initials}from"./guestView"
@@ -47,6 +49,8 @@ export default function GuestsWorkspace({propertyId,onNavigate,allowedViews=[]})
   return <section className={s.page}>
     <header className={s.heading}><div><small>GUESTBOOK · CRM HOTELERO</small><h1>Huéspedes</h1><p>Una ficha viva por huésped: estadías, preferencias y oportunidades en un solo lugar.</p></div><div className={s.headerActions}><button type="button" className={s.softButton} onClick={()=>setOverlay("segments")}><PmsIcon name="filter"/>Segmentos</button><button type="button" className={s.softButton} onClick={()=>setOverlay("journey")}><PmsIcon name="calendar"/>Pre check-in</button>{selected?<button type="button" className={s.softButton} onClick={openMerge}><PmsIcon name="guest"/>Fusionar perfiles</button>:null}<button type="button" className={s.primary} onClick={openNew}><PmsIcon name="plus"/>Agregar huésped</button></div></header>
     {data.error&&<div className={s.errorBanner}>{data.error}</div>}
+    <GuestAttentionPanel propertyId={propertyId}/>
+    <GuestDuplicateWatch propertyId={propertyId}/>
     <div className={s.workspace}>
       <aside className={s.indexPanel}>
         <div className={s.indexHead}><div><small>ÍNDICE DEL GUESTBOOK</small><b>{data.totalProfiles} perfiles</b><em>{data.limited&&!debouncedQuery?`Mostrando ${data.guests.length} recientes`:debouncedQuery?`${data.guests.length} resultados`:"Todos cargados"}</em></div><span className={s.signalPill}>{signalCount} señales</span></div>

@@ -3,8 +3,7 @@
 import{useSearchParams}from"next/navigation"
 import ReservationsWorkspaceBase from"./ReservationsWorkspaceBase"
 import ReservationDuplicateWatch from"./ReservationDuplicateWatch"
-import GuestAttentionPanel from"./GuestAttentionPanel"
-import GuestDuplicateWatch from"./GuestDuplicateWatch"
+import ReservationOperationalRules from"./ReservationOperationalRules"
 import hotel from"./reservationsHotelOs.module.css"
 
 export default function ReservationsWorkspace(props){
@@ -14,8 +13,7 @@ export default function ReservationsWorkspace(props){
   const effectiveFocusId=props.focusReservationId??urlReservationId
   return <div className={hotel.reservationsOs}>
     {!recordOpen?<>
-      <GuestAttentionPanel propertyId={props.propertyId}/>
-      <GuestDuplicateWatch propertyId={props.propertyId}/>
+      <ReservationOperationalRules propertyId={props.propertyId}/>
       <ReservationDuplicateWatch propertyId={props.propertyId}/>
     </>:null}
     <ReservationsWorkspaceBase {...props} focusReservationId={effectiveFocusId}/>
