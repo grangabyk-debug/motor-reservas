@@ -12,14 +12,20 @@ export const capacity=room=>Math.max(1,Number(room?.capacidad)||1)
 export const roundMoney=value=>Math.round((Number(value)||0)*100)/100
 
 const releasedRoomIds=item=>new Set(Object.entries(item?.room_checkout_dates||{}).filter(([,value])=>validDate(value)).map(([id])=>String(id)))
-const activeRoomIds=item=>{
+export const activeReservationRoomIds=item=>{
   const all=unique([item?.habitacion_id,...(item?.habitaciones_ids||[])])
-  const released=releasedRoomIds(item),active=all.filter(id=>!released.has(id))
-  return active.length?active:all
+  const released=releasedRoomIds(item)
+  const details=Array.isArray(item?.habitaciones_detalle)?item.habitaciones_detalle:[]
+  const historical=new Set(details.filter(detail=>String(detail?.segment_role||"").toLowerCase()==="previous_room").map(detail=>String(detail?.habitacion_id||"")).filter(Boolean))
+  const active=all.filter(id=>!released.has(id)&&!historical.has(id))
+  if(active.length)return active
+  const marked=details.filter(detail=>String(detail?.segment_role||"").toLowerCase()==="active_room").map(detail=>String(detail?.habitacion_id||"")).filter(Boolean)
+  if(marked.length)return unique(marked)
+  return item?.habitacion_id?[String(item.habitacion_id)]:all
 }
 
 export function initialReservationEditDraft(item,assigned){
-  const ids=activeRoomIds(item),details=Array.isArray(item.habitaciones_detalle)?item.habitaciones_detalle:[],roomAssignments={}
+  const ids=activeReservationRoomIds(item),details=Array.isArray(item.habitaciones_detalle)?item.habitaciones_detalle:[],roomAssignments={}
   for(const id of ids){const room=assigned.find(value=>String(value.id)===id),detail=details.find(value=>String(value?.habitacion_id)===id)||{},beds=detail.rooming||{};roomAssignments[id]={soldAs:detail.categoria_vendida||room?.tipo||"Habitación",guests:Math.max(0,Number(detail.huespedes)||0),matrimonial:Math.max(0,Number(beds.matrimonial)||0),individual:Math.max(0,Number(beds.individual)||0),rate:Number(detail.tarifa_noche)||Number(room?.precio)||Number(item.tarifa_noche)||0}}
   const earlyAmount=Math.max(0,Number(item.early_checkin_importe)||0),lateAmount=Math.max(0,Number(item.late_checkout_importe)||0)
   const taxEnabled=Boolean(item.impuestos_desglosados),storedNet=Math.max(0,Number(item.precio_sin_impuestos_nacionales)||Number(item.subtotal)||0),storedVat=Math.max(0,Number(item.iva_importe)||0),vatRate=taxEnabled?Math.max(0,Number(item.iva_porcentaje)||(storedNet>0?roundMoney(storedVat/storedNet*100):0)):0
