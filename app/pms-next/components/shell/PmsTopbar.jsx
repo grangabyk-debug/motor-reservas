@@ -10,7 +10,7 @@ import c from"./pmsTopbarControls.module.css"
 import glass from"./pmsGlassShell.module.css"
 import PmsIcon from"./PmsIcons"
 
-export default function PmsTopbar({title,info,theme,onToggleTheme,onNewReservation,onNewQuote,onOpenSearch,onOpenActivity,onOpenNotifications,notificationCount=0,onOpenSupport,timeZone}){
+export default function PmsTopbar({title,info,theme,onToggleTheme,onNewReservation,onNewQuote,onOpenSearch,onOpenActivity,onOpenNotifications,notificationCount=0,onOpenSupport,onTitleClick,timeZone}){
   const[now,setNow]=useState(()=>new Date())
   useEffect(()=>{const timer=setInterval(()=>setNow(new Date()),30000);return()=>clearInterval(timer)},[])
   const clock=useMemo(()=>{const zone=timeZone||Intl.DateTimeFormat().resolvedOptions().timeZone;try{return{date:new Intl.DateTimeFormat("es-AR",{weekday:"short",day:"2-digit",month:"short",timeZone:zone}).format(now),time:new Intl.DateTimeFormat("es-AR",{hour:"2-digit",minute:"2-digit",hour12:false,timeZone:zone}).format(now)}}catch{return{date:new Intl.DateTimeFormat("es-AR",{weekday:"short",day:"2-digit",month:"short"}).format(now),time:new Intl.DateTimeFormat("es-AR",{hour:"2-digit",minute:"2-digit",hour12:false}).format(now)}}},[now,timeZone])
@@ -21,7 +21,7 @@ export default function PmsTopbar({title,info,theme,onToggleTheme,onNewReservati
   return <header className={`${s.topbar} ${glass.topbarGlass} ${os.shellHook} ${interactions.hook} ${dashboardOs.hook} ${density.hook}`}>
     <div className={s.topbarTitle}>
       <small>HABITACIÓN LLENA</small>
-      <span style={{display:"flex",alignItems:"center",gap:6}}><b>{title}</b>{info?<button type="button" aria-label={`Información sobre ${title}`} title={info} className={glass.toolGlass} style={{width:18,height:18,padding:0,border:"1px solid var(--lineStrong)",borderRadius:"50%",background:"color-mix(in srgb,var(--panelSolid) 60%,transparent)",color:"var(--muted)",lineHeight:1,cursor:"help",display:"grid",placeItems:"center"}}><PmsIcon name="info" size={12}/></button>:null}</span>
+      <span style={{display:"flex",alignItems:"center",gap:6}}>{onTitleClick?<button type="button" onClick={onTitleClick} aria-label={`Volver a ${title}`} title={`Volver a ${title}`} style={{border:0,padding:0,background:"transparent",color:"inherit",font:"inherit",fontWeight:900,cursor:"pointer",textAlign:"left"}}>{title}</button>:<b>{title}</b>}{info?<button type="button" aria-label={`Información sobre ${title}`} title={info} className={glass.toolGlass} style={{width:18,height:18,padding:0,border:"1px solid var(--lineStrong)",borderRadius:"50%",background:"color-mix(in srgb,var(--panelSolid) 60%,transparent)",color:"var(--muted)",lineHeight:1,cursor:"help",display:"grid",placeItems:"center"}}><PmsIcon name="info" size={12}/></button>:null}</span>
     </div>
     <button className={`${s.globalSearch} ${glass.searchGlass}`} type="button" onClick={onOpenSearch}><span style={{display:"grid",placeItems:"center"}}><PmsIcon name="search" size={15}/></span><span>Buscar huésped, reserva o habitación…</span><kbd>Ctrl K</kbd></button>
     <div className={s.topbarActions}>
