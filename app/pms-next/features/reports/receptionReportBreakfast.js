@@ -39,7 +39,10 @@ function relevantGuests(guests,day){
     const key=guestKey(guest)
     if(key&&!map.has(key))map.set(key,guest)
   }
-  return[...map.values()]
+  return[...map.values()].sort((a,b)=>{
+    const aPrimary=normalized(a?.role)==="primary"?0:1,bPrimary=normalized(b?.role)==="primary"?0:1
+    return aPrimary-bPrimary||(Number(a?.sort_order)||0)-(Number(b?.sort_order)||0)
+  })
 }
 
 function ageAt(birthDate,day){
@@ -58,7 +61,7 @@ export function breakfastOccupancy({reservation,day,roomMap,guests=[]}){
   const details=activeDetails(reservation),detailPax=details.reduce((sum,detail)=>sum+Math.max(0,Number(detail?.huespedes)||0),0),storedPax=Math.max(0,Number(reservation?.cantidad_huespedes)||0)
   const pax=detailPax>0?detailPax:storedPax>0?storedPax:fallbackCapacity(reservation,roomMap)
   const source=detailPax>0?"Distribución cargada en la reserva":storedPax>0?"Cantidad de huéspedes de la ficha":"Capacidad predeterminada de la habitación"
-  const registered=relevantGuests(guests,day)
+  const registered=relevantGuests(guests,day).slice(0,pax)
   let adults=0,minors=0,unknownBirth=0
   for(const guest of registered){
     const age=ageAt(guest.birth_date,day)
@@ -68,9 +71,11 @@ export function breakfastOccupancy({reservation,day,roomMap,guests=[]}){
   }
   const missing=Math.max(0,pax-registered.length),unknown=Math.max(0,unknownBirth+missing)
   const parts=[]
-  if(adults)parts.push(label(adults,"adulto","adultos"))
-  if(minors)parts.push(label(minors,"menor","menores"))
-  if(unknown)parts.push(`${unknown} s/d edad`)
-  if(!parts.length)parts.push(label(pax,"pasajero","pasajeros"))
+  if(!adults&&!minors)parts.push(label(pax,"pasajero","pasajeros"))
+  else{
+    if(adults)parts.push(label(adults,"adulto","adultos"))
+    if(minors)parts.push(label(minors,"menor","menores"))
+    if(unknown)parts.push(`${unknown} s/d edad`)
+  }
   return{pax,adults,minors,unknown,composition:parts.join(" · "),source}
 }

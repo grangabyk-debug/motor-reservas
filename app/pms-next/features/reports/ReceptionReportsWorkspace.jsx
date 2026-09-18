@@ -61,7 +61,7 @@ export default function ReceptionReportsWorkspace({propertyId,property}){
       const taskRows=taskRes.data||[],reservationRows=reservationRes.data||[],profileIds=[...new Set(taskRows.map(row=>row.assigned_to).filter(Boolean))],reservationIds=reservationRows.map(row=>row.id).filter(Boolean)
       const[profileRes,guestRes]=await Promise.all([
         profileIds.length?supabase.from("profiles").select("id,full_name").in("id",profileIds):Promise.resolve({data:[],error:null}),
-        reservationIds.length?supabase.from("hotel_reservation_guests").select("id,reservation_id,room_id,guest_profile_id,full_name,birth_date,stay_from,stay_to,checked_out_at").in("reservation_id",reservationIds):Promise.resolve({data:[],error:null}),
+        reservationIds.length?supabase.from("hotel_reservation_guests").select("id,reservation_id,room_id,guest_profile_id,role,sort_order,full_name,birth_date,stay_from,stay_to,checked_out_at").in("reservation_id",reservationIds):Promise.resolve({data:[],error:null}),
       ])
       if(profileRes.error)throw profileRes.error
       if(guestRes.error)throw guestRes.error
