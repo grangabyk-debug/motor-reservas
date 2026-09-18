@@ -12,8 +12,6 @@ export function buildChargeLines(items=[],allocations=[],payments=[],reservation
     const id=String(row.folio_item_id||"")
     paidByItem.set(id,roundMoney((paidByItem.get(id)||0)+Math.max(0,Number(row.amount)||0)))
   }
-  const explicitTotal=[...paidByItem.values()].reduce((sum,value)=>sum+value,0)
-  let legacyPaid=Math.max(0,roundMoney(paidTotal(payments)-explicitTotal))
   const active=(items||[]).filter(row=>row&&row.status==="active")
   let discount=Math.abs(active.filter(row=>Number(row.total)<0).reduce((sum,row)=>sum+Number(row.total||0),0))
   const lines=[]
@@ -27,6 +25,8 @@ export function buildChargeLines(items=[],allocations=[],payments=[],reservation
   }
   const target=Math.max(0,Number(reservationTotal)||0),sum=roundMoney(lines.reduce((acc,line)=>acc+line.amount,0))
   if(lines.length&&Math.abs(target-sum)>.009){const delta=roundMoney(target-sum),last=lines[lines.length-1];if(last.amount+delta>=0)last.amount=roundMoney(last.amount+delta)}
+  const cappedExplicitTotal=roundMoney(lines.reduce((sum,line)=>sum+Math.min(line.amount,Math.max(0,paidByItem.get(line.id)||0)),0))
+  let legacyPaid=Math.max(0,roundMoney(paidTotal(payments)-cappedExplicitTotal))
   for(const line of lines){const explicit=Math.min(line.amount,Math.max(0,paidByItem.get(line.id)||0)),afterExplicit=roundMoney(Math.max(0,line.amount-explicit)),inherited=Math.min(afterExplicit,legacyPaid);legacyPaid=roundMoney(Math.max(0,legacyPaid-inherited));line.paid=roundMoney(explicit+inherited);line.remaining=roundMoney(Math.max(0,line.amount-line.paid))}
   return lines
 }
