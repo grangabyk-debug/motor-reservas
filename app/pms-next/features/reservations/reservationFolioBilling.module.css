@@ -97,7 +97,10 @@
 .scopeButtons{display:flex;gap:7px;margin-top:10px}
 .scopeButtons button{height:34px;padding:0 12px;border-radius:10px}
 .scopeButtons .scopeActive{border-color:color-mix(in srgb,var(--accent) 34%,var(--line));background:linear-gradient(145deg,color-mix(in srgb,var(--accent) 12%,var(--panelSolid)),color-mix(in srgb,var(--accent2) 8%,var(--panelSolid)));color:var(--accent);box-shadow:0 6px 16px color-mix(in srgb,var(--accent) 9%,transparent)}
-.paymentPicker{margin:0 0 12px!important}
+.paymentPicker{margin:0 0 12px!important;padding:11px 12px 12px;border:1px solid color-mix(in srgb,var(--accent) 44%,var(--line));border-radius:13px;background:color-mix(in srgb,var(--accent) 4%,var(--panelSolid));box-shadow:0 7px 18px color-mix(in srgb,var(--accent) 7%,transparent)}
+.paymentPicker>span{font-weight:900!important;color:var(--text)!important}
+.paymentPicker select{border-color:color-mix(in srgb,var(--accent) 48%,var(--line));background:linear-gradient(145deg,color-mix(in srgb,var(--accent) 5%,var(--panelSolid)),var(--panelSolid));font-weight:750}
+.paymentPicker select:focus{border-color:var(--accent)!important;box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 10%,transparent)!important}
 
 .invoiceLines{margin:19px 0 14px}
 .invoiceLines>header{display:flex;align-items:center;justify-content:space-between;gap:10px}
