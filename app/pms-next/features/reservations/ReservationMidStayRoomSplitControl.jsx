@@ -61,7 +61,8 @@ export default function ReservationMidStayRoomSplitControl({item,rooms=[],proper
   const rateDifference=reprice?quoteDelta:0
   const hasRateDifference=rateQuote?Math.abs(Number(rateQuote.local_delta)||0)>.005:false
   const minSplitDate=sourceStart?addDays(sourceStart,1):""
-  const maxSplitDate=sourceEnd?minDate(today,addDays(sourceEnd,-1)):today
+  const maxSplitDate=sourceEnd?addDays(sourceEnd,-1):today
+  const scheduled=Boolean(effectiveDate&&effectiveDate>today)
   const movementLocked=String(sourceDetail?.movement_locked||"").toLowerCase()==="true"||sourceDetail?.movement_locked===true
   const movementLockReason=String(sourceDetail?.movement_lock_reason||"").trim()
 
@@ -83,11 +84,11 @@ export default function ReservationMidStayRoomSplitControl({item,rooms=[],proper
       const row=reservationRes.data,active=activeRoomIds(row,today)
       if(String(row.estado||"").toLowerCase()!=="alojado")throw new Error("La reserva ya no está alojada.")
       if(active.length!==1)throw new Error(active.length>1?"Esta reserva tiene varias habitaciones activas. Cambiá la habitación desde el rooming del grupo.":"No encontramos una habitación activa para dividir.")
-      const source=active[0],start=roomStart(row,source),end=plannedEnd(row,source),minimum=addDays(start,1),maximum=minDate(today,addDays(end,-1))
+      const source=active[0],start=roomStart(row,source),end=plannedEnd(row,source),minimum=addDays(start,1),maximum=addDays(end,-1),suggested=today<minimum?minimum:today>maximum?maximum:today
       if(!minimum||!maximum||maximum<minimum)throw new Error("Todavía no hay un corte de noche válido para dividir esta estadía. Si el cambio ocurre el mismo día del ingreso, usá el cambio de habitación normal.")
       const detail=detailFor(row,source)
       if(String(detail?.movement_locked||"").toLowerCase()==="true"||detail?.movement_locked===true)throw new Error(`El movimiento de esta habitación está bloqueado${detail?.movement_lock_reason?`: ${detail.movement_lock_reason}`:""}.`)
-      setFresh(row);setAllRooms(roomRes.data||[]);setEffectiveDate(maximum);setTargetId("");setReason("");setReprice(false);setRateQuote(null);setQuoteLoading(false);setOpen(true)
+      setFresh(row);setAllRooms(roomRes.data||[]);setEffectiveDate(suggested);setTargetId("");setReason("");setReprice(false);setRateQuote(null);setQuoteLoading(false);setOpen(true)
     }catch(err){emit({tone:"error",title:"No se puede dividir la reserva",message:err?.message||"No se pudo preparar el cambio de habitación.",duration:4800})}
     finally{setLoading(false)}
   }
@@ -167,7 +168,7 @@ export default function ReservationMidStayRoomSplitControl({item,rooms=[],proper
         window.dispatchEvent(new CustomEvent("hl:pms-reservation-updated",{detail:{reservationId:Number(item.id),propertyId}}))
         window.dispatchEvent(new CustomEvent("hl:pms-data-updated",{detail:{propertyId,tables:["reservas","habitaciones","hotel_folios","hotel_folio_items","hotel_reservation_events"]}}))
       }
-      emit({title:"Reserva dividida",message:`Habitación ${sourceRoom?.nombre||sourceId} hasta ${fmtDate(effectiveDate)} · Habitación ${target?.nombre||targetId} desde esa fecha. Se conservaron dos folios separados.`,duration:5200})
+      emit({title:scheduled?"Cambio de habitación programado":"Reserva dividida",message:`Habitación ${sourceRoom?.nombre||sourceId} hasta ${fmtDate(effectiveDate)} · Habitación ${target?.nombre||targetId} desde esa fecha. ${scheduled?"La habitación actual sigue operativa hasta el día del cambio.":"Se conservaron dos folios separados."}`,duration:5200})
       setFresh(data||null)
     }catch(err){setError(err?.message||"No se pudo dividir la reserva.")}
     finally{setSaving(false)}
@@ -200,7 +201,7 @@ export default function ReservationMidStayRoomSplitControl({item,rooms=[],proper
         </div>
 
         <div className={s.formGrid}>
-          <label><span>Fecha del cambio</span><input type="date" min={minSplitDate} max={maxSplitDate} value={effectiveDate} disabled={saving} onChange={event=>{setEffectiveDate(event.target.value);setTargetId("");setReprice(false);setRateQuote(null)}}/><small>El tramo anterior termina ese día y el nuevo empieza desde esa misma fecha.</small></label>
+          <label><span>Fecha del cambio</span><input type="date" min={minSplitDate} max={maxSplitDate} value={effectiveDate} disabled={saving} onChange={event=>{setEffectiveDate(event.target.value);setTargetId("");setReprice(false);setRateQuote(null)}}/><small>{scheduled?"Cambio programado: la habitación actual sigue vigente hasta esa fecha y el nuevo tramo queda reservado desde ese día.":"El tramo anterior termina ese día y el nuevo empieza desde esa misma fecha."}</small></label>
           <label><span>Habitación de destino</span><select value={targetId} disabled={saving||checking} onChange={event=>{setTargetId(event.target.value);setReprice(false);setRateQuote(null);setError("")}}><option value="">{checking?"Comprobando disponibilidad…":"Seleccionar habitación"}</option>{targetRooms.map(room=>{const unavailable=availability.get(Number(room.id));return <option key={room.id} value={room.id} disabled={Boolean(unavailable)}>Hab. {room.nombre} · {room.tipo||"Habitación"}{unavailable?` · ${unavailable}`:room.estado&&!["limpia","inspeccionada","libre"].includes(String(room.estado).toLowerCase())?` · ${room.estado}`:""}</option>})}</select><small>Solo aparecen como elegibles habitaciones libres durante todo el tramo restante.</small></label>
         </div>
 
@@ -208,7 +209,7 @@ export default function ReservationMidStayRoomSplitControl({item,rooms=[],proper
 
         {target?<section className={s.rateBox}>
           <div><small>TARIFA DEL NUEVO TRAMO · {remainingNights} noche{remainingNights===1?"":"s"}</small><b>{quoteLoading?"Calculando diferencia…":rateQuote?<>Tarifa hotel {money(rateQuote.source_local_rate,rateQuote.property_currency)} → {money(rateQuote.target_local_rate,rateQuote.property_currency)}</>:<>{money(currentRate,fresh?.moneda||item.moneda)} · esperando cálculo</>}</b>{rateQuote&&String(rateQuote.property_currency)!==String(rateQuote.reservation_currency)?<small style={{display:"block",marginTop:4}}>La reserva está en {rateQuote.reservation_currency}. Se convierte sólo la diferencia con TC {Number(rateQuote.fx_rate||0).toLocaleString("es-AR")} ({rateQuote.fx_source||"cotización configurada"}).</small>:null}</div>
-          {quoteLoading?<span className={s.sameRate}>Consultando las tarifas vigentes de ambas categorías…</span>:rateQuote&&hasRateDifference?<div className={s.rateOptions}><label><input type="radio" name="split-rate" checked={!reprice} onChange={()=>setReprice(false)}/><span><b>Mantener tarifa actual</b><small>{money(currentRate,fresh?.moneda||item.moneda)} por noche · no cambia el total ya acordado</small></span></label><label><input type="radio" name="split-rate" checked={reprice} onChange={()=>setReprice(true)}/><span><b>Aplicar diferencia de categoría</b><small>{money(rateQuote.local_delta,rateQuote.property_currency)} de diferencia · {Number(rateQuote.reservation_delta)>=0?"+":""}{money(rateQuote.reservation_delta,rateQuote.reservation_currency)} al saldo · nueva tarifa del tramo {money(rateQuote.target_booked_rate,rateQuote.reservation_currency)}</small></span></label></div>:rateQuote?<span className={s.sameRate}>La habitación nueva tiene la misma tarifa para este tramo.</span>:<span className={s.sameRate}>No se pudo obtener una cotización de tarifa. Podés mantener la tarifa actual o volver a elegir la habitación.</span>}
+          {quoteLoading?<span className={s.sameRate}>Consultando las tarifas vigentes de ambas categorías…</span>:rateQuote&&hasRateDifference?<div className={s.rateOptions}><label><input type="radio" name="split-rate" checked={!reprice} onChange={()=>setReprice(false)}/><span><b>Mantener tarifa actual</b><small>{money(currentRate,fresh?.moneda||item.moneda)} por noche · no cambia el total ya acordado</small></span></label><label><input type="radio" name="split-rate" checked={reprice} onChange={()=>setReprice(true)}/><span><b>Aplicar diferencia de categoría</b><small>{money(rateQuote.local_delta,rateQuote.property_currency)} de diferencia · {Number(rateQuote.reservation_final_delta)>=0?"+":""}{money(rateQuote.reservation_final_delta,rateQuote.reservation_currency)} al total · nueva tarifa final del tramo {money(rateQuote.target_reservation_final_rate,rateQuote.reservation_currency)}</small></span></label></div>:rateQuote?<span className={s.sameRate}>La habitación nueva tiene la misma tarifa para este tramo.</span>:<span className={s.sameRate}>No se pudo obtener una cotización de tarifa. Podés mantener la tarifa actual o volver a elegir la habitación.</span>}
         </section>:null}
 
         <section className={s.folios}>
@@ -220,7 +221,7 @@ export default function ReservationMidStayRoomSplitControl({item,rooms=[],proper
           <p>Los cargos ya registrados permanecen en su folio. Si un consumo debe pasar al nuevo tramo, se puede transferir entre folios desde la cuenta de la reserva.</p>
         </section>
 
-        <footer className={s.footer}><button type="button" className={s.cancel} disabled={saving} onClick={()=>setOpen(false)}>Cancelar</button><button type="button" className={s.confirm} disabled={saving||checking||quoteLoading||!targetId||!reason.trim()||(reprice&&!rateQuote)} onClick={confirm}>{saving?"Dividiendo…":quoteLoading?"Calculando tarifa…":"Confirmar división"}</button></footer>
+        <footer className={s.footer}><button type="button" className={s.cancel} disabled={saving} onClick={()=>setOpen(false)}>Cancelar</button><button type="button" className={s.confirm} disabled={saving||checking||quoteLoading||!targetId||!reason.trim()||(reprice&&!rateQuote)} onClick={confirm}>{saving?"Guardando…":quoteLoading?"Calculando tarifa…":scheduled?"Programar cambio":"Confirmar división"}</button></footer>
       </section>
     </div>:null}
   </>

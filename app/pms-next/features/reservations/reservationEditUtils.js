@@ -15,11 +15,13 @@ const releasedRoomIds=item=>new Set(Object.entries(item?.room_checkout_dates||{}
 export const activeReservationRoomIds=item=>{
   const all=unique([item?.habitacion_id,...(item?.habitaciones_ids||[])])
   const released=releasedRoomIds(item)
-  const details=Array.isArray(item?.habitaciones_detalle)?item.habitaciones_detalle:[]
+  const details=Array.isArray(item?.habitaciones_detalle)?item.habitaciones_detalle:[],today=dateKey(new Date())
+  const dated=details.filter(detail=>{const role=String(detail?.segment_role||"active_room").toLowerCase(),start=String(detail?.fecha_entrada||item?.fecha_entrada||"").slice(0,10),end=String(detail?.fecha_salida||item?.fecha_salida||"").slice(0,10);return role!=="previous_room"&&role!=="transient_room"&&validDate(start)&&validDate(end)&&start<=today&&end>today}).map(detail=>String(detail?.habitacion_id||"")).filter(Boolean)
+  if(dated.length)return unique(dated)
   const historical=new Set(details.filter(detail=>String(detail?.segment_role||"").toLowerCase()==="previous_room").map(detail=>String(detail?.habitacion_id||"")).filter(Boolean))
   const active=all.filter(id=>!released.has(id)&&!historical.has(id))
   if(active.length)return active
-  const marked=details.filter(detail=>String(detail?.segment_role||"").toLowerCase()==="active_room").map(detail=>String(detail?.habitacion_id||"")).filter(Boolean)
+  const marked=details.filter(detail=>["active_room","scheduled_room"].includes(String(detail?.segment_role||"").toLowerCase())).map(detail=>String(detail?.habitacion_id||"")).filter(Boolean)
   if(marked.length)return unique(marked)
   return item?.habitacion_id?[String(item.habitacion_id)]:all
 }
