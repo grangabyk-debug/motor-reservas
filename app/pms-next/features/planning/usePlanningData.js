@@ -4,6 +4,7 @@ import{useCallback,useEffect,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 import{attachPayments}from"./planningPayment"
 import{normalizeTaxSettings,roundInternalPrice,roundPrice}from"../../core/priceTax"
+import{pricingRoomsById,resolvePricingQuote}from"../../core/pricingContract"
 
 const DAY=86400000
 const nightsBetween=(start,end)=>Math.max(1,Math.round((new Date(`${end}T12:00:00`)-new Date(`${start}T12:00:00`))/DAY))
@@ -72,31 +73,18 @@ export default function usePlanningData(propertyId,windowStart,windowEndExclusiv
     const maintenanceBoundary=boundaryBlocks.filter(isMaintenanceBlock),expectedMaintenanceAck=maintenanceAckKey(maintenanceBoundary);if(expectedMaintenanceAck&&draft.maintenanceCheckoutAckKey!==expectedMaintenanceAck){const first=maintenanceBoundary[0],blockedRoom=selectedRooms.find(room=>Number(room.id)===Number(first.habitacion_id));throw new Error(`La habitación ${blockedRoom?.nombre||first.habitacion_id} tiene mantenimiento programado el día de salida. Confirmá que se hará después del check-out para continuar.`)}
     const maintenanceByRoom=new Map(maintenanceBoundary.map(item=>[String(item.habitacion_id),item]))
 
-    const roomAssignments=draft.roomAssignments||{},isGroup=roomIds.length>1,nights=nightsBetween(draft.start,draft.end),dates=stayDateKeys(draft.start,draft.end),allRoomIds=uniqueNumeric(rooms.map(room=>room.id)),pricing=new Map()
-    const[calendarRes,settingsRes]=await Promise.all([
-      supabase.from("hotel_rate_calendar").select("habitacion_id,stay_date,price").eq("property_id",propertyId).in("habitacion_id",allRoomIds).gte("stay_date",draft.start).lt("stay_date",draft.end),
-      supabase.from("property_settings").select("settings").eq("property_id",propertyId).maybeSingle(),
-    ])
-    if(calendarRes.error)throw calendarRes.error;if(settingsRes.error)throw settingsRes.error
-    const byDay=new Map((calendarRes.data||[]).map(row=>[`${Number(row.habitacion_id)}:${row.stay_date}`,Number(row.price)])),categoryRooms=new Map()
-    for(const room of rooms){const key=String(room.tipo||"Habitación").trim();if(!categoryRooms.has(key))categoryRooms.set(key,[]);categoryRooms.get(key).push(room)}
-    function categoryPrice(category,day){
-      const candidates=categoryRooms.get(category)||[],values=candidates.map(room=>byDay.get(`${Number(room.id)}:${day}`)).filter(Number.isFinite)
-      if(!values.length)throw new Error(`Falta una tarifa de calendario para la categoría vendida ${category} el ${day}. Definila o elegí una tarifa manual explícita.`)
-      const anchor=values[0],different=values.some(value=>Math.abs(value-anchor)>.005)
-      if(different)throw new Error(`La categoría ${category} tiene tarifas distintas entre habitaciones el ${day}. Elegí una tarifa manual para esta reserva o unificá la categoría en Tarifas y disponibilidad.`)
-      return anchor
-    }
+    const roomAssignments=draft.roomAssignments||{},isGroup=roomIds.length>1,nights=nightsBetween(draft.start,draft.end),pricing=new Map()
+    const resolvedPricing=await resolvePricingQuote({propertyId,start:draft.start,end:draft.end,roomIds,reservationCurrency:draft.currency||null})
+    const resolvedByRoom=pricingRoomsById(resolvedPricing)
     for(const room of selectedRooms){
       const assignment=roomAssignments[String(room.id)]||{},soldAs=String(assignment.soldAs||room.tipo||"Habitación").trim(),manual=assignment.manualRate===true
       if(manual){const manualRate=Math.max(0,Number(assignment.rate)||0);pricing.set(Number(room.id),{rate:manualRate,total:roundInternalPrice(manualRate*nights),source:"manual",category:soldAs});continue}
-      const sameCategory=soldAs===String(room.tipo||"Habitación").trim();let fallbackDays=0
-      const values=dates.map(day=>{if(!sameCategory)return categoryPrice(soldAs,day);const calendar=byDay.get(`${Number(room.id)}:${day}`);if(Number.isFinite(calendar))return calendar;fallbackDays++;return Math.max(0,Number(room.precio)||0)}),missingIndex=values.findIndex(value=>!Number.isFinite(value))
-      if(missingIndex>=0)throw new Error(`No se pudo resolver una tarifa para la habitación ${room.nombre} el ${dates[missingIndex]}. Revisá Tarifas y disponibilidad.`)
-      const roomTotal=roundInternalPrice(values.reduce((sum,value)=>sum+value,0)),average=roundInternalPrice(roomTotal/Math.max(1,dates.length)),source=sameCategory?(fallbackDays?"calendar_room_with_base_fallback":"calendar_room"):"calendar_sold_category";pricing.set(Number(room.id),{rate:average,total:roomTotal,source,category:soldAs})
+      if(soldAs!==String(room.tipo||"Habitación").trim())throw new Error(`La categoría vendida ${soldAs} no coincide con la habitación ${room.nombre}. Revalidá la tarifa antes de crear la reserva.`)
+      const quote=resolvedByRoom.get(Number(room.id))
+      if(!quote?.is_complete)throw new Error(`Falta configurar una tarifa de calendario para ${room.nombre} en alguna noche del rango. Revisá Tarifas y disponibilidad.`)
+      pricing.set(Number(room.id),{rate:Number(quote.average_net)||0,total:Number(quote.total_net)||0,source:quote.rate_source||"central_pricing",category:soldAs,pricingVersion:2})
     }
-    const groupTaxes=normalizeTaxSettings(settingsRes.data?.settings?.taxes||{})
-
+    const groupTaxes=normalizeTaxSettings({enabled:resolvedPricing.taxes_enabled,vat_rate:resolvedPricing.vat_rate,price_tax_mode:resolvedPricing.tax_mode})
     const requestedGuests=Math.max(1,Number(draft.guests)||1),details=selectedRooms.map(room=>{const assignment=roomAssignments[String(room.id)]||{},resolved=pricing.get(Number(room.id)),soldAs=String(assignment.soldAs||room.tipo||"Habitación").trim(),maintenanceBlock=maintenanceByRoom.get(String(room.id));return{habitacion_id:Number(room.id),nombre:room.nombre,categoria_asignada:room.tipo||"Habitación",categoria_vendida:soldAs,huespedes:Math.max(0,Number(assignment.guests)||0),tarifa_noche:resolved.rate,tarifa_fuente:resolved.source,tarifa_categoria:resolved.category,tarifa_manual:resolved.source==="manual",fecha_entrada:draft.start,fecha_salida:draft.end,rooming:{matrimonial:Math.max(0,Number(assignment.matrimonial)||0),individual:Math.max(0,Number(assignment.individual)||0)},...(maintenanceBlock?{maintenance_checkout_ack:true,maintenance_checkout_block_id:Number(maintenanceBlock.id),maintenance_checkout_date:draft.end,maintenance_checkout_ack_at:new Date().toISOString()}: {})}}),assignedGuests=details.reduce((sum,item)=>sum+item.huespedes,0);if(assignedGuests!==requestedGuests)throw new Error(`Distribuí los ${requestedGuests} huésped${requestedGuests===1?"":"es"} entre las habitaciones seleccionadas antes de crear la reserva.`)
     const totalGuests=requestedGuests,defaultRate=details.reduce((sum,item)=>sum+item.tarifa_noche,0),rate=roundInternalPrice(defaultRate),subtotal=roundInternalPrice([...pricing.values()].reduce((sum,item)=>sum+item.total,0)),discountType=draft.discountType||"none",discountValue=Math.max(0,Number(draft.discountValue)||0),discountAmount=discountType==="percent"?Math.min(subtotal,subtotal*Math.min(100,discountValue)/100):discountType==="amount"?Math.min(subtotal,discountValue):0,total=Math.max(0,subtotal-discountAmount),reasonKey=String(draft.discountReason||"").trim(),reasonDetail=String(draft.discountReasonDetail||"").trim();if(discountAmount>0&&!reasonKey)throw new Error("Indicá el motivo del descuento antes de crear la reserva.");if(discountAmount>0&&reasonKey==="other"&&!reasonDetail)throw new Error("Especificá el motivo del descuento.");const reasonLabel=DISCOUNT_REASON_LABELS[reasonKey]||reasonKey,discountReason=discountAmount>0?`${reasonLabel}${reasonDetail?` · ${reasonDetail}`:""}`:null
     let taxPayload={},finalTotal=total
