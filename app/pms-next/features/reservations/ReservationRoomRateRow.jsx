@@ -3,7 +3,7 @@
 import{useMemo,useState}from"react"
 
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:2}).format(Number(value)||0)
-const fmtNight=value=>value?new Intl.DateTimeFormat("es-AR",{weekday:"short",day:"2-digit",month:"short"}).format(new Date(`${String(value).slice(0,10)}T12:00:00`)).replaceAll(".",""):"—"
+const fmtNight=value=>value?new Intl.DateTimeFormat("es-AR",{weekday:"short",day:"2-digit",month:"short"}).format(new Date(`${String(value).slice(0,10)}T12:00:00`)).replaceAll(".",""):"—"\nconst fmtStay=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"2-digit",year:"numeric"}).format(new Date(`${String(value).slice(0,10)}T12:00:00`)):"—"
 const round2=value=>Math.round((Number(value)||0)*100)/100
 
 function nightlyRows(detail,taxEnabled,vatRate){
@@ -32,7 +32,7 @@ export default function ReservationRoomRateRow({row,detail,currency="ARS",taxEna
     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:14,padding:"10px 12px"}}>
       <span style={{minWidth:0}}>
         <b>Hab. {row.name} · vendida como {row.soldAs}</b>
-        <small>Asignada: {row.physicalCategory}{changed?" · categoría física distinta":""} · {row.guests} huésped{row.guests===1?"":"es"} · {parts.length?parts.join(" + "):"Rooming sin configurar"}</small>
+        <small><b style={{color:"var(--text)",fontWeight:800}}>{fmtStay(row.start)} → {fmtStay(row.end)}</b> · Asignada: {row.physicalCategory}{changed?" · categoría física distinta":""} · {row.guests} huésped{row.guests===1?"":"es"} · {parts.length?parts.join(" + "):"Rooming sin configurar"}</small>
       </span>
       <span style={{display:"grid",justifyItems:"end",gap:3,flex:"0 0 auto",textAlign:"right"}}>
         <strong>{money(row.rate,currency)}</strong>
