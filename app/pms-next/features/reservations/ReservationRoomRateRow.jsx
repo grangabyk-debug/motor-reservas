@@ -31,12 +31,12 @@ export default function ReservationRoomRateRow({row,detail,currency="ARS",taxEna
 
   return <div style={{display:"block",padding:0}}>
     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:14,padding:"10px 12px"}}>
-      <span style={{minWidth:0}}>
-        <b>Hab. {row.name} · vendida como {row.soldAs}</b>
-        <small><b style={{color:"var(--text)",fontWeight:800}}>{fmtStay(row.start)} → {fmtStay(row.end)}</b> · Asignada: {row.physicalCategory}{changed?" · categoría física distinta":""} · {row.guests} huésped{row.guests===1?"":"es"} · {parts.length?parts.join(" + "):"Rooming sin configurar"}</small>
+      <span style={{minWidth:0,fontFamily:"inherit"}}>
+        <b style={{display:"block",fontSize:11,fontWeight:850,lineHeight:1.35}}>Hab. {row.name} · vendida como {row.soldAs} · {fmtStay(row.start)} → {fmtStay(row.end)}</b>
+        <small style={{display:"block",marginTop:2,fontSize:11,lineHeight:1.35,fontFamily:"inherit",color:"var(--muted)"}}>Asignada: {row.physicalCategory}{changed?" · categoría física distinta":""} · {row.guests} huésped{row.guests===1?"":"es"} · {parts.length?parts.join(" + "):"Rooming sin configurar"}</small>
       </span>
       <span style={{display:"grid",justifyItems:"end",gap:3,flex:"0 0 auto",textAlign:"right"}}>
-        <strong>{money(row.rate,currency)}</strong>
+        <strong style={{fontSize:11,fontFamily:"inherit"}}>{money(row.rate,currency)}</strong>
         <small style={{marginTop:0,fontWeight:650,color:"var(--muted)"}}>{varied?"promedio/noche":"/ noche"}</small>
         {canExpand?<button type="button" onClick={()=>setOpen(value=>!value)} aria-expanded={open} style={{border:0,padding:0,background:"transparent",color:"var(--accent)",font:"inherit",fontSize:9.5,fontWeight:850,cursor:"pointer"}}>{open?"Ocultar detalle":"Ver detalle de tarifas"}</button>:null}
       </span>
