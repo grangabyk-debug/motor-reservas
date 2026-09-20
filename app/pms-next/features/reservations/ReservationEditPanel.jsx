@@ -12,7 +12,7 @@ import ReservationMergeDialog from"./ReservationMergeDialog"
 import{activeReservationRoomIds,addDays,buildReservationMetadataPatch,capacity,diffDays,initialReservationEditDraft,money,originalNightlyRate,roundMoney,unique}from"./reservationEditUtils"
 
 export default function ReservationEditPanel({item,assignedRooms=[],allRooms=[],saving=false,onCancel,onPreviewMove,onMove,onUpdate,onAddRoom,onMerge=async(primaryId,secondaryId)=>{const{data,error}=await supabase.rpc("hl_merge_reservations_atomic",{p_primary_id:Number(primaryId),p_secondary_id:Number(secondaryId)});if(error)throw error;return data},onSaved}){
-  const[draft,setDraft]=useState(()=>initialReservationEditDraft(item,assignedRooms)),[error,setError]=useState(""),[availabilityError,setAvailabilityError]=useState(""),[availabilityOk,setAvailabilityOk]=useState(""),[checkingAvailability,setCheckingAvailability]=useState(false),[pending,setPending]=useState(null),[working,setWorking]=useState(false),[stayFees,setStayFees]=useState({early_checkin_percent:35,late_checkout_percent:35,early_checkin_time:"08:00",late_checkout_time:"18:00"}),[mergeOpen,setMergeOpen]=useState(false)
+  const[draft,setDraft]=useState(()=>initialReservationEditDraft(item,assignedRooms)),[error,setError]=useState(""),[availabilityError,setAvailabilityError]=useState(""),[availabilityOk,setAvailabilityOk]=useState(""),[checkingAvailability,setCheckingAvailability]=useState(false),[pending,setPending]=useState(null),[roomDecision,setRoomDecision]=useState(null),[working,setWorking]=useState(false),[stayFees,setStayFees]=useState({early_checkin_percent:35,late_checkout_percent:35,early_checkin_time:"08:00",late_checkout_time:"18:00"}),[mergeOpen,setMergeOpen]=useState(false)
   const validationSeq=useRef(0)
   const ids=unique(draft.roomIds?.length?draft.roomIds:[draft.roomId]),isGroup=ids.length>1,currentIds=activeReservationRoomIds(item),allStoredIds=unique([item.habitacion_id,...(item.habitaciones_ids||[])]),hasRoomHistory=allStoredIds.length>currentIds.length||(Array.isArray(item.habitaciones_detalle)&&item.habitaciones_detalle.some(detail=>String(detail?.segment_role||"").toLowerCase()==="previous_room"))
   const selectedRooms=ids.map(id=>allRooms.find(room=>String(room.id)===id)||assignedRooms.find(room=>String(room.id)===id)).filter(Boolean)
@@ -48,10 +48,34 @@ export default function ReservationEditPanel({item,assignedRooms=[],allRooms=[],
   async function specialAvailability(nextEarly,nextLate){const start=nextEarly?addDays(draft.start,-1):draft.start,end=nextLate?addDays(draft.end,1):draft.end;for(const id of ids){const preview=await onPreviewMove({reservationId:item.id,roomId:Number(id),start,end});if(!preview?.ok)return{ok:false,message:String(preview?.message||"La habitación no está disponible.").replace(/^No se puede aplicar el cambio:\s*/,"")}}return{ok:true}}
   async function toggleSpecial(kind){const key=kind==="early"?"earlyCheckin":"lateCheckout",label=kind==="early"?"Early check-in":"Late check-out",next=!draft[key];if(!next){setDraft(current=>({...current,[key]:false}));setAvailabilityError("");setAvailabilityOk("");return}const seq=++validationSeq.current;setCheckingAvailability(true);setAvailabilityError("");setAvailabilityOk("");try{const result=await specialAvailability(kind==="early"?true:draft.earlyCheckin,kind==="late"?true:draft.lateCheckout);if(seq!==validationSeq.current)return;if(!result.ok){setAvailabilityError(`No se puede habilitar ${label}: ${result.message}`);return}setDraft(current=>({...current,[key]:true}));setAvailabilityOk(`${label} disponible · se protege el turno de la habitación en el Planning.`)}catch(err){if(seq===validationSeq.current)setAvailabilityError(`No se puede habilitar ${label}: ${err?.message||"no se pudo comprobar la disponibilidad."}`)}finally{if(seq===validationSeq.current)setCheckingAvailability(false)}}
 
-  async function changeStart(nextStart){if(!nextStart)return;const nights=Math.max(1,diffDays(draft.start,draft.end)),nextEnd=addDays(nextStart,nights);await validateCandidate({start:nextStart,end:nextEnd,roomId:draft.roomId,apply:()=>setDraft(current=>({...current,start:nextStart,end:nextEnd}))})}
-  async function changeEnd(nextEnd){if(!nextEnd)return;await validateCandidate({start:draft.start,end:nextEnd,roomId:draft.roomId,apply:()=>setDraft(current=>({...current,end:nextEnd}))})}
-  async function changeNights(value){const count=Math.max(1,Number(value)||1),nextEnd=addDays(draft.start,count);await validateCandidate({start:draft.start,end:nextEnd,roomId:draft.roomId,apply:()=>setDraft(current=>({...current,end:nextEnd}))})}
-  async function changeRoom(nextId){if(isGroup){setAvailabilityOk("");setAvailabilityError("Para una reserva grupal, la reasignación física se hace por habitación para no romper el conjunto.");return false}const oldId=String(draft.roomId),nextRoom=allRooms.find(room=>String(room.id)===String(nextId));if(!nextRoom)return false;const previous=draft.roomAssignments?.[oldId]||{},nextAssignment={...previous,soldAs:previous.soldAs||currentRoom?.tipo||nextRoom.tipo||"Habitación",rate:Number(previous.rate)||Number(item.tarifa_noche)||0};return validateCandidate({start:draft.start,end:draft.end,roomId:nextId,apply:()=>{setError("");setDraft(current=>({...current,roomId:String(nextId),roomIds:[String(nextId)],roomAssignments:{[String(nextId)]:nextAssignment}}))}})}
+  async function changeStart(nextStart){if(!nextStart)return;const nights=Math.max(1,diffDays(draft.start,draft.end)),nextEnd=addDays(nextStart,nights);await validateCandidate({start:nextStart,end:nextEnd,roomId:draft.roomId,apply:()=>{setRoomDecision(null);setDraft(current=>({...current,start:nextStart,end:nextEnd}))}})}
+  async function changeEnd(nextEnd){if(!nextEnd)return;await validateCandidate({start:draft.start,end:nextEnd,roomId:draft.roomId,apply:()=>{setRoomDecision(null);setDraft(current=>({...current,end:nextEnd}))}})}
+  async function changeNights(value){const count=Math.max(1,Number(value)||1),nextEnd=addDays(draft.start,count);await validateCandidate({start:draft.start,end:nextEnd,roomId:draft.roomId,apply:()=>{setRoomDecision(null);setDraft(current=>({...current,end:nextEnd}))}})}
+  async function changeRoom(nextId){
+    if(isGroup){setAvailabilityOk("");setAvailabilityError("Para una reserva grupal, la reasignación física se hace por habitación para no romper el conjunto.");return false}
+    const nextRoom=allRooms.find(room=>String(room.id)===String(nextId));if(!nextRoom)return false
+    if(String(nextId)===String(item.habitacion_id)){setRoomDecision(null);setDraft(current=>({...current,roomId:String(nextId),roomIds:[String(nextId)]}));return true}
+    setCheckingAvailability(true);setAvailabilityError("");setAvailabilityOk("");setError("")
+    try{
+      const preview=await onPreviewMove({reservationId:item.id,roomId:Number(nextId),start:draft.start,end:draft.end})
+      if(!preview?.ok){setAvailabilityError(preview?.message||"La habitación no está disponible para ese cambio.");return false}
+      const{data:quote,error:quoteError}=await supabase.rpc("hl_quote_room_upgrade_atomic",{p_reserva_id:Number(item.id),p_from_room_id:Number(item.habitacion_id),p_to_room_id:Number(nextId),p_start:draft.start,p_end:draft.end})
+      if(quoteError)throw quoteError
+      setPending({kind:"room-selection",reservationId:item.id,roomId:Number(nextId),start:draft.start,end:draft.end,sourceRoom:currentRoom,targetRoom:nextRoom,currentRate:Number(quote?.source_reservation_final_rate)||0,targetRate:Number(quote?.target_reservation_final_rate)||0,currency:quote?.reservation_currency||item.moneda||"ARS",pricingQuote:quote})
+      return true
+    }catch(err){setAvailabilityError(err?.message||"No se pudo preparar el cambio de habitación.");return false}
+    finally{setCheckingAvailability(false)}
+  }
+  function acceptRoomSelection(reprice=false){
+    if(!pending||pending.kind!=="room-selection")return
+    const nextId=String(pending.roomId),oldId=String(draft.roomId),nextRoom=pending.targetRoom,previous=draft.roomAssignments?.[oldId]||{}
+    const bookedRate=Number(reprice?pending.pricingQuote?.target_booked_rate:pending.pricingQuote?.current_booked_rate)||Number(item.tarifa_noche)||0
+    const nextAssignment={...previous,soldAs:previous.soldAs||currentRoom?.tipo||nextRoom?.tipo||"Habitación",rate:bookedRate}
+    setDraft(current=>({...current,roomId:nextId,roomIds:[nextId],roomAssignments:{[nextId]:nextAssignment}}))
+    setRoomDecision({key:`${nextId}|${pending.start}|${pending.end}`,reprice:Boolean(reprice),quote:pending.pricingQuote})
+    setAvailabilityOk(`Cambio preparado · Hab. ${nextRoom?.nombre||nextId} · ${reprice?"se aplicará la tarifa destino":"se mantendrá la tarifa actual"}. Guardá los cambios para confirmar.`)
+    setPending(null)
+  }
   function changeGuests(value){const guests=Math.max(1,Number(value)||1);setDraft(current=>({...current,guests}))}
   function detailsFor(rateOverride=null){return selectedRooms.map(room=>{const id=String(room.id),assignment=draft.roomAssignments?.[id]||{},previous=existingDetails.find(value=>String(value?.habitacion_id)===id)||{},rooming={matrimonial:Math.max(0,Number(assignment.matrimonial)||0),individual:Math.max(0,Number(assignment.individual)||0)};return{...previous,habitacion_id:Number(room.id),nombre:room.nombre,categoria_asignada:room.tipo||"Habitación",categoria_vendida:assignment.soldAs||room.tipo||"Habitación",huespedes:Math.max(0,Number(assignment.guests)||0),tarifa_noche:rateOverride!=null&&selectedRooms.length===1?Number(rateOverride):Math.max(0,Number(assignment.rate)||Number(previous.tarifa_noche)||Number(item.tarifa_noche)||0),rooming}})}
   async function saveMetadata(baseItem=item,rateOverride=null){const details=detailsFor(rateOverride),effectiveNightly=details.reduce((sum,detail)=>sum+Math.max(0,Number(detail.tarifa_noche)||0),0)||Number(rateOverride)||Number(baseItem.tarifa_noche)||nightlyStayRate;const patch=buildReservationMetadataPatch({baseItem,draft,details,ids,effectiveNightly,addedStayAmount:0,earlyPercent,latePercent,newNights});const updated=await onUpdate(baseItem.id,patch);onSaved?.({...baseItem,...updated});return updated}
@@ -63,16 +87,15 @@ export default function ReservationEditPanel({item,assignedRooms=[],allRooms=[],
     try{
       await preflight()
       if(roomChanged){
-        const{data:quote,error:quoteError}=await supabase.rpc("hl_quote_room_upgrade_atomic",{
-          p_reserva_id:Number(item.id),
-          p_from_room_id:Number(item.habitacion_id),
-          p_to_room_id:Number(draft.roomId),
-          p_start:draft.start,
-          p_end:draft.end
-        })
+        const{data:quote,error:quoteError}=await supabase.rpc("hl_quote_room_upgrade_atomic",{p_reserva_id:Number(item.id),p_from_room_id:Number(item.habitacion_id),p_to_room_id:Number(draft.roomId),p_start:draft.start,p_end:draft.end})
         if(quoteError)throw quoteError
-        const currentFinal=Number(quote?.source_reservation_final_rate)||0,targetFinal=Number(quote?.target_reservation_final_rate)||0
-        setPending({reservationId:item.id,roomId:Number(draft.roomId),start:draft.start,end:draft.end,sourceRoom:currentRoom,targetRoom,currentRate:currentFinal,targetRate:targetFinal,currency:quote?.reservation_currency||item.moneda||"ARS",pricingQuote:quote})
+        const decisionKey=`${String(draft.roomId)}|${draft.start}|${draft.end}`,quoteChanged=!roomDecision?.quote||Math.abs((Number(roomDecision.quote?.source_reservation_final_rate)||0)-(Number(quote?.source_reservation_final_rate)||0))>.005||Math.abs((Number(roomDecision.quote?.target_reservation_final_rate)||0)-(Number(quote?.target_reservation_final_rate)||0))>.005
+        if(!roomDecision||roomDecision.key!==decisionKey||quoteChanged){
+          setPending({kind:"room-selection",reservationId:item.id,roomId:Number(draft.roomId),start:draft.start,end:draft.end,sourceRoom:currentRoom,targetRoom,currentRate:Number(quote?.source_reservation_final_rate)||0,targetRate:Number(quote?.target_reservation_final_rate)||0,currency:quote?.reservation_currency||item.moneda||"ARS",pricingQuote:quote})
+          return
+        }
+        const moved=await onMove({reservationId:item.id,roomId:Number(draft.roomId),start:draft.start,end:draft.end,reprice:Boolean(roomDecision.reprice)})
+        await saveMetadata(moved,Number(moved.tarifa_noche)||Number(item.tarifa_noche)||0)
         return
       }
       if(durationChanged){
@@ -104,5 +127,5 @@ export default function ReservationEditPanel({item,assignedRooms=[],allRooms=[],
     {isGroup?<ReservationGroupRoomChangeControl item={item} allRooms={allRooms} busy={busy} onMoved={updated=>onSaved?.(updated)}/>:null}
     <RoomingEditor draft={draft} setDraft={setDraft} rooms={selectedRooms} categories={commercialCategories} currency={item.moneda||"ARS"} editableRate={false}/>
     <div style={{display:"flex",justifyContent:"flex-end",alignItems:"center",gap:12,marginTop:14,paddingTop:13,borderTop:"1px solid var(--line)"}}><div style={{display:"flex",gap:8}}><button type="button" disabled={busy} onClick={onCancel} style={{height:40,padding:"0 14px",border:"1px solid var(--line)",borderRadius:10,background:"var(--panel)",color:"var(--text)",font:"inherit",fontWeight:800}}>Cancelar</button><button type="button" disabled={busy} onClick={requestSave} style={{height:40,padding:"0 16px",border:0,borderRadius:10,background:"linear-gradient(145deg,var(--accent),var(--accent2))",color:"#fff",font:"inherit",fontWeight:850,boxShadow:"0 9px 22px color-mix(in srgb,var(--accent) 22%,transparent)",opacity:busy?0.62:1}}>{busy?"Validando…":"Guardar cambios"}</button></div></div><style>{`@media(max-width:980px){[aria-label="Editar reserva"] [data-edit-grid]{grid-template-columns:repeat(3,minmax(0,1fr))!important}}@media(max-width:620px){[aria-label="Editar reserva"] [data-edit-grid]{grid-template-columns:1fr 1fr!important}[aria-label="Editar reserva"] [data-special-stay]{grid-template-columns:1fr!important}}`}</style>
-  </section></div>{mergeOpen?<ReservationMergeDialog item={item} propertyId={item.property_id} rooms={allRooms} onMerge={onMerge} onClose={()=>setMergeOpen(false)} onMerged={updated=>{setMergeOpen(false);onSaved?.(updated)}}/>:null}<PlanningRateChangeDialog change={pending} saving={busy} onKeep={()=>commitMove(false)} onReprice={()=>commitMove(true)} onCancel={()=>!busy&&setPending(null)}/></>
+  </section></div>{mergeOpen?<ReservationMergeDialog item={item} propertyId={item.property_id} rooms={allRooms} onMerge={onMerge} onClose={()=>setMergeOpen(false)} onMerged={updated=>{setMergeOpen(false);onSaved?.(updated)}}/>:null}<PlanningRateChangeDialog change={pending} saving={busy} onKeep={()=>pending?.kind==="room-selection"?acceptRoomSelection(false):commitMove(false)} onReprice={()=>pending?.kind==="room-selection"?acceptRoomSelection(true):commitMove(true)} onCancel={()=>!busy&&setPending(null)}/></>
 }
