@@ -25,8 +25,8 @@ export function ReservationBlock({item,days,selected,onSelect,onDragStart,onResi
   const[resizeEnd,setResizeEnd]=useState(null),[resizing,setResizing]=useState(false),resizeValue=useRef(null)
   const first=days[0],dayUse=isDayUse(item),noShow=Boolean(item.no_show),effectiveEnd=resizeEnd||item.fecha_salida,entryOffset=diffDays(first,item.fecha_entrada),rooms=roomCount(item),group=rooms>1,channel=channelMeta(item.canal_reserva)
   const lock=movementDetail(item),roomScoped=Boolean(item._room_segment),detailPax=Math.max(0,Number(lock?.huespedes)||0),pax=Math.max(1,roomScoped&&detailPax>0?detailPax:Number(item.cantidad_huespedes)||1),movementLocked=Boolean(lock?.movement_locked),lockReason=String(lock?.movement_lock_reason||"").trim()
-  const early=roomScoped?Boolean(lock?.early_checkin_requested||lock?.early_checkin_time||Number(lock?.early_checkin_net)>0):Boolean(item.early_checkin)||Number(item.early_checkin_importe)>0
-  const late=roomScoped?Boolean(lock?.late_checkout_requested||lock?.late_checkout_time||item?.room_checkout_dates?.[`late:${item.habitacion_id}`]):(Boolean(item.late_checkout)||Number(item.late_checkout_importe)>0)&&item._room_checkout_segment!=="checked_out"
+  const early=roomScoped?Boolean(item._room_early):Boolean(item.early_checkin)||Number(item.early_checkin_importe)>0
+  const late=roomScoped?Boolean(item._room_late):(Boolean(item.late_checkout)||Number(item.late_checkout_importe)>0)&&item._room_checkout_segment!=="checked_out"
   const rawStart=noShow?entryOffset+.5:dayUse?entryOffset+.08:entryOffset+(early?0:.5)
   const rawEnd=noShow?rawStart+.28:dayUse?entryOffset+.92:diffDays(first,effectiveEnd)+(late?1:.5)
   const start=Math.max(0,rawStart),end=Math.min(days.length,rawEnd)

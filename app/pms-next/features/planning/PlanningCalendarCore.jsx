@@ -23,9 +23,9 @@ const selectionDate=value=>new Intl.DateTimeFormat("es-AR",{weekday:"short",day:
 const validDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(String(value||""))
 const roomHas=(item,roomId)=>Number(item.habitacion_id)===Number(roomId)||(item.habitaciones_ids||[]).map(Number).includes(Number(roomId))
 const roomMeta=(item,roomId)=>item?._room_detail&&Number(item._room_detail?.habitacion_id)===Number(roomId)?item._room_detail:(Array.isArray(item?.habitaciones_detalle)?item.habitaciones_detalle:[]).find(detail=>Number(detail?.habitacion_id)===Number(roomId))||{}
-const roomEarly=(item,roomId)=>{const meta=roomMeta(item,roomId);return item?._room_segment?Boolean(meta?.early_checkin_requested||meta?.early_checkin_time||Number(meta?.early_checkin_net)>0):Boolean(item?.early_checkin)||Number(item?.early_checkin_importe)>0}
+const roomEarly=(item,roomId)=>item?._room_segment?Boolean(item?._room_early):Boolean(item?.early_checkin)||Number(item?.early_checkin_importe)>0
 const roomLateDate=(item,roomId)=>{const value=item?.room_checkout_dates?.[`late:${roomId}`];return validDate(value)?String(value):""}
-const roomLate=(item,roomId)=>{const meta=roomMeta(item,roomId);return item?._room_segment?Boolean(meta?.late_checkout_requested||meta?.late_checkout_time||roomLateDate(item,roomId)):Boolean(item?.late_checkout)||Number(item?.late_checkout_importe)>0}
+const roomLate=(item,roomId)=>item?._room_segment?Boolean(item?._room_late):Boolean(item?.late_checkout)||Number(item?.late_checkout_importe)>0
 const inventoryStart=(item,roomId)=>roomEarly(item,roomId)&&validDate(item?.fecha_entrada)?addDays(item.fecha_entrada,-1):item?.fecha_entrada
 const inventoryEnd=(item,roomId)=>{const planned=item?.fecha_salida,lateDate=roomLateDate(item,roomId);if(lateDate&&(!planned||lateDate>planned))return lateDate;return roomLate(item,roomId)&&validDate(planned)?addDays(planned,1):planned}
 const covers=(item,roomId,day)=>roomHas(item,roomId)&&inventoryStart(item,roomId)<=day&&inventoryEnd(item,roomId)>day

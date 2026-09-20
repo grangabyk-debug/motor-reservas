@@ -19,8 +19,13 @@ const detailFor=(item,roomId)=>(Array.isArray(item?.habitaciones_detalle)?item.h
 const roomStart=(item,roomId)=>String(detailFor(item,roomId)?.fecha_entrada||item?.fecha_entrada||"").slice(0,10)
 const plannedEnd=(item,roomId)=>String(detailFor(item,roomId)?.fecha_salida||item?.fecha_salida||"").slice(0,10)
 const effectiveEnd=(item,roomId)=>{const planned=plannedEnd(item,roomId),released=String(item?.room_checkout_dates?.[String(roomId)]||"").slice(0,10);return released&&(!planned||released<planned)?released:planned}
+const explicitBool=(obj,key)=>Object.prototype.hasOwnProperty.call(obj||{},key)?String(obj[key]).toLowerCase()==="true":null
+const roomEarly=(item,roomId)=>{const detail=detailFor(item,roomId)||{},explicit=explicitBool(detail,"early_checkin_requested"),start=roomStart(item,roomId);return explicit??Boolean(detail.early_checkin_time||Number(detail.early_checkin_net)>0||((Boolean(item?.early_checkin)||Number(item?.early_checkin_importe)>0)&&start===String(item?.fecha_entrada||"").slice(0,10)))}
+const roomLate=(item,roomId)=>{const detail=detailFor(item,roomId)||{},explicit=explicitBool(detail,"late_checkout_requested"),planned=plannedEnd(item,roomId),sentinel=String(item?.room_checkout_dates?.[`late:${roomId}`]||"").slice(0,10);return Boolean(sentinel)||(explicit??Boolean(detail.late_checkout_time||Number(detail.late_checkout_net)>0||((Boolean(item?.late_checkout)||Number(item?.late_checkout_importe)>0)&&planned===String(item?.fecha_salida||"").slice(0,10))))}
+const inventoryStart=(item,roomId)=>roomEarly(item,roomId)?addDays(roomStart(item,roomId),-1):roomStart(item,roomId)
+const inventoryEnd=(item,roomId)=>{const effective=effectiveEnd(item,roomId),planned=plannedEnd(item,roomId),sentinel=String(item?.room_checkout_dates?.[`late:${roomId}`]||"").slice(0,10);if(effective&&planned&&effective<planned)return effective;if(sentinel&&(!planned||sentinel>planned))return sentinel;return roomLate(item,roomId)?addDays(planned,1):planned}
 const activeRoomIds=(item,day)=>reservationIds(item).filter(id=>{const start=roomStart(item,id),end=effectiveEnd(item,id);return start&&end&&start<=day&&end>day})
-const roomOverlaps=(item,roomId,start,end)=>reservationIds(item).includes(Number(roomId))&&roomStart(item,roomId)<end&&effectiveEnd(item,roomId)>start
+const roomOverlaps=(item,roomId,start,end)=>reservationIds(item).includes(Number(roomId))&&inventoryStart(item,roomId)<end&&inventoryEnd(item,roomId)>start
 
 function emit(detail){if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("hl:pms-toast",{detail}))}
 
@@ -114,7 +119,7 @@ export default function ReservationMidStayRoomSplitControl({item,rooms=[],proper
       setChecking(true);setError("")
       try{
         const[reservationRes,blockRes]=await Promise.all([
-          supabase.from("reservas").select("id,habitacion_id,habitaciones_ids,habitaciones_detalle,room_checkout_dates,fecha_entrada,fecha_salida,estado,no_show").eq("property_id",propertyId).neq("id",Number(item.id)).neq("estado","cancelada").eq("no_show",false).lt("fecha_entrada",sourceEnd).gt("fecha_salida",effectiveDate),
+          supabase.from("reservas").select("id,habitacion_id,habitaciones_ids,habitaciones_detalle,room_checkout_dates,fecha_entrada,fecha_salida,estado,no_show,early_checkin,early_checkin_importe,late_checkout,late_checkout_importe").eq("property_id",propertyId).neq("id",Number(item.id)).neq("estado","cancelada").eq("no_show",false).lt("fecha_entrada",addDays(sourceEnd,1)).gt("fecha_salida",addDays(effectiveDate,-1)),
           supabase.from("bloqueos").select("id,habitacion_id,fecha_desde,fecha_hasta,motivo").eq("property_id",propertyId).lt("fecha_desde",sourceEnd).gt("fecha_hasta",effectiveDate)
         ])
         if(reservationRes.error)throw reservationRes.error
