@@ -76,7 +76,33 @@ export default function PlanningWorkspace({propertyId,property,onNavigate,newRes
   function beginDrag(event,item){if(isGroup(item)){event.preventDefault();data.setError("Las reservas grupales se modifican desde su ficha para conservar todas las habitaciones asignadas.");return}event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("text/plain",String(item.id));setPreview(null);setRateMove(null);setDragging({item,mode:"move"});setSelected(null);setRangeSelection(null)}
   function beginResize(item,end){if(isGroup(item)){data.setError("Las reservas grupales se modifican desde su ficha para conservar todas las habitaciones asignadas.");return}if(!end||end===item.fecha_salida)return;if(end<=item.fecha_entrada){data.setError("La salida tiene que quedar después de la entrada.");return}const room=roomById.get(Number(item.habitacion_id)),oldNights=Math.max(1,diffDays(item.fecha_entrada,item.fecha_salida)),newNights=Math.max(1,diffDays(item.fecha_entrada,end)),currentRate=Number(item.tarifa_noche)||Number(room?.precio)||0;setPreview(null);setSelected(null);setDragging(null);setDropCell("");setRangeSelection(null);setRateMove({kind:"duration",reservationId:item.id,roomId:item.habitacion_id,start:item.fecha_entrada,end,oldStart:item.fecha_entrada,oldEnd:item.fecha_salida,oldNights,newNights,sourceRoom:room,targetRoom:room,currentRate,targetRate:currentRate,currency:item.moneda||"ARS"})}
   async function commitMove(change,reprice=false){if(!change||saving)return;setSaving(true);data.setError("");try{await data.moveReservation({reservationId:change.reservationId,roomId:change.roomId,start:change.start,end:change.end,reprice});setRateMove(null)}catch(err){data.setError(err?.message||"No se pudo mover la reserva.")}finally{setSaving(false)}}
-  async function dropReservation(event,roomId,day){event.preventDefault();if(!dragging)return;const source=dragging.item,start=day,roomChanged=Number(source.habitacion_id)!==Number(roomId),dateChanged=source.fecha_entrada!==day;if(settings.blockDiagonal&&roomChanged&&dateChanged){data.setError("El movimiento diagonal está bloqueado. Cambiá primero fecha o habitación.");setDragging(null);setDropCell("");return}const end=addDays(day,Math.max(1,diffDays(source.fecha_entrada,source.fecha_salida)));if(roomChanged){const sourceRoom=roomById.get(Number(source.habitacion_id)),targetRoom=roomById.get(Number(roomId)),currentRate=Number(source.tarifa_noche)||Number(sourceRoom?.precio)||0,targetRate=Number(targetRoom?.precio)||0;if(targetRoom&&currentRate!==targetRate){setRateMove({reservationId:source.id,roomId,start,end,sourceRoom,targetRoom,currentRate,targetRate,currency:source.moneda||"ARS"});setDragging(null);setDropCell("");return}}setDragging(null);setDropCell("");await commitMove({reservationId:source.id,roomId,start,end},false)}
+  async function dropReservation(event,roomId,day){
+    event.preventDefault()
+    if(!dragging)return
+    const source=dragging.item,start=day,roomChanged=Number(source.habitacion_id)!==Number(roomId),dateChanged=source.fecha_entrada!==day
+    if(settings.blockDiagonal&&roomChanged&&dateChanged){data.setError("El movimiento diagonal está bloqueado. Cambiá primero fecha o habitación.");setDragging(null);setDropCell("");return}
+    const end=addDays(day,Math.max(1,diffDays(source.fecha_entrada,source.fecha_salida)))
+    if(roomChanged){
+      const sourceRoom=roomById.get(Number(source.habitacion_id)),targetRoom=roomById.get(Number(roomId))
+      setDragging(null);setDropCell("")
+      try{
+        const{data:quote,error:quoteError}=await supabase.rpc("hl_quote_room_upgrade_atomic",{
+          p_reserva_id:Number(source.id),
+          p_from_room_id:Number(source.habitacion_id),
+          p_to_room_id:Number(roomId),
+          p_start:start,
+          p_end:end
+        })
+        if(quoteError)throw quoteError
+        const currentRate=Number(quote?.source_reservation_final_rate)||0,targetRate=Number(quote?.target_reservation_final_rate)||0,delta=Number(quote?.reservation_final_delta)||0
+        if(targetRoom&&Math.abs(delta)>.005){
+          setRateMove({reservationId:source.id,roomId,start,end,sourceRoom,targetRoom,currentRate,targetRate,currency:quote?.reservation_currency||source.moneda||"ARS",pricingQuote:quote})
+          return
+        }
+      }catch(err){data.setError(err?.message||"No se pudo calcular la tarifa del cambio de habitación.");return}
+    }else{setDragging(null);setDropCell("")}
+    await commitMove({reservationId:source.id,roomId,start,end},false)
+  }
   function roomsBetween(anchorRoomId,currentRoomId){const a=visibleRooms.findIndex(room=>String(room.id)===String(anchorRoomId)),b=visibleRooms.findIndex(room=>String(room.id)===String(currentRoomId));if(a<0||b<0)return[String(anchorRoomId)];return visibleRooms.slice(Math.min(a,b),Math.max(a,b)+1).map(room=>String(room.id))}
   function beginRange(event,roomId,day){if(event.button!==0||dragging||event.detail>1)return;event.preventDefault();setPreview(null);setSelected(null);setRateMove(null);setRangeSelection({anchorRoomId:String(roomId),roomIds:[String(roomId)],anchorDay:day,start:day,end:addDays(day,1)});setSelecting(true)}
   function extendRange(roomId,day){if(!selecting)return;setRangeSelection(current=>{if(!current)return current;const roomIds=roomsBetween(current.anchorRoomId,roomId);if(day===current.anchorDay)return{...current,roomIds,start:current.anchorDay,end:addDays(current.anchorDay,1)};return day>current.anchorDay?{...current,roomIds,start:current.anchorDay,end:day}:{...current,roomIds,start:day,end:current.anchorDay}})}
