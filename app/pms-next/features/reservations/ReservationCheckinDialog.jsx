@@ -21,7 +21,8 @@ export default function ReservationCheckinDialog({item,onClose,onConfirm,onHouse
   const[guests,setGuests]=useState([]),[payments,setPayments]=useState([]),[policy,setPolicy]=useState("allow"),[loading,setLoading]=useState(true),[loadError,setLoadError]=useState(""),[selectedIds,setSelectedIds]=useState([])
   const assigned=item?.rooms?.length?item.rooms:[item?.room].filter(Boolean),progress=reservationCheckinProgress(item||{}),pendingKey=progress.pendingRoomIds.join(",")
   const checkedSet=useMemo(()=>new Set(progress.checkedRoomIds.map(Number)),[progress.checkedRoomIds.join(",")]),selectedSet=useMemo(()=>new Set(selectedIds.map(Number)),[selectedIds.join(",")])
-  const eligibleKey=progress.eligiblePendingRoomIds.join(",")\n  useEffect(()=>{setSelectedIds(progress.eligiblePendingRoomIds.map(Number))},[item?.id,pendingKey,eligibleKey])
+  const eligibleKey=progress.eligiblePendingRoomIds.join(",")
+  useEffect(()=>{setSelectedIds(progress.eligiblePendingRoomIds.map(Number))},[item?.id,pendingKey,eligibleKey])
   useEffect(()=>{
     if(!item?.id||!item?.property_id){setGuests([]);setPayments([]);setPolicy("allow");setLoading(false);setLoadError("");return}
     let cancelled=false;setLoading(true);setLoadError("")

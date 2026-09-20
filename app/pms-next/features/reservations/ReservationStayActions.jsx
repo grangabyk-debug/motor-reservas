@@ -3,7 +3,9 @@
 import{useEffect,useRef,useState}from"react"
 import{reservationCheckinProgress}from"./reservationEditUtils"
 
-const fmtShort=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"2-digit"}).format(new Date(`${value}T12:00:00`)):""\n\nexport default function ReservationStayActions({item,saving=false,onPrimary,onNoShow,onCancel}){
+const fmtShort=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"2-digit"}).format(new Date(`${value}T12:00:00`)):""
+
+export default function ReservationStayActions({item,saving=false,onPrimary,onNoShow,onCancel}){
   const[open,setOpen]=useState(false)
   const rootRef=useRef(null),progress=reservationCheckinProgress(item||{}),partial=progress.partial
   const waitingFuture=partial&&progress.eligiblePending===0&&progress.futurePendingRoomIds.length>0
