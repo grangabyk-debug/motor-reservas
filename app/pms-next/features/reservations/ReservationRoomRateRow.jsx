@@ -3,7 +3,8 @@
 import{useMemo,useState}from"react"
 
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:2}).format(Number(value)||0)
-const fmtNight=value=>value?new Intl.DateTimeFormat("es-AR",{weekday:"short",day:"2-digit",month:"short"}).format(new Date(`${String(value).slice(0,10)}T12:00:00`)).replaceAll(".",""):"—"\nconst fmtStay=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"2-digit",year:"numeric"}).format(new Date(`${String(value).slice(0,10)}T12:00:00`)):"—"
+const fmtNight=value=>value?new Intl.DateTimeFormat("es-AR",{weekday:"short",day:"2-digit",month:"short"}).format(new Date(`${String(value).slice(0,10)}T12:00:00`)).replaceAll(".",""):"—"
+const fmtStay=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"2-digit",year:"numeric"}).format(new Date(`${String(value).slice(0,10)}T12:00:00`)):"—"
 const round2=value=>Math.round((Number(value)||0)*100)/100
 
 function nightlyRows(detail,taxEnabled,vatRate){
