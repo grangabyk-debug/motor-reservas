@@ -18,7 +18,7 @@ returns integer
 language plpgsql
 security definer
 set search_path to 'public','private','pg_temp'
-as $function$;
+as $function$
 declare v_count integer:=0;
 begin
   update public.hotel_folio_items i
@@ -49,7 +49,7 @@ create or replace function private.hl_materialize_added_room_guests(
 language plpgsql
 security definer
 set search_path to 'public','private','pg_temp'
-as $function$;
+as $function$
 declare
   r public.reservas%rowtype;
   h public.habitaciones%rowtype;
@@ -111,7 +111,7 @@ CREATE OR REPLACE FUNCTION public.hl_move_folio_item(p_item_id uuid, p_target_fo
  LANGUAGE plpgsql
  SECURITY DEFINER
  SET search_path TO 'public', 'private', 'pg_temp'
-AS $function$;
+AS $function$
 declare i public.hotel_folio_items%rowtype;f public.hotel_folios%rowtype;oldf public.hotel_folios%rowtype;
 begin
  select * into i from public.hotel_folio_items where id=p_item_id;select * into f from public.hotel_folios where id=p_target_folio_id;select * into oldf from public.hotel_folios where id=i.folio_id;
@@ -128,7 +128,7 @@ CREATE OR REPLACE FUNCTION public.hl_consolidate_folio(p_target_folio_id uuid)
  LANGUAGE plpgsql
  SECURITY DEFINER
  SET search_path TO 'public', 'private', 'pg_temp'
-AS $function$;
+AS $function$
 declare f public.hotel_folios%rowtype; n integer;
 begin
   select * into f from public.hotel_folios where id=p_target_folio_id;
@@ -154,7 +154,7 @@ CREATE OR REPLACE FUNCTION private.hl_rehome_auto_room_folio_items(p_reservation
  LANGUAGE plpgsql
  SECURITY DEFINER
  SET search_path TO 'public', 'private', 'pg_temp'
-AS $function$;
+AS $function$
 begin
   update public.hotel_folio_items i
   set folio_id=(
@@ -195,7 +195,7 @@ CREATE OR REPLACE FUNCTION public.hl_add_room_to_reservation_atomic(p_reservatio
  LANGUAGE plpgsql
  SECURITY DEFINER
  SET search_path TO 'public', 'private', 'pg_temp'
-AS $function$;
+AS $function$
 declare v_before public.reservas%rowtype; v_after public.reservas%rowtype; v_room public.habitaciones%rowtype; v_policy public.hotel_cancellation_policies%rowtype; v_room_id bigint; v_start date; v_end date; v_guests integer; v_rate numeric; v_nights integer; v_policy_id uuid; v_policy_snapshot jsonb; v_detail jsonb; v_details jsonb:='[]'::jsonb; v_existing jsonb; v_id bigint; v_new_start date; v_new_end date; v_added_net numeric; v_current_net numeric; v_new_net numeric; v_new_vat numeric; v_vat_rate numeric; v_total_rate numeric; v_quote jsonb; v_min_stay integer; v_cta boolean; v_ctd boolean;
 begin
  if auth.uid() is null then raise exception using errcode='42501',message='Tenés que iniciar sesión.'; end if; if p_room is null or jsonb_typeof(p_room)<>'object' then raise exception using errcode='22023',message='Datos de la habitación inválidos.'; end if; select * into v_before from public.reservas where id=p_reservation_id for update; if not found then raise exception using errcode='P0002',message='Reserva inexistente.'; end if; if not private.user_has_property_role(v_before.property_id,array['owner','admin','manager','reception']::text[]) then raise exception using errcode='42501',message='No tenés permisos para modificar esta reserva.'; end if; if v_before.estado in('cancelada','finalizada') or coalesce(v_before.no_show,false) then raise exception using errcode='P0001',message='Esta reserva ya no admite nuevas habitaciones.'; end if;
@@ -219,7 +219,7 @@ CREATE OR REPLACE FUNCTION public.hl_extend_reservation_room_atomic(p_reserva_id
  LANGUAGE plpgsql
  SECURITY DEFINER
  SET search_path TO 'public', 'private', 'pg_temp'
-AS $function$;
+AS $function$
 declare
   v public.reservas%rowtype;
   v_room public.habitaciones%rowtype;
