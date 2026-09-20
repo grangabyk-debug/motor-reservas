@@ -94,8 +94,8 @@ export default function PlanningWorkspace({propertyId,property,onNavigate,newRes
           p_end:end
         })
         if(quoteError)throw quoteError
-        const currentRate=Number(quote?.source_reservation_final_rate)||0,targetRate=Number(quote?.target_reservation_final_rate)||0,delta=Number(quote?.reservation_final_delta)||0
-        if(targetRoom&&Math.abs(delta)>.005){
+        const currentRate=Number(quote?.source_reservation_final_rate)||0,targetRate=Number(quote?.target_reservation_final_rate)||0
+        if(targetRoom){
           setRateMove({reservationId:source.id,roomId,start,end,sourceRoom,targetRoom,currentRate,targetRate,currency:quote?.reservation_currency||source.moneda||"ARS",pricingQuote:quote})
           return
         }

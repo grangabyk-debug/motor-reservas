@@ -71,11 +71,9 @@ export default function ReservationEditPanel({item,assignedRooms=[],allRooms=[],
           p_end:draft.end
         })
         if(quoteError)throw quoteError
-        const currentFinal=Number(quote?.source_reservation_final_rate)||0,targetFinal=Number(quote?.target_reservation_final_rate)||0,delta=Number(quote?.reservation_final_delta)||0
-        if(Math.abs(delta)>.005){
-          setPending({reservationId:item.id,roomId:Number(draft.roomId),start:draft.start,end:draft.end,sourceRoom:currentRoom,targetRoom,currentRate:currentFinal,targetRate:targetFinal,currency:quote?.reservation_currency||item.moneda||"ARS",pricingQuote:quote})
-          return
-        }
+        const currentFinal=Number(quote?.source_reservation_final_rate)||0,targetFinal=Number(quote?.target_reservation_final_rate)||0
+        setPending({reservationId:item.id,roomId:Number(draft.roomId),start:draft.start,end:draft.end,sourceRoom:currentRoom,targetRoom,currentRate:currentFinal,targetRate:targetFinal,currency:quote?.reservation_currency||item.moneda||"ARS",pricingQuote:quote})
+        return
       }
       if(durationChanged){
         setPending({kind:"duration",reservationId:item.id,roomId:Number(draft.roomId),start:draft.start,end:draft.end,oldStart:item.fecha_entrada,oldEnd:item.fecha_salida,oldNights,newNights,sourceRoom:currentRoom,targetRoom:targetRoom||currentRoom,currentRate:displayRate(Number(item.tarifa_noche)||0),targetRate:displayRate(Number(item.tarifa_noche)||0),currency:item.moneda||"ARS"})
