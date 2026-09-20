@@ -15,13 +15,11 @@ const releasedRoomIds=item=>new Set(Object.entries(item?.room_checkout_dates||{}
 export const activeReservationRoomIds=item=>{
   const all=unique([item?.habitacion_id,...(item?.habitaciones_ids||[])])
   const released=releasedRoomIds(item)
-  const details=Array.isArray(item?.habitaciones_detalle)?item.habitaciones_detalle:[],today=dateKey(new Date())
-  const dated=details.filter(detail=>{const role=String(detail?.segment_role||"active_room").toLowerCase(),start=String(detail?.fecha_entrada||item?.fecha_entrada||"").slice(0,10),end=String(detail?.fecha_salida||item?.fecha_salida||"").slice(0,10);return role!=="previous_room"&&role!=="transient_room"&&validDate(start)&&validDate(end)&&start<=today&&end>today}).map(detail=>String(detail?.habitacion_id||"")).filter(Boolean)
-  if(dated.length)return unique(dated)
-  const historical=new Set(details.filter(detail=>String(detail?.segment_role||"").toLowerCase()==="previous_room").map(detail=>String(detail?.habitacion_id||"")).filter(Boolean))
+  const details=Array.isArray(item?.habitaciones_detalle)?item.habitaciones_detalle:[]
+  const historical=new Set(details.filter(detail=>["previous_room","transient_room"].includes(String(detail?.segment_role||"").toLowerCase())).map(detail=>String(detail?.habitacion_id||"")).filter(Boolean))
   const active=all.filter(id=>!released.has(id)&&!historical.has(id))
   if(active.length)return active
-  const marked=details.filter(detail=>["active_room","scheduled_room"].includes(String(detail?.segment_role||"").toLowerCase())).map(detail=>String(detail?.habitacion_id||"")).filter(Boolean)
+  const marked=details.filter(detail=>["active_room","scheduled_room",""].includes(String(detail?.segment_role||"").toLowerCase())).map(detail=>String(detail?.habitacion_id||"")).filter(id=>id&&!released.has(id)&&!historical.has(id))
   if(marked.length)return unique(marked)
   return item?.habitacion_id?[String(item.habitacion_id)]:all
 }
@@ -58,13 +56,20 @@ export function buildReservationMetadataPatch({baseItem,draft,details,ids,effect
 
 export function reservationCheckinProgress(item){
   const roomIds=activeReservationRoomIds(item).map(Number).filter(Number.isFinite)
-  const activeSet=new Set(roomIds.map(String)),details=Array.isArray(item?.habitaciones_detalle)?item.habitaciones_detalle:[]
+  const activeSet=new Set(roomIds.map(String)),details=Array.isArray(item?.habitaciones_detalle)?item.habitaciones_detalle:[],today=dateKey(new Date())
+  const detailFor=id=>details.find(detail=>String(detail?.habitacion_id||"")===String(id))||{}
+  const roomStart=id=>String(detailFor(id)?.fecha_entrada||item?.fecha_entrada||"").slice(0,10)
+  const roomEnd=id=>String(detailFor(id)?.fecha_salida||item?.fecha_salida||"").slice(0,10)
   const checkedExplicit=unique(details.filter(detail=>{
     const id=String(detail?.habitacion_id||""),role=String(detail?.segment_role||"active_room").toLowerCase()
     return activeSet.has(id)&&role!=="previous_room"&&role!=="transient_room"&&Boolean(detail?.checked_in_at)
   }).map(detail=>detail.habitacion_id)).map(Number)
-  const legacyComplete=item?.estado==="alojado"&&checkedExplicit.length===0
+  const legacyComplete=item?.estado==="alojado"&&checkedExplicit.length===0&&roomIds.every(id=>{const start=roomStart(id);return!validDate(start)||start<=today})
   const checkedRoomIds=legacyComplete?[...roomIds]:checkedExplicit
   const checkedSet=new Set(checkedRoomIds.map(Number)),pendingRoomIds=roomIds.filter(id=>!checkedSet.has(Number(id)))
-  return{roomIds,checkedRoomIds,pendingRoomIds,total:roomIds.length,checked:checkedRoomIds.length,pending:pendingRoomIds.length,partial:item?.estado==="alojado"&&checkedRoomIds.length>0&&pendingRoomIds.length>0,complete:item?.estado==="alojado"&&roomIds.length>0&&pendingRoomIds.length===0,started:item?.estado==="alojado"||checkedRoomIds.length>0,legacyComplete}
+  const eligiblePendingRoomIds=pendingRoomIds.filter(id=>{const start=roomStart(id),end=roomEnd(id);return(!validDate(start)||start<=today)&&(!validDate(end)||end>today)})
+  const futurePendingRoomIds=pendingRoomIds.filter(id=>{const start=roomStart(id);return validDate(start)&&start>today})
+  const expiredPendingRoomIds=pendingRoomIds.filter(id=>{const end=roomEnd(id);return validDate(end)&&end<=today})
+  const nextPendingDate=futurePendingRoomIds.map(roomStart).filter(validDate).sort()[0]||null
+  return{roomIds,checkedRoomIds,pendingRoomIds,eligiblePendingRoomIds,futurePendingRoomIds,expiredPendingRoomIds,nextPendingDate,total:roomIds.length,checked:checkedRoomIds.length,pending:pendingRoomIds.length,eligiblePending:eligiblePendingRoomIds.length,partial:item?.estado==="alojado"&&checkedRoomIds.length>0&&pendingRoomIds.length>0,complete:item?.estado==="alojado"&&roomIds.length>0&&pendingRoomIds.length===0,started:item?.estado==="alojado"||checkedRoomIds.length>0,legacyComplete}
 }
