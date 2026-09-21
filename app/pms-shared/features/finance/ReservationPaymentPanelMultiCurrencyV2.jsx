@@ -132,7 +132,7 @@ export default function ReservationPaymentPanelMultiCurrencyV2({ propertyId, res
       }
     })()
     return () => { cancelled = true }
-  }, [propertyId, partners])
+  }, [propertyId])
 
   const toReservation = useCallback((value, fromCurrency) => {
     const from = normalizeCurrency(fromCurrency)
