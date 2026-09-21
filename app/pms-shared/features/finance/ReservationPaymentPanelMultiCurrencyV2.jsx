@@ -7,7 +7,7 @@ import ReservationPaymentChargeSelector from "./ReservationPaymentChargeSelector
 import { allocatePaymentParts, buildChargeLines, paidTotal, roundMoney, selectedBalance, validPayment } from "./paymentChargeUtils"
 import s from "./cashActions.module.css"
 
-const RESERVATION_SELECT = "id,numero_reserva,nombre_huesped,fecha_entrada,fecha_salida,precio_total,subtotal,moneda,estado"
+const RESERVATION_SELECT = "id,numero_reserva,nombre_huesped,fecha_entrada,fecha_salida,precio_total,subtotal,moneda,estado,partner_id"
 const METHODS = ["Efectivo", "Transferencia bancaria", "Tarjeta de débito", "Tarjeta de crédito", "Billetera virtual / QR", "Cuenta corriente", "Voucher / Agencia", "Cheque", "Otro"]
 const CURRENCIES = ["ARS", "USD"]
 const INVALID_PAYMENT_STATES = new Set(["anulado", "cancelado", "void", "rechazado", "cancelled"])
@@ -15,6 +15,14 @@ const INVALID_PAYMENT_STATES = new Set(["anulado", "cancelado", "void", "rechaza
 const normalize = value => String(value || "").trim().toLowerCase()
 const normalizeCurrency = value => String(value || "ARS").toUpperCase() === "USD" ? "USD" : "ARS"
 const isCash = method => normalize(method).includes("efect") || normalize(method) === "cash"
+const isAccountCurrent = method => normalize(method) === "cuenta corriente"
+const paymentMethods = METHODS.filter(item => !isAccountCurrent(item))
+const localIso = date => new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
+const dueDateFor = partner => {
+  const text = String(partner?.billing_terms || "").toLowerCase()
+  const days = text.includes("contado") ? 0 : Math.max(0, Number(text.match(/\d+/)?.[0] || 30))
+  const date = new Date(); date.setDate(date.getDate() + days); return localIso(date)
+}
 const numberValue = value => Math.max(0, Number(String(value ?? "").replace(",", ".")) || 0)
 const money = (value, currency = "ARS") => new Intl.NumberFormat("es-AR", { style: "currency", currency: normalizeCurrency(currency), maximumFractionDigits: 2 }).format(Number(value) || 0)
 const fmtDate = value => value ? new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(`${String(value).slice(0, 10)}T12:00:00`)) : "—"
@@ -92,6 +100,10 @@ export default function ReservationPaymentPanelMultiCurrencyV2({ propertyId, res
   const [cashReceived, setCashReceived] = useState("")
   const [propertySettings, setPropertySettings] = useState({})
   const [automaticFx, setAutomaticFx] = useState(null)
+  const [partners, setPartners] = useState([])
+  const [receivables, setReceivables] = useState([])
+  const [accountPartnerId, setAccountPartnerId] = useState("")
+  const [accountDueAt, setAccountDueAt] = useState("")
 
   const pricing = pricingFromSettings(propertySettings)
   const fxRate = pricing.fxMode === "manual" ? Number(pricing.manualUsdArs || 0) : Number(automaticFx?.rate || 0)
@@ -104,8 +116,14 @@ export default function ReservationPaymentPanelMultiCurrencyV2({ propertyId, res
     let cancelled = false
     ;(async () => {
       try {
-        const settingsRes = await supabase.from("property_settings").select("settings").eq("property_id", propertyId).maybeSingle()
+        const [settingsRes, partnerRes, receivableRes] = await Promise.all([
+          supabase.from("property_settings").select("settings").eq("property_id", propertyId).maybeSingle(),
+          supabase.from("hotel_partners").select("id,kind,name,tax_id,credit_limit,billing_terms,negotiated_rate_label,active").eq("property_id", propertyId).eq("active", true).order("name"),
+          supabase.from("hotel_finance_documents").select("id,partner_id,status,currency,balance,due_at,billing_mode").eq("property_id", propertyId).in("status", ["issued", "partial"]).gt("balance", 0),
+        ])
         if (!cancelled && !settingsRes.error) setPropertySettings(settingsRes.data?.settings || {})
+        if (!cancelled && !partnerRes.error) setPartners(partnerRes.data || [])
+        if (!cancelled && !receivableRes.error) setReceivables(receivableRes.data || [])
         const response = await fetch("/api/hotel/exchange-rate", { cache: "no-store" })
         const json = await response.json()
         if (!cancelled && response.ok) setAutomaticFx(json)
@@ -114,7 +132,7 @@ export default function ReservationPaymentPanelMultiCurrencyV2({ propertyId, res
       }
     })()
     return () => { cancelled = true }
-  }, [propertyId])
+  }, [propertyId, partners])
 
   const toReservation = useCallback((value, fromCurrency) => {
     const from = normalizeCurrency(fromCurrency)
@@ -158,6 +176,7 @@ export default function ReservationPaymentPanelMultiCurrencyV2({ propertyId, res
       const code = normalizeCurrency(row.moneda)
 
       setReservation(row)
+      setAccountPartnerId(row.partner_id || "")
       setPayments(pays)
       setFolioItems(items)
       setAllocations(itemAllocations)
@@ -169,6 +188,8 @@ export default function ReservationPaymentPanelMultiCurrencyV2({ propertyId, res
       setSplit(false)
       setParts([])
       setCashReceived("")
+      const linkedPartner = partners.find(partner => String(partner.id) === String(row.partner_id || ""))
+      setAccountDueAt(linkedPartner ? dueDateFor(linkedPartner) : "")
     } catch (err) {
       setError(err?.message || "No se pudo cargar la reserva para cobrar.")
     } finally {
@@ -187,18 +208,22 @@ export default function ReservationPaymentPanelMultiCurrencyV2({ propertyId, res
   }, [reservationId, loadReservation])
 
   const paid = useMemo(() => paidTotal(payments), [payments])
+  const accountPartner = useMemo(() => partners.find(row => String(row.id) === String(accountPartnerId)) || null, [partners, accountPartnerId])
+  const accountExposure = useMemo(() => receivables.filter(row => String(row.partner_id) === String(accountPartnerId) && normalizeCurrency(row.currency) === reservationCurrency).reduce((sum, row) => sum + Math.max(0, Number(row.balance) || 0), 0), [receivables, accountPartnerId, reservationCurrency])
+  const accountAvailable = accountPartner && Number(accountPartner.credit_limit) > 0 ? Math.max(0, Number(accountPartner.credit_limit) - accountExposure) : null
   const total = Number(reservation?.precio_total || 0)
   const pending = Math.max(0, total - paid)
   const lines = useMemo(() => buildChargeLines(folioItems, allocations, payments, total), [folioItems, allocations, payments, total])
   const selectedDue = useMemo(() => selectedBalance(lines, selectedIds), [lines, selectedIds])
   const selectedLines = useMemo(() => lines.filter(line => selectedIds.has(String(line.id))), [lines, selectedIds])
 
-  const paymentAmount = numberValue(amount)
+  const accountMode = !split && isAccountCurrent(method)
+  const paymentAmount = accountMode ? selectedDue : numberValue(amount)
   const rawSingleApplied = reservation ? toReservation(paymentAmount, paymentCurrency) : 0
   const roundingTolerance = reservationCurrency === "ARS" && paymentCurrency === "USD" ? Math.max(.011, fxRate / 200) : .011
   const singleApplied = rawSingleApplied != null && Math.abs(rawSingleApplied - selectedDue) <= roundingTolerance ? roundMoney(selectedDue) : rawSingleApplied
-  const singleFxReady = paymentCurrency === reservationCurrency || fxRate > 0
-  const singleValid = singleFxReady && Number(singleApplied) > 0 && Number(singleApplied) <= selectedDue + .011
+  const singleFxReady = accountMode || paymentCurrency === reservationCurrency || fxRate > 0
+  const singleValid = accountMode ? Boolean(accountPartnerId && accountDueAt && selectedDue > .009) : singleFxReady && Number(singleApplied) > 0 && Number(singleApplied) <= selectedDue + .011
 
   const resolvedParts = useMemo(() => {
     if (!split || !reservation || !parts.length) return []
@@ -229,7 +254,7 @@ export default function ReservationPaymentPanelMultiCurrencyV2({ propertyId, res
   function applySelection(next) {
     const due = selectedBalance(lines, next)
     setSelectedIds(next)
-    const physical = fromReservation(due, paymentCurrency)
+    const physical = accountMode ? due : fromReservation(due, paymentCurrency)
     setAmount(physical == null ? "" : String(physical || ""))
     setCashReceived("")
     setError("")
@@ -257,8 +282,8 @@ export default function ReservationPaymentPanelMultiCurrencyV2({ propertyId, res
 
   function enableSplit() {
     if (selectedDue <= 0) return
-    const firstMethod = method || "Efectivo"
-    const secondMethod = METHODS.find(item => item !== firstMethod) || "Transferencia bancaria"
+    const firstMethod = isAccountCurrent(method) ? "Efectivo" : (method || "Efectivo")
+    const secondMethod = paymentMethods.find(item => item !== firstMethod) || "Transferencia bancaria"
     const halfApplied = roundMoney(selectedDue / 2)
     const halfPhysical = fromReservation(halfApplied, paymentCurrency)
     setParts([
@@ -286,7 +311,7 @@ export default function ReservationPaymentPanelMultiCurrencyV2({ propertyId, res
     setParts(current => {
       if (current.length >= 4) return current
       const used = new Set(current.map(part => part.method))
-      const nextMethod = METHODS.find(item => !used.has(item))
+      const nextMethod = paymentMethods.find(item => !used.has(item))
       if (!nextMethod) return current
       return [...current.slice(0, -1), { method: nextMethod, currency: reservationCurrency, amount: 0 }, current[current.length - 1]]
     })
@@ -303,6 +328,26 @@ export default function ReservationPaymentPanelMultiCurrencyV2({ propertyId, res
     setError("")
     try {
       if (selectedDue <= 0) throw new Error("Seleccioná al menos un cargo pendiente para cobrar.")
+      if (accountMode) {
+        if (!accountPartnerId) throw new Error("Elegí la empresa o agencia que asumirá la cuenta corriente.")
+        if (!accountDueAt) throw new Error("Elegí el vencimiento de la cuenta corriente.")
+        const allocationRows = allocatePaymentParts(lines, selectedIds, [selectedDue])[0] || []
+        const { data: accountResult, error: accountError } = await supabase.rpc("hl_charge_to_partner_account_atomic", {
+          p_reservation_id: Number(reservation.id),
+          p_partner_id: accountPartnerId,
+          p_charge_allocations: allocationRows,
+          p_due_at: accountDueAt,
+          p_note: note.trim() || null,
+        })
+        if (accountError) throw accountError
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("hl:pms-payment-updated", { detail: { reservationId: Number(reservation.id), paymentIds: [Number(accountResult?.payment_id)].filter(Number.isFinite) } }))
+          window.dispatchEvent(new CustomEvent("hl:pms-data-updated", { detail: { propertyId, tables: ["pagos", "hotel_finance_documents", "hotel_partners", "hotel_folios"] } }))
+          window.dispatchEvent(new CustomEvent("hl:pms-toast", { detail: { title: "Pasado a cuenta corriente", message: `${reservation.nombre_huesped} · ${money(selectedDue, reservationCurrency)} a ${accountResult?.partner_name || accountPartner?.name || "empresa"} · vence ${accountResult?.due_at || accountDueAt}.` } }))
+        }
+        onSaved?.({ payment: { id: accountResult?.payment_id, metodo: "Cuenta corriente", monto: selectedDue, moneda: reservationCurrency }, payments: [], reservation: { ...reservation, partner_id: accountPartnerId }, account: accountResult })
+        return
+      }
       const finalParts = split ? resolvedParts : [{ method, currency: paymentCurrency, amount: paymentAmount, applied: roundMoney(singleApplied || 0) }]
       if (split && !splitValid) throw new Error("El pago dividido debe completar exactamente los cargos seleccionados y usar medios diferentes.")
       if (!split && !singleValid) throw new Error(`El pago no puede superar ${money(selectedDue, reservationCurrency)}.`)
@@ -383,15 +428,23 @@ export default function ReservationPaymentPanelMultiCurrencyV2({ propertyId, res
             <p className={s.hint}><b>Moneda de la reserva: {reservationCurrency}.</b> {fxCaption}. Podés recibir ARS o USD y el saldo queda siempre en la moneda original.</p>
             <div className={s.footer} style={{ justifyContent: "space-between", marginTop: 0, marginBottom: 12, paddingTop: 0, borderTop: 0 }}>
               <b style={{ fontSize: 11 }}>{split ? "Pago dividido" : "Un medio de pago"}</b>
-              <button type="button" className={s.secondary} onClick={split ? disableSplit : enableSplit}>{split ? "Usar un solo medio" : "Dividir pago"}</button>
+              {!accountMode ? <button type="button" className={s.secondary} onClick={split ? disableSplit : enableSplit}>{split ? "Usar un solo medio" : "Dividir pago"}</button> : <span style={{fontSize:10,color:"var(--muted)"}}>No ingresa dinero a Caja</span>}
             </div>
 
             {!split ? <div className={s.formGrid}>
-              <label className={s.field}><span>Medio de pago</span><select value={method} onChange={event => { setMethod(event.target.value); setCashReceived("") }}>{METHODS.map(item => <option key={item}>{item}</option>)}</select></label>
-              <label className={s.field}><span>Moneda recibida</span><select value={paymentCurrency} onChange={event => changeSingleCurrency(event.target.value)}>{CURRENCIES.map(code => <option key={code}>{code}</option>)}</select></label>
-              <label className={s.field}><span>Importe recibido ({paymentCurrency})</span><input type="number" min="0.01" step="0.01" value={amount} onChange={event => setAmount(event.target.value)} /><div className={s.quickAmount}><button type="button" onClick={() => { const value = fromReservation(selectedDue, paymentCurrency); setAmount(value == null ? "" : String(value)) }}>Cobrar selección completa</button></div>{paymentCurrency !== reservationCurrency && singleApplied ? <small>Aplica {money(singleApplied, reservationCurrency)} a la reserva.</small> : null}</label>
-              <label className={s.field}><span>Referencia</span><input value={reference} onChange={event => setReference(event.target.value)} placeholder="Banco, billetera, cupón…" /></label>
-              <label className={`${s.field} ${s.fieldFull}`}><span>Nota</span><input value={note} onChange={event => setNote(event.target.value)} placeholder="Opcional" /></label>
+              <label className={s.field}><span>Medio de pago</span><select value={method} onChange={event => { const next=event.target.value; setMethod(next); setCashReceived(""); if(isAccountCurrent(next)){setPaymentCurrency(reservationCurrency);setAmount(String(selectedDue||""));const linked=partners.find(row=>String(row.id)===String(accountPartnerId||reservation?.partner_id||""));if(linked){setAccountPartnerId(linked.id);setAccountDueAt(dueDateFor(linked))}} }}>{paymentMethods.map(item => <option key={item}>{item}</option>)}</select></label>
+              {accountMode ? <>
+                <label className={s.field}><span>Empresa / cuenta corriente</span><select value={accountPartnerId} onChange={event=>{const id=event.target.value;setAccountPartnerId(id);const selectedPartner=partners.find(row=>String(row.id)===String(id));setAccountDueAt(selectedPartner?dueDateFor(selectedPartner):"")}}><option value="">Elegir empresa o agencia</option>{partners.map(row=><option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
+                <label className={s.field}><span>Importe a cuenta</span><input value={money(selectedDue,reservationCurrency)} readOnly/><small>Se saldan los cargos seleccionados en la reserva y nace una cuenta por cobrar.</small></label>
+                <label className={s.field}><span>Vencimiento</span><input type="date" value={accountDueAt} onChange={event=>setAccountDueAt(event.target.value)}/></label>
+                {accountPartner ? <div className={`${s.field} ${s.fieldFull}`} style={{padding:11,border:"1px solid color-mix(in srgb,var(--accent) 18%,var(--line))",borderRadius:12,background:"color-mix(in srgb,var(--accent) 4%,var(--panelSolid))"}}><span>{accountPartner.name}</span><b style={{fontSize:11}}>{accountPartner.billing_terms||"Sin condición de pago"} · saldo actual {money(accountExposure,reservationCurrency)}{accountAvailable!=null?` · crédito disponible ${money(accountAvailable,reservationCurrency)}`:""}</b><small style={{color:"var(--muted)"}}>{accountPartner.negotiated_rate_label||"Cuenta comercial"}</small></div> : null}
+                <label className={`${s.field} ${s.fieldFull}`}><span>Nota</span><input value={note} onChange={event => setNote(event.target.value)} placeholder="Opcional · referencia interna de la empresa" /></label>
+              </> : <>
+                <label className={s.field}><span>Moneda recibida</span><select value={paymentCurrency} onChange={event => changeSingleCurrency(event.target.value)}>{CURRENCIES.map(code => <option key={code}>{code}</option>)}</select></label>
+                <label className={s.field}><span>Importe recibido ({paymentCurrency})</span><input type="number" min="0.01" step="0.01" value={amount} onChange={event => setAmount(event.target.value)} /><div className={s.quickAmount}><button type="button" onClick={() => { const value = fromReservation(selectedDue, paymentCurrency); setAmount(value == null ? "" : String(value)) }}>Cobrar selección completa</button></div>{paymentCurrency !== reservationCurrency && singleApplied ? <small>Aplica {money(singleApplied, reservationCurrency)} a la reserva.</small> : null}</label>
+                <label className={s.field}><span>Referencia</span><input value={reference} onChange={event => setReference(event.target.value)} placeholder="Banco, billetera, cupón…" /></label>
+                <label className={`${s.field} ${s.fieldFull}`}><span>Nota</span><input value={note} onChange={event => setNote(event.target.value)} placeholder="Opcional" /></label>
+              </>}
             </div> : <div style={{ display: "grid", gap: 10 }}>
               {resolvedParts.map((part, index) => {
                 const auto = index === resolvedParts.length - 1
@@ -407,6 +460,7 @@ export default function ReservationPaymentPanelMultiCurrencyV2({ propertyId, res
               <div className={s.formGrid}><label className={s.field}><span>Referencia</span><input value={reference} onChange={event => setReference(event.target.value)} /></label><label className={s.field}><span>Nota</span><input value={note} onChange={event => setNote(event.target.value)} /></label></div>
             </div>}
 
+            {accountMode ? <p className={s.hint}><b>Cuenta corriente no es un ingreso de caja.</b> La reserva queda saldada por la empresa/agencia y el importe pasa a Empresas y cuentas como deuda pendiente.</p> : null}
             {cashPart ? <div style={{ marginTop: 12 }} className={s.formGrid}>
               <label className={s.field}><span>Efectivo recibido ({cashPart.currency})</span><input type="number" min="0" step="0.01" value={cashReceived} onChange={event => setCashReceived(event.target.value)} placeholder={String(cashTarget)} /></label>
               <div className={s.field}><span>Vuelto</span><b>{cashReceived ? money(change, cashPart.currency) : "—"}</b><small>Parte en efectivo: {money(cashTarget, cashPart.currency)}</small></div>
@@ -417,7 +471,7 @@ export default function ReservationPaymentPanelMultiCurrencyV2({ propertyId, res
           <div className={s.footer}>
             <button type="button" className={s.secondary} onClick={() => setReservation(null)}>Cambiar reserva</button>
             <button type="button" className={s.secondary} onClick={onClose}>Cancelar</button>
-            <button type="button" className={s.save} disabled={saving || pending <= 0 || selectedDue <= 0 || (split ? !splitValid : !singleValid) || !cashValid} onClick={save}>{saving ? "Registrando…" : split ? "Registrar pago dividido" : "Registrar pago"}</button>
+            <button type="button" className={s.save} disabled={saving || pending <= 0 || selectedDue <= 0 || (split ? !splitValid : !singleValid) || !cashValid} onClick={save}>{saving ? "Registrando…" : accountMode ? "Pasar a cuenta corriente" : split ? "Registrar pago dividido" : "Registrar pago"}</button>
           </div>
         </>}
       </div>
