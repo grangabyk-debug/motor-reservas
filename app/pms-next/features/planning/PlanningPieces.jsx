@@ -18,7 +18,8 @@ const addDays=(value,amount)=>keyFromDate(new Date(fromKey(value).getTime()+amou
 const diffDays=(a,b)=>Math.round((fromKey(b)-fromKey(a))/DAY)
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:0}).format(Number(value)||0)
 const isDayUse=item=>["day_use","dayuse","day-use"].includes(String(item.tipo_estadia||"").toLowerCase())
-const roomCount=item=>new Set([...(item?._reservation_room_ids||[]),item.habitacion_id,...(item.habitaciones_ids||[])].filter(Boolean).map(Number)).size
+const HISTORICAL_ROOM_ROLES=new Set(["previous_room","cancelled_room","transient_room"])
+const roomCount=item=>{const excluded=new Set((Array.isArray(item?.habitaciones_detalle)?item.habitaciones_detalle:[]).filter(detail=>HISTORICAL_ROOM_ROLES.has(String(detail?.segment_role||"").toLowerCase())).map(detail=>Number(detail?.habitacion_id)).filter(Number.isFinite));return new Set([...(item?._reservation_room_ids||[]),item.habitacion_id,...(item.habitaciones_ids||[])].filter(Boolean).map(Number).filter(id=>!excluded.has(id))).size}
 const movementDetail=item=>{if(item?._room_detail&&Number(item._room_detail?.habitacion_id)===Number(item?.habitacion_id))return item._room_detail;return(Array.isArray(item?.habitaciones_detalle)?item.habitaciones_detalle:[]).find(detail=>Number(detail?.habitacion_id)===Number(item?.habitacion_id))||{}}
 
 export function ReservationBlock({item,days,selected,onSelect,onDragStart,onResizeStart,settings,onPreview}){
