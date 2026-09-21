@@ -1,16 +1,17 @@
 "use client"
 
-import{useEffect,useMemo,useState}from"react"
+import{useEffect,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
+import useOperationalDate from"../../core/useOperationalDate"
 
 const CASH_PREFILL_KEY="hl:pms:cash-prefill"
-const dateKey=date=>date.toLocaleDateString("en-CA")
 const fmtDate=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short",year:"numeric"}).format(new Date(`${value}T12:00:00`)).replace(".",""):"—"
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:0}).format(Number(value)||0)
 function penaltyValue(rule,item){const value=Math.max(0,Number(rule?.value)||0),type=rule?.charge_type||"none";if(type==="fixed")return value;if(type==="percent")return Math.max(0,Number(item?.precio_total)||0)*value/100;if(type==="nights")return Math.max(0,Number(item?.tarifa_noche)||0)*value;return 0}
 function ruleText(rule,currency="ARS"){const value=Math.max(0,Number(rule?.value)||0);if(rule?.charge_type==="fixed")return money(value,currency);if(rule?.charge_type==="percent")return`${value}% del total`;if(rule?.charge_type==="nights")return`${value} noche${value===1?"":"s"}`;return"Sin cargo"}
 
 export default function ReservationNoShowDialog({item,onClose,onConfirm,onPay,saving,error}){
+  const operationalDay=useOperationalDate(item?.property_id)
   const[penalty,setPenalty]=useState(false),[amount,setAmount]=useState(0),[note,setNote]=useState(""),[guarantee,setGuarantee]=useState(null),[loadingGuarantee,setLoadingGuarantee]=useState(false)
   const policy=item?.cancellation_policy_snapshot&&typeof item.cancellation_policy_snapshot==="object"?item.cancellation_policy_snapshot:{},policyRule=policy?.no_show_rule||{charge_type:"none",value:0},suggestedPenalty=penaltyValue(policyRule,item)
   useEffect(()=>{
@@ -27,7 +28,7 @@ export default function ReservationNoShowDialog({item,onClose,onConfirm,onPay,sa
     document.body.style.overflow="hidden"
     return()=>{document.body.style.overflow=previous}
   },[item?.id])
-  const today=useMemo(()=>dateKey(new Date()),[item?.id]),currency=item?.moneda||"ARS",paid=Math.max(0,Number(item?.paid)||0),penaltyAmount=Math.max(0,Number(amount)||0),arrived=today>=String(item?.fecha_entrada||""),withinStay=today<=String(item?.fecha_salida||"9999-12-31"),lateNoShow=Boolean(item?.fecha_salida)&&today>String(item.fecha_salida),releaseDate=lateNoShow?String(item.fecha_salida):today,penaltyCovered=!penalty||penaltyAmount<=0||paid+0.01>=penaltyAmount,canMark=Boolean(item)&&arrived&&penaltyCovered
+  const today=operationalDay,currency=item?.moneda||"ARS",paid=Math.max(0,Number(item?.paid)||0),penaltyAmount=Math.max(0,Number(amount)||0),arrived=today>=String(item?.fecha_entrada||""),withinStay=today<=String(item?.fecha_salida||"9999-12-31"),lateNoShow=Boolean(item?.fecha_salida)&&today>String(item.fecha_salida),releaseDate=lateNoShow?String(item.fecha_salida):today,penaltyCovered=!penalty||penaltyAmount<=0||paid+0.01>=penaltyAmount,canMark=Boolean(item)&&arrived&&penaltyCovered
   if(!item)return null
   const card=guarantee?`${guarantee.card_brand||guarantee.guarantee_type||"Garantía"}${guarantee.last_four?` · •••• ${guarantee.last_four}`:""}`:item.garantia_ultimos4?`${item.garantia_marca||"Tarjeta"} · •••• ${item.garantia_ultimos4}`:null
   function payPenalty(){

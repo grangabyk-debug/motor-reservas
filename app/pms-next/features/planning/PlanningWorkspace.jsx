@@ -1,5 +1,7 @@
 "use client"
 
+import useOperationalDate from"../../core/useOperationalDate"
+
 import{useEffect,useMemo,useRef,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 import usePlanningData from"./usePlanningData"
@@ -28,7 +30,7 @@ const overlaps=(item,start,end)=>item.fecha_entrada<end&&item.fecha_salida>start
 const uniqueIds=values=>[...new Set((values||[]).filter(Boolean).map(value=>String(value)))]
 
 export default function PlanningWorkspace({propertyId,property,onNavigate,newReservationRequest=0}){
-  const today=keyFromDate(new Date())
+  const today=useOperationalDate(propertyId)
   const[anchor,setAnchor]=useState(today),[query,setQuery]=useState(""),[roomQuery,setRoomQuery]=useState(""),[typeFilter,setTypeFilter]=useState("all"),[channelFilter,setChannelFilter]=useState("all"),[statusFilter,setStatusFilter]=useState("all")
   const[selected,setSelected]=useState(null),[preview,setPreview]=useState(null),[dragging,setDragging]=useState(null),[dropCell,setDropCell]=useState(""),[saving,setSaving]=useState(false),[rateMove,setRateMove]=useState(null)
   const[formOpen,setFormOpen]=useState(false),[drawerStep,setDrawerStep]=useState(0),[draft,setDraft]=useState(null),[draftState,setDraftState]=useState(""),[,setHasSavedDraft]=useState(false),[formError,setFormError]=useState("")

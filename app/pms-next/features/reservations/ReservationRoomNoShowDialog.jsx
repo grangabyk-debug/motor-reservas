@@ -3,9 +3,9 @@
 import{useEffect,useMemo,useState}from"react"
 import{createPortal}from"react-dom"
 import{reservationCheckinProgress}from"./reservationEditUtils"
+import useOperationalDate from"../../core/useOperationalDate"
 
 const DAY=86400000
-const dateKey=date=>date.toLocaleDateString("en-CA")
 const fmtDate=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short",year:"numeric"}).format(new Date(`${value}T12:00:00`)).replace(".",""):"—"
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:0}).format(Number(value)||0)
 const diffDays=(start,end)=>Math.max(0,Math.round((new Date(`${end}T12:00:00`)-new Date(`${start}T12:00:00`))/DAY))
@@ -14,7 +14,8 @@ function penaltyValue(rule,{total=0,rate=0}={}){const value=Math.max(0,Number(ru
 function ruleText(rule,currency="ARS"){const value=Math.max(0,Number(rule?.value)||0);if(rule?.charge_type==="fixed")return money(value,currency);if(rule?.charge_type==="percent")return`${value}% del total`;if(rule?.charge_type==="nights")return`${value} noche${value===1?"":"s"}`;return"Sin cargo"}
 
 export default function ReservationRoomNoShowDialog({item,onClose,onConfirm,onPay,saving=false,error=""}){
-  const progress=useMemo(()=>reservationCheckinProgress(item||{}),[item])
+  const operationalDay=useOperationalDate(item?.property_id)
+  const progress=useMemo(()=>reservationCheckinProgress(item||{},operationalDay),[item,operationalDay])
   const candidateIds=useMemo(()=>[...new Set([...progress.eligiblePendingRoomIds,...progress.expiredPendingRoomIds].map(Number))],[progress.eligiblePendingRoomIds.join("|"),progress.expiredPendingRoomIds.join("|")])
   const candidates=useMemo(()=>candidateIds.map(id=>{const detail=detailFor(item,id),room=(item?.rooms||[]).find(value=>Number(value.id)===id);return{id,name:room?.nombre||detail?.nombre||id,detail,start:String(detail?.fecha_entrada||item?.fecha_entrada||"").slice(0,10),end:String(detail?.fecha_salida||item?.fecha_salida||"").slice(0,10)}}),[candidateIds.join("|"),item])
   const[selectedId,setSelectedId]=useState("")
@@ -27,7 +28,7 @@ export default function ReservationRoomNoShowDialog({item,onClose,onConfirm,onPa
   const rateNet=Math.max(0,Number(detail?.tarifa_noche)||0),rateGross=Math.round(rateNet*factor*100)/100,nights=selected?diffDays(selected.start,selected.end):0,totalGross=Math.round(rateGross*nights*100)/100
   const policy=detail?.cancellation_policy_snapshot&&typeof detail.cancellation_policy_snapshot==="object"?detail.cancellation_policy_snapshot:item?.cancellation_policy_snapshot&&typeof item.cancellation_policy_snapshot==="object"?item.cancellation_policy_snapshot:{}
   const rule=policy?.no_show_rule||{charge_type:"none",value:0},suggested=penaltyValue(rule,{total:totalGross,rate:rateGross})
-  const today=dateKey(new Date()),late=Boolean(selected?.end)&&today>selected.end,releaseDate=late?selected.end:today,arrived=Boolean(selected?.start)&&today>=selected.start
+  const today=operationalDay,late=Boolean(selected?.end)&&today>selected.end,releaseDate=late?selected.end:today,arrived=Boolean(selected?.start)&&today>=selected.start
   const paid=Math.max(0,Number(item?.paid)||0),penaltyAmount=Math.max(0,Number(amount)||0),covered=!penalty||penaltyAmount<=0||paid+0.01>=penaltyAmount,canConfirm=Boolean(selected)&&arrived&&covered
 
   useEffect(()=>{setSelectedId(String(candidates[0]?.id||""));setNote("")},[item?.id,candidates.map(row=>row.id).join("|")])

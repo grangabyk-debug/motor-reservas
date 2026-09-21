@@ -45,13 +45,32 @@ export default function usePlanningData(propertyId,windowStart,windowEndExclusiv
         supabase.from("bloqueos").select("id,habitacion_id,fecha_desde,fecha_hasta,motivo,detalle").eq("property_id",propertyId).lt("fecha_desde",windowEndExclusive).gt("fecha_hasta",windowStart).order("fecha_desde"),
       ])
       if(roomRes.error)throw roomRes.error;if(resRes.error)throw resRes.error;if(floorRes.error)throw floorRes.error;if(policyRes.error)throw policyRes.error;if(blockRes.error)throw blockRes.error
-      const floorById=new Map((floorRes.data||[]).map(floor=>[String(floor.id),floor])),roomRows=(roomRes.data||[]).map(room=>{const floor=floorById.get(String(room.floor_id||""));return{...room,floor_name:floor?.name||"Sin piso",floor_sort:Number(floor?.sort_order??999)}}).sort((a,b)=>a.floor_sort-b.floor_sort||Number(a.sort_order||0)-Number(b.sort_order||0)||String(a.nombre).localeCompare(String(b.nombre),"es",{numeric:true})),enriched=attachPayments(planningSegments(resRes.data||[]),paymentRes.error?[]:paymentRes.data||[])
+      const reservationRows=resRes.data||[],reservationIds=reservationRows.map(row=>Number(row.id)).filter(Number.isFinite)
+      let guestRows=[]
+      if(reservationIds.length){
+        const guestRes=await supabase.from("hotel_reservation_guests").select("reservation_id,room_id,checked_out_at").eq("property_id",propertyId).in("reservation_id",reservationIds)
+        if(guestRes.error)throw guestRes.error
+        guestRows=guestRes.data||[]
+      }
+      const manifestReservations=new Set(guestRows.map(row=>Number(row.reservation_id)).filter(Number.isFinite)),activeGuestsByRoom=new Map(),unassignedActiveGuests=new Map()
+      for(const guest of guestRows){
+        if(guest.checked_out_at)continue
+        const reservationId=Number(guest.reservation_id),roomId=Number(guest.room_id)
+        if(Number.isFinite(roomId))activeGuestsByRoom.set(`${reservationId}:${roomId}`,(activeGuestsByRoom.get(`${reservationId}:${roomId}`)||0)+1)
+        else unassignedActiveGuests.set(reservationId,(unassignedActiveGuests.get(reservationId)||0)+1)
+      }
+      const segments=planningSegments(reservationRows).map(segment=>{
+        const reservationId=Number(segment.id),roomId=Number(segment.habitacion_id),hasManifest=manifestReservations.has(reservationId),singleRoom=reservationRooms(segment).length===1
+        const roomGuests=activeGuestsByRoom.get(`${reservationId}:${roomId}`)||0,unassigned=singleRoom?(unassignedActiveGuests.get(reservationId)||0):0
+        return{...segment,_has_guest_manifest:hasManifest,_room_guest_count:hasManifest?roomGuests+unassigned:null}
+      })
+      const floorById=new Map((floorRes.data||[]).map(floor=>[String(floor.id),floor])),roomRows=(roomRes.data||[]).map(room=>{const floor=floorById.get(String(room.floor_id||""));return{...room,floor_name:floor?.name||"Sin piso",floor_sort:Number(floor?.sort_order??999)}}).sort((a,b)=>a.floor_sort-b.floor_sort||Number(a.sort_order||0)-Number(b.sort_order||0)||String(a.nombre).localeCompare(String(b.nombre),"es",{numeric:true})),enriched=attachPayments(segments,paymentRes.error?[]:paymentRes.data||[])
       setRooms(roomRows);setReservations(enriched);setBlocks(blockRes.data||[]);setCancellationPolicies(policyRes.data||[])
     }catch(err){setError(err?.message||"No se pudo cargar el Planning.")}finally{if(!silent)setLoading(false)}
   },[propertyId,windowStart,windowEndExclusive])
   useEffect(()=>{load()},[load])
   useEffect(()=>{if(typeof window==="undefined")return;const refresh=()=>load(true);window.addEventListener("hl:pms-payment-updated",refresh);window.addEventListener("hl:pms-reservation-updated",refresh);window.addEventListener("hl:pms-cancellation-policies-updated",refresh);return()=>{window.removeEventListener("hl:pms-payment-updated",refresh);window.removeEventListener("hl:pms-reservation-updated",refresh);window.removeEventListener("hl:pms-cancellation-policies-updated",refresh)}},[load])
-  useEffect(()=>{if(!propertyId)return;let timer=null;const refresh=()=>{if(timer)clearTimeout(timer);timer=setTimeout(()=>load(true),70)},channel=supabase.channel(`hl-planning-live-${propertyId}`).on("postgres_changes",{event:"*",schema:"public",table:"reservas",filter:`property_id=eq.${propertyId}`},refresh).on("postgres_changes",{event:"*",schema:"public",table:"pagos",filter:`property_id=eq.${propertyId}`},refresh).on("postgres_changes",{event:"*",schema:"public",table:"hotel_cancellation_policies",filter:`property_id=eq.${propertyId}`},refresh).on("postgres_changes",{event:"*",schema:"public",table:"bloqueos",filter:`property_id=eq.${propertyId}`},refresh).subscribe();return()=>{if(timer)clearTimeout(timer);supabase.removeChannel(channel)}},[propertyId,load])
+  useEffect(()=>{if(!propertyId)return;let timer=null;const refresh=()=>{if(timer)clearTimeout(timer);timer=setTimeout(()=>load(true),70)},channel=supabase.channel(`hl-planning-live-${propertyId}`).on("postgres_changes",{event:"*",schema:"public",table:"reservas",filter:`property_id=eq.${propertyId}`},refresh).on("postgres_changes",{event:"*",schema:"public",table:"pagos",filter:`property_id=eq.${propertyId}`},refresh).on("postgres_changes",{event:"*",schema:"public",table:"hotel_cancellation_policies",filter:`property_id=eq.${propertyId}`},refresh).on("postgres_changes",{event:"*",schema:"public",table:"hotel_reservation_guests",filter:`property_id=eq.${propertyId}`},refresh).on("postgres_changes",{event:"*",schema:"public",table:"bloqueos",filter:`property_id=eq.${propertyId}`},refresh).subscribe();return()=>{if(timer)clearTimeout(timer);supabase.removeChannel(channel)}},[propertyId,load])
 
   const moveReservation=useCallback(async({reservationId,roomId,start,end,reprice=false})=>{
     const numericId=Number(reservationId),numericRoom=Number(roomId),previous=reservations.find(item=>Number(item.id)===numericId);if(!previous)throw new Error("No encontramos la reserva en el Planning actual.")

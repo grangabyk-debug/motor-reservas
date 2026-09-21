@@ -3,9 +3,9 @@
 import{useEffect,useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 import s from"./reservationGroupCheckout.module.css"
+import useOperationalDate from"../../core/useOperationalDate"
 
 const roomIds=item=>[...new Set([item?.habitacion_id,...(item?.habitaciones_ids||[])].filter(Boolean).map(Number))]
-const todayKey=()=>{const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`}
 const validDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(String(value||""))
 const detailFor=(item,roomId)=>{const list=(Array.isArray(item?.habitaciones_detalle)?item.habitaciones_detalle:[]).filter(row=>Number(row?.habitacion_id)===Number(roomId)&&String(row?.segment_role||"")!=="previous_room");return list[list.length-1]||{}}
 const roomStart=(item,roomId)=>validDate(detailFor(item,roomId)?.fecha_entrada)?detailFor(item,roomId).fecha_entrada:item?.fecha_entrada
@@ -13,8 +13,9 @@ const roomEnd=(item,roomId)=>validDate(detailFor(item,roomId)?.fecha_salida)?det
 function WarnIcon(){return <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10.3 3.7 2.6 18a2 2 0 0 0 1.8 3h15.2a2 2 0 0 0 1.8-3L13.7 3.7a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></svg>}
 
 export default function ReservationGroupCheckoutDialog({item,rooms=[],propertyId,onClose,onCheckoutAll}){
-  const[guests,setGuests]=useState([]),[loading,setLoading]=useState(true),[working,setWorking]=useState(false),[error,setError]=useState(""),[confirmTarget,setConfirmTarget]=useState(null),[cancelDraft,setCancelDraft]=useState({date:todayKey(),penalty:0,recalculate:true,note:""})
-  const assigned=useMemo(()=>roomIds(item).map(id=>rooms.find(room=>Number(room.id)===id)||{id,nombre:String(id),tipo:"Habitación"}),[item,rooms]),checkoutDates=item?.room_checkout_dates||{},today=todayKey()
+  const today=useOperationalDate(propertyId||item?.property_id)
+  const[guests,setGuests]=useState([]),[loading,setLoading]=useState(true),[working,setWorking]=useState(false),[error,setError]=useState(""),[confirmTarget,setConfirmTarget]=useState(null),[cancelDraft,setCancelDraft]=useState({date:today,penalty:0,recalculate:true,note:""})
+  const assigned=useMemo(()=>roomIds(item).map(id=>rooms.find(room=>Number(room.id)===id)||{id,nombre:String(id),tipo:"Habitación"}),[item,rooms]),checkoutDates=item?.room_checkout_dates||{}
   const released=room=>{const value=checkoutDates[String(room.id)];return validDate(value)&&value<=today}
   const future=room=>String(roomStart(item,room.id)||"")>today
   const activeRooms=assigned.filter(room=>!released(room))

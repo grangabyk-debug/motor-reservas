@@ -54,9 +54,9 @@ export function buildReservationMetadataPatch({baseItem,draft,details,ids,effect
 }
 
 
-export function reservationCheckinProgress(item){
+export function reservationCheckinProgress(item,operationalDay=""){
   const roomIds=activeReservationRoomIds(item).map(Number).filter(Number.isFinite)
-  const activeSet=new Set(roomIds.map(String)),details=Array.isArray(item?.habitaciones_detalle)?item.habitaciones_detalle:[],today=dateKey(new Date())
+  const activeSet=new Set(roomIds.map(String)),details=Array.isArray(item?.habitaciones_detalle)?item.habitaciones_detalle:[],today=validDate(operationalDay)?String(operationalDay):dateKey(new Date())
   const detailFor=id=>details.find(detail=>String(detail?.habitacion_id||"")===String(id))||{}
   const roomStart=id=>String(detailFor(id)?.fecha_entrada||item?.fecha_entrada||"").slice(0,10)
   const roomEnd=id=>String(detailFor(id)?.fecha_salida||item?.fecha_salida||"").slice(0,10)

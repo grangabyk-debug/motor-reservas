@@ -2,12 +2,14 @@
 
 import{useEffect,useRef,useState}from"react"
 import{reservationCheckinProgress}from"./reservationEditUtils"
+import useOperationalDate from"../../core/useOperationalDate"
 
 const fmtShort=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"2-digit"}).format(new Date(`${value}T12:00:00`)):""
 
 export default function ReservationStayActions({item,saving=false,onPrimary,onNoShow,onCancel}){
   const[open,setOpen]=useState(false)
-  const rootRef=useRef(null),progress=reservationCheckinProgress(item||{}),partial=progress.partial
+  const operationalDay=useOperationalDate(item?.property_id)
+  const rootRef=useRef(null),progress=reservationCheckinProgress(item||{},operationalDay),partial=progress.partial
   const waitingFuture=partial&&progress.eligiblePending===0&&progress.futurePendingRoomIds.length>0
   const isCheckout=item?.estado==="alojado"&&!partial
   const isClosed=item?.estado==="finalizada"||item?.estado==="cancelada"

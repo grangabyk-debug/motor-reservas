@@ -3,10 +3,10 @@
 import{useEffect,useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 import{reservationCheckinProgress}from"./reservationEditUtils"
+import useOperationalDate from"../../core/useOperationalDate"
 
 const fmtDate=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"2-digit",year:"numeric"}).format(new Date(`${value}T12:00:00`)):"—"
 const statusLabel=value=>value==="alojado"?"En hotel":value==="finalizada"?"Finalizada":value==="cancelada"?"Cancelada":value==="tentativa"?"Tentativa":value==="pendiente"?"Pendiente":"Confirmada"
-const todayKey=()=>{const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`}
 const validPayment=row=>!["anulado","cancelado","void","rechazado","cancelled"].includes(String(row?.estado||"").toLowerCase())
 const roomDetail=(item,id)=>(Array.isArray(item?.habitaciones_detalle)?item.habitaciones_detalle:[]).find(detail=>Number(detail?.habitacion_id)===Number(id))||{}
 function roomingLabel(detail){
@@ -19,7 +19,8 @@ function StateIcon({tone}){const stroke=tone==="ok"?"#268357":tone==="block"?"#c
 
 export default function ReservationCheckinDialog({item,onClose,onConfirm,onHousekeeping,saving,error}){
   const[guests,setGuests]=useState([]),[payments,setPayments]=useState([]),[policy,setPolicy]=useState("allow"),[loading,setLoading]=useState(true),[loadError,setLoadError]=useState(""),[selectedIds,setSelectedIds]=useState([])
-  const assigned=item?.rooms?.length?item.rooms:[item?.room].filter(Boolean),progress=reservationCheckinProgress(item||{}),pendingKey=progress.pendingRoomIds.join(",")
+  const operationalDay=useOperationalDate(item?.property_id)
+  const assigned=item?.rooms?.length?item.rooms:[item?.room].filter(Boolean),progress=reservationCheckinProgress(item||{},operationalDay),pendingKey=progress.pendingRoomIds.join(",")
   const checkedSet=useMemo(()=>new Set(progress.checkedRoomIds.map(Number)),[progress.checkedRoomIds.join(",")]),selectedSet=useMemo(()=>new Set(selectedIds.map(Number)),[selectedIds.join(",")])
   const eligibleKey=progress.eligiblePendingRoomIds.join(",")
   useEffect(()=>{setSelectedIds(progress.eligiblePendingRoomIds.map(Number))},[item?.id,pendingKey,eligibleKey])
@@ -35,7 +36,7 @@ export default function ReservationCheckinDialog({item,onClose,onConfirm,onHouse
   if(!item)return null
 
   const selectedRooms=assigned.filter(room=>selectedSet.has(Number(room.id))),dirty=selectedRooms.filter(room=>String(room.estado||"").toLowerCase()==="sucia"),blocked=selectedRooms.filter(room=>room.activa===false||!["libre","limpia","inspeccionada","sucia"].includes(String(room.estado||"").toLowerCase()))
-  const today=todayKey(),future=String(item.fecha_entrada||"")>today,past=String(item.fecha_salida||"")<today,activeGuests=guests.filter(g=>!g.checked_out_at),hasContact=Boolean(String(item.email_huesped||"").trim()||String(item.telefono_huesped||"").trim()),hasDocument=Boolean(item.dni_huesped||activeGuests.some(g=>g.document_number||g.document_front_path||g.document_back_path)),guestTarget=Math.max(1,Number(item.cantidad_huespedes)||1),guestReady=activeGuests.length>=guestTarget,paid=payments.filter(validPayment).reduce((sum,p)=>sum+Math.max(0,Number(p.monto||0)-Number(p.refunded_amount||0)),0),hasGuarantee=paid>0||Boolean(item.garantia_tipo||item.garantia_ultimos4),dirtyBlocked=dirty.length>0&&policy==="block"
+  const today=operationalDay,future=String(item.fecha_entrada||"")>today,past=String(item.fecha_salida||"")<today,activeGuests=guests.filter(g=>!g.checked_out_at),hasContact=Boolean(String(item.email_huesped||"").trim()||String(item.telefono_huesped||"").trim()),hasDocument=Boolean(item.dni_huesped||activeGuests.some(g=>g.document_number||g.document_front_path||g.document_back_path)),guestTarget=Math.max(1,Number(item.cantidad_huespedes)||1),guestReady=activeGuests.length>=guestTarget,paid=payments.filter(validPayment).reduce((sum,p)=>sum+Math.max(0,Number(p.monto||0)-Number(p.refunded_amount||0)),0),hasGuarantee=paid>0||Boolean(item.garantia_tipo||item.garantia_ultimos4),dirtyBlocked=dirty.length>0&&policy==="block"
   const afterCount=Math.min(progress.total,progress.checked+selectedRooms.length),isGroup=assigned.length>1,nextState=afterCount>=progress.total?"En hotel · ingreso completo":`Check-in parcial · ${afterCount} de ${progress.total}`
   const checks=[
     {label:"Fecha de llegada",detail:future?`La llegada es ${fmtDate(item.fecha_entrada)}.`:past?"La estadía quedó fuera de fecha.":"Fecha válida para realizar el check-in.",tone:future||past?"block":"ok"},

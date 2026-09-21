@@ -24,7 +24,7 @@ const movementDetail=item=>{if(item?._room_detail&&Number(item._room_detail?.hab
 export function ReservationBlock({item,days,selected,onSelect,onDragStart,onResizeStart,settings,onPreview}){
   const[resizeEnd,setResizeEnd]=useState(null),[resizing,setResizing]=useState(false),resizeValue=useRef(null)
   const first=days[0],dayUse=isDayUse(item),noShow=Boolean(item.no_show),effectiveEnd=resizeEnd||item.fecha_salida,entryOffset=diffDays(first,item.fecha_entrada),rooms=roomCount(item),group=rooms>1,channel=channelMeta(item.canal_reserva)
-  const lock=movementDetail(item),roomScoped=Boolean(item._room_segment),detailPax=Math.max(0,Number(lock?.huespedes)||0),pax=roomScoped?detailPax:Math.max(1,Number(item.cantidad_huespedes)||1),movementLocked=Boolean(lock?.movement_locked),lockReason=String(lock?.movement_lock_reason||"").trim()
+  const lock=movementDetail(item),roomScoped=Boolean(item._room_segment),detailPax=Math.max(0,Number(lock?.huespedes)||0),manifestPax=item?._room_guest_count,pax=roomScoped?(manifestPax==null?detailPax:Math.max(0,Number(manifestPax)||0)):Math.max(1,Number(item.cantidad_huespedes)||1),movementLocked=Boolean(lock?.movement_locked),lockReason=String(lock?.movement_lock_reason||"").trim()
   const early=roomScoped?Boolean(item._room_early):Boolean(item.early_checkin)||Number(item.early_checkin_importe)>0
   const late=roomScoped?Boolean(item._room_late):(Boolean(item.late_checkout)||Number(item.late_checkout_importe)>0)&&item._room_checkout_segment!=="checked_out"
   const rawStart=noShow?entryOffset+.5:dayUse?entryOffset+.08:entryOffset+(early?0:.5)
