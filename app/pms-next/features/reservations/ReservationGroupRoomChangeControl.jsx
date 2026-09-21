@@ -6,6 +6,7 @@ import{supabase}from"../../../../lib/supabase"
 import ReservationGroupLockDialog from"./ReservationGroupLockDialog"
 import{commercialPriceFromNet,normalizeTaxSettings}from"../../core/priceTax"
 import{pricingFromSettings}from"../../core/currency"
+import{operationalDateKey}from"./operationalDate"
 
 const validDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(String(value||""))
 const normalize=value=>String(value||"").trim().toLowerCase()
@@ -16,14 +17,6 @@ const roomStart=(item,roomId)=>{const value=detailFor(item,roomId)?.fecha_entrad
 const roomPlannedEnd=(item,roomId)=>{const value=detailFor(item,roomId)?.fecha_salida;return validDate(value)?String(value):item?.fecha_salida}
 const roomEnd=(item,roomId)=>{const planned=roomPlannedEnd(item,roomId),release=item?.room_checkout_dates?.[String(roomId)];return validDate(release)&&String(release)<planned?String(release):planned}
 const round=value=>Math.round((Number(value)||0)*100)/100
-const pad=value=>String(value).padStart(2,"0")
-const operationalDateKey=settings=>{
-  const timezone=String(settings?.preferences?.timezone||"America/Argentina/Buenos_Aires"),cutoff=Math.min(23,Math.max(0,Number(settings?.preferences?.hotel_day_cutoff_hour??12)||12)),now=new Date()
-  let parts
-  try{parts=Object.fromEntries(new Intl.DateTimeFormat("en-US",{timeZone:timezone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",hourCycle:"h23"}).formatToParts(now).filter(part=>part.type!=="literal").map(part=>[part.type,part.value]))}catch{parts=Object.fromEntries(new Intl.DateTimeFormat("en-US",{timeZone:"America/Argentina/Buenos_Aires",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",hourCycle:"h23"}).formatToParts(now).filter(part=>part.type!=="literal").map(part=>[part.type,part.value]))}
-  const base=new Date(Date.UTC(Number(parts.year),Number(parts.month)-1,Number(parts.day)));if(Number(parts.hour)<cutoff)base.setUTCDate(base.getUTCDate()-1)
-  return`${base.getUTCFullYear()}-${pad(base.getUTCMonth()+1)}-${pad(base.getUTCDate())}`
-}
 const prettyDate=value=>{if(!validDate(value))return value||"—";const[y,m,d]=String(value).split("-");return`${d}/${m}/${y}`}
 const inHouseState=value=>["alojado","inhouse","in_house","in house"].includes(normalize(value))
 
