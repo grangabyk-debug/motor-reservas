@@ -111,6 +111,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
   },[folios,activeItems,allocations,documents])
   const selectedStats=selected?statsByFolio.get(selected.id)||{charges:0,paid:0,invoiced:0}:{charges:0,paid:0,invoiced:0}
   const folioItems=selected?activeItems.filter(row=>row.folio_id===selected.id):[]
+  const movedRoomItems=selected?.room_id?activeItems.filter(row=>Number(row.room_id)===Number(selected.room_id)&&row.folio_id!==selected.id).map(row=>({...row,targetFolio:folios.find(folio=>folio.id===row.folio_id)})).filter(row=>row.targetFolio):[]
   const folioAllocations=selected?allocations.filter(row=>row.folio_id===selected.id):[]
   const folioPaymentIds=new Set(folioAllocations.map(row=>Number(row.payment_id)))
   const usedInvoicePaymentIds=useMemo(()=>new Set(documents.filter(doc=>doc.document_type==="invoice"&&!["void","cancelled","cancelada","anulado","anulada"].includes(String(doc.status||"").toLowerCase())&&doc.payment_id).map(doc=>Number(doc.payment_id))),[documents])
@@ -329,6 +330,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
         <small style={{flex:"1 1 auto",minWidth:0,whiteSpace:"nowrap",textAlign:"left",margin:0,fontSize:"9px",letterSpacing:"-.01em"}}>{selectedItems.size?`${selectedItems.size} consumo${selectedItems.size===1?"":"s"} seleccionado${selectedItems.size===1?"":"s"} para facturar parcialmente`:"Seleccioná consumos si querés facturar sólo una parte."}</small>
       </div>
 
+      {movedRoomItems.length?<div style={{margin:"8px 0 10px",padding:"10px 12px",border:"1px solid color-mix(in srgb,var(--accent) 20%,var(--line))",borderRadius:11,background:"color-mix(in srgb,var(--accent) 5%,var(--panelSolid))",fontSize:10.5,lineHeight:1.45}}><b style={{display:"block",marginBottom:4}}>Cargos de esta habitación trasladados a otro pagador</b>{movedRoomItems.map(row=><div key={row.id} style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"start"}}><span><strong>{row.description}</strong><small style={{display:"block",color:"var(--muted)",marginTop:2}}>Ahora está en <b>{row.targetFolio.label}</b>. Los pagos asignados a ese cargo se muestran en el folio destino.</small></span><b style={{whiteSpace:"nowrap"}}>{money(row.total,row.currency)}</b></div>)}</div>:null}
       <div className={s.itemList}>
         {folioItems.length?folioItems.map(row=>{
           const coverage=invoiceCoverage.get(row.id),billing=folioItemBillingState(row,coverage),invoiceable=billing.remaining>.009,movable=billing.covered<=.009&&!row.invoice_document_id
