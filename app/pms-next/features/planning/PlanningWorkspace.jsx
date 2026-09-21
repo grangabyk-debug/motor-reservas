@@ -30,7 +30,8 @@ const overlaps=(item,start,end)=>item.fecha_entrada<end&&item.fecha_salida>start
 const uniqueIds=values=>[...new Set((values||[]).filter(Boolean).map(value=>String(value)))]
 
 export default function PlanningWorkspace({propertyId,property,onNavigate,newReservationRequest=0}){
-  const today=useOperationalDate(propertyId)
+  const operationalDay=useOperationalDate(propertyId)
+  const today=keyFromDate(new Date())
   const[anchor,setAnchor]=useState(today),[query,setQuery]=useState(""),[roomQuery,setRoomQuery]=useState(""),[typeFilter,setTypeFilter]=useState("all"),[channelFilter,setChannelFilter]=useState("all"),[statusFilter,setStatusFilter]=useState("all")
   const[selected,setSelected]=useState(null),[preview,setPreview]=useState(null),[dragging,setDragging]=useState(null),[dropCell,setDropCell]=useState(""),[saving,setSaving]=useState(false),[rateMove,setRateMove]=useState(null)
   const[formOpen,setFormOpen]=useState(false),[drawerStep,setDrawerStep]=useState(0),[draft,setDraft]=useState(null),[draftState,setDraftState]=useState(""),[,setHasSavedDraft]=useState(false),[formError,setFormError]=useState("")
@@ -46,7 +47,7 @@ export default function PlanningWorkspace({propertyId,property,onNavigate,newRes
   const roomTypes=useMemo(()=>[...new Set(data.rooms.map(room=>room.tipo||"Sin tipo"))].sort(),[data.rooms]),channels=useMemo(()=>[...new Set(data.reservations.filter(item=>!item.no_show).map(item=>item.canal_reserva||"Walk-in"))].sort(),[data.reservations])
   const availabilityReservations=useMemo(()=>data.reservations.filter(item=>!item.no_show),[data.reservations])
   const visibleRooms=useMemo(()=>{const term=roomQuery.trim().toLowerCase();return sortRoomsByHotelCategory(data.rooms.filter(room=>(typeFilter==="all"||(room.tipo||"Sin tipo")===typeFilter)&&(!term||`${room.nombre} ${room.tipo||""} ${room.floor_name||""}`.toLowerCase().includes(term))))},[data.rooms,typeFilter,roomQuery])
-  const visibleReservations=useMemo(()=>data.reservations.filter(item=>{if(item.no_show)return false;if(statusFilter!=="all"&&planningStage(item,today)!==statusFilter)return false;if(channelFilter!=="all"&&(item.canal_reserva||"Walk-in")!==channelFilter)return false;const term=query.trim().toLowerCase(),room=roomById.get(Number(item.habitacion_id));return !term||`${item.numero_reserva||item.id} ${item.nombre_huesped} ${room?.nombre||""} ${item.canal_reserva||""}`.toLowerCase().includes(term)}),[data.reservations,statusFilter,channelFilter,query,roomById,today])
+  const visibleReservations=useMemo(()=>data.reservations.filter(item=>{if(item.no_show)return false;if(statusFilter!=="all"&&planningStage(item,operationalDay)!==statusFilter)return false;if(channelFilter!=="all"&&(item.canal_reserva||"Walk-in")!==channelFilter)return false;const term=query.trim().toLowerCase(),room=roomById.get(Number(item.habitacion_id));return !term||`${item.numero_reserva||item.id} ${item.nombre_huesped} ${room?.nombre||""} ${item.canal_reserva||""}`.toLowerCase().includes(term)}),[data.reservations,statusFilter,channelFilter,query,roomById,operationalDay])
 
   useEffect(()=>{if(draftKey)try{setHasSavedDraft(Boolean(localStorage.getItem(draftKey)))}catch{}},[draftKey])
   useEffect(()=>{if(settingsKey)try{const raw=localStorage.getItem(settingsKey);if(raw)setSettings({...DEFAULT_SETTINGS,...JSON.parse(raw)})}catch{}},[settingsKey])
