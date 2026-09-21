@@ -15,6 +15,7 @@ const fmtDateTime=value=>value?new Intl.DateTimeFormat("es-AR",{dateStyle:"short
 const normalize=value=>String(value||"").trim().toLowerCase()
 const currency=value=>String(value||"ARS").toUpperCase()==="USD"?"USD":"ARS"
 const isVoid=row=>["anulado","cancelado","void","rechazado","cancelled"].includes(normalize(row?.estado))
+const isReceivableTransfer=row=>normalize(row?.source)==="accounts_receivable"||normalize(row?.metodo)==="cuenta corriente"
 const isPaymentMirror=row=>normalize(row?.reference).startsWith("pago:")
 const round=value=>Math.round((Number(value)||0)*100)/100
 function methodGroup(value){const key=normalize(value);if(key.includes("efect")||key==="cash")return"cash";if(key.includes("transfer"))return"transfer";if(key.includes("mercado")||key==="mp"||key.includes("billetera")||key.includes("qr"))return"mp";if(key.includes("tarjet")||key.includes("card")||key.includes("debito")||key.includes("débito")||key.includes("credito")||key.includes("crédito"))return"card";return"other"}
@@ -60,9 +61,9 @@ export default function DailyCashWorkspaceMultiCurrency({propertyId,property,onN
   usePmsAutoRefresh(propertyId,load,["reservas","pagos","hotel_cash_movements","hotel_finance_documents","hotel_cash_sessions"])
 
   const isToday=day===dateKey(new Date())
-  const validPayments=useMemo(()=>payments.filter(row=>!isVoid(row)),[payments]),manualOnly=useMemo(()=>manual.filter(row=>!isPaymentMirror(row)),[manual])
+  const validPayments=useMemo(()=>payments.filter(row=>!isVoid(row)&&!isReceivableTransfer(row)),[payments]),manualOnly=useMemo(()=>manual.filter(row=>!isPaymentMirror(row)),[manual])
   const ledgerMatches=Boolean(session&&sessionLedger.sessionId===session.id)
-  const scopedPayments=useMemo(()=>session&&isToday?(ledgerMatches?sessionLedger.payments.filter(row=>!isVoid(row)):[]):validPayments,[session,isToday,ledgerMatches,sessionLedger,validPayments])
+  const scopedPayments=useMemo(()=>session&&isToday?(ledgerMatches?sessionLedger.payments.filter(row=>!isVoid(row)&&!isReceivableTransfer(row)):[]):validPayments,[session,isToday,ledgerMatches,sessionLedger,validPayments])
   const scopedManual=useMemo(()=>session&&isToday?(ledgerMatches?sessionLedger.movements.filter(row=>!isPaymentMirror(row)):[]):manualOnly,[session,isToday,ledgerMatches,sessionLedger,manualOnly])
   const totals=useMemo(()=>{
     const byMethod={cash:blankPair(),transfer:blankPair(),mp:blankPair(),card:blankPair(),other:blankPair()},income=blankPair(),expense=blankPair()
@@ -73,7 +74,7 @@ export default function DailyCashWorkspaceMultiCurrency({propertyId,property,onN
   const sessionCash=useMemo(()=>{
     if(!session)return null
     const income=blankPair(),expense=blankPair(),ledger=ledgerMatches?sessionLedger:{payments:[],movements:[]}
-    for(const row of ledger.payments){if(isVoid(row)||methodGroup(row.metodo)!=="cash")continue;const actual=physicalPayment(row);income[actual.currency]+=actual.amount}
+    for(const row of ledger.payments){if(isVoid(row)||isReceivableTransfer(row)||methodGroup(row.metodo)!=="cash")continue;const actual=physicalPayment(row);income[actual.currency]+=actual.amount}
     for(const row of ledger.movements){if(isPaymentMirror(row)||methodGroup(row.method)!=="cash")continue;const code=currency(row.currency),amount=Number(row.amount||0);if(["expense","refund"].includes(normalize(row.movement_type)))expense[code]+=amount;else income[code]+=amount}
     return{income,expense,expected:{ARS:round(Number(session.opening_amount||0)+income.ARS-expense.ARS),USD:round(Number(session.opening_amount_usd||0)+income.USD-expense.USD)}}
   },[session,sessionLedger,ledgerMatches])

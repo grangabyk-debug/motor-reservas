@@ -5,6 +5,7 @@ import{supabase}from"../../../../lib/supabase"
 import s from"./reservationFolioBilling.module.css"
 import ReservationInvoiceDialog from"./ReservationInvoiceDialog"
 import ReservationDocumentHistory from"./ReservationDocumentHistory"
+import MovedRoomChargeNotice from"./MovedRoomChargeNotice"
 import{printReservationFolio}from"./reservationFolioPrint"
 import{buildFolioInvoiceCoverage,folioItemBillingState,remainingInvoiceGross}from"./reservationBillingCoverage"
 import{validPayment,netPayment,paymentCurrency,allocatedPhysicalAmount}from"./reservationPaymentInvoiceUtils"
@@ -329,6 +330,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
         <small style={{flex:"1 1 auto",minWidth:0,whiteSpace:"nowrap",textAlign:"left",margin:0,fontSize:"9px",letterSpacing:"-.01em"}}>{selectedItems.size?`${selectedItems.size} consumo${selectedItems.size===1?"":"s"} seleccionado${selectedItems.size===1?"":"s"} para facturar parcialmente`:"Seleccioná consumos si querés facturar sólo una parte."}</small>
       </div>
 
+      <MovedRoomChargeNotice selected={selected} items={activeItems} folios={folios}/>
       <div className={s.itemList}>
         {folioItems.length?folioItems.map(row=>{
           const coverage=invoiceCoverage.get(row.id),billing=folioItemBillingState(row,coverage),invoiceable=billing.remaining>.009,movable=billing.covered<=.009&&!row.invoice_document_id
