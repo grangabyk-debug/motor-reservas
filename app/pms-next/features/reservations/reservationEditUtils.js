@@ -16,7 +16,7 @@ export const activeReservationRoomIds=item=>{
   const all=unique([item?.habitacion_id,...(item?.habitaciones_ids||[])])
   const released=releasedRoomIds(item)
   const details=Array.isArray(item?.habitaciones_detalle)?item.habitaciones_detalle:[]
-  const historical=new Set(details.filter(detail=>["previous_room","transient_room"].includes(String(detail?.segment_role||"").toLowerCase())).map(detail=>String(detail?.habitacion_id||"")).filter(Boolean))
+  const historical=new Set(details.filter(detail=>["previous_room","transient_room","cancelled_room","no_show_room"].includes(String(detail?.segment_role||"").toLowerCase())).map(detail=>String(detail?.habitacion_id||"")).filter(Boolean))
   const active=all.filter(id=>!released.has(id)&&!historical.has(id))
   if(active.length)return active
   const marked=details.filter(detail=>["active_room","scheduled_room",""].includes(String(detail?.segment_role||"").toLowerCase())).map(detail=>String(detail?.habitacion_id||"")).filter(id=>id&&!released.has(id)&&!historical.has(id))

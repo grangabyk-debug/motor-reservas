@@ -279,3 +279,48 @@
   :global([data-theme])>main>header>div:last-child>button:last-child:hover,
   :global([data-workspace="dashboard"]) button[data-tone]:hover{transform:none!important}
 }
+
+
+/* HL MODAL PORTAL BRIDGE
+   Los portales montados en document.body conservan las mismas variables que el PMS.
+   Así ningún modal queda transparente por salir del árbol data-theme. */
+:global(body){
+  --bg:#f2efe9;
+  --bg2:#e8edf4;
+  --panel:rgba(252,250,246,.93);
+  --panelSolid:#fbfaf7;
+  --text:#1b2433;
+  --muted:#707b8d;
+  --line:rgba(42,53,72,.12);
+  --lineStrong:rgba(42,53,72,.2);
+  --accent:#6658e8;
+  --accent2:#8971ee;
+  --green:#2b9b76;
+  --red:#df6678;
+  --gold:#c79a4a;
+}
+:global(body:has([data-theme="dark"])){
+  --bg:#070c15;
+  --bg2:#0a1220;
+  --panel:rgba(15,24,40,.93);
+  --panelSolid:#111a2a;
+  --text:#eef3fb;
+  --muted:#97a5b8;
+  --line:rgba(166,184,220,.1);
+  --lineStrong:rgba(166,184,220,.17);
+  --accent:#8d91ff;
+  --accent2:#aa83f2;
+  --green:#61d19a;
+  --red:#ff8496;
+  --gold:#d6b56d;
+}
+:global(section[role="dialog"][aria-modal="true"]),
+:global(article[role="dialog"][aria-modal="true"]),
+:global(div[role="dialog"][aria-modal="true"] > section),
+:global(div[role="dialog"][aria-modal="true"] > article){
+  background:var(--panelSolid)!important;
+  color:var(--text)!important;
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important;
+  isolation:isolate;
+}

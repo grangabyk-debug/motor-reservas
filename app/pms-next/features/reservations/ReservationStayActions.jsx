@@ -13,9 +13,11 @@ export default function ReservationStayActions({item,saving=false,onPrimary,onNo
   const isClosed=item?.estado==="finalizada"||item?.estado==="cancelada"
   const menuDisabled=saving||isClosed
   const primaryDisabled=saving||Boolean(item?.no_show)||isClosed||waitingFuture
-  const noShowDisabled=saving||item?.estado==="alojado"||item?.estado==="finalizada"||item?.estado==="cancelada"
+  const roomNoShowAvailable=partial&&(progress.eligiblePendingRoomIds.length>0||progress.expiredPendingRoomIds.length>0)
+  const noShowDisabled=saving||item?.estado==="finalizada"||item?.estado==="cancelada"||(item?.estado==="alojado"&&!roomNoShowAvailable)
   const canCancel=item?.estado!=="cancelada"&&!item?.no_show&&item?.estado!=="finalizada"
   const mainLabel=item?.no_show?"No Show":waitingFuture?`Próximo check-in · ${fmtShort(progress.nextPendingDate)}`:partial?`Completar check-in · ${progress.eligiblePending}`:isCheckout?"Check-out":"Check-in"
+  const noShowLabel=item?.no_show?"Reabrir No Show":item?.estado==="alojado"&&roomNoShowAvailable?"No Show de habitación":"Marcar No Show"
 
   useEffect(()=>{setOpen(false)},[item?.id])
   useEffect(()=>{if(!open)return;const onPointer=event=>{if(!rootRef.current?.contains(event.target))setOpen(false)},onKey=event=>{if(event.key==="Escape")setOpen(false)};document.addEventListener("mousedown",onPointer);document.addEventListener("keydown",onKey);return()=>{document.removeEventListener("mousedown",onPointer);document.removeEventListener("keydown",onKey)}},[open])
@@ -28,7 +30,7 @@ export default function ReservationStayActions({item,saving=false,onPrimary,onNo
     <button type="button" aria-haspopup="menu" aria-expanded={open} disabled={menuDisabled} onClick={()=>setOpen(value=>!value)} style={mainStyle}><span>{mainLabel}</span><svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></button>
     {open?<div role="menu" style={{position:"absolute",right:0,top:"calc(100% + 7px)",zIndex:260,width:205,padding:6,border:"1px solid var(--line)",borderRadius:12,background:"color-mix(in srgb,var(--panelSolid) 97%,transparent)",boxShadow:"0 18px 46px rgba(18,30,52,.18)",backdropFilter:"blur(18px)",WebkitBackdropFilter:"blur(18px)"}}>
       <button type="button" role="menuitem" disabled={primaryDisabled} onClick={()=>run(onPrimary)} style={{...menuButton,opacity:primaryDisabled?.45:1,cursor:primaryDisabled?"not-allowed":"pointer"}}>{waitingFuture?`Check-in habilitado el ${fmtShort(progress.nextPendingDate)}`:partial?`Completar check-in · ${progress.eligiblePending} pendiente${progress.eligiblePending===1?"":"s"}`:isCheckout?"Hacer check-out":"Hacer check-in"}</button>
-      <button type="button" role="menuitem" disabled={noShowDisabled&&!item?.no_show} onClick={()=>run(onNoShow)} style={{...menuButton,color:item?.no_show?"var(--text)":"#9a5b18",opacity:noShowDisabled&&!item?.no_show?.45:1,cursor:noShowDisabled&&!item?.no_show?"not-allowed":"pointer"}}>{item?.no_show?"Reabrir No Show":"Marcar No Show"}</button>
+      <button type="button" role="menuitem" disabled={noShowDisabled&&!item?.no_show} onClick={()=>run(onNoShow)} style={{...menuButton,color:item?.no_show?"var(--text)":"#9a5b18",opacity:noShowDisabled&&!item?.no_show?0.45:1,cursor:noShowDisabled&&!item?.no_show?"not-allowed":"pointer"}}>{noShowLabel}</button>
       {canCancel?<><div style={{height:1,margin:"4px 3px",background:"var(--line)"}}/><button type="button" role="menuitem" disabled={saving} onClick={()=>run(onCancel)} style={{...menuButton,color:"#c24850",cursor:saving?"not-allowed":"pointer",opacity:saving?.5:1}}>Cancelar reserva</button></>:null}
     </div>:null}
   </div>
