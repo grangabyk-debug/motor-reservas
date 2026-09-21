@@ -195,7 +195,7 @@ export default function ReservationPaymentPanelMultiCurrencyV2({ propertyId, res
     } finally {
       setLoading(false)
     }
-  }, [propertyId])
+  }, [propertyId, partners])
 
   useEffect(() => {
     setReservation(null)
@@ -432,7 +432,7 @@ export default function ReservationPaymentPanelMultiCurrencyV2({ propertyId, res
             </div>
 
             {!split ? <div className={s.formGrid}>
-              <label className={s.field}><span>Medio de pago</span><select value={method} onChange={event => { const next=event.target.value; setMethod(next); setCashReceived(""); if(isAccountCurrent(next)){setPaymentCurrency(reservationCurrency);setAmount(String(selectedDue||""));const linked=partners.find(row=>String(row.id)===String(accountPartnerId||reservation?.partner_id||""));if(linked){setAccountPartnerId(linked.id);setAccountDueAt(dueDateFor(linked))}} }}>{paymentMethods.map(item => <option key={item}>{item}</option>)}</select></label>
+              <label className={s.field}><span>Medio de pago</span><select value={method} onChange={event => { const next=event.target.value; setMethod(next); setCashReceived(""); if(isAccountCurrent(next)){setPaymentCurrency(reservationCurrency);setAmount(String(selectedDue||""));const linked=partners.find(row=>String(row.id)===String(accountPartnerId||reservation?.partner_id||""));if(linked){setAccountPartnerId(linked.id);setAccountDueAt(dueDateFor(linked))}} }}>{METHODS.map(item => <option key={item}>{item}</option>)}</select></label>
               {accountMode ? <>
                 <label className={s.field}><span>Empresa / cuenta corriente</span><select value={accountPartnerId} onChange={event=>{const id=event.target.value;setAccountPartnerId(id);const selectedPartner=partners.find(row=>String(row.id)===String(id));setAccountDueAt(selectedPartner?dueDateFor(selectedPartner):"")}}><option value="">Elegir empresa o agencia</option>{partners.map(row=><option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
                 <label className={s.field}><span>Importe a cuenta</span><input value={money(selectedDue,reservationCurrency)} readOnly/><small>Se saldan los cargos seleccionados en la reserva y nace una cuenta por cobrar.</small></label>
@@ -449,7 +449,7 @@ export default function ReservationPaymentPanelMultiCurrencyV2({ propertyId, res
               {resolvedParts.map((part, index) => {
                 const auto = index === resolvedParts.length - 1
                 return <div key={index} className={s.formGrid} style={{ padding: 10, border: "1px solid var(--line)", borderRadius: 12 }}>
-                  <label className={s.field}><span>Medio {index + 1}</span><select value={parts[index]?.method || part.method} onChange={event => updatePart(index, { method: event.target.value })}>{METHODS.map(item => <option key={item}>{item}</option>)}</select></label>
+                  <label className={s.field}><span>Medio {index + 1}</span><select value={parts[index]?.method || part.method} onChange={event => updatePart(index, { method: event.target.value })}>{paymentMethods.map(item => <option key={item}>{item}</option>)}</select></label>
                   <label className={s.field}><span>Moneda</span><select value={parts[index]?.currency || part.currency} onChange={event => updatePart(index, { currency: event.target.value })}>{CURRENCIES.map(code => <option key={code}>{code}</option>)}</select></label>
                   {auto ? <div className={s.field}><span>Resto automático</span><b>{money(part.amount, part.currency)}</b><small>Aplica {money(part.applied, reservationCurrency)}</small></div> : <label className={s.field}><span>Importe recibido</span><input type="number" min="0.01" step="0.01" value={parts[index]?.amount ?? ""} onChange={event => updatePart(index, { amount: event.target.value })} />{part.currency !== reservationCurrency ? <small>Aplica {money(part.applied, reservationCurrency)}</small> : null}</label>}
                   {parts.length > 2 ? <div className={s.field}><span>&nbsp;</span><button type="button" className={s.secondary} onClick={() => removePart(index)}>Quitar</button></div> : null}
