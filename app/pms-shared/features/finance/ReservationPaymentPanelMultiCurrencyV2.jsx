@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { supabase } from "../../../../lib/supabase"
 import { convertCurrency, pricingFromSettings } from "../../core/currency"
 import ReservationPaymentChargeSelector from "./ReservationPaymentChargeSelector"
+import QuickPartnerAccountCreator from "./QuickPartnerAccountCreator"
 import { allocatePaymentParts, buildChargeLines, paidTotal, roundMoney, selectedBalance, validPayment } from "./paymentChargeUtils"
 import s from "./cashActions.module.css"
 
@@ -104,6 +105,7 @@ export default function ReservationPaymentPanelMultiCurrencyV2({ propertyId, res
   const [receivables, setReceivables] = useState([])
   const [accountPartnerId, setAccountPartnerId] = useState("")
   const [accountDueAt, setAccountDueAt] = useState("")
+  const [accountCreatorOpen, setAccountCreatorOpen] = useState(false)
 
   const pricing = pricingFromSettings(propertySettings)
   const fxRate = pricing.fxMode === "manual" ? Number(pricing.manualUsdArs || 0) : Number(automaticFx?.rate || 0)
@@ -434,7 +436,7 @@ export default function ReservationPaymentPanelMultiCurrencyV2({ propertyId, res
             {!split ? <div className={s.formGrid}>
               <label className={s.field}><span>Medio de pago</span><select value={method} onChange={event => { const next=event.target.value; setMethod(next); setCashReceived(""); if(isAccountCurrent(next)){setPaymentCurrency(reservationCurrency);setAmount(String(selectedDue||""));const linked=partners.find(row=>String(row.id)===String(accountPartnerId||reservation?.partner_id||""));if(linked){setAccountPartnerId(linked.id);setAccountDueAt(dueDateFor(linked))}} }}>{METHODS.map(item => <option key={item}>{item}</option>)}</select></label>
               {accountMode ? <>
-                <label className={s.field}><span>Empresa / cuenta corriente</span><select value={accountPartnerId} onChange={event=>{const id=event.target.value;setAccountPartnerId(id);const selectedPartner=partners.find(row=>String(row.id)===String(id));setAccountDueAt(selectedPartner?dueDateFor(selectedPartner):"")}}><option value="">Elegir empresa o agencia</option>{partners.map(row=><option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
+                <div className={s.field}><span>Empresa / cuenta corriente</span><select value={accountPartnerId} onChange={event=>{const id=event.target.value;setAccountPartnerId(id);const selectedPartner=partners.find(row=>String(row.id)===String(id));setAccountDueAt(selectedPartner?dueDateFor(selectedPartner):"")}}><option value="">Elegir empresa o agencia</option>{partners.map(row=><option key={row.id} value={row.id}>{row.name}</option>)}</select><button type="button" className={s.secondary} style={{height:30,justifySelf:"start",padding:"0 10px"}} onClick={()=>setAccountCreatorOpen(true)}>+ Crear nueva cuenta corriente</button></div>
                 <label className={s.field}><span>Importe a cuenta</span><input value={money(selectedDue,reservationCurrency)} readOnly/><small>Se saldan los cargos seleccionados en la reserva y nace una cuenta por cobrar.</small></label>
                 <label className={s.field}><span>Vencimiento</span><input type="date" value={accountDueAt} onChange={event=>setAccountDueAt(event.target.value)}/></label>
                 {accountPartner ? <div className={`${s.field} ${s.fieldFull}`} style={{padding:11,border:"1px solid color-mix(in srgb,var(--accent) 18%,var(--line))",borderRadius:12,background:"color-mix(in srgb,var(--accent) 4%,var(--panelSolid))"}}><span>{accountPartner.name}</span><b style={{fontSize:11}}>{accountPartner.billing_terms||"Sin condición de pago"} · saldo actual {money(accountExposure,reservationCurrency)}{accountAvailable!=null?` · crédito disponible ${money(accountAvailable,reservationCurrency)}`:""}</b><small style={{color:"var(--muted)"}}>{accountPartner.negotiated_rate_label||"Cuenta comercial"}</small></div> : null}
@@ -476,5 +478,6 @@ export default function ReservationPaymentPanelMultiCurrencyV2({ propertyId, res
         </>}
       </div>
     </section>
+    {accountCreatorOpen?<QuickPartnerAccountCreator propertyId={propertyId} onClose={()=>setAccountCreatorOpen(false)} onCreated={partner=>{setPartners(current=>[...current.filter(row=>String(row.id)!==String(partner.id)),partner].sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"es")));setAccountPartnerId(partner.id);setAccountDueAt(dueDateFor(partner));setAccountCreatorOpen(false);setError("");if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("hl:pms-toast",{detail:{title:"Cuenta corriente creada",message:`${partner.name} quedó seleccionada para este cobro.`}}))}}/>:null}
   </div>
 }
