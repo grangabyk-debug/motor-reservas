@@ -4,6 +4,7 @@ import{useEffect,useMemo,useState}from"react"
 import useCrmData from"./useCrmData"
 import CrmOpportunityForm from"./CrmOpportunityForm"
 import useQuoteAvailability from"../quotes/useQuoteAvailability"
+import{prepareReservationFromCrm}from"./crmReservationSeed"
 import s from"./crm.module.css"
 
 const STAGES={new:"Nueva consulta",quote_sent:"Presupuesto",follow_up:"Seguimiento",waitlist:"Lista de espera",won:"Ganada",lost:"Perdida"}
@@ -12,7 +13,6 @@ const fmtDate=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:
 const fmtTime=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}).format(new Date(value)).replace(".",""):"—"
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency,maximumFractionDigits:0}).format(Number(value)||0)
 const localInput=value=>{if(!value)return"";const d=new Date(value),pad=n=>String(n).padStart(2,"0");return`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`}
-const splitName=name=>{const parts=String(name||"").trim().split(/\s+/).filter(Boolean);return{firstName:parts[0]||"",lastName:parts.slice(1).join(" ")}}
 const toast=detail=>typeof window!=="undefined"&&window.dispatchEvent(new CustomEvent("hl:pms-toast",{detail}))
 
 export default function CrmWorkspace({propertyId,onNavigate}){
@@ -98,10 +98,12 @@ export default function CrmWorkspace({propertyId,onNavigate}){
     localStorage.setItem(`hl:pms-next:crm-quote-seed:${propertyId}`,JSON.stringify(seed));onNavigate?.("quotes",{restoreScroll:false});setTimeout(()=>window.dispatchEvent(new CustomEvent("hl:pms-open-crm-quote-seed")),0)
   }
 
-  function toReservation(){
-    if(!selected)return
-    const names=splitName(selected.name),seed={opportunityId:selected.id,...names,email:selected.email||"",phone:selected.phone||"",start:selected.desired_check_in||"",end:selected.desired_check_out||"",guests:Math.max(1,Number(selected.adults||0)+Number(selected.children||0)),preferredRoomType:selected.preferred_room_type||"",roomsCount:selected.rooms_count||1,channel:selected.source_channel||"Directa",notes:`Oportunidad CRM ${selected.id}. ${selected.notes||""}`.trim()}
-    localStorage.setItem(`hl:pms-next:crm-reservation-seed:${propertyId}`,JSON.stringify(seed));onNavigate?.("planning",{restoreScroll:false});setTimeout(()=>window.dispatchEvent(new CustomEvent("hl:pms-open-crm-reservation-seed")),0)
+  async function toReservation(){
+    if(!selected||checking)return
+    setChecking(true);data.setError("")
+    try{await prepareReservationFromCrm({propertyId,opportunity:selected,checkAvailability,onNavigate})}
+    catch(err){data.setError(err?.message||"No se pudo preparar la reserva desde CRM.")}
+    finally{setChecking(false)}
   }
 
   const due=row=>row.next_follow_up_at&&new Date(row.next_follow_up_at).getTime()<now&&!["won","lost"].includes(row.stage)
