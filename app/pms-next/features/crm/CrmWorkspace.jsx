@@ -25,6 +25,7 @@ export default function CrmWorkspace({propertyId,onNavigate}){
 
   useEffect(()=>{if(!selected){setActivities([]);setFollowAt("");setAvailability(null);return}setFollowAt(localInput(selected.next_follow_up_at));setFollowChannel(selected.follow_up_channel||"whatsapp");setAvailability(null);let cancelled=false;setActivityLoading(true);data.loadActivities(selected.id).then(rows=>{if(!cancelled)setActivities(rows)}).catch(err=>data.setError(err?.message||"No se pudo cargar la actividad.")).finally(()=>{if(!cancelled)setActivityLoading(false)});return()=>{cancelled=true}},[selected?.id])
   useEffect(()=>{if(selectedId&&!selected)setSelectedId("")},[selectedId,selected])
+  useEffect(()=>{if(typeof window==="undefined"||!data.opportunities.length)return;const id=new URL(window.location.href).searchParams.get("crm_opportunity");if(id&&data.opportunities.some(row=>row.id===id))setSelectedId(id)},[data.opportunities])
 
   const filtered=useMemo(()=>{
     const term=query.trim().toLowerCase()
