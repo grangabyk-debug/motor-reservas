@@ -7,6 +7,7 @@ import{pricingFromSettings}from"../../core/currency"
 import useQuoteAvailability from"./useQuoteAvailability"
 import prepareReservationFromQuote from"./quoteReservationSeed"
 import QuoteFollowUpPanel,{FOLLOW_CHANNEL,followWhen,recordQuoteContact}from"./QuoteFollowUpPanel"
+import{closeCrmFromRejectedQuote,consumeCrmQuoteSeed,createCrmWaitlistFromQuote,linkQuoteToCrm}from"./quoteCrmBridge"
 import{addDays,buildQuoteText,dateKey,esc,freshForm,money,nights}from"./quoteUtils"
 import s from"./quotes.module.css"
 
@@ -20,7 +21,6 @@ export default function QuotesWorkspace({propertyId,property,onNavigate,allowedV
   const[availability,setAvailability]=useState({types:[],rooms:[],occupiedCount:0}),[checking,setChecking]=useState(false)
   const checkAvailability=useQuoteAvailability(propertyId)
   const taxCaption=priceTaxCaption(taxes)
-  const crmSeedKey=propertyId?`hl:pms-next:crm-quote-seed:${propertyId}`:""
 
   const load=useCallback(async()=>{
     if(!propertyId)return
@@ -41,7 +41,7 @@ export default function QuotesWorkspace({propertyId,property,onNavigate,allowedV
     finally{setLoading(false)}
   },[propertyId])
   useEffect(()=>{load()},[load])
-  useEffect(()=>{if(!crmSeedKey||typeof window==="undefined")return;const consume=()=>{let seed=null;try{const raw=localStorage.getItem(crmSeedKey);if(!raw)return;seed=JSON.parse(raw);localStorage.removeItem(crmSeedKey)}catch{return}const base=freshForm(seed.currency||currency),start=seed.start||base.start,end=seed.end&&seed.end>start?seed.end:addDays(start,1),next={...base,name:seed.name||"",email:seed.email||"",phone:seed.phone||"",start,end,pax:Math.max(1,Number(seed.pax)||1),currency:seed.currency||currency,notes:seed.notes||"",crmOpportunityId:seed.opportunityId||"",selection:{}};setForm(next);setSelected(null);setNotice("Datos precargados desde CRM · elegí las habitaciones disponibles.");setError("");setFormOpen(true);setTimeout(()=>refreshAvailability(next),0)};consume();window.addEventListener("hl:pms-open-crm-quote-seed",consume);return()=>window.removeEventListener("hl:pms-open-crm-quote-seed",consume)},[crmSeedKey,currency])
+  useEffect(()=>{if(typeof window==="undefined")return;const consume=()=>{const next=consumeCrmQuoteSeed({propertyId,currency});if(!next)return;setForm(next);setSelected(null);setNotice("Datos precargados desde CRM · elegí las habitaciones disponibles.");setError("");setFormOpen(true);setTimeout(()=>refreshAvailability(next),0)};consume();window.addEventListener("hl:pms-open-crm-quote-seed",consume);return()=>window.removeEventListener("hl:pms-open-crm-quote-seed",consume)},[propertyId,currency])
 
   async function refreshAvailability(nextForm=form,options={}){
     if(!nextForm.start||!nextForm.end||nextForm.end<=nextForm.start){setAvailability({types:[],rooms:[],occupiedCount:0});return}
@@ -56,11 +56,8 @@ export default function QuotesWorkspace({propertyId,property,onNavigate,allowedV
     if(!form.start||!form.end||form.end<=form.start)return setError("Completá fechas válidas antes de pasar la consulta a Lista de espera.")
     setSaving(true);setError("")
     try{
-      const payload={property_id:propertyId,stage:"waitlist",priority:"normal",name:form.name.trim(),email:form.email.trim()||null,phone:form.phone.trim()||null,source_channel:"direct",desired_check_in:form.start,desired_check_out:form.end,adults:Math.max(1,Number(form.pax)||1),children:0,rooms_count:1,preferred_room_type:null,alternative_room_types:[],flexible_dates:false,flexibility_days:0,max_budget:null,currency:form.currency||currency,waitlist_until:form.validUntil||null,notes:form.notes.trim()||"Consulta sin disponibilidad creada desde Presupuestos."}
-      const{data:opportunity,error:insertError}=await supabase.from("hotel_crm_opportunities").insert(payload).select("id").single()
-      if(insertError)throw insertError
-      await supabase.rpc("hl_crm_log_activity_atomic",{p_opportunity_id:opportunity.id,p_activity_type:"system",p_summary:"Agregada a Lista de espera desde Presupuestos por falta de disponibilidad.",p_channel:null,p_metadata:{source:"quotes"}})
-      if(typeof window!=="undefined"){const url=new URL(window.location.href);url.searchParams.set("crm_opportunity",opportunity.id);window.history.replaceState(window.history.state||{},"",url)}
+      const opportunityId=await createCrmWaitlistFromQuote({propertyId,form,currency})
+      if(typeof window!=="undefined"){const url=new URL(window.location.href);url.searchParams.set("crm_opportunity",opportunityId);window.history.replaceState(window.history.state||{},"",url)}
       setFormOpen(false)
       emit({title:"Agregada a Lista de espera",message:"La consulta quedó en CRM y no bloquea el Planning."})
       onNavigate?.("crm",{restoreScroll:false})
@@ -96,7 +93,7 @@ export default function QuotesWorkspace({propertyId,property,onNavigate,allowedV
       const quoteNumber=`PRE-${dateKey(new Date()).replaceAll("-","")}-${String(Date.now()).slice(-5)}`
       const{data:quote,error:quoteError}=await supabase.rpc("hl_group_create_quote_atomic",{p_property_id:propertyId,p_group_id:groupId,p_version:1,p_quote_number:quoteNumber,p_status:"draft",p_currency:form.currency||currency,p_valid_until:form.validUntil||null,p_deposit_percent:0,p_deposit_due_date:null,p_terms:form.terms.trim()||null,p_internal_notes:form.notes.trim()||null,p_lines:quoteLines});if(quoteError)throw quoteError
       quoteCreated=true
-      if(form.crmOpportunityId){const{error:crmError}=await supabase.from("hotel_crm_opportunities").update({stage:"quote_sent",quote_id:quote.id}).eq("id",form.crmOpportunityId).eq("property_id",propertyId);if(!crmError)await supabase.rpc("hl_crm_log_activity_atomic",{p_opportunity_id:form.crmOpportunityId,p_activity_type:"quote",p_summary:`Presupuesto ${quote.quote_number} creado desde CRM.`,p_channel:null,p_metadata:{quote_id:quote.id,quote_number:quote.quote_number}})}
+      await linkQuoteToCrm({propertyId,opportunityId:form.crmOpportunityId,quote})
       const groupRecord={...groupPayload,id:group.id}
       if(mode==="reservation")return await openReservationFromQuote(quote,groupRecord,quoteLines)
       emit({title:"Presupuesto preparado",message:`${quote.quote_number} · ya podés enviarlo por email, WhatsApp o convertirlo en reserva.`});setFormOpen(false);await load();setSelected(quote)
@@ -104,7 +101,7 @@ export default function QuotesWorkspace({propertyId,property,onNavigate,allowedV
     finally{setSaving(false)}
   }
 
-  async function markQuote(quote,status){setSaving(true);setError("");try{const{error:rpcError}=await supabase.rpc("hl_group_mark_quote_atomic",{p_property_id:propertyId,p_quote_id:quote.id,p_status:status});if(rpcError)throw rpcError;if(status==="accepted"||status==="rejected"){const{error:followError}=await supabase.from("hotel_group_quotes").update({follow_up_status:status==="accepted"?"done":"cancelled"}).eq("id",quote.id).eq("property_id",propertyId);if(followError)throw followError;if(status==="rejected"){const{data:crmRows}=await supabase.from("hotel_crm_opportunities").update({stage:"lost",lost_reason:"Presupuesto cancelado",next_follow_up_at:null}).eq("property_id",propertyId).eq("quote_id",quote.id).not("stage","eq","won").select("id");for(const row of crmRows||[])await supabase.rpc("hl_crm_log_activity_atomic",{p_opportunity_id:row.id,p_activity_type:"stage",p_summary:"Oportunidad perdida: presupuesto cancelado.",p_channel:null,p_metadata:{quote_id:quote.id}})}}emit({title:status==="rejected"?"Presupuesto cancelado":"Presupuesto actualizado",message:`${quote.quote_number} · ${STATUS[status]||status}.`});await load();setSelected(null)}catch(err){setError(err?.message||"No se pudo actualizar el presupuesto.")}finally{setSaving(false)}}
+  async function markQuote(quote,status){setSaving(true);setError("");try{const{error:rpcError}=await supabase.rpc("hl_group_mark_quote_atomic",{p_property_id:propertyId,p_quote_id:quote.id,p_status:status});if(rpcError)throw rpcError;if(status==="accepted"||status==="rejected"){const{error:followError}=await supabase.from("hotel_group_quotes").update({follow_up_status:status==="accepted"?"done":"cancelled"}).eq("id",quote.id).eq("property_id",propertyId);if(followError)throw followError;if(status==="rejected")await closeCrmFromRejectedQuote({propertyId,quoteId:quote.id})}emit({title:status==="rejected"?"Presupuesto cancelado":"Presupuesto actualizado",message:`${quote.quote_number} · ${STATUS[status]||status}.`});await load();setSelected(null)}catch(err){setError(err?.message||"No se pudo actualizar el presupuesto.")}finally{setSaving(false)}}
   async function touchQuoteContact(quote,channel){try{const patch=await recordQuoteContact({propertyId,quote,channel});setQuotes(rows=>rows.map(row=>row.id===quote.id?{...row,...patch}:row));setSelected(current=>current?.id===quote.id?{...current,...patch}:current)}catch{emit({tone:"error",title:"Contacto abierto",message:"Se abrió el canal, pero no se pudo registrar el contacto en el presupuesto."})}}
   async function convertToReservation(quote){setSaving(true);setError("");try{await openReservationFromQuote(quote)}catch(err){setError(err?.message||"No se pudo preparar la reserva desde el presupuesto.")}finally{setSaving(false)}}
   function quoteText(quote){return buildQuoteText({quote,group:groups[quote.group_id],quoteLines:lines[quote.id]||[],propertyName:property?.name||"Hotel"})}
