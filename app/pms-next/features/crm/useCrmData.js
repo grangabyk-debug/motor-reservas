@@ -6,6 +6,31 @@ import usePmsAutoRefresh from"../../core/usePmsAutoRefresh"
 
 const OPPORTUNITY_FIELDS="id,property_id,guest_profile_id,stage,priority,name,email,phone,source_channel,desired_check_in,desired_check_out,adults,children,rooms_count,preferred_room_type,alternative_room_types,flexible_dates,flexibility_days,max_budget,currency,waitlist_until,next_follow_up_at,follow_up_channel,last_contacted_at,quote_id,reservation_id,assigned_to,notes,lost_reason,metadata,created_by,created_at,updated_at"
 const GUEST_FIELDS="id,full_name,email,phone,last_stay_at"
+const editablePayload=draft=>({
+  guest_profile_id:draft.guest_profile_id||null,
+  stage:draft.stage||"new",
+  priority:draft.priority||"normal",
+  name:String(draft.name||"").trim(),
+  email:String(draft.email||"").trim()||null,
+  phone:String(draft.phone||"").trim()||null,
+  source_channel:draft.source_channel||"direct",
+  desired_check_in:draft.desired_check_in||null,
+  desired_check_out:draft.desired_check_out||null,
+  adults:Math.max(0,Number(draft.adults)||0),
+  children:Math.max(0,Number(draft.children)||0),
+  rooms_count:Math.max(1,Number(draft.rooms_count)||1),
+  preferred_room_type:String(draft.preferred_room_type||"").trim()||null,
+  alternative_room_types:Array.isArray(draft.alternative_room_types)?draft.alternative_room_types:[],
+  flexible_dates:Boolean(draft.flexible_dates),
+  flexibility_days:Math.max(0,Number(draft.flexibility_days)||0),
+  max_budget:draft.max_budget===""||draft.max_budget==null?null:Math.max(0,Number(draft.max_budget)||0),
+  currency:draft.currency||"ARS",
+  waitlist_until:(draft.stage||"new")==="waitlist"?(draft.waitlist_until||null):null,
+  next_follow_up_at:draft.next_follow_up_at?new Date(draft.next_follow_up_at).toISOString():null,
+  follow_up_channel:draft.follow_up_channel||null,
+  notes:String(draft.notes||"").trim()||null,
+  lost_reason:(draft.stage||"new")==="lost"?(String(draft.lost_reason||"").trim()||null):null
+})
 
 export default function useCrmData(propertyId){
   const[opportunities,setOpportunities]=useState([]),[guests,setGuests]=useState([]),[roomTypes,setRoomTypes]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState("")
@@ -32,31 +57,7 @@ export default function useCrmData(propertyId){
   usePmsAutoRefresh(propertyId,load,["hotel_crm_opportunities","hotel_crm_opportunity_activities"])
 
   const createOpportunity=useCallback(async draft=>{
-    const payload={
-      property_id:propertyId,
-      guest_profile_id:draft.guest_profile_id||null,
-      stage:draft.stage||"new",
-      priority:draft.priority||"normal",
-      name:String(draft.name||"").trim(),
-      email:String(draft.email||"").trim()||null,
-      phone:String(draft.phone||"").trim()||null,
-      source_channel:draft.source_channel||"direct",
-      desired_check_in:draft.desired_check_in||null,
-      desired_check_out:draft.desired_check_out||null,
-      adults:Math.max(0,Number(draft.adults)||0),
-      children:Math.max(0,Number(draft.children)||0),
-      rooms_count:Math.max(1,Number(draft.rooms_count)||1),
-      preferred_room_type:String(draft.preferred_room_type||"").trim()||null,
-      alternative_room_types:Array.isArray(draft.alternative_room_types)?draft.alternative_room_types:[],
-      flexible_dates:Boolean(draft.flexible_dates),
-      flexibility_days:Math.max(0,Number(draft.flexibility_days)||0),
-      max_budget:draft.max_budget===""||draft.max_budget==null?null:Math.max(0,Number(draft.max_budget)||0),
-      currency:draft.currency||"ARS",
-      waitlist_until:draft.stage==="waitlist"?(draft.waitlist_until||null):null,
-      next_follow_up_at:draft.next_follow_up_at?new Date(draft.next_follow_up_at).toISOString():null,
-      follow_up_channel:draft.follow_up_channel||null,
-      notes:String(draft.notes||"").trim()||null
-    }
+    const payload={property_id:propertyId,...editablePayload(draft)}
     if(!payload.name)throw new Error("Ingresá el nombre del contacto.")
     if(payload.desired_check_in&&payload.desired_check_out&&payload.desired_check_out<=payload.desired_check_in)throw new Error("La salida deseada debe ser posterior a la entrada.")
     const{data,error:insertError}=await supabase.from("hotel_crm_opportunities").insert(payload).select(OPPORTUNITY_FIELDS).single()
@@ -67,15 +68,15 @@ export default function useCrmData(propertyId){
   },[propertyId])
 
   const updateOpportunity=useCallback(async(id,patch,activitySummary="")=>{
-    const payload={...patch}
-    if(Object.prototype.hasOwnProperty.call(payload,"next_follow_up_at"))payload.next_follow_up_at=payload.next_follow_up_at?new Date(payload.next_follow_up_at).toISOString():null
-    if(Object.prototype.hasOwnProperty.call(payload,"alternative_room_types")&&!Array.isArray(payload.alternative_room_types))payload.alternative_room_types=[]
+    const current=opportunities.find(row=>row.id===id)||{},payload=editablePayload({...current,...patch})
+    if(!payload.name)throw new Error("Ingresá el nombre del contacto.")
+    if(payload.desired_check_in&&payload.desired_check_out&&payload.desired_check_out<=payload.desired_check_in)throw new Error("La salida deseada debe ser posterior a la entrada.")
     const{data,error:updateError}=await supabase.from("hotel_crm_opportunities").update(payload).eq("id",id).eq("property_id",propertyId).select(OPPORTUNITY_FIELDS).single()
     if(updateError)throw updateError
     if(activitySummary)await supabase.rpc("hl_crm_log_activity_atomic",{p_opportunity_id:id,p_activity_type:"stage",p_summary:activitySummary,p_channel:null,p_metadata:{stage:data.stage}})
     setOpportunities(list=>list.map(row=>row.id===id?data:row))
     return data
-  },[propertyId])
+  },[propertyId,opportunities])
 
   const logActivity=useCallback(async(id,type,summary,channel=null,metadata={})=>{
     const{data,error:rpcError}=await supabase.rpc("hl_crm_log_activity_atomic",{p_opportunity_id:id,p_activity_type:type,p_summary:summary,p_channel:channel,p_metadata:metadata})
