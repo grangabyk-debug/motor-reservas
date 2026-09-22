@@ -20,6 +20,7 @@ export default function QuotesWorkspace({propertyId,property,onNavigate}){
   const[availability,setAvailability]=useState({types:[],rooms:[],occupiedCount:0}),[checking,setChecking]=useState(false)
   const checkAvailability=useQuoteAvailability(propertyId)
   const taxCaption=priceTaxCaption(taxes)
+  const crmSeedKey=propertyId?`hl:pms-next:crm-quote-seed:${propertyId}`:""
 
   const load=useCallback(async()=>{
     if(!propertyId)return
@@ -40,6 +41,7 @@ export default function QuotesWorkspace({propertyId,property,onNavigate}){
     finally{setLoading(false)}
   },[propertyId])
   useEffect(()=>{load()},[load])
+  useEffect(()=>{if(!crmSeedKey||typeof window==="undefined")return;const consume=()=>{let seed=null;try{const raw=localStorage.getItem(crmSeedKey);if(!raw)return;seed=JSON.parse(raw);localStorage.removeItem(crmSeedKey)}catch{return}const base=freshForm(seed.currency||currency),start=seed.start||base.start,end=seed.end&&seed.end>start?seed.end:addDays(start,1),next={...base,name:seed.name||"",email:seed.email||"",phone:seed.phone||"",start,end,pax:Math.max(1,Number(seed.pax)||1),currency:seed.currency||currency,notes:seed.notes||"",crmOpportunityId:seed.opportunityId||"",selection:{}};setForm(next);setSelected(null);setNotice("Datos precargados desde CRM · elegí las habitaciones disponibles.");setError("");setFormOpen(true);setTimeout(()=>refreshAvailability(next),0)};consume();window.addEventListener("hl:pms-open-crm-quote-seed",consume);return()=>window.removeEventListener("hl:pms-open-crm-quote-seed",consume)},[crmSeedKey,currency])
 
   async function refreshAvailability(nextForm=form,options={}){
     if(!nextForm.start||!nextForm.end||nextForm.end<=nextForm.start){setAvailability({types:[],rooms:[],occupiedCount:0});return}
@@ -76,6 +78,7 @@ export default function QuotesWorkspace({propertyId,property,onNavigate}){
       const quoteNumber=`PRE-${dateKey(new Date()).replaceAll("-","")}-${String(Date.now()).slice(-5)}`
       const{data:quote,error:quoteError}=await supabase.rpc("hl_group_create_quote_atomic",{p_property_id:propertyId,p_group_id:groupId,p_version:1,p_quote_number:quoteNumber,p_status:"draft",p_currency:form.currency||currency,p_valid_until:form.validUntil||null,p_deposit_percent:0,p_deposit_due_date:null,p_terms:form.terms.trim()||null,p_internal_notes:form.notes.trim()||null,p_lines:quoteLines});if(quoteError)throw quoteError
       quoteCreated=true
+      if(form.crmOpportunityId){const{error:crmError}=await supabase.from("hotel_crm_opportunities").update({stage:"quote_sent",quote_id:quote.id}).eq("id",form.crmOpportunityId).eq("property_id",propertyId);if(!crmError)await supabase.rpc("hl_crm_log_activity_atomic",{p_opportunity_id:form.crmOpportunityId,p_activity_type:"quote",p_summary:`Presupuesto ${quote.quote_number} creado desde CRM.`,p_channel:null,p_metadata:{quote_id:quote.id,quote_number:quote.quote_number}})}
       const groupRecord={...groupPayload,id:group.id}
       if(mode==="reservation")return await openReservationFromQuote(quote,groupRecord,quoteLines)
       emit({title:"Presupuesto preparado",message:`${quote.quote_number} · ya podés enviarlo por email, WhatsApp o convertirlo en reserva.`});setFormOpen(false);await load();setSelected(quote)
