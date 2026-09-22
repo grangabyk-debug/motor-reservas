@@ -160,7 +160,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
     setBillingName(selected.payer_name||reservation.nombre_huesped||"")
     setBillingEmail(reservation.email_huesped||"")
     setBillingPhone(reservation.telefono_huesped||"")
-    setBillingTaxId(reservation.dni_huesped||"")
+    setBillingTaxId(selected.payer_type==="guest"?(reservation.dni_huesped||""):"")
     setBillingDueAt("")
     setBillingCurrency(selected.currency||reservation.moneda||"ARS")
     setBillingStatus("draft")
