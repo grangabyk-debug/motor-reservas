@@ -5,7 +5,7 @@ import s from"./crm.module.css"
 
 const today=()=>new Date().toLocaleDateString("en-CA")
 const addDays=(value,days)=>{const d=new Date(`${value}T12:00:00`);d.setDate(d.getDate()+days);return d.toLocaleDateString("en-CA")}
-const fresh=()=>({guest_profile_id:"",stage:"new",priority:"normal",name:"",email:"",phone:"",source_channel:"direct",desired_check_in:today(),desired_check_out:addDays(today(),1),adults:2,children:0,rooms_count:1,preferred_room_type:"",alternative_room_types:"",flexible_dates:false,flexibility_days:0,max_budget:"",currency:"ARS",waitlist_until:"",next_follow_up_at:"",follow_up_channel:"whatsapp",notes:""})
+const fresh=()=>({guest_profile_id:"",stage:"new",priority:"normal",name:"",email:"",phone:"",source_channel:"direct",desired_check_in:today(),desired_check_out:addDays(today(),1),adults:2,children:0,rooms_count:1,preferred_room_type:"",alternative_room_types:"",flexible_dates:false,flexibility_days:0,max_budget:"",currency:"ARS",waitlist_until:"",lost_reason:"",next_follow_up_at:"",follow_up_channel:"whatsapp",notes:""})
 
 export default function CrmOpportunityForm({open,guests=[],roomTypes=[],saving=false,onClose,onSave,initial=null}){
   const[draft,setDraft]=useState(fresh)
@@ -43,6 +43,7 @@ export default function CrmOpportunityForm({open,guests=[],roomTypes=[],saving=f
       <label className={s.checkLabel}><input type="checkbox" checked={Boolean(draft.flexible_dates)} onChange={e=>set("flexible_dates",e.target.checked)}/><span>Fechas flexibles</span></label>
       <label>Días de flexibilidad<input type="number" min="0" max="60" disabled={!draft.flexible_dates} value={draft.flexibility_days||0} onChange={e=>set("flexibility_days",e.target.value)}/></label>
       {draft.stage==="waitlist"?<label>Esperar hasta<input type="date" value={draft.waitlist_until||""} onChange={e=>set("waitlist_until",e.target.value)}/><small>Después de esta fecha la oportunidad se considera vencida.</small></label>:<div/>}
+      {draft.stage==="lost"?<label className={s.full}>Motivo de pérdida<input value={draft.lost_reason||""} onChange={e=>set("lost_reason",e.target.value)} placeholder="Ej. eligió otro hotel / precio / no respondió"/></label>:null}
       <label>Próximo seguimiento<input type="datetime-local" value={draft.next_follow_up_at||""} onChange={e=>set("next_follow_up_at",e.target.value)}/></label>
       <label>Canal de seguimiento<select value={draft.follow_up_channel||"whatsapp"} onChange={e=>set("follow_up_channel",e.target.value)}><option value="whatsapp">WhatsApp</option><option value="email">Email</option><option value="phone">Teléfono</option><option value="other">Otro</option></select></label>
       <label className={s.full}>Notas<textarea rows="3" value={draft.notes||""} onChange={e=>set("notes",e.target.value)} placeholder="Preferencias, contexto de la consulta, restricciones…"/></label>
