@@ -85,11 +85,13 @@ export default function ReservationInvoiceDialog({
         <label><span>Cliente</span><input value={billingName} onChange={event=>setBillingName(event.target.value)}/></label>
         <label><span>Email</span><input type="email" value={billingEmail} onChange={event=>setBillingEmail(event.target.value)}/></label>
         <label><span>Teléfono</span><input value={billingPhone} onChange={event=>setBillingPhone(event.target.value)}/></label>
+        <label><span>CUIT / documento</span><input inputMode="numeric" value={billingTaxId} onChange={event=>setBillingTaxId(event.target.value)} placeholder={["responsable_inscripto","monotributo"].includes(taxCondition)?"CUIT de 11 dígitos":"Opcional"}/>{["responsable_inscripto","monotributo"].includes(taxCondition)?<small style={{marginTop:4}}>Requerido para emitir Factura A.</small>:null}</label>
         <label><span>Vencimiento</span><input type="date" value={billingDueAt} onChange={event=>setBillingDueAt(event.target.value)}/></label>
         <label><span>{invoiceMode==="payment"?"Moneda recibida":"Moneda"}</span><select value={billingCurrency} disabled={invoiceMode==="payment"&&Boolean(invoicePaymentId)} onChange={event=>setBillingCurrency(event.target.value)}><option value="ARS">ARS</option><option value="USD">USD</option></select>{invoiceMode==="payment"&&invoicePaymentId?<small style={{marginTop:4}}>Se toma de la moneda realmente recibida en el pago.</small>:null}</label>
         <label><span>Condición IVA</span><select value={taxCondition} onChange={event=>changeTaxCondition(event.target.value)}>{RECIPIENT_IVA_CONDITIONS.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
         <label><span>Estado inicial</span><select value={billingStatus} onChange={event=>setBillingStatus(event.target.value)}><option value="draft">Borrador</option><option value="issued">Emitido</option></select></label>
       </div>
+      <div style={{margin:"10px 0 0",padding:"10px 12px",border:"1px solid color-mix(in srgb,var(--accent) 22%,var(--line))",borderRadius:12,background:"color-mix(in srgb,var(--accent) 5%,var(--panelSolid))",fontSize:10.4,lineHeight:1.45}}><b style={{display:"block",color:"var(--text)"}}>{fiscalNote.title}</b><span style={{display:"block",marginTop:3,color:"var(--muted)"}}>{fiscalNote.detail}</span><span style={{display:"block",marginTop:4,color:"var(--muted)"}}>Condición receptor ARCA: código {recipientCode}{issuerCondition?" · Emisor: "+issuerCondition.replaceAll("_"," "):""}</span></div>
 
       <div className={s.invoiceLines}>
         <header><h3>Conceptos</h3><button type="button" onClick={()=>setInvoiceLines(current=>[...current,blankLine(reservation,taxConfig,issuerCondition)])}>＋ Agregar línea</button></header>
@@ -108,7 +110,7 @@ export default function ReservationInvoiceDialog({
 
       <label className={s.notes}><span>Nota interna</span><textarea value={billingNotes} onChange={event=>setBillingNotes(event.target.value)} placeholder={`Factura vinculada a ${selected.label}`}/></label>
       <div className={s.invoiceTotals}><span>Precio sin impuestos nacionales <b>{money(invoiceCalc.subtotal,billingCurrency)}</b></span><span>IVA / impuestos <b>{money(invoiceCalc.tax,billingCurrency)}</b></span><strong>Total {money(invoiceCalc.total,billingCurrency)}</strong></div>
-      <div className={s.documentActions}><button className={s.primary} type="button" onClick={()=>prepareInvoice({taxCondition})} disabled={saving||(invoiceMode==="payment"&&!invoicePaymentId)}>{saving?"Guardando…":"Crear documento"}</button></div>
+      <div className={s.documentActions}><button className={s.primary} type="button" onClick={()=>prepareInvoice({taxCondition,fiscal:{...fiscalRule,recipientCode,taxBreakdownRequired:currentTaxRate>0,taxRate:currentTaxRate}})} disabled={saving||(invoiceMode==="payment"&&!invoicePaymentId)}>{saving?"Guardando…":"Crear documento"}</button></div>
     </div>
   </div>
   return createPortal(dialog,portalRoot)
