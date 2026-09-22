@@ -35,6 +35,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
   const[billingName,setBillingName]=useState(reservation.nombre_huesped||"")
   const[billingEmail,setBillingEmail]=useState(reservation.email_huesped||"")
   const[billingPhone,setBillingPhone]=useState(reservation.telefono_huesped||"")
+  const[billingTaxId,setBillingTaxId]=useState(reservation.dni_huesped||"")
   const[billingDueAt,setBillingDueAt]=useState("")
   const[billingCurrency,setBillingCurrency]=useState(reservation.moneda||"ARS")
   const[billingStatus,setBillingStatus]=useState("draft")
@@ -158,6 +159,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
     setBillingName(selected.payer_name||reservation.nombre_huesped||"")
     setBillingEmail(reservation.email_huesped||"")
     setBillingPhone(reservation.telefono_huesped||"")
+    setBillingTaxId(reservation.dni_huesped||"")
     setBillingDueAt("")
     setBillingCurrency(selected.currency||reservation.moneda||"ARS")
     setBillingStatus("draft")
@@ -181,7 +183,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
     if(!allocation||!payment){setInvoiceLines([]);return}
     const physicalCurrency=paymentCurrency(payment)
     const amount=allocatedPhysicalAmount(payment,allocation.amount)
-    setInvoiceLines([{folio_item_id:null,description:`Pago registrado · ${payment.metodo||"Pago"}`,detail:payment.fx_rate&&physicalCurrency!==String(payment.moneda||"").toUpperCase()?`Recibido en ${physicalCurrency} · TC ${Number(payment.fx_rate).toLocaleString("es-AR",{maximumFractionDigits:4})}`:null,source_type:"payment",quantity:1,unit_price:amount,tax_rate:0}])
+    setInvoiceLines([{folio_item_id:null,description:`Pago registrado · ${payment.metodo||"Pago"}`,detail:payment.fx_rate&&physicalCurrency!==String(payment.moneda||"").toUpperCase()?`Recibido en ${physicalCurrency} · TC ${Number(payment.fx_rate).toLocaleString("es-AR",{maximumFractionDigits:4})}`:null,source_type:"payment",quantity:1,unit_price:amount,tax_rate:0,gross_total:amount}])
     setBillingCurrency(physicalCurrency)
   }
 
@@ -228,13 +230,15 @@ export default function ReservationFolioBilling({reservation,propertyId,property
     finally{setSaving(false)}
   }
 
-  async function prepareInvoice({taxCondition="consumidor_final"}={}){
+  async function prepareInvoice({taxCondition="consumidor_final",fiscal={}}={}){
     if(!selected||saving)return
     setSaving(true);setError("")
     try{
       if(!billingName.trim())throw new Error("Ingresá el nombre o razón social del cliente.")
       if(!invoiceLines.length||invoiceCalc.total<=0)throw new Error("Agregá al menos un concepto con importe.")
       if(invoiceLines.some(line=>!String(line.description||"").trim()))throw new Error("Completá la descripción de todos los conceptos.")
+      const fiscalId=String(billingTaxId||"").replace(/\D/g,"")
+      if(billingStatus==="issued"&&["responsable_inscripto","monotributo"].includes(taxCondition)&&fiscalId.length!==11)throw new Error("Para emitir a Responsable Inscripto o Monotributo cargá el CUIT de 11 dígitos.")
       let itemIds=[],paymentId=null,billingMode="folio"
       if(invoiceMode==="payment"){
         paymentId=Number(invoicePaymentId)||null
@@ -272,7 +276,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
         tax:invoiceCalc.tax,
         total:invoiceCalc.total,
         balance:invoiceCalc.total,
-        billing_to:{name:billingName.trim(),email:billingEmail.trim()||null,phone:billingPhone.trim()||null,payer_type:selected.payer_type,folio_label:selected.label,iva_condition:taxCondition},
+        billing_to:{name:billingName.trim(),email:billingEmail.trim()||null,phone:billingPhone.trim()||null,tax_id:billingTaxId.trim()||null,payer_type:selected.payer_type,folio_label:selected.label,iva_condition:taxCondition,iva_condition_code:fiscal.recipientCode||null,issuer_iva_condition:fiscal.issuerCondition||null,receipt_class:fiscal.receiptClass||null,receipt_type:fiscal.receiptType||null,tax_breakdown_required:Boolean(fiscal.taxBreakdownRequired)},
         items:payloadItems,
         folio_item_ids:itemIds,
         billing_mode:billingMode,
@@ -379,6 +383,8 @@ export default function ReservationFolioBilling({reservation,propertyId,property
       setBillingEmail={setBillingEmail}
       billingPhone={billingPhone}
       setBillingPhone={setBillingPhone}
+      billingTaxId={billingTaxId}
+      setBillingTaxId={setBillingTaxId}
       billingDueAt={billingDueAt}
       setBillingDueAt={setBillingDueAt}
       billingCurrency={billingCurrency}
