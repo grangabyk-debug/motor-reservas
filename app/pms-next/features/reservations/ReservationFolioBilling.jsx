@@ -174,7 +174,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
     setInvoiceLines(mode==="folio"?linesFromFolio():[])
   }
 
-  function chooseInvoicePayment(value){
+  function chooseInvoicePayment(value,taxRate=0){
     setInvoicePaymentId(value)
     const paymentId=Number(value)||null
     if(!paymentId){setInvoiceLines([]);return}
@@ -183,7 +183,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
     if(!allocation||!payment){setInvoiceLines([]);return}
     const physicalCurrency=paymentCurrency(payment)
     const amount=allocatedPhysicalAmount(payment,allocation.amount)
-    setInvoiceLines([{folio_item_id:null,description:`Pago registrado · ${payment.metodo||"Pago"}`,detail:payment.fx_rate&&physicalCurrency!==String(payment.moneda||"").toUpperCase()?`Recibido en ${physicalCurrency} · TC ${Number(payment.fx_rate).toLocaleString("es-AR",{maximumFractionDigits:4})}`:null,source_type:"payment",quantity:1,unit_price:amount,tax_rate:0,gross_total:amount}])
+    const rate=Math.max(0,Number(taxRate)||0),net=amount/(1+rate/100);setInvoiceLines([{folio_item_id:null,description:`Pago registrado · ${payment.metodo||"Pago"}`,detail:payment.fx_rate&&physicalCurrency!==String(payment.moneda||"").toUpperCase()?`Recibido en ${physicalCurrency} · TC ${Number(payment.fx_rate).toLocaleString("es-AR",{maximumFractionDigits:4})}`:null,source_type:"payment",quantity:1,unit_price:net,tax_rate:rate,gross_total:amount}])
     setBillingCurrency(physicalCurrency)
   }
 
