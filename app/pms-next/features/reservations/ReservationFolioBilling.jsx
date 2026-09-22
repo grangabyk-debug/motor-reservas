@@ -9,6 +9,7 @@ import MovedRoomChargeNotice from"./MovedRoomChargeNotice"
 import{printReservationFolio}from"./reservationFolioPrint"
 import{buildFolioInvoiceCoverage,folioItemBillingState,remainingInvoiceGross}from"./reservationBillingCoverage"
 import{validPayment,netPayment,paymentCurrency,allocatedPhysicalAmount}from"./reservationPaymentInvoiceUtils"
+import{buildFinanceInvoicePayload,validateFiscalRecipient}from"./reservationInvoiceDocument"
 
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:2}).format(Number(value)||0)
 const fmtDate=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short"}).format(new Date(`${String(value).slice(0,10)}T12:00:00`)).replace(".",""):"—"
@@ -237,8 +238,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
       if(!billingName.trim())throw new Error("Ingresá el nombre o razón social del cliente.")
       if(!invoiceLines.length||invoiceCalc.total<=0)throw new Error("Agregá al menos un concepto con importe.")
       if(invoiceLines.some(line=>!String(line.description||"").trim()))throw new Error("Completá la descripción de todos los conceptos.")
-      const fiscalId=String(billingTaxId||"").replace(/\D/g,"")
-      if(billingStatus==="issued"&&["responsable_inscripto","monotributo"].includes(taxCondition)&&fiscalId.length!==11)throw new Error("Para emitir a Responsable Inscripto o Monotributo cargá el CUIT de 11 dígitos.")
+      validateFiscalRecipient({billingStatus,taxCondition,billingTaxId})
       let itemIds=[],paymentId=null,billingMode="folio"
       if(invoiceMode==="payment"){
         paymentId=Number(invoicePaymentId)||null
@@ -255,39 +255,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
         billingMode=checkedInvoiceItems.length?"partial_items":"folio"
       }
       const userRes=await supabase.auth.getUser();if(userRes.error)throw userRes.error
-      const payloadItems=invoiceLines.map(line=>{
-        const quantity=Math.max(0,Number(line.quantity||0))
-        const unitPrice=Number(line.unit_price||0)
-        const taxRate=Math.max(0,Number(line.tax_rate||0))
-        const subtotal=quantity*unitPrice
-        const tax=subtotal*taxRate/100
-        return{folio_item_id:line.folio_item_id||null,description:String(line.description||"").trim(),detail:line.detail||null,quantity,unit_price:unitPrice,tax_rate:taxRate,tax,subtotal,total:subtotal+tax}
-      })
-      const payload={
-        property_id:propertyId,
-        reservation_id:Number(reservation.id),
-        folio_id:selected.id,
-        payment_id:paymentId,
-        document_type:"invoice",
-        number:null,
-        status:billingStatus,
-        currency:billingCurrency||selected.currency||reservation.moneda||"ARS",
-        subtotal:invoiceCalc.subtotal,
-        tax:invoiceCalc.tax,
-        total:invoiceCalc.total,
-        balance:invoiceCalc.total,
-        billing_to:{name:billingName.trim(),email:billingEmail.trim()||null,phone:billingPhone.trim()||null,tax_id:billingTaxId.trim()||null,payer_type:selected.payer_type,folio_label:selected.label,iva_condition:taxCondition,iva_condition_code:fiscal.recipientCode||null,issuer_iva_condition:fiscal.issuerCondition||null,receipt_class:fiscal.receiptClass||null,receipt_type:fiscal.receiptType||null,tax_breakdown_required:Boolean(fiscal.taxBreakdownRequired)},
-        items:payloadItems,
-        folio_item_ids:itemIds,
-        billing_mode:billingMode,
-        issued_at:billingStatus==="issued"?new Date().toISOString():null,
-        due_at:billingDueAt||null,
-        external_ref:null,
-        notes:billingNotes.trim()||`Preparada desde ${selected.label}`,
-        created_by:userRes.data?.user?.id||null,
-        related_document_id:null,
-        adjustment_reason:null
-      }
+      const payload=buildFinanceInvoicePayload({propertyId,reservation,selected,paymentId,billingStatus,billingCurrency,billingName,billingEmail,billingPhone,billingTaxId,billingDueAt,billingNotes,invoiceCalc,invoiceLines,itemIds,billingMode,userId:userRes.data?.user?.id,taxCondition,fiscal})
       const res=await supabase.from("hotel_finance_documents").insert(payload).select("id").single()
       if(res.error)throw res.error
       setInvoiceOpen(false);setSelectedItems(new Set());setInvoicePaymentId("");setInvoiceLines([]);await load(true)
