@@ -28,6 +28,9 @@ PMS Next usa una sola aplicación y selecciona el workspace mediante `?view=<id>
 <!-- view:guests -->
 - `guests` — **Huéspedes**: perfil, historial, preferencias, idioma, etiquetas y datos de contacto.
 
+<!-- view:crm -->
+- `crm` — **CRM**: oportunidades, seguimientos y lista de espera comercial sin bloquear el Planning; conecta huéspedes, presupuestos y reservas.
+
 <!-- view:messages -->
 - `messages` — **Mensajes**: comunicaciones asociadas a huéspedes y reservas; núcleo del Inbox inteligente.
 
@@ -151,6 +154,7 @@ Operación
 
 Huéspedes & CRM
   Huéspedes
+  CRM · Oportunidades / Seguimientos / Lista de espera
   Mensajes
   [Segmentos / Campañas / Fidelización - próximos]
 
