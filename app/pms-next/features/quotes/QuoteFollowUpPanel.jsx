@@ -12,6 +12,8 @@ export async function recordQuoteContact({propertyId,quote,channel}){
   const now=new Date().toISOString(),patch={last_contacted_at:now,...(quote.status==="draft"?{status:"sent",sent_at:now}:{})}
   const{error}=await supabase.from("hotel_group_quotes").update(patch).eq("id",quote.id).eq("property_id",propertyId)
   if(error)throw error
+  const{data:crmRows}=await supabase.from("hotel_crm_opportunities").select("id").eq("property_id",propertyId).eq("quote_id",quote.id).not("stage","in","(won,lost)")
+  for(const row of crmRows||[])await supabase.rpc("hl_crm_log_activity_atomic",{p_opportunity_id:row.id,p_activity_type:channel,p_summary:`Contacto por ${FOLLOW_CHANNEL[channel]||channel} desde Presupuestos.`,p_channel:channel,p_metadata:{quote_id:quote.id}})
   return patch
 }
 
