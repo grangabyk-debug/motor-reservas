@@ -2,6 +2,7 @@
 
 import{useEffect,useMemo,useRef,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
+import{pmsConfirm}from"../../components/system/PmsDialogHost"
 
 const BUCKET="hotel-reservation-documents"
 const MAX_BYTES=12*1024*1024
@@ -67,7 +68,7 @@ export default function ReservationAttachmentsPanel({item,propertyId}){
   async function signedUrl(row){const result=await supabase.storage.from(BUCKET).createSignedUrl(row.storage_path,180);if(result.error)throw result.error;return result.data.signedUrl}
   async function openFile(row){try{setError("");const url=await signedUrl(row);window.open(url,"_blank","noopener,noreferrer")}catch(err){setError(err?.message||"No se pudo abrir el archivo.")}}
   async function remove(row){
-    if(removing||!window.confirm(`Eliminar “${row.file_name}” de esta reserva?`))return
+    if(removing||!await pmsConfirm({title:"Eliminar adjunto",message:`¿Eliminar “${row.file_name}” de esta reserva?`,confirmLabel:"Eliminar",tone:"danger"}))return
     setRemoving(row.id);setError("");setNotice("")
     try{const deleted=await supabase.from("hotel_reservation_documents").delete().eq("id",row.id).eq("property_id",propertyId).eq("reserva_id",Number(item.id));if(deleted.error)throw deleted.error;await supabase.storage.from(BUCKET).remove([row.storage_path]);setRows(current=>current.filter(item=>item.id!==row.id));setNotice("Adjunto eliminado.");window.dispatchEvent(new CustomEvent("hl:pms-data-updated",{detail:{propertyId,tables:["hotel_reservation_documents"]}}))}catch(err){setError(err?.message||"No se pudo eliminar el archivo.")}finally{setRemoving("")}
   }
