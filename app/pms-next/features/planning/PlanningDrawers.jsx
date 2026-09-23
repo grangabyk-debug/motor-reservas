@@ -37,7 +37,7 @@ function GuestRecognitionPanel({propertyId,draft,setDraft,drawerStep,roomById}){
     setDraft(current=>{
       if(!current)return current
       const currentName=`${current.firstName||""} ${current.lastName||""}`.trim(),sameName=cleanName(currentName)===cleanName(profile.full_name)
-      return{...current,firstName:sameName&&current.firstName?current.firstName:names.firstName||current.firstName,lastName:sameName&&current.lastName?current.lastName:names.lastName||current.lastName,email:profile.email||current.email||"",phone:profile.phone||current.phone||"",country:profile.country||current.country||"",guestProfileId:profile.id}
+      return{...current,firstName:sameName&&current.firstName?current.firstName:names.firstName||current.firstName,lastName:sameName&&current.lastName?current.lastName:names.lastName||current.lastName,email:profile.email||current.email||"",phone:profile.phone||current.phone||"",country:profile.country||current.country||"",guestProfileId:profile.id,guestProfileSnapshot:{id:profile.id,full_name:profile.full_name,email:profile.email||null,phone:profile.phone||null,document_type:profile.document_type||null,document_number:profile.document_number||null,birth_date:profile.birth_date||null,nationality:profile.nationality||null,language:profile.language||null,address:profile.address||null,city:profile.city||null,province:profile.province||null,country:profile.country||null,sex:profile.sex||null,marital_status:profile.marital_status||null,cuil:profile.cuil||null,postal_code:profile.postal_code||null,occupation:profile.occupation||null,travel_reason:profile.travel_reason||null,document_front_path:profile.document_front_path||null,document_back_path:profile.document_back_path||null}}
     })
   }
 
@@ -49,11 +49,11 @@ function GuestRecognitionPanel({propertyId,draft,setDraft,drawerStep,roomById}){
     const timer=setTimeout(async()=>{
       setLoading(true)
       try{
-        const select="id,full_name,email,phone,country,last_stay_at,status"
+        const select="id,full_name,email,phone,country,last_stay_at,status,merged_into_id,document_type,document_number,birth_date,nationality,language,address,city,province,sex,marital_status,cuil,postal_code,occupation,travel_reason,document_front_path,document_back_path"
         const requests=[]
-        if(hasName)requests.push(supabase.from("hotel_guest_profiles").select(select).eq("property_id",propertyId).eq("status","active").ilike("full_name",`%${safeLike(fullName)}%`).limit(6))
-        if(hasEmail)requests.push(supabase.from("hotel_guest_profiles").select(select).eq("property_id",propertyId).eq("status","active").ilike("email",`%${safeLike(draft.email)}%`).limit(6))
-        if(hasPhone)requests.push(supabase.from("hotel_guest_profiles").select(select).eq("property_id",propertyId).eq("status","active").ilike("phone",`%${safeLike(rawPhone)}%`).limit(6))
+        if(hasName)requests.push(supabase.from("hotel_guest_profiles").select(select).eq("property_id",propertyId).eq("status","active").is("merged_into_id",null).ilike("full_name",`%${safeLike(fullName)}%`).limit(6))
+        if(hasEmail)requests.push(supabase.from("hotel_guest_profiles").select(select).eq("property_id",propertyId).eq("status","active").is("merged_into_id",null).ilike("email",`%${safeLike(draft.email)}%`).limit(6))
+        if(hasPhone)requests.push(supabase.from("hotel_guest_profiles").select(select).eq("property_id",propertyId).eq("status","active").is("merged_into_id",null).ilike("phone",`%${safeLike(rawPhone)}%`).limit(6))
         const results=await Promise.all(requests),byId=new Map()
         for(const result of results)if(!result.error)for(const profile of result.data||[])byId.set(profile.id,profile)
         const ranked=[...byId.values()].map(profile=>{const profileName=cleanName(profile.full_name),profileEmail=cleanEmail(profile.email),profilePhone=cleanPhone(profile.phone);let score=0;if(emailKey&&profileEmail===emailKey)score+=1000;if(phoneKey.length>=6&&profilePhone===phoneKey)score+=900;if(nameKey&&profileName===nameKey)score+=800;else if(nameKey&&profileName.startsWith(nameKey))score+=420;else if(nameKey&&profileName.includes(nameKey))score+=260;return{...profile,_score:score}}).sort((a,b)=>b._score-a._score||String(a.full_name||"").localeCompare(String(b.full_name||""),"es")).slice(0,6)
