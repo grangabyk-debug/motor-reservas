@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { supabase } from "../../../../lib/supabase"
+import{pmsConfirm}from"../../components/system/PmsDialogHost"
 import s from "./finance.module.css"
 
 async function accessToken(){
@@ -46,7 +47,7 @@ export default function OnlinePaymentsPanel({propertyId}){
     catch(err){setError(err?.message||"No se pudo iniciar la conexión.");setBusy("")}
   }
   async function disconnect(){
-    if(!window.confirm("¿Desconectar Mercado Pago de este hotel? El motor volverá automáticamente a pago en el hotel."))return
+    if(!await pmsConfirm({title:"Desconectar Mercado Pago",message:"¿Desconectar Mercado Pago de este hotel? El motor volverá automáticamente a pago en el hotel.",confirmLabel:"Desconectar",tone:"danger"}))return
     setBusy("disconnect");setError("");setNotice("")
     try{await request("/api/hotel/mercadopago/config",{method:"DELETE",body:JSON.stringify({property_id:propertyId})});setNotice("Mercado Pago fue desconectado. El motor quedó en pago en el hotel.");await load()}
     catch(err){setError(err?.message||"No se pudo desconectar Mercado Pago.")}
