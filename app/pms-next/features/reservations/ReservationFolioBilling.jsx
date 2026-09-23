@@ -13,7 +13,7 @@ import{defaultRecipientDocType}from"./reservationInvoiceDocument"
 import{calculateInvoiceTotals,createFinanceInvoice,deriveInvoicePaymentSnapshot,issueArcaFinanceDocument}from"./reservationInvoiceFlow"
 import{fmtDate,fmtDateTime,money,payerLabels,typeLabels}from"./reservationFolioFormat"
 
-export default function ReservationFolioBilling({reservation,propertyId,property,onNavigate}){
+export default function ReservationFolioBilling({reservation,propertyId,property}){
   const[folios,setFolios]=useState([])
   const[items,setItems]=useState([])
   const[allocations,setAllocations]=useState([])
