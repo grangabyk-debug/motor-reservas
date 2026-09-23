@@ -18,7 +18,7 @@ function nightlyRows(detail,taxEnabled,vatRate){
   }).filter(entry=>entry.date&&Number.isFinite(entry.gross)).sort((a,b)=>a.date.localeCompare(b.date))
 }
 
-export default function ReservationRoomRateRow({row,detail,currency="ARS",taxEnabled=false,vatRate=0,defaultOpen=false}){
+export default function ReservationRoomRateRow({row,detail,checkoutDate="",currency="ARS",taxEnabled=false,vatRate=0,defaultOpen=false}){
   const nightly=useMemo(()=>nightlyRows(detail,taxEnabled,vatRate),[detail,taxEnabled,vatRate])
   const varied=useMemo(()=>nightly.length>1&&nightly.some(entry=>Math.abs(entry.gross-nightly[0].gross)>.01),[nightly])
   const[open,setOpen]=useState(()=>Boolean(defaultOpen&&varied))
@@ -26,16 +26,17 @@ export default function ReservationRoomRateRow({row,detail,currency="ARS",taxEna
   const parts=[]
   if(row.matrimonial)parts.push(`${row.matrimonial} matrimonial${row.matrimonial===1?"":"es"}`)
   if(row.individual)parts.push(`${row.individual} individual${row.individual===1?"":"es"}`)
-  const changed=row.soldAs!==row.physicalCategory
+  const changed=row.soldAs!==row.physicalCategory,checkedOut=Boolean(checkoutDate)
   const canExpand=nightly.length>0&&varied
 
-  return <div style={{display:"block",padding:0}}>
+  return <div style={{display:"block",padding:0,borderLeft:checkedOut?"3px solid #2e9b61":"3px solid transparent",background:checkedOut?"color-mix(in srgb,#2e9b61 6%,var(--panelSolid))":"transparent"}}>
     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:14,padding:"10px 12px"}}>
       <span style={{minWidth:0,fontFamily:"inherit"}}>
         <b style={{display:"block",fontSize:11,fontWeight:850,lineHeight:1.35}}>Hab. {row.name} · vendida como {row.soldAs} · {fmtStay(row.start)} → {fmtStay(row.end)}</b>
         <small style={{display:"block",marginTop:2,fontSize:11,lineHeight:1.35,fontFamily:"inherit",color:"var(--muted)"}}>Asignada: {row.physicalCategory}{changed?" · categoría física distinta":""} · {row.guests} huésped{row.guests===1?"":"es"} · {parts.length?parts.join(" + "):"Rooming sin configurar"}</small>
       </span>
       <span style={{display:"grid",justifyItems:"end",gap:3,flex:"0 0 auto",textAlign:"right"}}>
+        {checkedOut?<span style={{padding:"4px 7px",border:"1px solid color-mix(in srgb,#2e9b61 30%,var(--line))",borderRadius:999,background:"color-mix(in srgb,#2e9b61 9%,var(--panelSolid))",color:"#26794d",fontSize:8.8,fontWeight:950,letterSpacing:".02em"}}>✓ CHECK-OUT · {fmtStay(checkoutDate)}</span>:null}
         <strong style={{fontSize:11,fontFamily:"inherit"}}>{money(row.rate,currency)}</strong>
         <small style={{marginTop:0,fontWeight:650,color:"var(--muted)"}}>{varied?"promedio/noche":"/ noche"}</small>
         {canExpand?<button type="button" onClick={()=>setOpen(value=>!value)} aria-expanded={open} style={{border:0,padding:0,background:"transparent",color:"var(--accent)",font:"inherit",fontSize:9.5,fontWeight:850,cursor:"pointer"}}>{open?"Ocultar detalle":"Ver detalle de tarifas"}</button>:null}
