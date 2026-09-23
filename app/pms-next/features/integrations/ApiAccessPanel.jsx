@@ -2,6 +2,7 @@
 
 import{useCallback,useEffect,useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
+import{pmsConfirm}from"../../components/system/PmsDialogHost"
 import s from"./apiAccess.module.css"
 
 const fmt=value=>value?new Intl.DateTimeFormat("es-AR",{dateStyle:"short",timeStyle:"short"}).format(new Date(value)):"Nunca"
@@ -15,7 +16,7 @@ export default function ApiAccessPanel({propertyId}){
   const active=useMemo(()=>data.keys.filter(key=>key.status==="active"&&(!key.expires_at||new Date(key.expires_at).getTime()>Date.now())),[data.keys]),lastUse=useMemo(()=>data.keys.map(key=>key.last_used_at).filter(Boolean).sort().at(-1)||null,[data.keys])
 
   async function createKey(){setBusy("create");setError("");setNotice("");setSecret("");try{const result=await call("/api/hotel/api-keys",{method:"POST",body:JSON.stringify({property_id:propertyId,name:draft.name,scopes:draft.scopes,rate_limit_per_min:Number(draft.rate_limit_per_min),expires_days:Number(draft.expires_days)||0})});setSecret(result.secret||"");setNotice(result.notice||"Clave creada.");setCreateOpen(false);await load()}catch(err){setError(err?.message||"No se pudo crear la clave.")}finally{setBusy("")}}
-  async function revoke(key){if(!window.confirm(`¿Revocar la clave “${key.name}”? Las integraciones que la usen dejarán de funcionar.`))return;setBusy(key.id);setError("");setNotice("");try{await call("/api/hotel/api-keys",{method:"PATCH",body:JSON.stringify({property_id:propertyId,key_id:key.id,action:"revoke"})});setNotice("Clave revocada.");await load()}catch(err){setError(err?.message||"No se pudo revocar la clave.")}finally{setBusy("")}}
+  async function revoke(key){if(!await pmsConfirm({title:"Revocar clave API",message:`¿Revocar la clave “${key.name}”? Las integraciones que la usen dejarán de funcionar.`,confirmLabel:"Revocar",tone:"danger"}))return;setBusy(key.id);setError("");setNotice("");try{await call("/api/hotel/api-keys",{method:"PATCH",body:JSON.stringify({property_id:propertyId,key_id:key.id,action:"revoke"})});setNotice("Clave revocada.");await load()}catch(err){setError(err?.message||"No se pudo revocar la clave.")}finally{setBusy("")}}
   async function copy(value,label="Copiado"){try{await navigator.clipboard.writeText(value);setNotice(label)}catch{setError("El navegador no permitió copiar al portapapeles.")}}
 
   if(loading)return <div className={s.empty}>Cargando acceso API…</div>
