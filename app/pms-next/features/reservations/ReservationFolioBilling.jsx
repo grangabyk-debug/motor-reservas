@@ -9,8 +9,8 @@ import MovedRoomChargeNotice from"./MovedRoomChargeNotice"
 import{printReservationFolio}from"./reservationFolioPrint"
 import{buildFolioInvoiceCoverage,folioItemBillingState,remainingInvoiceGross}from"./reservationBillingCoverage"
 import{netPayment,paymentCurrency,allocatedPhysicalAmount}from"./reservationPaymentInvoiceUtils"
-import{defaultRecipientDocType,normalizedTributes}from"./reservationInvoiceDocument"
-import{createFinanceInvoice,deriveInvoicePaymentSnapshot,issueArcaFinanceDocument}from"./reservationInvoiceFlow"
+import{defaultRecipientDocType}from"./reservationInvoiceDocument"
+import{calculateInvoiceTotals,createFinanceInvoice,deriveInvoicePaymentSnapshot,issueArcaFinanceDocument}from"./reservationInvoiceFlow"
 
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:2}).format(Number(value)||0)
 const fmtDate=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short"}).format(new Date(`${String(value).slice(0,10)}T12:00:00`)).replace(".",""):"—"
@@ -132,19 +132,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
   const checkedInvoiceItems=invoiceableItems.filter(row=>selectedItems.has(row.id))
   const unallocatedPayments=payments.map(row=>({...row,remaining:Math.max(0,netPayment(row)-(allocationByPayment.get(Number(row.id))||0))})).filter(row=>row.remaining>.009)
   const balance=selectedStats.charges-selectedStats.paid
-  const invoiceCalc=useMemo(()=>{
-    let subtotal=0,tax=0
-    for(const line of invoiceLines){
-      const quantity=Math.max(0,Number(line.quantity||0))
-      const unitPrice=Number(line.unit_price||0)
-      const rate=Math.max(0,Number(line.tax_rate||0))
-      const base=quantity*unitPrice
-      subtotal+=base
-      tax+=base*rate/100
-    }
-    const tributeTotal=normalizedTributes(billingTributes).reduce((sum,row)=>sum+Number(row.amount||0),0)
-    return{subtotal,tax,tributes:tributeTotal,total:subtotal+tax+tributeTotal}
-  },[invoiceLines,billingTributes])
+  const invoiceCalc=useMemo(()=>calculateInvoiceTotals(invoiceLines,billingTributes),[invoiceLines,billingTributes])
 
   function toggleItem(id){setSelectedItems(current=>{const next=new Set(current);next.has(id)?next.delete(id):next.add(id);return next})}
 
