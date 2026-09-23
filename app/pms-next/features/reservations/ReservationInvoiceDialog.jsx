@@ -46,12 +46,12 @@ export default function ReservationInvoiceDialog({
         if(propertyId){
           const[{data:settings},{data:arca}]=await Promise.all([
             supabase.from("property_settings").select("settings").eq("property_id",propertyId).maybeSingle(),
-            supabase.from("hotel_arca_settings").select("issuer_iva_condition,enabled,invoice_a_variant").eq("property_id",propertyId).maybeSingle(),
+            supabase.from("hotel_arca_settings").select("issuer_iva_condition,enabled,invoice_a_variant,legal_name,fiscal_address,gross_income_number,gross_income_condition,activity_start_date").eq("property_id",propertyId).maybeSingle(),
           ])
           const taxes=settings?.settings?.taxes||{}
           next={enabled:taxes.enabled!==false,rate:Math.max(0,Number(taxes.vat_rate??21)),defaultRecipient:taxes.default_recipient_condition||"consumidor_final",issuerCondition:taxes.issuer_iva_condition||null}
           const configuredIssuer=arca?.enabled===false?null:(arca?.issuer_iva_condition||taxes.issuer_iva_condition||null)
-          issuerIsConfigured=Boolean(configuredIssuer)
+          issuerIsConfigured=Boolean(configuredIssuer&&arca?.legal_name&&arca?.fiscal_address&&arca?.activity_start_date&&(arca?.gross_income_condition==="non_contributor"||arca?.gross_income_number))
           issuer=configuredIssuer||(taxes.enabled!==false&&Number(taxes.vat_rate??21)>0?"responsable_inscripto":null)
           aVariant=arca?.invoice_a_variant||"standard"
         }
