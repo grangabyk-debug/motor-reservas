@@ -5,6 +5,7 @@ export const RECIPIENT_IVA_CONDITIONS=[
   ["exento","Exento",4],
   ["cliente_exterior","Cliente del exterior",9],
   ["no_categorizado","No categorizado",7],
+  ["no_alcanzado","IVA no alcanzado",15],
 ]
 
 export function recipientIvaCode(value){
@@ -23,7 +24,8 @@ export function receiptRule(issuerCondition,recipientCondition){
 }
 
 export function shouldDiscriminateVat(issuerCondition,recipientCondition){
-  return receiptRule(issuerCondition,recipientCondition).receiptClass==="A"
+  const rule=receiptRule(issuerCondition,recipientCondition)
+  return ["A","B"].includes(rule.receiptClass)
 }
 
 export function invoiceVatRate({reservation,taxConfig,issuerCondition}){
@@ -46,7 +48,7 @@ export function fiscalRecipientNote(issuerCondition,recipientCondition,rate){
   }
   if(rule.receiptClass==="B"){
     const exterior=String(recipientCondition||"").toLowerCase()==="cliente_exterior"
-    return{title:"Factura B · IVA incluido, no discriminado",detail:exterior?"Para una estadía en Argentina corresponde B en el flujo general. La Factura T sólo aplica cuando se cumplen las condiciones específicas del régimen para turistas extranjeros.":"El IVA sigue contabilizado internamente, pero no se expone separado al receptor."}
+    return{title:`Factura B · IVA ${rateLabel}% discriminado`,detail:exterior?"Para alojamiento en Argentina se usa B en el flujo general. La Factura T sólo corresponde si se cumplen las condiciones específicas para turistas extranjeros y medio de pago admitido.":"ARCA determina clase B para Consumidor Final, Exento, No alcanzado y No categorizado; desde el régimen de transparencia fiscal el IVA de operaciones gravadas se muestra discriminado."}
   }
   return{title:"Factura C · sin IVA discriminado",detail:"La condición fiscal del emisor determina automáticamente la clase C."}
 }
