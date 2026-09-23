@@ -40,7 +40,7 @@ export default function ReservationInvoiceDialog({
     if(!open)return
     let cancelled=false
     async function loadTax(){
-      let next={enabled:true,rate:21},issuer=null,issuerIsConfigured=false
+      let next={enabled:true,rate:21},issuer=null,issuerIsConfigured=false,aVariant="standard"
       try{
         const propertyId=reservation?.property_id
         if(propertyId){
@@ -53,11 +53,12 @@ export default function ReservationInvoiceDialog({
           const configuredIssuer=arca?.enabled===false?null:(arca?.issuer_iva_condition||taxes.issuer_iva_condition||null)
           issuerIsConfigured=Boolean(configuredIssuer)
           issuer=configuredIssuer||(taxes.enabled!==false&&Number(taxes.vat_rate??21)>0?"responsable_inscripto":null)
+          aVariant=arca?.invoice_a_variant||"standard"
         }
       }catch{}
       if(cancelled)return
       const initial=reservation?.condicion_iva_huesped||next.defaultRecipient||"consumidor_final",rate=invoiceVatRate({reservation,taxConfig:next,issuerCondition:issuer})
-      setTaxConfig(next);setIssuerCondition(issuer);setIssuerConfigured(issuerIsConfigured);setInvoiceAVariant(arca?.invoice_a_variant||"standard");setTaxCondition(initial);setBillingDocType(current=>current||defaultRecipientDocType(initial,billingTaxId));setForeignTouristVerified(false);setForeignPaymentVerified(false);setInvoiceLines(current=>retaxPreservingGross(current,rate))
+      setTaxConfig(next);setIssuerCondition(issuer);setIssuerConfigured(issuerIsConfigured);setInvoiceAVariant(aVariant);setTaxCondition(initial);setBillingDocType(current=>current||defaultRecipientDocType(initial,billingTaxId));setForeignTouristVerified(false);setForeignPaymentVerified(false);setInvoiceLines(current=>retaxPreservingGross(current,rate))
     }
     loadTax()
     return()=>{cancelled=true}
