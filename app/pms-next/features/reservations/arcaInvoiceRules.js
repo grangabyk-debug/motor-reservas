@@ -22,6 +22,10 @@ export function receiptRule(issuerCondition,recipientCondition){
   return{receiptClass:null,receiptType:null,issuerCondition:null,automatic:false}
 }
 
+export function shouldDiscriminateVat(issuerCondition,recipientCondition){
+  return receiptRule(issuerCondition,recipientCondition).receiptClass==="A"
+}
+
 export function invoiceVatRate({reservation,taxConfig,issuerCondition}){
   if(["monotributo","exento"].includes(String(issuerCondition||"").toLowerCase()))return 0
   const stored=Math.max(0,Number(reservation?.iva_porcentaje)||0)
@@ -31,8 +35,18 @@ export function invoiceVatRate({reservation,taxConfig,issuerCondition}){
 
 export function fiscalRecipientNote(issuerCondition,recipientCondition,rate){
   const rule=receiptRule(issuerCondition,recipientCondition)
-  const vat=Number(rate)>0?`IVA ${Number(rate).toLocaleString("es-AR",{maximumFractionDigits:2})}% discriminado`:"Sin IVA discriminado"
-  if(!rule.receiptClass)return{title:vat,detail:"ARCA todavía no está configurado para esta propiedad; al conectarlo, Habitación Llena determinará automáticamente la clase de comprobante."}
-  if(recipientCondition==="cliente_exterior"&&rule.receiptClass==="B")return{title:`Factura ${rule.receiptClass} · ${vat}`,detail:"Para una estadía en Argentina corresponde B en el flujo general. La Factura T se usa sólo cuando el turista extranjero y el medio de pago cumplen el régimen específico de alojamiento."}
-  return{title:`Factura ${rule.receiptClass} · ${vat}`,detail:"La clase se determina automáticamente por la condición fiscal del emisor y del receptor."}
+  const rateLabel=Number(rate).toLocaleString("es-AR",{maximumFractionDigits:2})
+  const discriminates=shouldDiscriminateVat(issuerCondition,recipientCondition)
+  if(!rule.receiptClass){
+    return{title:Number(rate)>0?`IVA ${rateLabel}% configurado`:"Sin IVA",detail:"ARCA todavía no está configurado para esta propiedad; al conectarlo, Habitación Llena determinará automáticamente la clase de comprobante y su presentación fiscal."}
+  }
+  if(rule.receiptClass==="A"){
+    const monotributo=String(recipientCondition||"").toLowerCase()==="monotributo"
+    return{title:`Factura A · IVA ${rateLabel}% discriminado`,detail:monotributo?"El sistema discrimina el IVA y al emitir deberá incluir la leyenda ARCA correspondiente a operaciones con Monotributistas.":"El precio neto y el IVA se muestran separados automáticamente."}
+  }
+  if(rule.receiptClass==="B"){
+    const exterior=String(recipientCondition||"").toLowerCase()==="cliente_exterior"
+    return{title:"Factura B · IVA incluido, no discriminado",detail:exterior?"Para una estadía en Argentina corresponde B en el flujo general. La Factura T sólo aplica cuando se cumplen las condiciones específicas del régimen para turistas extranjeros.":"El IVA sigue contabilizado internamente, pero no se expone separado al receptor."}
+  }
+  return{title:"Factura C · sin IVA discriminado",detail:"La condición fiscal del emisor determina automáticamente la clase C."}
 }
