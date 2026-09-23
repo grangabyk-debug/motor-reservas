@@ -44,12 +44,12 @@ export default function ReservationInvoiceDialog({
             supabase.from("hotel_arca_settings").select("issuer_iva_condition,enabled").eq("property_id",propertyId).maybeSingle(),
           ])
           const taxes=settings?.settings?.taxes||{}
-          next={enabled:taxes.enabled!==false,rate:Math.max(0,Number(taxes.vat_rate??21))}
-          issuer=arca?.enabled===false?null:arca?.issuer_iva_condition||null
+          next={enabled:taxes.enabled!==false,rate:Math.max(0,Number(taxes.vat_rate??21)),defaultRecipient:taxes.default_recipient_condition||"consumidor_final",issuerCondition:taxes.issuer_iva_condition||null}
+          issuer=arca?.enabled===false?null:(arca?.issuer_iva_condition||taxes.issuer_iva_condition||(taxes.enabled!==false&&Number(taxes.vat_rate??21)>0?"responsable_inscripto":null))
         }
       }catch{}
       if(cancelled)return
-      const initial=reservation?.condicion_iva_huesped||"consumidor_final",rate=invoiceVatRate({reservation,taxConfig:next,issuerCondition:issuer})
+      const initial=reservation?.condicion_iva_huesped||next.defaultRecipient||"consumidor_final",rate=invoiceVatRate({reservation,taxConfig:next,issuerCondition:issuer})
       setTaxConfig(next);setIssuerCondition(issuer);setTaxCondition(initial);setInvoiceLines(current=>retaxPreservingGross(current,rate))
     }
     loadTax()
@@ -88,7 +88,7 @@ export default function ReservationInvoiceDialog({
         <label><span>CUIT / documento</span><input inputMode="numeric" value={billingTaxId} onChange={event=>setBillingTaxId(event.target.value)} placeholder={["responsable_inscripto","monotributo"].includes(taxCondition)?"CUIT de 11 dígitos":"Opcional"}/>{["responsable_inscripto","monotributo"].includes(taxCondition)?<small style={{marginTop:4}}>Requerido para emitir Factura A.</small>:null}</label>
         <label><span>Vencimiento</span><input type="date" value={billingDueAt} onChange={event=>setBillingDueAt(event.target.value)}/></label>
         <label><span>{invoiceMode==="payment"?"Moneda recibida":"Moneda"}</span><select value={billingCurrency} disabled={invoiceMode==="payment"&&Boolean(invoicePaymentId)} onChange={event=>setBillingCurrency(event.target.value)}><option value="ARS">ARS</option><option value="USD">USD</option></select>{invoiceMode==="payment"&&invoicePaymentId?<small style={{marginTop:4}}>Se toma de la moneda realmente recibida en el pago.</small>:null}</label>
-        <label><span>Condición IVA</span><select value={taxCondition} onChange={event=>changeTaxCondition(event.target.value)}>{RECIPIENT_IVA_CONDITIONS.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
+        <label><span>Condición IVA del receptor</span><select value={taxCondition} onChange={event=>changeTaxCondition(event.target.value)}>{RECIPIENT_IVA_CONDITIONS.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select><small style={{marginTop:4}}>Recepción informa la condición del cliente; el sistema determina automáticamente la clase A/B/C y cómo mostrar el IVA.</small></label>
         <label><span>Estado inicial</span><select value={billingStatus} onChange={event=>setBillingStatus(event.target.value)}><option value="draft">Borrador</option><option value="issued">Emitido</option></select></label>
       </div>
       <div style={{margin:"10px 0 0",padding:"10px 12px",border:"1px solid color-mix(in srgb,var(--accent) 22%,var(--line))",borderRadius:12,background:"color-mix(in srgb,var(--accent) 5%,var(--panelSolid))",fontSize:10.4,lineHeight:1.45}}><b style={{display:"block",color:"var(--text)"}}>{fiscalNote.title}</b><span style={{display:"block",marginTop:3,color:"var(--muted)"}}>{fiscalNote.detail}</span><span style={{display:"block",marginTop:4,color:"var(--muted)"}}>Condición receptor ARCA: código {recipientCode}{issuerCondition?" · Emisor: "+issuerCondition.replaceAll("_"," "):""}</span></div>
