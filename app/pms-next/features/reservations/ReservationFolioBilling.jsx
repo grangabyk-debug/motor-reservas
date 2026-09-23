@@ -8,8 +8,9 @@ import ReservationDocumentHistory from"./ReservationDocumentHistory"
 import MovedRoomChargeNotice from"./MovedRoomChargeNotice"
 import{printReservationFolio}from"./reservationFolioPrint"
 import{buildFolioInvoiceCoverage,folioItemBillingState,remainingInvoiceGross}from"./reservationBillingCoverage"
-import{validPayment,netPayment,paymentCurrency,allocatedPhysicalAmount}from"./reservationPaymentInvoiceUtils"
-import{buildArcaIssueRequest,buildArcaIssueRequestFromDocument,buildFinanceInvoicePayload,defaultRecipientDocType,normalizedTributes,validateFiscalIssueContext,validateFiscalRecipient}from"./reservationInvoiceDocument"
+import{netPayment,paymentCurrency,allocatedPhysicalAmount}from"./reservationPaymentInvoiceUtils"
+import{defaultRecipientDocType,normalizedTributes}from"./reservationInvoiceDocument"
+import{createFinanceInvoice,deriveInvoicePaymentSnapshot,issueArcaFinanceDocument}from"./reservationInvoiceFlow"
 
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:2}).format(Number(value)||0)
 const fmtDate=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short"}).format(new Date(`${String(value).slice(0,10)}T12:00:00`)).replace(".",""):"—"
@@ -248,75 +249,18 @@ export default function ReservationFolioBilling({reservation,propertyId,property
     finally{setSaving(false)}
   }
 
-  function invoicePaymentSnapshot(total,currency,paymentId=null){
-    const invoiceCurrency=String(currency||"ARS").toUpperCase(),remainingStart=Math.max(0,Number(total)||0)
-    const rows=(paymentId?folioAllocations.filter(row=>Number(row.payment_id)===Number(paymentId)):folioAllocations).slice().sort((a,b)=>new Date(a.created_at||0)-new Date(b.created_at||0))
-    let remaining=remainingStart,covered=0;const methods=[]
-    for(const allocation of rows){
-      if(remaining<=.009)break
-      const payment=payments.find(row=>Number(row.id)===Number(allocation.payment_id))
-      if(!payment||!validPayment(payment))continue
-      const receivedCurrency=paymentCurrency(payment)
-      const available=receivedCurrency===invoiceCurrency?allocatedPhysicalAmount(payment,allocation.amount):Math.max(0,Number(allocation.amount)||0)
-      const applied=Math.min(remaining,available)
-      if(applied<=.009)continue
-      covered+=applied;remaining-=applied
-      methods.push({payment_id:Number(payment.id),method:payment.metodo||"Pago",amount:applied,currency:invoiceCurrency,received_amount:allocatedPhysicalAmount(payment,allocation.amount),received_currency:receivedCurrency,reference:payment.referencia||null,created_at:payment.created_at||null})
-    }
-    const labels=[...new Set(methods.map(row=>row.method).filter(Boolean))]
-    return{sale_condition:remaining<=.02?"contado":"cuenta_corriente",payment_methods:methods,payment_method_label:labels.join(" + ")||null,payment_covered:covered,payment_pending:Math.max(0,remaining)}
-  }
-
-  async function issueFinanceDocument(doc,relatedDocument=null){
-    const request=buildArcaIssueRequestFromDocument({doc,reservation,relatedDocument})
-    const{data,error:fnError}=await supabase.functions.invoke("hotel-arca-invoice",{body:request})
-    if(fnError)throw fnError
-    if(!data?.ok)throw new Error(data?.error||(data?.invoice?.errors||[]).map(row=>row.msg||row.code).join(" · ")||"ARCA no autorizó el comprobante.")
-    return data.invoice
-  }
+  async function issueFinanceDocument(doc,relatedDocument=null){return issueArcaFinanceDocument({doc,reservation,relatedDocument})}
 
   async function prepareInvoice({taxCondition="consumidor_final",fiscal={}}={}){
     if(!selected||saving)return
     setSaving(true);setError("")
-    let createdDoc=null
     try{
-      if(!billingName.trim())throw new Error("Ingresá el nombre o razón social del cliente.")
-      if(!invoiceLines.length||invoiceCalc.total<=0)throw new Error("Agregá al menos un concepto con importe.")
-      if(invoiceLines.some(line=>!String(line.description||"").trim()))throw new Error("Completá la descripción de todos los conceptos.")
-      validateFiscalRecipient({billingStatus,taxCondition,billingTaxId,billingDocType,billingAddress,invoiceTotal:invoiceCalc.total})
-      validateFiscalIssueContext({billingStatus,fiscal})
-      let itemIds=[],paymentId=null,billingMode="folio"
-      if(invoiceMode==="payment"){
-        paymentId=Number(invoicePaymentId)||null
-        const allocation=folioAllocations.find(row=>Number(row.payment_id)===paymentId)
-        const payment=payments.find(row=>Number(row.id)===paymentId)
-        if(!allocation||!payment)throw new Error("Elegí un pago asignado a este folio.")
-        const expectedCurrency=paymentCurrency(payment),expectedTotal=allocatedPhysicalAmount(payment,allocation.amount)
-        if(String(billingCurrency||"").toUpperCase()!==expectedCurrency)throw new Error(`La factura de este pago debe emitirse en ${expectedCurrency}, que fue la moneda realmente recibida.`)
-        if(Math.abs(invoiceCalc.total-expectedTotal)>.02)throw new Error(`El total debe coincidir con el importe recibido: ${money(expectedTotal,expectedCurrency)}.`)
-        billingMode="payment"
-      }else{
-        const source=checkedInvoiceItems.length?checkedInvoiceItems:invoiceableItems
-        itemIds=source.map(row=>row.id)
-        billingMode=checkedInvoiceItems.length?"partial_items":"folio"
-      }
-      if(String(billingCurrency).toUpperCase()==="USD"&&Number(billingExchangeRate)<=0)throw new Error("Para emitir en USD cargá la cotización ARS/USD.")
-      const paymentSnapshot=invoicePaymentSnapshot(invoiceCalc.total,billingCurrency,paymentId)
-      const userRes=await supabase.auth.getUser();if(userRes.error)throw userRes.error
-      const payload=buildFinanceInvoicePayload({propertyId,reservation,selected,paymentId,billingStatus,billingCurrency,billingName,billingEmail,billingPhone,billingTaxId,billingDocType,billingAddress,billingDueAt,billingNotes,billingExchangeRate,invoiceCalc,invoiceLines,itemIds,billingMode,userId:userRes.data?.user?.id,taxCondition,fiscal,paymentSnapshot,billingTributes})
-      const res=await supabase.from("hotel_finance_documents").insert(payload).select("*").single()
-      if(res.error)throw res.error
-      createdDoc=res.data
-      if(billingStatus==="issued"){
-        const request=buildArcaIssueRequest({documentId:createdDoc.id,propertyId,reservation,billingCurrency,billingTaxId,billingDocType,billingDueAt,billingExchangeRate,invoiceCalc,invoiceLines,taxCondition,fiscal,billingTributes})
-        const{data,error:fnError}=await supabase.functions.invoke("hotel-arca-invoice",{body:request})
-        if(fnError)throw fnError
-        if(!data?.ok)throw new Error(data?.error||(data?.invoice?.errors||[]).map(row=>row.msg||row.code).join(" · ")||"ARCA no autorizó el comprobante.")
-        if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("hl:pms-toast",{detail:{title:"Factura autorizada",message:`ARCA otorgó CAE ${data.invoice?.cae||""}.`}}))
-      }
+      const{invoice}=await createFinanceInvoice({propertyId,reservation,selected,billingStatus,billingCurrency,billingName,billingEmail,billingPhone,billingTaxId,billingDocType,billingAddress,billingDueAt,billingNotes,billingExchangeRate,invoiceCalc,invoiceLines,invoiceMode,invoicePaymentId,folioAllocations,payments,checkedInvoiceItems,invoiceableItems,taxCondition,fiscal,billingTributes})
+      if(invoice&&typeof window!=="undefined")window.dispatchEvent(new CustomEvent("hl:pms-toast",{detail:{title:"Factura autorizada",message:`ARCA otorgó CAE ${invoice.cae||""}.`}}))
       setInvoiceOpen(false);setSelectedItems(new Set());setInvoicePaymentId("");setInvoiceLines([]);setBillingTributes([]);await load(true)
       window.dispatchEvent(new CustomEvent("hl:pms-data-updated",{detail:{propertyId,tables:["hotel_finance_documents","hotel_folio_items"]}}))
     }catch(err){
+      const createdDoc=err?.financeDocument||null
       if(createdDoc&&billingStatus==="issued")await load(true)
       setError(createdDoc&&billingStatus==="issued"?`La factura quedó guardada como borrador, pero ARCA no la autorizó: ${err?.message||"error de autorización"}. Podés reintentar desde Facturas y notas vinculadas.`:err?.message||"No se pudo crear el documento.")
       if(createdDoc&&billingStatus==="issued")setInvoiceOpen(false)
@@ -432,7 +376,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
       billingNotes={billingNotes}
       setBillingNotes={setBillingNotes}
       invoiceCalc={invoiceCalc}
-      paymentSnapshotPreview={invoicePaymentSnapshot(invoiceCalc.total,billingCurrency,invoiceMode==="payment"?Number(invoicePaymentId)||null:null)}
+      paymentSnapshotPreview={deriveInvoicePaymentSnapshot({total:invoiceCalc.total,currency:billingCurrency,paymentId:invoiceMode==="payment"?Number(invoicePaymentId)||null:null,folioAllocations,payments})}
       saving={saving}
       prepareInvoice={prepareInvoice}
       onClose={()=>setInvoiceOpen(false)}
