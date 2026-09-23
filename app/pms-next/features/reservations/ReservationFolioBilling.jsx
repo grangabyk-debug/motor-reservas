@@ -8,16 +8,12 @@ import ReservationDocumentHistory from"./ReservationDocumentHistory"
 import MovedRoomChargeNotice from"./MovedRoomChargeNotice"
 import{printReservationFolio}from"./reservationFolioPrint"
 import{buildFolioInvoiceCoverage,folioItemBillingState,remainingInvoiceGross}from"./reservationBillingCoverage"
-import{validPayment,netPayment,paymentCurrency,allocatedPhysicalAmount}from"./reservationPaymentInvoiceUtils"
-import{buildFinanceInvoicePayload,validateFiscalIssueContext,validateFiscalRecipient}from"./reservationInvoiceDocument"
+import{netPayment,paymentCurrency,allocatedPhysicalAmount}from"./reservationPaymentInvoiceUtils"
+import{defaultRecipientDocType}from"./reservationInvoiceDocument"
+import{calculateInvoiceTotals,createFinanceInvoice,deriveInvoicePaymentSnapshot,issueArcaFinanceDocument}from"./reservationInvoiceFlow"
+import{fmtDate,fmtDateTime,money,payerLabels,typeLabels}from"./reservationFolioFormat"
 
-const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:2}).format(Number(value)||0)
-const fmtDate=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short"}).format(new Date(`${String(value).slice(0,10)}T12:00:00`)).replace(".",""):"—"
-const fmtDateTime=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}).format(new Date(value)).replace(".",""):"—"
-const payerLabels={guest:"Huésped",company:"Empresa",agency:"Agencia",group:"Grupo",other:"Otro"}
-const typeLabels={lodging:"Alojamiento",parking:"Cochera",pet:"Mascotas",service:"Servicio",extra:"Extra",discount:"Descuento",adjustment:"Ajuste",fee:"Cargo"}
-
-export default function ReservationFolioBilling({reservation,propertyId,property,onNavigate}){
+export default function ReservationFolioBilling({reservation,propertyId,property}){
   const[folios,setFolios]=useState([])
   const[items,setItems]=useState([])
   const[allocations,setAllocations]=useState([])
@@ -37,10 +33,14 @@ export default function ReservationFolioBilling({reservation,propertyId,property
   const[billingEmail,setBillingEmail]=useState(reservation.email_huesped||"")
   const[billingPhone,setBillingPhone]=useState(reservation.telefono_huesped||"")
   const[billingTaxId,setBillingTaxId]=useState(reservation.dni_huesped||"")
+  const[billingDocType,setBillingDocType]=useState(defaultRecipientDocType("consumidor_final",reservation.dni_huesped))
+  const[billingAddress,setBillingAddress]=useState([reservation.direccion_huesped,reservation.ciudad_huesped,reservation.provincia_estado_huesped,reservation.pais_huesped].filter(Boolean).join(", "))
   const[billingDueAt,setBillingDueAt]=useState("")
   const[billingCurrency,setBillingCurrency]=useState(reservation.moneda||"ARS")
+  const[billingExchangeRate,setBillingExchangeRate]=useState(Number(reservation.tipo_cambio)||1)
   const[billingStatus,setBillingStatus]=useState("draft")
   const[billingNotes,setBillingNotes]=useState("")
+  const[billingTributes,setBillingTributes]=useState([])
   const[invoiceLines,setInvoiceLines]=useState([])
 
   const load=useCallback(async(silent=false)=>{
@@ -74,9 +74,13 @@ export default function ReservationFolioBilling({reservation,propertyId,property
     setBillingName(reservation.nombre_huesped||"")
     setBillingEmail(reservation.email_huesped||"")
     setBillingPhone(reservation.telefono_huesped||"")
+    setBillingTaxId(reservation.dni_huesped||"")
+    setBillingDocType(defaultRecipientDocType("consumidor_final",reservation.dni_huesped))
+    setBillingAddress([reservation.direccion_huesped,reservation.ciudad_huesped,reservation.provincia_estado_huesped,reservation.pais_huesped].filter(Boolean).join(", "))
     setBillingCurrency(reservation.moneda||"ARS")
+    setBillingExchangeRate(Number(reservation.tipo_cambio)||1)
     setSelectedItems(new Set())
-  },[reservation.id,reservation.nombre_huesped,reservation.email_huesped,reservation.telefono_huesped,reservation.moneda])
+  },[reservation.id,reservation.nombre_huesped,reservation.email_huesped,reservation.telefono_huesped,reservation.dni_huesped,reservation.direccion_huesped,reservation.ciudad_huesped,reservation.provincia_estado_huesped,reservation.pais_huesped,reservation.moneda,reservation.tipo_cambio])
   useEffect(()=>{
     if(typeof window==="undefined")return
     let timer=null
@@ -123,18 +127,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
   const checkedInvoiceItems=invoiceableItems.filter(row=>selectedItems.has(row.id))
   const unallocatedPayments=payments.map(row=>({...row,remaining:Math.max(0,netPayment(row)-(allocationByPayment.get(Number(row.id))||0))})).filter(row=>row.remaining>.009)
   const balance=selectedStats.charges-selectedStats.paid
-  const invoiceCalc=useMemo(()=>{
-    let subtotal=0,tax=0
-    for(const line of invoiceLines){
-      const quantity=Math.max(0,Number(line.quantity||0))
-      const unitPrice=Number(line.unit_price||0)
-      const rate=Math.max(0,Number(line.tax_rate||0))
-      const base=quantity*unitPrice
-      subtotal+=base
-      tax+=base*rate/100
-    }
-    return{subtotal,tax,total:subtotal+tax}
-  },[invoiceLines])
+  const invoiceCalc=useMemo(()=>calculateInvoiceTotals(invoiceLines,billingTributes),[invoiceLines,billingTributes])
 
   function toggleItem(id){setSelectedItems(current=>{const next=new Set(current);next.has(id)?next.delete(id):next.add(id);return next})}
 
@@ -160,11 +153,16 @@ export default function ReservationFolioBilling({reservation,propertyId,property
     setBillingName(selected.payer_name||reservation.nombre_huesped||"")
     setBillingEmail(reservation.email_huesped||"")
     setBillingPhone(reservation.telefono_huesped||"")
-    setBillingTaxId(selected.payer_type==="guest"?(reservation.dni_huesped||""):"")
-    setBillingDueAt("")
+    const nextTaxId=selected.payer_type==="guest"?(reservation.dni_huesped||""):""
+    setBillingTaxId(nextTaxId)
+    setBillingDocType(defaultRecipientDocType("consumidor_final",nextTaxId))
+    setBillingAddress(selected.payer_type==="guest"?[reservation.direccion_huesped,reservation.ciudad_huesped,reservation.provincia_estado_huesped,reservation.pais_huesped].filter(Boolean).join(", "):"")
+    setBillingDueAt(reservation.fecha_salida||"")
     setBillingCurrency(selected.currency||reservation.moneda||"ARS")
+    setBillingExchangeRate(Number(reservation.tipo_cambio)||1)
     setBillingStatus("draft")
     setBillingNotes("")
+    setBillingTributes([])
     setInvoiceLines(mode==="folio"?linesFromFolio():[])
     setInvoiceOpen(true)
   }
@@ -172,6 +170,8 @@ export default function ReservationFolioBilling({reservation,propertyId,property
   function changeInvoiceMode(mode){
     setInvoiceMode(mode)
     setInvoicePaymentId("")
+    setBillingCurrency(selected?.currency||reservation.moneda||"ARS")
+    setBillingExchangeRate(Number(reservation.tipo_cambio)||1)
     setInvoiceLines(mode==="folio"?linesFromFolio():[])
   }
 
@@ -186,6 +186,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
     const amount=allocatedPhysicalAmount(payment,allocation.amount)
     const rate=Math.max(0,Number(taxRate)||0),net=amount/(1+rate/100);setInvoiceLines([{folio_item_id:null,description:`Pago registrado · ${payment.metodo||"Pago"}`,detail:payment.fx_rate&&physicalCurrency!==String(payment.moneda||"").toUpperCase()?`Recibido en ${physicalCurrency} · TC ${Number(payment.fx_rate).toLocaleString("es-AR",{maximumFractionDigits:4})}`:null,source_type:"payment",quantity:1,unit_price:net,tax_rate:rate,gross_total:amount}])
     setBillingCurrency(physicalCurrency)
+    setBillingExchangeRate(physicalCurrency==="USD"?Number(payment.fx_rate||reservation.tipo_cambio)||1:1)
   }
 
   function updateInvoiceLine(index,key,value){
@@ -231,38 +232,31 @@ export default function ReservationFolioBilling({reservation,propertyId,property
     finally{setSaving(false)}
   }
 
+  async function issueFinanceDocument(doc,relatedDocument=null){
+    let current=doc
+    if(doc?.document_type==="invoice"&&doc?.status==="draft"){
+      const snapshot=deriveInvoicePaymentSnapshot({total:doc.total,currency:doc.currency,paymentId:doc.payment_id||null,folioAllocations:allocations.filter(row=>row.folio_id===doc.folio_id),payments}),billing_to={...(doc.billing_to||{}),...snapshot}
+      const updated=await supabase.from("hotel_finance_documents").update({billing_to,balance:snapshot.payment_pending}).eq("id",doc.id).eq("property_id",propertyId).select("*").single()
+      if(updated.error)throw updated.error
+      current=updated.data
+    }
+    return issueArcaFinanceDocument({doc:current,reservation,relatedDocument})
+  }
+
   async function prepareInvoice({taxCondition="consumidor_final",fiscal={}}={}){
     if(!selected||saving)return
     setSaving(true);setError("")
     try{
-      if(!billingName.trim())throw new Error("Ingresá el nombre o razón social del cliente.")
-      if(!invoiceLines.length||invoiceCalc.total<=0)throw new Error("Agregá al menos un concepto con importe.")
-      if(invoiceLines.some(line=>!String(line.description||"").trim()))throw new Error("Completá la descripción de todos los conceptos.")
-      validateFiscalRecipient({billingStatus,taxCondition,billingTaxId})
-      validateFiscalIssueContext({billingStatus,fiscal})
-      let itemIds=[],paymentId=null,billingMode="folio"
-      if(invoiceMode==="payment"){
-        paymentId=Number(invoicePaymentId)||null
-        const allocation=folioAllocations.find(row=>Number(row.payment_id)===paymentId)
-        const payment=payments.find(row=>Number(row.id)===paymentId)
-        if(!allocation||!payment)throw new Error("Elegí un pago asignado a este folio.")
-        const expectedCurrency=paymentCurrency(payment),expectedTotal=allocatedPhysicalAmount(payment,allocation.amount)
-        if(String(billingCurrency||"").toUpperCase()!==expectedCurrency)throw new Error(`La factura de este pago debe emitirse en ${expectedCurrency}, que fue la moneda realmente recibida.`)
-        if(Math.abs(invoiceCalc.total-expectedTotal)>.02)throw new Error(`El total debe coincidir con el importe recibido: ${money(expectedTotal,expectedCurrency)}.`)
-        billingMode="payment"
-      }else{
-        const source=checkedInvoiceItems.length?checkedInvoiceItems:invoiceableItems
-        itemIds=source.map(row=>row.id)
-        billingMode=checkedInvoiceItems.length?"partial_items":"folio"
-      }
-      const userRes=await supabase.auth.getUser();if(userRes.error)throw userRes.error
-      const payload=buildFinanceInvoicePayload({propertyId,reservation,selected,paymentId,billingStatus,billingCurrency,billingName,billingEmail,billingPhone,billingTaxId,billingDueAt,billingNotes,invoiceCalc,invoiceLines,itemIds,billingMode,userId:userRes.data?.user?.id,taxCondition,fiscal})
-      const res=await supabase.from("hotel_finance_documents").insert(payload).select("id").single()
-      if(res.error)throw res.error
-      setInvoiceOpen(false);setSelectedItems(new Set());setInvoicePaymentId("");setInvoiceLines([]);await load(true)
+      const{invoice}=await createFinanceInvoice({propertyId,reservation,selected,billingStatus,billingCurrency,billingName,billingEmail,billingPhone,billingTaxId,billingDocType,billingAddress,billingDueAt,billingNotes,billingExchangeRate,invoiceCalc,invoiceLines,invoiceMode,invoicePaymentId,folioAllocations,payments,checkedInvoiceItems,invoiceableItems,taxCondition,fiscal,billingTributes})
+      if(invoice&&typeof window!=="undefined")window.dispatchEvent(new CustomEvent("hl:pms-toast",{detail:{title:"Factura autorizada",message:`ARCA otorgó CAE ${invoice.cae||""}.`}}))
+      setInvoiceOpen(false);setSelectedItems(new Set());setInvoicePaymentId("");setInvoiceLines([]);setBillingTributes([]);await load(true)
       window.dispatchEvent(new CustomEvent("hl:pms-data-updated",{detail:{propertyId,tables:["hotel_finance_documents","hotel_folio_items"]}}))
-    }catch(err){setError(err?.message||"No se pudo crear el documento.")}
-    finally{setSaving(false)}
+    }catch(err){
+      const createdDoc=err?.financeDocument||null
+      if(createdDoc&&billingStatus==="issued")await load(true)
+      setError(createdDoc&&billingStatus==="issued"?`La factura quedó guardada como borrador, pero ARCA no la autorizó: ${err?.message||"error de autorización"}. Podés reintentar desde Facturas y notas vinculadas.`:err?.message||"No se pudo crear el documento.")
+      if(createdDoc&&billingStatus==="issued")setInvoiceOpen(false)
+    }finally{setSaving(false)}
   }
 
   function printFolio(){printReservationFolio({selected,folioItems,folioPayments,folioAllocations,selectedStats,balance,reservation,property,setError})}
@@ -323,7 +317,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
         {unallocatedPayments.map(payment=><div key={payment.id}><span><b>{payment.metodo||"Pago"}</b><small>{fmtDateTime(payment.created_at)} · disponible {money(payment.remaining,payment.moneda)}</small></span><button type="button" onClick={()=>allocate(payment)} disabled={saving}>Asignar a {selected.label}</button></div>)}
       </div>:null}
 
-      <ReservationDocumentHistory documents={documents} selected={selected} reservation={reservation} propertyId={propertyId} onRefresh={load} setError={setError}/>
+      <ReservationDocumentHistory documents={documents} selected={selected} reservation={reservation} propertyId={propertyId} onRefresh={load} setError={setError} onIssueDocument={issueFinanceDocument}/>
     </>:<div className={s.empty}>No hay folios disponibles.</div>}
 
     {newOpen?<div className={s.overlay} onMouseDown={event=>event.target===event.currentTarget&&setNewOpen(false)}><div className={s.modal}>
@@ -354,10 +348,18 @@ export default function ReservationFolioBilling({reservation,propertyId,property
       setBillingPhone={setBillingPhone}
       billingTaxId={billingTaxId}
       setBillingTaxId={setBillingTaxId}
+      billingDocType={billingDocType}
+      setBillingDocType={setBillingDocType}
+      billingAddress={billingAddress}
+      setBillingAddress={setBillingAddress}
       billingDueAt={billingDueAt}
       setBillingDueAt={setBillingDueAt}
       billingCurrency={billingCurrency}
       setBillingCurrency={setBillingCurrency}
+      billingExchangeRate={billingExchangeRate}
+      setBillingExchangeRate={setBillingExchangeRate}
+      billingTributes={billingTributes}
+      setBillingTributes={setBillingTributes}
       billingStatus={billingStatus}
       setBillingStatus={setBillingStatus}
       invoiceLines={invoiceLines}
@@ -366,6 +368,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
       billingNotes={billingNotes}
       setBillingNotes={setBillingNotes}
       invoiceCalc={invoiceCalc}
+      paymentSnapshotPreview={deriveInvoicePaymentSnapshot({total:invoiceCalc.total,currency:billingCurrency,paymentId:invoiceMode==="payment"?Number(invoicePaymentId)||null:null,folioAllocations,payments})}
       saving={saving}
       prepareInvoice={prepareInvoice}
       onClose={()=>setInvoiceOpen(false)}
