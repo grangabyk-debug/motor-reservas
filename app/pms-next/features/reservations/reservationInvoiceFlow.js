@@ -4,6 +4,13 @@ import{buildArcaIssueRequest,buildArcaIssueRequestFromDocument,buildFinanceInvoi
 
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:2}).format(Number(value)||0)
 
+export function calculateInvoiceTotals(invoiceLines=[],billingTributes=[]){
+  let subtotal=0,tax=0
+  for(const line of invoiceLines){const quantity=Math.max(0,Number(line.quantity||0)),unitPrice=Number(line.unit_price||0),rate=Math.max(0,Number(line.tax_rate||0)),base=quantity*unitPrice;subtotal+=base;tax+=base*rate/100}
+  const tributes=(billingTributes||[]).reduce((sum,row)=>{const base=Math.max(0,Number(row.base)||0),rate=Math.max(0,Number(row.rate)||0),computed=base>0&&rate>0?base*rate/100:0;return sum+Math.max(0,Number(row.amount)||computed)},0)
+  return{subtotal,tax,tributes,total:subtotal+tax+tributes}
+}
+
 export function deriveInvoicePaymentSnapshot({total,currency,paymentId=null,folioAllocations=[],payments=[]}){
   const invoiceCurrency=String(currency||"ARS").toUpperCase(),rows=(paymentId?folioAllocations.filter(row=>Number(row.payment_id)===Number(paymentId)):folioAllocations).slice().sort((a,b)=>new Date(a.created_at||0)-new Date(b.created_at||0))
   let remaining=Math.max(0,Number(total)||0),covered=0
