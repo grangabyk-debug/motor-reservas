@@ -5,21 +5,11 @@ import{createPortal}from"react-dom"
 import{supabase}from"../../../../lib/supabase"
 import s from"./reservationFolioBilling.module.css"
 import{printReservationFinanceDocument}from"./reservationInvoicePrint"
+import{A_VARIANT_LABELS,SALE_LABELS,STATUS_LABELS,TAX_LABELS,docLabel,docNumber,nextLabel,nextType,rowTotal}from"./reservationDocumentMeta"
 
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:2}).format(Number(value)||0)
 const fmtDateTime=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}).format(new Date(value)).replace(".",""):"—"
 const fmtDate=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"2-digit",year:"numeric"}).format(new Date(`${String(value).slice(0,10)}T12:00:00`)):"—"
-const DOC_LABELS={invoice:"Factura",credit_note:"Nota de crédito",debit_note:"Nota de débito",receipt:"Recibo",proforma:"Proforma",folio:"Folio"}
-const TAX_LABELS={consumidor_final:"Consumidor final",responsable_inscripto:"Responsable inscripto",monotributo:"Monotributo",exento:"Exento",cliente_exterior:"Cliente del exterior",no_categorizado:"No categorizado",no_alcanzado:"IVA no alcanzado"}
-const STATUS_LABELS={draft:"Borrador",issued:"Emitida",void:"Anulada",cancelled:"Cancelada",paid:"Pagada",partial:"Pago parcial"}
-const SALE_LABELS={contado:"Contado",cuenta_corriente:"Cuenta corriente"}
-const A_VARIANT_LABELS={cbu:"PAGO EN CBU INFORMADA",retention:"OPERACIÓN SUJETA A RETENCIÓN"}
-const docLabel=doc=>DOC_LABELS[doc?.document_type]||"Documento"
-const docNumber=doc=>doc?.number||"Sin numerar"
-const nextType=doc=>doc?.document_type==="invoice"?"credit_note":doc?.document_type==="credit_note"?"debit_note":null
-const nextLabel=type=>type==="credit_note"?"Nota de crédito":"Nota de débito"
-const rowTotal=row=>{const quantity=Math.max(0,Number(row?.quantity)||0),unit=Math.max(0,Number(row?.unit_price)||0),rate=Math.max(0,Number(row?.tax_rate)||0);return Number.isFinite(Number(row?.total))?Number(row.total):quantity*unit*(1+rate/100)}
-
 function sourceLines(doc,remaining){
   const rows=Array.isArray(doc?.items)?doc.items:[]
   const original=Math.max(0,Number(doc?.total)||0)
