@@ -26,6 +26,9 @@ export default function ReservationInvoiceDialog({
   const[taxCondition,setTaxCondition]=useState("consumidor_final")
   const[taxConfig,setTaxConfig]=useState({enabled:true,rate:21})
   const[issuerCondition,setIssuerCondition]=useState(null)
+  const[issuerConfigured,setIssuerConfigured]=useState(false)
+  const[foreignTouristVerified,setForeignTouristVerified]=useState(false)
+  const[foreignPaymentVerified,setForeignPaymentVerified]=useState(false)
   const[portalRoot,setPortalRoot]=useState(null)
   useEffect(()=>{
     if(!open||typeof document==="undefined"){setPortalRoot(null);return}
@@ -35,7 +38,7 @@ export default function ReservationInvoiceDialog({
     if(!open)return
     let cancelled=false
     async function loadTax(){
-      let next={enabled:true,rate:21},issuer=null
+      let next={enabled:true,rate:21},issuer=null,issuerIsConfigured=false
       try{
         const propertyId=reservation?.property_id
         if(propertyId){
@@ -45,20 +48,24 @@ export default function ReservationInvoiceDialog({
           ])
           const taxes=settings?.settings?.taxes||{}
           next={enabled:taxes.enabled!==false,rate:Math.max(0,Number(taxes.vat_rate??21)),defaultRecipient:taxes.default_recipient_condition||"consumidor_final",issuerCondition:taxes.issuer_iva_condition||null}
-          issuer=arca?.enabled===false?null:(arca?.issuer_iva_condition||taxes.issuer_iva_condition||(taxes.enabled!==false&&Number(taxes.vat_rate??21)>0?"responsable_inscripto":null))
+          const configuredIssuer=arca?.enabled===false?null:(arca?.issuer_iva_condition||taxes.issuer_iva_condition||null)
+          issuerIsConfigured=Boolean(configuredIssuer)
+          issuer=configuredIssuer||(taxes.enabled!==false&&Number(taxes.vat_rate??21)>0?"responsable_inscripto":null)
         }
       }catch{}
       if(cancelled)return
       const initial=reservation?.condicion_iva_huesped||next.defaultRecipient||"consumidor_final",rate=invoiceVatRate({reservation,taxConfig:next,issuerCondition:issuer})
-      setTaxConfig(next);setIssuerCondition(issuer);setTaxCondition(initial);setInvoiceLines(current=>retaxPreservingGross(current,rate))
+      setTaxConfig(next);setIssuerCondition(issuer);setIssuerConfigured(issuerIsConfigured);setTaxCondition(initial);setForeignTouristVerified(false);setForeignPaymentVerified(false);setInvoiceLines(current=>retaxPreservingGross(current,rate))
     }
     loadTax()
     return()=>{cancelled=true}
   },[open,reservation?.id,reservation?.property_id])
   if(!open||!selected||!portalRoot)return null
   const crossCurrencyPayment=folioPayments.find(payment=>paymentCurrency(payment)!==String(payment.moneda||selected.currency||reservation.moneda||"ARS").toUpperCase())
-  function changeTaxCondition(value){const rate=invoiceVatRate({reservation,taxConfig,issuerCondition});setTaxCondition(value);setInvoiceLines(current=>retaxPreservingGross(current,rate))}
-  const fiscalRule=receiptRule(issuerCondition,taxCondition),currentTaxRate=invoiceVatRate({reservation,taxConfig,issuerCondition}),showTaxBreakdown=shouldDiscriminateVat(issuerCondition,taxCondition),fiscalNote=fiscalRecipientNote(issuerCondition,taxCondition,currentTaxRate),recipientCode=recipientIvaCode(taxCondition)
+  function changeTaxCondition(value){const rate=invoiceVatRate({reservation,taxConfig,issuerCondition});setTaxCondition(value);if(value!=="cliente_exterior"){setForeignTouristVerified(false);setForeignPaymentVerified(false)}setInvoiceLines(current=>retaxPreservingGross(current,rate))}
+  const lodgingOnly=invoiceMode==="folio"&&invoiceLines.length>0&&invoiceLines.every(line=>String(line.source_type||"").toLowerCase()==="lodging")
+  const foreignContext={foreignTouristVerified,foreignPaymentVerified,lodgingOnly}
+  const fiscalRule=receiptRule(issuerCondition,taxCondition,foreignContext),currentTaxRate=invoiceVatRate({reservation,taxConfig,issuerCondition}),showTaxBreakdown=shouldDiscriminateVat(issuerCondition,taxCondition,foreignContext),fiscalNote=fiscalRecipientNote(issuerCondition,taxCondition,currentTaxRate,foreignContext),recipientCode=recipientIvaCode(taxCondition)
   const dialog=<div className={s.overlay} role="dialog" aria-modal="true" aria-label="Crear factura o documento" onMouseDown={event=>event.target===event.currentTarget&&onClose()}>
     <div className={`${s.modal} ${s.invoiceModal}`} style={{width:"min(1180px,calc(100vw - 40px))",maxHeight:"calc(100dvh - 40px)",padding:24}}>
       <button className={s.close} onClick={onClose}>×</button>
@@ -88,10 +95,12 @@ export default function ReservationInvoiceDialog({
         <label><span>CUIT / documento</span><input inputMode="numeric" value={billingTaxId} onChange={event=>setBillingTaxId(event.target.value)} placeholder={["responsable_inscripto","monotributo"].includes(taxCondition)?"CUIT de 11 dígitos":"Opcional"}/>{["responsable_inscripto","monotributo"].includes(taxCondition)?<small style={{marginTop:4}}>Requerido para emitir Factura A.</small>:null}</label>
         <label><span>Vencimiento</span><input type="date" value={billingDueAt} onChange={event=>setBillingDueAt(event.target.value)}/></label>
         <label><span>{invoiceMode==="payment"?"Moneda recibida":"Moneda"}</span><select value={billingCurrency} disabled={invoiceMode==="payment"&&Boolean(invoicePaymentId)} onChange={event=>setBillingCurrency(event.target.value)}><option value="ARS">ARS</option><option value="USD">USD</option></select>{invoiceMode==="payment"&&invoicePaymentId?<small style={{marginTop:4}}>Se toma de la moneda realmente recibida en el pago.</small>:null}</label>
-        <label><span>Condición IVA del receptor</span><select value={taxCondition} onChange={event=>changeTaxCondition(event.target.value)}>{RECIPIENT_IVA_CONDITIONS.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select><small style={{marginTop:4}}>Recepción informa la condición del cliente; el sistema determina automáticamente la clase A/B/C y cómo mostrar el IVA.</small></label>
+        <label><span>Condición IVA del receptor</span><select value={taxCondition} onChange={event=>changeTaxCondition(event.target.value)}>{RECIPIENT_IVA_CONDITIONS.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select><small style={{marginTop:4}}>Recepción informa la condición del cliente; el sistema determina la clase A/B/C y evalúa T sólo cuando corresponda. “Cliente del exterior” no genera Factura E automáticamente.</small></label>
         <label><span>Estado inicial</span><select value={billingStatus} onChange={event=>setBillingStatus(event.target.value)}><option value="draft">Borrador</option><option value="issued">Emitido</option></select></label>
       </div>
-      <div style={{margin:"10px 0 0",padding:"10px 12px",border:"1px solid color-mix(in srgb,var(--accent) 22%,var(--line))",borderRadius:12,background:"color-mix(in srgb,var(--accent) 5%,var(--panelSolid))",fontSize:10.4,lineHeight:1.45}}><b style={{display:"block",color:"var(--text)"}}>{fiscalNote.title}</b><span style={{display:"block",marginTop:3,color:"var(--muted)"}}>{fiscalNote.detail}</span><span style={{display:"block",marginTop:4,color:"var(--muted)"}}>Condición receptor ARCA: código {recipientCode}{issuerCondition?" · Emisor: "+issuerCondition.replaceAll("_"," "):""}</span></div>
+      {!issuerConfigured?<div style={{margin:"10px 0 0",padding:"10px 12px",border:"1px solid color-mix(in srgb,#d18b00 34%,var(--line))",borderRadius:12,background:"color-mix(in srgb,#d18b00 7%,var(--panelSolid))",fontSize:10.4,lineHeight:1.45}}><b style={{display:"block",color:"var(--text)"}}>Falta confirmar la condición fiscal del hotel</b><span style={{color:"var(--muted)"}}>La clase que ves es una simulación basada en la configuración impositiva actual. Antes de marcar un documento como Emitido, guardá en Configuración si el emisor es Responsable Inscripto, Monotributista o Exento.</span></div>:null}
+      {taxCondition==="cliente_exterior"&&issuerCondition==="responsable_inscripto"?<div style={{margin:"10px 0 0",padding:"10px 12px",border:"1px solid color-mix(in srgb,var(--accent) 22%,var(--line))",borderRadius:12,background:"color-mix(in srgb,var(--accent) 4%,var(--panelSolid))",fontSize:10.3,lineHeight:1.45}}><b style={{display:"block",marginBottom:6}}>Evaluación de Factura T</b><label style={{display:"flex",gap:8,alignItems:"flex-start",marginTop:5}}><input type="checkbox" checked={foreignTouristVerified} onChange={event=>setForeignTouristVerified(event.target.checked)}/><span>Se verificó la condición de turista del exterior y la documentación correspondiente de las personas alcanzadas por el alojamiento.</span></label><label style={{display:"flex",gap:8,alignItems:"flex-start",marginTop:6}}><input type="checkbox" checked={foreignPaymentVerified} onChange={event=>setForeignPaymentVerified(event.target.checked)}/><span>El pago se realiza con un medio admitido para el reintegro (por ejemplo tarjeta emitida en el exterior o transferencia desde el exterior).</span></label><small style={{display:"block",marginTop:7,color:"var(--muted)"}}>{lodgingOnly?"Los conceptos seleccionados son sólo alojamiento. Si ambas verificaciones están marcadas, el sistema clasifica la operación como T.":"La selección contiene un pago o cargos distintos del alojamiento. Factura T no puede absorber esos extras: seleccioná sólo el alojamiento elegible y facturá los demás cargos aparte."}</small></div>:null}
+      <div style={{margin:"10px 0 0",padding:"10px 12px",border:"1px solid color-mix(in srgb,var(--accent) 22%,var(--line))",borderRadius:12,background:"color-mix(in srgb,var(--accent) 5%,var(--panelSolid))",fontSize:10.4,lineHeight:1.45}}><b style={{display:"block",color:"var(--text)"}}>{fiscalNote.title}</b><span style={{display:"block",marginTop:3,color:"var(--muted)"}}>{fiscalNote.detail}</span><span style={{display:"block",marginTop:4,color:"var(--muted)"}}>Condición receptor ARCA: código {recipientCode}{issuerCondition?" · Emisor: "+issuerCondition.replaceAll("_"," "):""}{fiscalRule.arcaService?" · Servicio: "+fiscalRule.arcaService:""}</span></div>
 
       <div className={s.invoiceLines}>
         <header><h3>Conceptos</h3><button type="button" onClick={()=>setInvoiceLines(current=>[...current,blankLine(reservation,taxConfig,issuerCondition)])}>＋ Agregar línea</button></header>
@@ -107,8 +116,8 @@ export default function ReservationInvoiceDialog({
       </div>
 
       <label className={s.notes}><span>Nota interna</span><textarea value={billingNotes} onChange={event=>setBillingNotes(event.target.value)} placeholder={`Factura vinculada a ${selected.label}`}/></label>
-      <div className={s.invoiceTotals}>{showTaxBreakdown?<><span>Precio neto <b>{money(invoiceCalc.subtotal,billingCurrency)}</b></span><span>IVA discriminado <b>{money(invoiceCalc.tax,billingCurrency)}</b></span></>:<span>{fiscalRule.receiptClass==="B"?"IVA incluido · no discriminado":"Sin IVA discriminado"}</span>}<strong>Total {money(invoiceCalc.total,billingCurrency)}</strong></div>
-      <div className={s.documentActions}><button className={s.primary} type="button" onClick={()=>prepareInvoice({taxCondition,fiscal:{...fiscalRule,recipientCode,taxBreakdownRequired:showTaxBreakdown,taxRate:currentTaxRate}})} disabled={saving||(invoiceMode==="payment"&&!invoicePaymentId)}>{saving?"Guardando…":"Crear documento"}</button></div>
+      <div className={s.invoiceTotals}>{showTaxBreakdown?<><span>Precio neto <b>{money(invoiceCalc.subtotal,billingCurrency)}</b></span><span>IVA discriminado <b>{money(invoiceCalc.tax,billingCurrency)}</b></span></>:<span>{fiscalRule.receiptClass==="C"?"Sin IVA discriminado":fiscalRule.receiptClass?`Factura ${fiscalRule.receiptClass}`:"Tratamiento fiscal pendiente"}</span>}<strong>Total {money(invoiceCalc.total,billingCurrency)}</strong></div>
+      <div className={s.documentActions}><button className={s.primary} type="button" onClick={()=>prepareInvoice({taxCondition,fiscal:{...fiscalRule,recipientCode,taxBreakdownRequired:showTaxBreakdown,taxRate:currentTaxRate,issuerConfigured,foreignTouristVerified,foreignPaymentVerified,lodgingOnly}})} disabled={saving||(invoiceMode==="payment"&&!invoicePaymentId)}>{saving?"Guardando…":"Crear documento"}</button></div>
     </div>
   </div>
   return createPortal(dialog,portalRoot)

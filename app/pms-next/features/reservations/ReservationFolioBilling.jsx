@@ -9,7 +9,7 @@ import MovedRoomChargeNotice from"./MovedRoomChargeNotice"
 import{printReservationFolio}from"./reservationFolioPrint"
 import{buildFolioInvoiceCoverage,folioItemBillingState,remainingInvoiceGross}from"./reservationBillingCoverage"
 import{validPayment,netPayment,paymentCurrency,allocatedPhysicalAmount}from"./reservationPaymentInvoiceUtils"
-import{buildFinanceInvoicePayload,validateFiscalRecipient}from"./reservationInvoiceDocument"
+import{buildFinanceInvoicePayload,validateFiscalIssueContext,validateFiscalRecipient}from"./reservationInvoiceDocument"
 
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:2}).format(Number(value)||0)
 const fmtDate=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short"}).format(new Date(`${String(value).slice(0,10)}T12:00:00`)).replace(".",""):"—"
@@ -239,6 +239,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
       if(!invoiceLines.length||invoiceCalc.total<=0)throw new Error("Agregá al menos un concepto con importe.")
       if(invoiceLines.some(line=>!String(line.description||"").trim()))throw new Error("Completá la descripción de todos los conceptos.")
       validateFiscalRecipient({billingStatus,taxCondition,billingTaxId})
+      validateFiscalIssueContext({billingStatus,fiscal})
       let itemIds=[],paymentId=null,billingMode="folio"
       if(invoiceMode==="payment"){
         paymentId=Number(invoicePaymentId)||null
