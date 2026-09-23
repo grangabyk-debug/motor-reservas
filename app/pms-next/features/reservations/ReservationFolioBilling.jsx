@@ -2,6 +2,7 @@
 
 import{useCallback,useEffect,useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
+import{pmsConfirm}from"../../components/system/PmsDialogHost"
 import s from"./reservationFolioBilling.module.css"
 import ReservationInvoiceDialog from"./ReservationInvoiceDialog"
 import ReservationDocumentHistory from"./ReservationDocumentHistory"
@@ -202,7 +203,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
 
   async function consolidate(){
     if(!selected||selected.folio_type!=="master")return
-    if(!window.confirm("¿Mover al Folio maestro todos los consumos todavía no facturados de las habitaciones?"))return
+    if(!await pmsConfirm({title:"Consolidar consumos",message:"¿Mover al Folio maestro todos los consumos todavía no facturados de las habitaciones?",confirmLabel:"Mover consumos",tone:"warning"}))return
     setSaving(true);setError("")
     try{const res=await supabase.rpc("hl_consolidate_folio",{p_target_folio_id:selected.id});if(res.error)throw res.error;await load(true)}
     catch(err){setError(err?.message||"No se pudieron consolidar los consumos.")}
