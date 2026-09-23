@@ -432,6 +432,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
       billingNotes={billingNotes}
       setBillingNotes={setBillingNotes}
       invoiceCalc={invoiceCalc}
+      paymentSnapshotPreview={invoicePaymentSnapshot(invoiceCalc.total,billingCurrency,invoiceMode==="payment"?Number(invoicePaymentId)||null:null)}
       saving={saving}
       prepareInvoice={prepareInvoice}
       onClose={()=>setInvoiceOpen(false)}
