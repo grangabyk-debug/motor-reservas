@@ -4,6 +4,7 @@ import{useEffect,useMemo,useState}from"react"
 import{createPortal}from"react-dom"
 import{supabase}from"../../../../lib/supabase"
 import s from"./reservationFolioBilling.module.css"
+import{printReservationFinanceDocument}from"./reservationInvoicePrint"
 
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:2}).format(Number(value)||0)
 const fmtDateTime=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}).format(new Date(value)).replace(".",""):"—"
@@ -18,7 +19,6 @@ const docNumber=doc=>doc?.number||"Sin numerar"
 const nextType=doc=>doc?.document_type==="invoice"?"credit_note":doc?.document_type==="credit_note"?"debit_note":null
 const nextLabel=type=>type==="credit_note"?"Nota de crédito":"Nota de débito"
 const rowTotal=row=>{const quantity=Math.max(0,Number(row?.quantity)||0),unit=Math.max(0,Number(row?.unit_price)||0),rate=Math.max(0,Number(row?.tax_rate)||0);return Number.isFinite(Number(row?.total))?Number(row.total):quantity*unit*(1+rate/100)}
-const esc=value=>String(value??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")
 
 function sourceLines(doc,remaining){
   const rows=Array.isArray(doc?.items)?doc.items:[]
@@ -27,31 +27,6 @@ function sourceLines(doc,remaining){
   if(rows.length)return rows.map((row,index)=>({key:`${index}-${row.description||"concepto"}`,description:row.description||"Concepto",detail:row.detail||null,quantity:Math.max(.0001,Number(row.quantity)||1),unit_price:(Number(row.unit_price)||0)*factor,tax_rate:Math.max(0,Number(row.tax_rate)||0)}))
   const tax=Math.max(0,Number(doc?.tax)||0),subtotal=Math.max(0,Number(doc?.subtotal)||Math.max(0,original-tax)),rate=subtotal>0?tax/subtotal*100:0
   return[{key:"document-total",description:docLabel(doc),detail:null,quantity:1,unit_price:remaining/(1+rate/100),tax_rate:rate}]
-}
-
-function printDocument(doc,reservation){
-  if(typeof window==="undefined")return
-  const billing=doc?.billing_to||{},rows=Array.isArray(doc?.items)?doc.items:[],currency=doc?.currency||reservation?.moneda||"ARS",receiptClass=String(billing.receipt_class||"").toUpperCase()
-  const showTax=["A","B","T"].includes(receiptClass),methods=Array.isArray(billing.payment_methods)?billing.payment_methods:[],tributes=Array.isArray(billing.tributes)?billing.tributes:[],transparency=billing.transparency||{}
-  const lineRows=rows.map(row=>`<tr><td>${esc(row.description||"Concepto")}${row.detail?`<small>${esc(row.detail)}</small>`:""}</td><td>${Number(row.quantity)||1}</td><td>${esc(money(showTax?row.unit_price:(Number(row.unit_price)||0)*(1+(Number(row.tax_rate)||0)/100),currency))}</td>${showTax?`<td>${Number(row.tax_rate)||0}%</td>`:""}<td>${esc(money(rowTotal(row),currency))}</td></tr>`).join("")
-  const paymentRows=methods.map(row=>`<div>${esc(row.method||"Pago")} · ${esc(money(row.amount,row.currency||currency))}</div>`).join("")
-  const tributeRows=tributes.map(row=>`<div>${esc(row.description||"Tributo")} · ${esc(money(row.amount,currency))}</div>`).join("")
-  const qr=billing.qr_svg?`<div class="qr">${billing.qr_svg}</div>`:""
-  const aLegend=billing.invoice_a_variant&&billing.invoice_a_variant!=="standard"?A_VARIANT_LABELS[billing.invoice_a_variant]:""
-  const transparencyBlock=["consumidor_final","exento"].includes(String(billing.iva_condition||""))&&receiptClass==="B"?`<section class="taxnote"><b>Régimen de Transparencia Fiscal al Consumidor (Ley 27.743)</b><div>IVA Contenido: ${esc(money(transparency.iva_contenido||doc.tax||0,currency))}</div><div>Otros Impuestos Nacionales Indirectos: ${esc(money(transparency.otros_impuestos_nacionales_indirectos||0,currency))}</div></section>`:""
-  const html=`<!doctype html><html><head><meta charset="utf-8"><title>${esc(docLabel(doc))} ${esc(docNumber(doc))}</title><style>
-  *{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#161b2b;margin:28px;font-size:12px}.head{display:grid;grid-template-columns:1fr auto;gap:18px;border-bottom:2px solid #222;padding-bottom:14px}.issuer h1{margin:0 0 5px;font-size:22px}.letter{width:66px;height:66px;border:2px solid #222;display:grid;place-items:center;font-size:34px;font-weight:900}.meta{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}.box{border:1px solid #bbb;border-radius:8px;padding:10px;line-height:1.55}.box b{display:block;margin-bottom:3px}.legend{font-weight:900;border:1px solid #222;padding:8px;margin:8px 0;text-align:center}.payment{margin-top:8px;padding-top:7px;border-top:1px solid #ddd}.payment small{display:block;color:#555}.tbl{width:100%;border-collapse:collapse;margin-top:14px}.tbl th,.tbl td{border-bottom:1px solid #ddd;padding:8px;text-align:right}.tbl th:first-child,.tbl td:first-child{text-align:left}.tbl td small{display:block;color:#666;margin-top:2px}.totals{margin:16px 0 0 auto;width:360px}.totals div{display:flex;justify-content:space-between;padding:4px 0}.totals .grand{font-size:16px;font-weight:900;border-top:2px solid #222;margin-top:4px;padding-top:8px}.fiscal{display:grid;grid-template-columns:1fr 190px;gap:16px;align-items:end;margin-top:18px;border-top:1px solid #bbb;padding-top:12px}.qr svg{width:170px;height:170px}.taxnote{margin-top:12px;border:1px solid #bbb;padding:10px;border-radius:8px}.note{font-size:10px;color:#444;margin-top:8px}@media print{body{margin:10mm}.no-print{display:none}}</style></head><body>
-  <div class="head"><div class="issuer"><h1>${esc(billing.issuer_trade_name||billing.issuer_legal_name||"Hotel")}</h1><div><b>Razón social:</b> ${esc(billing.issuer_legal_name||"—")}</div><div><b>CUIT:</b> ${esc(billing.issuer_tax_id||"—")} · <b>Condición IVA:</b> ${esc(String(billing.issuer_iva_condition||"—").replaceAll("_"," "))}</div><div><b>Domicilio comercial:</b> ${esc(billing.issuer_fiscal_address||"—")}</div><div><b>Ingresos Brutos:</b> ${esc(billing.issuer_gross_income_condition==="non_contributor"?"No contribuyente":billing.issuer_gross_income_number||"—")} · <b>Inicio de actividades:</b> ${esc(fmtDate(billing.issuer_activity_start_date))}</div></div><div class="letter">${esc(receiptClass||"")}</div></div>
-  ${aLegend?`<div class="legend">${esc(aLegend)}</div>`:""}
-  <div class="meta"><div class="box"><b>${esc(docLabel(doc))} ${esc(docNumber(doc))}</b><div>Fecha: ${esc(fmtDate(doc.issued_at||doc.created_at))}</div><div>Punto de venta: ${esc(String(billing.point_of_sale||"—"))}</div><div>Moneda: ${esc(currency)}${currency==="USD"?` · Cotización ARS/USD: ${esc(String(billing.exchange_rate||"—"))}`:""}</div></div><div class="box"><b>Receptor</b><div>${esc(billing.name||reservation?.nombre_huesped||"—")}</div><div>${esc(TAX_LABELS[billing.iva_condition]||billing.iva_condition||"—")} · ${esc(String(billing.doc_type||"Documento"))}: ${esc(billing.tax_id||"—")}</div><div>${esc(billing.address||"")}</div><div class="payment"><b>Condición de venta: ${esc(SALE_LABELS[billing.sale_condition]||billing.sale_condition||"—")}</b>${paymentRows||"<small>Sin pagos aplicados al emitir.</small>"}</div></div></div>
-  <table class="tbl"><thead><tr><th>Descripción</th><th>Cant.</th><th>${showTax?"Precio neto":"Precio final"}</th>${showTax?"<th>IVA</th>":""}<th>Total</th></tr></thead><tbody>${lineRows||"<tr><td colspan='5'>Sin conceptos detallados</td></tr>"}</tbody></table>
-  <div class="totals"><div><span>Subtotal</span><b>${esc(money(doc.subtotal,currency))}</b></div>${showTax?`<div><span>IVA</span><b>${esc(money(doc.tax,currency))}</b></div>`:""}${tributeRows?`<div><span>Tributos</span><b>${esc(money((tributes||[]).reduce((s,r)=>s+Number(r.amount||0),0),currency))}</b></div>`:""}<div class="grand"><span>Total</span><span>${esc(money(doc.total,currency))}</span></div></div>
-  ${transparencyBlock}
-  ${billing.monotributo_a_legend?`<div class="note">${esc(billing.monotributo_a_legend)}</div>`:""}
-  <div class="fiscal"><div class="box"><b>Autorización ARCA</b><div>CAE: ${esc(billing.cae||"—")}</div><div>Vencimiento CAE: ${esc(fmtDate(billing.cae_expiration))}</div><div>Comprobante: ${esc(docNumber(doc))}</div><div class="note">La autenticidad puede verificarse mediante el código QR.</div></div>${qr}</div>
-  <script>window.onload=()=>{window.print()}</script></body></html>`
-  const win=window.open("","_blank","noopener,noreferrer,width=980,height=760");if(!win)return
-  win.document.open();win.document.write(html);win.document.close()
 }
 
 export default function ReservationDocumentHistory({documents,selected,reservation,propertyId,onRefresh,setError,onIssueDocument}){
@@ -197,7 +172,7 @@ function DocumentPreview({doc,reservation,onClose,onIssue,saving}){
 
     {billing.cae?<div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:14,alignItems:"center",marginTop:12,padding:"11px 12px",border:"1px solid color-mix(in srgb,#2d9f62 28%,var(--line))",borderRadius:12,background:"color-mix(in srgb,#2d9f62 6%,var(--panelSolid))"}}><div style={{fontSize:10.5,lineHeight:1.55}}><b style={{display:"block",color:"#26794d"}}>Autorizado por ARCA</b><div>CAE: <strong>{billing.cae}</strong></div><div>Vencimiento CAE: {fmtDate(billing.cae_expiration)}</div><div>Comprobante: {doc.number||"—"}</div></div>{qrSrc?<img src={qrSrc} alt="QR ARCA" style={{width:122,height:122,background:"#fff",padding:4,borderRadius:8}}/>:null}</div>:doc.status==="draft"?<div style={{marginTop:10,padding:"9px 11px",border:"1px solid var(--line)",borderRadius:11,fontSize:9.5,color:"var(--muted)",lineHeight:1.45}}>Este comprobante está en <b style={{color:"var(--text)"}}>borrador</b>. Todavía no tiene número fiscal ni CAE.</div>:null}
 
-    <div className={s.documentActions}>{doc.status==="draft"&&["invoice","credit_note","debit_note"].includes(doc.document_type)?<button type="button" onClick={onIssue} disabled={saving}>{saving?"Procesando…":"Emitir con ARCA"}</button>:null}{billing.cae?<button type="button" onClick={()=>printDocument(doc,reservation)}>Imprimir / PDF</button>:null}<button type="button" className={s.primary} onClick={onClose}>Cerrar</button></div>
+    <div className={s.documentActions}>{doc.status==="draft"&&["invoice","credit_note","debit_note"].includes(doc.document_type)?<button type="button" onClick={onIssue} disabled={saving}>{saving?"Procesando…":"Emitir con ARCA"}</button>:null}{billing.cae?<button type="button" onClick={()=>printReservationFinanceDocument(doc,reservation)}>Imprimir / PDF</button>:null}<button type="button" className={s.primary} onClick={onClose}>Cerrar</button></div>
   </div></div>
   return createPortal(preview,portalRoot)
 }
