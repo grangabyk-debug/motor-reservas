@@ -44,12 +44,12 @@ export default function ReservationInvoiceDialog({
             supabase.from("hotel_arca_settings").select("issuer_iva_condition,enabled").eq("property_id",propertyId).maybeSingle(),
           ])
           const taxes=settings?.settings?.taxes||{}
-          next={enabled:taxes.enabled!==false,rate:Math.max(0,Number(taxes.vat_rate??21))}
-          issuer=arca?.enabled===false?null:arca?.issuer_iva_condition||null
+          next={enabled:taxes.enabled!==false,rate:Math.max(0,Number(taxes.vat_rate??21)),defaultRecipient:taxes.default_recipient_condition||"consumidor_final",issuerCondition:taxes.issuer_iva_condition||null}
+          issuer=arca?.enabled===false?null:(arca?.issuer_iva_condition||taxes.issuer_iva_condition||(taxes.enabled!==false&&Number(taxes.vat_rate??21)>0?"responsable_inscripto":null))
         }
       }catch{}
       if(cancelled)return
-      const initial=reservation?.condicion_iva_huesped||"consumidor_final",rate=invoiceVatRate({reservation,taxConfig:next,issuerCondition:issuer})
+      const initial=reservation?.condicion_iva_huesped||next.defaultRecipient||"consumidor_final",rate=invoiceVatRate({reservation,taxConfig:next,issuerCondition:issuer})
       setTaxConfig(next);setIssuerCondition(issuer);setTaxCondition(initial);setInvoiceLines(current=>retaxPreservingGross(current,rate))
     }
     loadTax()
