@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { supabase } from "../../../../lib/supabase"
+import{pmsConfirm}from"../../components/system/PmsDialogHost"
 import ui from "./cancellation-policies.module.css"
 
 const TYPES = {
@@ -207,7 +208,7 @@ export default function CancellationPoliciesSettings({ propertyId, currency = "A
 
   async function remove() {
     if (!canEdit || !form?.id || form.is_default) return
-    if (!window.confirm(`¿Eliminar la política ${form.name}? Las reservas históricas conservarán la copia de sus condiciones.`)) return
+    if (!await pmsConfirm({title:"Eliminar política",message:`¿Eliminar la política ${form.name}? Las reservas históricas conservarán la copia de sus condiciones.`,confirmLabel:"Eliminar",tone:"danger"})) return
     setSaving(true)
     setError("")
     try {
