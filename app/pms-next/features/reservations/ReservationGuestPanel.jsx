@@ -6,6 +6,7 @@ import{supabase}from"../../../../lib/supabase"
 import ReservationGuestCheckout from"./ReservationGuestCheckout"
 import ReservationGroupGuestOverview from"./ReservationGroupGuestOverview"
 import ReservationGuestEditorFields from"./ReservationGuestEditorFields"
+import useGuestProfileAutocomplete from"./useGuestProfileAutocomplete"
 
 const blankGuest=(role="companion",roomId=null)=>({id:null,role,room_id:roomId||null,guest_profile_id:null,full_name:"",email:"",phone:"",document_type:"DNI",document_number:"",birth_date:"",sex:"",marital_status:"",cuil:"",nationality:"",language:"",address:"",city:"",province:"",country:"Argentina",postal_code:"",occupation:"",travel_reason:"",relationship:"",document_front_path:"",document_back_path:"",notes:"",checked_out_at:null})
 const clean=value=>String(value??"")
@@ -16,7 +17,8 @@ export default function ReservationGuestPanel({item,rooms=[],propertyId,onClose,
   const groupNameRef=useRef(item?.nombre_huesped||"Reserva grupal"),lastReservationRef=useRef(item?.id)
   if(lastReservationRef.current!==item?.id){lastReservationRef.current=item?.id;groupNameRef.current=item?.nombre_huesped||"Reserva grupal"}
   const groupName=groupNameRef.current
-  const[guests,setGuests]=useState([]),[selectedId,setSelectedId]=useState(""),[draft,setDraft]=useState(null),[activeRoomId,setActiveRoomId]=useState(""),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState(""),[confirmAction,setConfirmAction]=useState(null),[profileMatches,setProfileMatches]=useState([]),[profileSearching,setProfileSearching]=useState(false),[profileApplied,setProfileApplied]=useState("")
+  const[guests,setGuests]=useState([]),[selectedId,setSelectedId]=useState(""),[draft,setDraft]=useState(null),[activeRoomId,setActiveRoomId]=useState(""),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState(""),[confirmAction,setConfirmAction]=useState(null)
+  const{profileMatches,profileSearching,profileApplied,applyGuestProfile,resetGuestProfileSearch,clearAppliedProfile}=useGuestProfileAutocomplete({propertyId,draft,setDraft})
   const roomList=useMemo(()=>[...(rooms||[])],[rooms]),roomIdSet=useMemo(()=>new Set(roomList.map(room=>String(room.id))),[roomList])
   const checkedRoomIds=useMemo(()=>new Set((Array.isArray(item?.habitaciones_detalle)?item.habitaciones_detalle:[]).filter(detail=>detail?.checked_in_at).map(detail=>String(detail?.habitacion_id||"")).filter(Boolean)),[item?.habitaciones_detalle])
   const legacyAllInHouse=item?.estado==="alojado"&&checkedRoomIds.size===0
@@ -32,39 +34,16 @@ export default function ReservationGuestPanel({item,rooms=[],propertyId,onClose,
     rows=[...rows].sort((a,b)=>a.role==="primary"?-1:b.role==="primary"?1:(Number(a.sort_order)||0)-(Number(b.sort_order)||0));const target=rows.find(row=>String(row.id)===String(preferredId))||rows.find(row=>row.role==="primary")||rows[0];setGuests(rows);setSelectedId(String(target.id));setDraft(guestForEdit(target));if(target?.room_id)setActiveRoomId(String(target.room_id));else if(isGroup&&rooms[0]?.id)setActiveRoomId(String(rooms[0].id));return rows
   }
   useEffect(()=>{let cancelled=false;async function load(){setLoading(true);setError("");try{await fetchGuests()}catch(err){if(!cancelled)setError(err?.message||"No se pudieron cargar los huéspedes.")}finally{if(!cancelled)setLoading(false)}}load();return()=>{cancelled=true}},[item.id,propertyId])
-  useEffect(()=>{if(selected){setDraft(guestForEdit(selected));setProfileMatches([]);setProfileApplied("")}},[selectedId])
-  useEffect(()=>{
-    const term=String(draft?.full_name||"").trim()
-    if(!propertyId||draft?.checked_out_at||term.length<3){setProfileMatches([]);setProfileSearching(false);return}
-    let cancelled=false
-    const timer=setTimeout(async()=>{
-      setProfileSearching(true)
-      try{
-        const needle=term.replace(/[%_*,()]/g," ").trim().replace(/\s+/g," ")
-        if(needle.length<3){if(!cancelled)setProfileMatches([]);return}
-        const{data,error:profileError}=await supabase.from("hotel_guest_profiles").select("id,full_name,email,phone,document_type,document_number,birth_date,sex,marital_status,cuil,nationality,language,address,city,province,country,postal_code,occupation,travel_reason,document_front_path,document_back_path,last_stay_at,status,merged_into_id").eq("property_id",propertyId).eq("status","active").is("merged_into_id",null).ilike("full_name",`%${needle}%`).order("last_stay_at",{ascending:false,nullsFirst:false}).limit(6)
-        if(profileError)throw profileError
-        if(!cancelled)setProfileMatches((data||[]).filter(profile=>String(profile.id)!==String(draft?.guest_profile_id||"")))
-      }catch{if(!cancelled)setProfileMatches([])}
-      finally{if(!cancelled)setProfileSearching(false)}
-    },240)
-    return()=>{cancelled=true;clearTimeout(timer)}
-  },[propertyId,draft?.full_name,draft?.checked_out_at,draft?.guest_profile_id])
+  useEffect(()=>{if(selected){setDraft(guestForEdit(selected));resetGuestProfileSearch()}},[selectedId])
 
   function scrollTop(){requestAnimationFrame(()=>mainRef.current?.scrollTo({top:0,behavior:"smooth"}))}
   function scrollEditor(){requestAnimationFrame(()=>editorRef.current?.scrollIntoView({behavior:"smooth",block:"start"}))}
   function showNotice(message){setNotice(message);setError("");scrollTop()}
   function showError(message){setError(message);setNotice("");scrollTop()}
-  function setField(key,value){setNotice("");setError("");if(key==="full_name")setProfileApplied("");setDraft(current=>({...current,[key]:value}));if(key==="room_id"&&value)setActiveRoomId(String(value))}
-  function applyGuestProfile(profile){
-    if(!profile)return
-    const profileFields=["full_name","email","phone","document_type","document_number","birth_date","sex","marital_status","cuil","nationality","language","address","city","province","country","postal_code","occupation","travel_reason","document_front_path","document_back_path"]
-    setDraft(current=>{const next={...current,guest_profile_id:profile.id};for(const key of profileFields)next[key]=profile[key]??"";return next})
-    setProfileApplied(profile.full_name||"Huésped registrado");setProfileMatches([]);setNotice("");setError("")
-  }
-  function selectPerson(guest,{scroll=true}={}){setSelectedId(String(guest.id));setDraft(guestForEdit(guest));setProfileMatches([]);setProfileApplied("");if(guest.room_id)setActiveRoomId(String(guest.room_id));setNotice("");setError("");if(scroll)scrollEditor()}
+  function setField(key,value){setNotice("");setError("");if(key==="full_name")clearAppliedProfile();setDraft(current=>({...current,[key]:value}));if(key==="room_id"&&value)setActiveRoomId(String(value))}
+  function selectPerson(guest,{scroll=true}={}){setSelectedId(String(guest.id));setDraft(guestForEdit(guest));resetGuestProfileSearch();if(guest.room_id)setActiveRoomId(String(guest.room_id));setNotice("");setError("");if(scroll)scrollEditor()}
   function selectRoom(room){const id=String(room.id);setActiveRoomId(id);const people=guests.filter(g=>String(g.room_id||"")===id),target=people.find(g=>!g.checked_out_at)||people[0];if(target)selectPerson(target,{scroll:false});setNotice("");setError("")}
-  function addCompanion(roomId=null){const targetRoom=roomId||activeRoomId||rooms[0]?.id||item.habitacion_id||null,id=`new-${Date.now()}`,next={...blankGuest("companion",targetRoom),id,property_id:propertyId,reservation_id:item.id,sort_order:companions.length+1};setGuests(current=>[...current,next]);setSelectedId(id);setDraft(next);setProfileMatches([]);setProfileApplied("");if(targetRoom)setActiveRoomId(String(targetRoom));setNotice("");setError("");scrollEditor()}
+  function addCompanion(roomId=null){const targetRoom=roomId||activeRoomId||rooms[0]?.id||item.habitacion_id||null,id=`new-${Date.now()}`,next={...blankGuest("companion",targetRoom),id,property_id:propertyId,reservation_id:item.id,sort_order:companions.length+1};setGuests(current=>[...current,next]);setSelectedId(id);setDraft(next);resetGuestProfileSearch();if(targetRoom)setActiveRoomId(String(targetRoom));setNotice("");setError("");scrollEditor()}
 
   async function persistGuest(current=draft){
     if(!current?.full_name?.trim())throw new Error("Ingresá nombre y apellido.")
