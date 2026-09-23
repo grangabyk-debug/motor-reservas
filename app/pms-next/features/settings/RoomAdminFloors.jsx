@@ -2,6 +2,7 @@
 
 import{useState}from"react"
 import{supabase}from"../../../../lib/supabase"
+import{pmsConfirm}from"../../components/system/PmsDialogHost"
 import{RoomField,RoomSection,RoomToggleCard,RoomSwitch}from"./RoomAdminControls"
 import s from"./propertyRooms.module.css"
 
@@ -38,7 +39,7 @@ export default function RoomAdminFloors({propertyId,floors,rooms,query,editor,se
     if(!editor?.id||!canManage)return
     const used=roomCount(editor.id)
     if(used)return onError?.(`No se puede eliminar ${editor.name}: tiene ${used} habitación${used===1?"":"es"} asignada${used===1?"":"s"}. Reasignalas primero.`)
-    if(!window.confirm(`¿Eliminar el piso ${editor.name}?`))return
+    if(!await pmsConfirm({title:"Eliminar piso",message:`¿Eliminar el piso ${editor.name}?`,confirmLabel:"Eliminar",tone:"danger"}))return
     setSaving(true);onError?.("")
     try{const{error}=await supabase.from("hotel_floors").delete().eq("id",editor.id).eq("property_id",propertyId);if(error)throw error;setEditor(null);await onChanged?.();onNotice?.("Piso eliminado.")}catch(err){onError?.(err?.message||"No se pudo eliminar el piso.")}finally{setSaving(false)}
   }
