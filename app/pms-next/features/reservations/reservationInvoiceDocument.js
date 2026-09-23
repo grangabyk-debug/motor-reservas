@@ -86,7 +86,7 @@ export function buildFinanceInvoicePayload({propertyId,reservation,selected,paym
   const otherNationalIndirect=round2(tributes.filter(row=>["national","internal"].includes(row.scope)).reduce((sum,row)=>sum+row.amount,0))
   return{
     property_id:propertyId,reservation_id:Number(reservation.id),folio_id:selected.id,payment_id:paymentId,document_type:"invoice",number:null,status:billingStatus==="issued"?"draft":billingStatus,
-    currency:billingCurrency||selected.currency||reservation.moneda||"ARS",subtotal:invoiceCalc.subtotal,tax:invoiceCalc.tax,total:invoiceCalc.total,balance:invoiceCalc.total,
+    currency:billingCurrency||selected.currency||reservation.moneda||"ARS",subtotal:invoiceCalc.subtotal,tax:invoiceCalc.tax,total:invoiceCalc.total,balance:round2(paymentSnapshot?.payment_pending??invoiceCalc.total),
     billing_to:{
       name:billingName.trim(),email:billingEmail.trim()||null,phone:billingPhone.trim()||null,address:String(billingAddress||"").trim()||null,
       tax_id:String(billingTaxId||"").trim()||null,doc_type:billingDocType||"consumidor_final",doc_type_code:recipientDocTypeCode(billingDocType),
@@ -129,7 +129,7 @@ export function buildArcaIssueRequestFromDocument({doc,reservation,relatedDocume
   }:null
   return{
     request_id:`finance-${doc.id}`,property_id:doc.property_id||reservation?.property_id,reservation_id:Number(doc.reservation_id||reservation?.id),finance_document_id:doc.id,
-    document_type:doc.document_type||"invoice",receipt_class:billing.receipt_class||null,receipt_type:billing.receipt_type||null,
+    document_type:doc.document_type||"invoice",receipt_class:billing.receipt_class||null,receipt_type:billing.receipt_type||null,invoice_a_variant:billing.invoice_a_variant||"standard",
     recipient_iva_condition:billing.iva_condition||"consumidor_final",recipient_iva_condition_id:billing.iva_condition_code||null,
     recipient_doc_type:Number(billing.doc_type_code)||99,recipient_doc_number:digits(billing.tax_id)||"0",
     amount:round2(doc.total),net_amount:round2(doc.subtotal),vat_amount:round2(doc.tax),exempt_amount:0,untaxed_amount:0,
