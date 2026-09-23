@@ -2,6 +2,7 @@
 
 import{useCallback,useEffect,useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
+import{pmsConfirm}from"../../components/system/PmsDialogHost"
 import s from"./audit.module.css"
 
 const pad=value=>String(value).padStart(2,"0")
@@ -83,7 +84,7 @@ export default function NightAuditPanel({propertyId,property,onNavigate}){
   async function closeDay(){
     if(closing||alreadyClosed||!ready)return
     if(!backendReady){setError("El cierre definitivo todavía no está habilitado para esta propiedad. Podés seguir revisando y resolviendo pendientes sin riesgo.");return}
-    if(Number(status?.warning_count||0)>0&&!window.confirm("Hay saldos pendientes de estadías ya finalizadas. El cierre no los elimina ni los cobra. ¿Cerrar el día igualmente?"))return
+    if(Number(status?.warning_count||0)>0&&!await pmsConfirm({title:"Cerrar día con pendientes",message:"Hay saldos pendientes de estadías ya finalizadas. El cierre no los elimina ni los cobra. ¿Cerrar el día igualmente?",confirmLabel:"Cerrar igualmente",tone:"warning"}))return
     setClosing(true);setError("");setNotice("")
     try{
       const result=await supabase.rpc("hl_close_business_day",{p_property_id:propertyId,p_business_date:status.business_date,p_note:note.trim()||null})
