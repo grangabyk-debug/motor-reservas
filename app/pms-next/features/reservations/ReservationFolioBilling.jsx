@@ -232,7 +232,16 @@ export default function ReservationFolioBilling({reservation,propertyId,property
     finally{setSaving(false)}
   }
 
-  async function issueFinanceDocument(doc,relatedDocument=null){return issueArcaFinanceDocument({doc,reservation,relatedDocument})}
+  async function issueFinanceDocument(doc,relatedDocument=null){
+    let current=doc
+    if(doc?.document_type==="invoice"&&doc?.status==="draft"){
+      const snapshot=deriveInvoicePaymentSnapshot({total:doc.total,currency:doc.currency,paymentId:doc.payment_id||null,folioAllocations:allocations.filter(row=>row.folio_id===doc.folio_id),payments}),billing_to={...(doc.billing_to||{}),...snapshot}
+      const updated=await supabase.from("hotel_finance_documents").update({billing_to,balance:snapshot.payment_pending}).eq("id",doc.id).eq("property_id",propertyId).select("*").single()
+      if(updated.error)throw updated.error
+      current=updated.data
+    }
+    return issueArcaFinanceDocument({doc:current,reservation,relatedDocument})
+  }
 
   async function prepareInvoice({taxCondition="consumidor_final",fiscal={}}={}){
     if(!selected||saving)return
