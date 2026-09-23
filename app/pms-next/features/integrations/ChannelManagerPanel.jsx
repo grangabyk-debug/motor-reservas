@@ -2,6 +2,7 @@
 
 import{useEffect,useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
+import{pmsConfirm}from"../../components/system/PmsDialogHost"
 import ChannelConnectDrawer from"./ChannelConnectDrawer"
 import s from"./channelManager.module.css"
 
@@ -67,7 +68,7 @@ export default function ChannelManagerPanel({propertyId,property,connections=[],
 
   async function remove(card){
     if(!canDelete||!card.connection)return
-    setMenu(null);if(!window.confirm(`¿Desconectar ${card.name}? Se borrarán sus mapeos, pero no las reservas ya importadas.`))return
+    setMenu(null);if(!await pmsConfirm({title:"Desconectar canal",message:`¿Desconectar ${card.name}? Se borrarán sus mapeos, pero no las reservas ya importadas.`,confirmLabel:"Desconectar",tone:"danger"}))return
     setSaving(true);setError("")
     try{const{error:e}=await supabase.from("hotel_channel_connections").delete().eq("id",card.connection.id).eq("property_id",propertyId);if(e)throw e;await onReload?.();onMessage?.(`${card.name} fue desconectado.`)}
     catch(err){setError(err?.message||"No se pudo desconectar el canal.")}
