@@ -2,6 +2,7 @@
 
 import{useState}from"react"
 import{supabase}from"../../../../lib/supabase"
+import{pmsAlert}from"../../components/system/PmsDialogHost"
 import s from"./growth.module.css"
 
 const money=(value,currency)=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:0}).format(Number(value)||0)
@@ -11,7 +12,7 @@ export default function VoucherEditor({editing,setEditing,currency,roomTypes,pro
   const[step,setStep]=useState(1),[imageBusy,setImageBusy]=useState(false),f=editing.form
   const patch=values=>setEditing(current=>({...current,form:{...current.form,...values}}))
   const titles=["Información general","Descripción e imagen","Precio","Fechas de utilización","Inventario","Vigencia","Visibilidad"]
-  async function upload(file){if(!file)return;setImageBusy(true);try{const ext=(file.name.split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"")||"jpg",path=`${propertyId}/vouchers/${Date.now()}-${slugify(f.name||"voucher")}.${ext}`,res=await supabase.storage.from("hotel-media").upload(path,file,{upsert:false,contentType:file.type});if(res.error)throw res.error;const pub=supabase.storage.from("hotel-media").getPublicUrl(path);patch({image_url:pub.data.publicUrl})}catch(err){window.alert(err?.message||"No se pudo subir la imagen.")}finally{setImageBusy(false)}}
+  async function upload(file){if(!file)return;setImageBusy(true);try{const ext=(file.name.split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"")||"jpg",path=`${propertyId}/vouchers/${Date.now()}-${slugify(f.name||"voucher")}.${ext}`,res=await supabase.storage.from("hotel-media").upload(path,file,{upsert:false,contentType:file.type});if(res.error)throw res.error;const pub=supabase.storage.from("hotel-media").getPublicUrl(path);patch({image_url:pub.data.publicUrl})}catch(err){await pmsAlert({title:"No se pudo subir la imagen",message:err?.message||"No se pudo subir la imagen.",tone:"danger"})}finally{setImageBusy(false)}}
   const canNext=step!==1||String(f.name||"").trim()
   return <div className={s.backdrop} onMouseDown={e=>e.target===e.currentTarget&&setEditing(null)}><div className={`${s.modal} ${s.voucherModal}`}><button className={s.close} onClick={()=>setEditing(null)}>×</button><small>VOUCHER · PASO {step} DE 7</small><h2>{f.id?"Editar voucher":"Nuevo voucher"}</h2><div className={s.voucherSteps}>{titles.map((title,index)=><button type="button" key={title} className={step===index+1?s.stepActive:step>index+1?s.stepDone:""} onClick={()=>setStep(index+1)}><span>{index+1}</span><b>{title}</b></button>)}</div>
     <div className={s.voucherBody}>
