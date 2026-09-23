@@ -118,3 +118,24 @@ export function buildArcaIssueRequest({documentId,propertyId,reservation,billing
     payment_due:billingDueAt||reservation.fecha_salida||null
   }
 }
+
+
+export function buildArcaIssueRequestFromDocument({doc,reservation,relatedDocument=null}){
+  const billing=doc?.billing_to||{},items=Array.isArray(doc?.items)?doc.items:[],tributes=normalizedTributes(billing.tributes||[])
+  const associated=relatedDocument?{
+    receipt_type:Number(relatedDocument.billing_to?.receipt_type)||null,
+    point_of_sale:Number(relatedDocument.billing_to?.point_of_sale)||null,
+    receipt_number:Number(relatedDocument.billing_to?.receipt_number)||Number(String(relatedDocument.number||"").split("-").at(-1))||null,
+  }:null
+  return{
+    request_id:`finance-${doc.id}`,property_id:doc.property_id||reservation?.property_id,reservation_id:Number(doc.reservation_id||reservation?.id),finance_document_id:doc.id,
+    document_type:doc.document_type||"invoice",receipt_class:billing.receipt_class||null,receipt_type:billing.receipt_type||null,
+    recipient_iva_condition:billing.iva_condition||"consumidor_final",recipient_iva_condition_id:billing.iva_condition_code||null,
+    recipient_doc_type:Number(billing.doc_type_code)||99,recipient_doc_number:digits(billing.tax_id)||"0",
+    amount:round2(doc.total),net_amount:round2(doc.subtotal),vat_amount:round2(doc.tax),exempt_amount:0,untaxed_amount:0,
+    tribute_amount:round2(tributes.reduce((sum,row)=>sum+row.amount,0)),tributes,vat_breakdown:buildVatBreakdown(items),
+    currency:String(doc.currency||reservation?.moneda||"ARS").toUpperCase(),exchange_rate:Number(billing.exchange_rate)||1,
+    service_from:reservation?.fecha_entrada||null,service_to:reservation?.fecha_salida||null,payment_due:doc.due_at||reservation?.fecha_salida||null,
+    associated_receipt:associated&&associated.receipt_type&&associated.point_of_sale&&associated.receipt_number?associated:null
+  }
+}
