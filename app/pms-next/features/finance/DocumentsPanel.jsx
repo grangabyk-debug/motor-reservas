@@ -2,6 +2,7 @@
 
 import{useCallback,useEffect,useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
+import{pmsConfirm}from"../../components/system/PmsDialogHost"
 import s from"./finance.module.css"
 
 function money(value,currency="ARS"){return new Intl.NumberFormat("es-AR",{style:"currency",currency,maximumFractionDigits:2}).format(Number(value||0))}
@@ -67,7 +68,7 @@ export default function DocumentsPanel({propertyId}){
     const current=String(doc.status||"")
     const allowed=(current==="draft"&&["issued","void"].includes(status))||(current==="issued"&&status==="void")
     if(!allowed){setError("Ese cambio de estado no se hace manualmente. Los pagos parciales o totales deben surgir de un cobro real.");return}
-    if(status==="void"&&!window.confirm(`${current==="draft"?"Descartar":"Anular"} ${TYPE_LABELS[doc.document_type]||"este documento"}? Esta acción queda registrada y no lo marcará como cobrado.`))return
+    if(status==="void"&&!await pmsConfirm({title:current==="draft"?"Descartar documento":"Anular documento",message:`${current==="draft"?"Descartar":"Anular"} ${TYPE_LABELS[doc.document_type]||"este documento"}? Esta acción queda registrada y no lo marcará como cobrado.`,confirmLabel:current==="draft"?"Descartar":"Anular",tone:"danger"}))return
     setSaving(true);setError("")
     try{
       const patch={status,updated_at:new Date().toISOString()}
