@@ -7,7 +7,7 @@ import{isBookingChannel,isOtaChannel}from"./guestCrm"
 
 const LIST_LIMIT=28
 const SEARCH_LIMIT=60
-function canonicalKey(draft){const email=draft.email?.trim().toLowerCase();if(email)return`email:${email}`;const phone=draft.phone?.replace(/\D/g,"");if(phone)return`phone:${phone}`;return`manual:${crypto.randomUUID()}`}
+function canonicalKey(draft){const email=draft.email?.trim().toLowerCase();if(email)return`email:${email}`;const document=draft.document_number?.trim().toLowerCase();if(document)return`doc:${document}`;const phone=draft.phone?.replace(/\D/g,"");if(phone)return`phone:${phone}`;return`manual:${crypto.randomUUID()}`}
 const todayKey=()=>new Date().toLocaleDateString("en-CA")
 const nightsBetween=(from,to)=>{const a=new Date(`${from}T12:00:00`),b=new Date(`${to}T12:00:00`);return Number.isNaN(a.getTime())||Number.isNaN(b.getTime())?0:Math.max(0,Math.round((b-a)/86400000))}
 const emptyStats=profile=>({stays:0,nights:0,spent:0,spentByCurrency:{},lastStay:profile?.last_stay_at||null,nextStay:null,currentStay:null,channelCounts:{},dominantChannel:"",lastChannel:"",otaStays:0,bookingStays:0,directStays:0,groupStays:0})
@@ -77,9 +77,14 @@ export default function useGuestsData(propertyId,searchTerm=""){
   const guests=useMemo(()=>profiles.map(profile=>({...profile,...(statsByProfile.get(profile.id)||emptyStats(profile))})),[profiles,statsByProfile])
 
   const createGuest=useCallback(async draft=>{
-    const payload={property_id:propertyId,canonical_key:canonicalKey(draft),full_name:draft.full_name.trim(),email:draft.email?.trim()||null,phone:draft.phone?.trim()||null,birth_date:draft.birth_date||null,document_type:draft.document_type||null,document_number:draft.document_number?.trim()||null,country:draft.country?.trim()||null,nationality:draft.nationality?.trim()||null,language:draft.language||"es",address:draft.address?.trim()||null,city:draft.city?.trim()||null,province:draft.province?.trim()||null,preferences:draft.preferences||{},tags:Array.isArray(draft.tags)?draft.tags:[],vip_level:draft.vip_level||"standard",status:"active",notes:draft.notes?.trim()||null}
-    const{data,error:insertError}=await supabase.from("hotel_guest_profiles").insert(payload).select().single();if(insertError)throw insertError
-    setProfiles(list=>[data,...list].slice(0,SEARCH_LIMIT));setTotalProfiles(value=>value+1);return data
+    const key=canonicalKey(draft),email=draft.email?.trim()||"",document=draft.document_number?.trim()||"",phone=draft.phone?.trim()||""
+    let existing=null
+    if(!key.startsWith("manual:")){const byKey=await supabase.from("hotel_guest_profiles").select(PROFILE_FIELDS).eq("property_id",propertyId).is("merged_into_id",null).eq("canonical_key",key).limit(1);if(byKey.error)throw byKey.error;existing=byKey.data?.[0]||null}
+    for(const[field,value,caseInsensitive]of[["email",email,true],["document_number",document,false],["phone",phone,false]]){if(existing||!value)continue;let query=supabase.from("hotel_guest_profiles").select(PROFILE_FIELDS).eq("property_id",propertyId).is("merged_into_id",null).limit(1);query=caseInsensitive?query.ilike(field,value):query.eq(field,value);const found=await query;if(found.error)throw found.error;existing=found.data?.[0]||null}
+    const payload={property_id:propertyId,canonical_key:key,full_name:draft.full_name.trim(),email:email||null,phone:phone||null,birth_date:draft.birth_date||null,document_type:draft.document_type||null,document_number:document||null,country:draft.country?.trim()||null,nationality:draft.nationality?.trim()||null,language:draft.language||"es",address:draft.address?.trim()||null,city:draft.city?.trim()||null,province:draft.province?.trim()||null,preferences:draft.preferences||{},tags:Array.isArray(draft.tags)?draft.tags:[],vip_level:draft.vip_level||"standard",status:"active",notes:draft.notes?.trim()||null}
+    if(existing){const patch=Object.fromEntries(Object.entries(payload).filter(([field,value])=>field!=="property_id"&&value!==null&&value!==""));const{data:updated,error:updateError}=await supabase.from("hotel_guest_profiles").update({...patch,updated_at:new Date().toISOString()}).eq("id",existing.id).eq("property_id",propertyId).is("merged_into_id",null).select().single();if(updateError)throw updateError;setProfiles(list=>list.some(item=>item.id===updated.id)?list.map(item=>item.id===updated.id?updated:item):[updated,...list].slice(0,SEARCH_LIMIT));return updated}
+    const{data:created,error:insertError}=await supabase.from("hotel_guest_profiles").insert(payload).select().single();if(insertError)throw insertError
+    setProfiles(list=>[created,...list].slice(0,SEARCH_LIMIT));setTotalProfiles(value=>value+1);return created
   },[propertyId])
 
   const updateGuest=useCallback(async(id,patch)=>{

@@ -16,6 +16,8 @@ function reasonFor(a,b){
   if(ad&&bd&&ad===bd)return"Mismo documento"
   if(ap.length>=7&&bp.length>=7&&ap===bp)return"Mismo teléfono"
   if(an&&an===bn&&a.birth_date&&b.birth_date&&a.birth_date===b.birth_date)return"Mismo nombre y fecha de nacimiento"
+  const aStrong=Boolean(ae||ad||ap.length>=7),bStrong=Boolean(be||bd||bp.length>=7)
+  if(an&&an===bn&&aStrong!==bStrong)return"Mismo nombre · una ficha está incompleta"
   return""
 }
 function completeness(p){return["full_name","email","phone","document_number","birth_date","nationality","address","city","country"].reduce((n,key)=>n+(text(p?.[key])?1:0),0)+(Array.isArray(p?.tags)?p.tags.length:0)}
@@ -23,7 +25,7 @@ function label(value){return text(value)||"—"}
 
 export default function GuestDuplicateWatch({propertyId}){
   const[profiles,setProfiles]=useState([]),[working,setWorking]=useState(""),[message,setMessage]=useState(null),[review,setReview]=useState(null),[keepId,setKeepId]=useState(""),[linked,setLinked]=useState([]),[reviewLoading,setReviewLoading]=useState(false)
-  const load=useCallback(async()=>{if(!propertyId)return;const{data,error}=await supabase.from("hotel_guest_profiles").select("id,full_name,email,phone,document_type,document_number,birth_date,nationality,address,city,province,country,tags,vip_level,notes,preferences,created_at").eq("property_id",propertyId).eq("status","active").order("created_at").limit(800);if(error){setMessage({kind:"error",text:error.message||"No se pudieron revisar perfiles duplicados."});return}setProfiles(data||[])},[propertyId])
+  const load=useCallback(async()=>{if(!propertyId)return;const{data,error}=await supabase.from("hotel_guest_profiles").select("id,full_name,email,phone,document_type,document_number,birth_date,nationality,address,city,province,country,tags,vip_level,notes,preferences,created_at").eq("property_id",propertyId).eq("status","active").is("merged_into_id",null).order("created_at").limit(800);if(error){setMessage({kind:"error",text:error.message||"No se pudieron revisar perfiles duplicados."});return}setProfiles(data||[])},[propertyId])
   useEffect(()=>{load()},[load])
   const candidates=useMemo(()=>{
     const out=[]
