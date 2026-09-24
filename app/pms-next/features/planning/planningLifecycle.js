@@ -5,13 +5,20 @@ export const PLANNING_STAGES=[
   {key:"venta",label:"Venta",description:"Confirmada / garantizada"},
   {key:"checkin",label:"Check-in",description:"Pendiente de ingreso"},
   {key:"inhouse",label:"In-house",description:"Huésped alojado"},
-  {key:"checkout",label:"Check-out",description:"Sale hoy y continúa alojado"},
+  {key:"departure",label:"Salida hoy",description:"Salida prevista · check-out pendiente de recepción"},
+  {key:"checkout",label:"Check-out realizado",description:"Salida confirmada manualmente"},
   {key:"postventa",label:"Postventa",description:"Estadía finalizada"},
   {key:"noshow",label:"No-show",description:"El huésped no se presentó"},
 ]
 
 export function dateKey(date=new Date()){
   return`${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`
+}
+
+const validDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(String(value||""))
+function manualRoomCheckout(item,today){
+  const value=String(item?._room_checkout_date||"")
+  return validDate(value)&&value<=today
 }
 
 function pendingRoomCheckin(item){
@@ -28,7 +35,8 @@ export function planningStage(item,today=dateKey()){
   if(item.estado==="finalizada")return"postventa"
   if(item.estado==="alojado"){
     if(pendingRoomCheckin(item))return"checkin"
-    return item.fecha_salida===today?"checkout":"inhouse"
+    if(manualRoomCheckout(item,today))return"checkout"
+    return item.fecha_salida===today?"departure":"inhouse"
   }
   if(item.estado==="confirmada")return item.fecha_entrada===today?"checkin":"venta"
   if(item.estado==="pendiente"||item.estado==="tentativa")return"preventa"

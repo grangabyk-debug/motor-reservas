@@ -6,7 +6,8 @@
 .venta{--stage-bg:#087d1e;--stage-border:#056617;--stage-text:#fff}
 .checkin{--stage-bg:#1538e8;--stage-border:#1029bd;--stage-text:#fff}
 .inhouse{--stage-bg:#ff7a35;--stage-border:#dc5e22;--stage-text:#3d1b07}
-.checkout{--stage-bg:#ef1e25;--stage-border:#c91218;--stage-text:#fff}
+.departure{--stage-bg:#ef1e25;--stage-border:#c91218;--stage-text:#fff}
+.checkout{--stage-bg:#2d9f62;--stage-border:#237e4e;--stage-text:#fff}
 .postventa{--stage-bg:#929292;--stage-border:#707070;--stage-text:#fff}
 .noshow{--stage-bg:#111;--stage-border:#000;--stage-text:#fff}
 .weekendLegend{width:28px;height:16px;flex:0 0 28px;border:1px solid var(--line);border-radius:4px;background:color-mix(in srgb,var(--muted) 10%,var(--panelSolid))}
