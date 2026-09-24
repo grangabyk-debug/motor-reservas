@@ -46,7 +46,7 @@ export default function useReservationsData(propertyId){
     if(["mantenimiento","fuera_servicio"].includes(String(target.estado||"").toLowerCase()))return{ok:false,message:`La habitación ${target.nombre} está fuera de servicio.`}
     if(!start||!end||end<=start)return{ok:false,message:"La fecha de salida tiene que ser posterior a la entrada."}
     const search=expandedReservationSearchWindow(start,end),[resRes,blockRes]=await Promise.all([
-      supabase.from("reservas").select("id,numero_reserva,nombre_huesped,habitacion_id,habitaciones_ids,habitaciones_detalle,room_checkout_dates,fecha_entrada,fecha_salida,estado,no_show,early_checkin,late_checkout").eq("property_id",propertyId).neq("id",Number(reservationId)).neq("estado","cancelada").neq("estado","fusionada").eq("no_show",false).lt("fecha_entrada",search.end).gt("fecha_salida",search.start),
+      supabase.from("reservas").select("id,numero_reserva,nombre_huesped,habitacion_id,habitaciones_ids,habitaciones_detalle,room_checkout_dates,fecha_entrada,fecha_salida,estado,no_show,early_checkin,late_checkout").eq("property_id",propertyId).neq("id",Number(reservationId)).neq("estado","cancelada").neq("estado","fusionada").or("no_show.eq.false,no_show.is.null").lt("fecha_entrada",search.end).gt("fecha_salida",search.start),
       supabase.from("bloqueos").select("id,habitacion_id,fecha_desde,fecha_hasta,motivo").eq("property_id",propertyId).eq("habitacion_id",Number(roomId)).lt("fecha_desde",end).gt("fecha_hasta",start),
     ])
     if(resRes.error)throw resRes.error;if(blockRes.error)throw blockRes.error
