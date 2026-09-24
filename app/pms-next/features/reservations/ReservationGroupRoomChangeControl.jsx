@@ -8,6 +8,7 @@ import{commercialPriceFromNet,normalizeTaxSettings}from"../../core/priceTax"
 import{pricingFromSettings}from"../../core/currency"
 import useOperationalDate from"../../core/useOperationalDate"
 import{expandedReservationSearchWindow,reservationRoomInventoryOverlaps,reservationRoomInventoryWindow}from"./reservationInventoryAvailability"
+import{groupRoomOverlay,groupRoomShell}from"./reservationGroupRoomChangeStyles"
 
 const validDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(String(value||""))
 const normalize=value=>String(value||"").trim().toLowerCase()
@@ -108,8 +109,7 @@ export default function ReservationGroupRoomChangeControl({item,allRooms=[],busy
   const card={marginTop:12,border:"1px solid color-mix(in srgb,var(--accent) 20%,var(--line))",borderRadius:14,overflow:"hidden",background:"color-mix(in srgb,var(--panelSolid) 88%,transparent)"}
   const button={height:38,padding:"0 11px",border:"1px solid var(--line)",borderRadius:9,background:"var(--panelSolid)",color:"var(--text)",font:"inherit",fontSize:10.5,fontWeight:850,lineHeight:1,letterSpacing:0,display:"inline-flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}
   const primary={...button,borderColor:"color-mix(in srgb,var(--accent) 32%,var(--line))",background:"color-mix(in srgb,var(--accent) 7%,var(--panelSolid))",color:"var(--accent)"}
-  const overlay={position:"fixed",inset:0,zIndex:2147483000,display:"grid",placeItems:"center",padding:"clamp(12px,3vh,24px)",overflow:"auto",boxSizing:"border-box",background:"rgba(10,18,34,.34)",color:"var(--text)",isolation:"isolate"}
-  const shell={position:"relative",width:"min(760px,calc(100vw - 24px))",maxHeight:"calc(100dvh - 32px)",overflow:"hidden",display:"grid",gridTemplateRows:"auto auto minmax(0,1fr)",border:"1px solid var(--line)",borderRadius:18,background:"var(--panelSolid)",boxShadow:"0 24px 70px rgba(15,27,50,.22)",isolation:"isolate"}
+  const overlay=groupRoomOverlay,shell=groupRoomShell
 
   return <><section style={card} aria-label={historyMode?"Historial y habitación actual":"Reasignar habitación de reserva grupal"}>
     <header style={{padding:"11px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap",borderBottom:"1px solid var(--line)",background:"color-mix(in srgb,var(--accent) 4%,var(--panelSolid))"}}><div><small style={{display:"block",fontSize:10,fontWeight:900,letterSpacing:".1em",color:"var(--accent)"}}>{historyMode?"HISTORIAL DE HABITACIONES · REASIGNACIÓN FÍSICA":"RESERVA GRUPAL · REASIGNACIÓN FÍSICA"}</small><b style={{display:"block",marginTop:2,fontSize:12}}>{historyMode?"Cambiar la habitación actual sin perder los tramos anteriores":"Cambiar una habitación sin tocar el resto del grupo"}</b></div><button type="button" disabled={busy||saving||!activeRows.length} onClick={()=>setLockOpen(true)} style={{...button,width:174,color:anyLocked?"#111827":"var(--muted)",opacity:activeRows.length?1:.5}}>{allLocked?"🔒 Desbloquear / elegir":anyLocked?"🔒 Gestionar bloqueo":historyMode?"🔓 Bloquear habitación":"🔓 Bloquear habitaciones"}</button></header>
