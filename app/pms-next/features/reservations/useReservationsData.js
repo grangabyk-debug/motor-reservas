@@ -2,16 +2,12 @@
 
 import{useCallback,useEffect,useMemo,useRef,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
+import{expandedReservationSearchWindow,reservationRoomInventoryOverlaps,reservationRoomInventoryWindow}from"./reservationInventoryAvailability"
 
 const PAGE_SIZE=200
 const roomIds=item=>[...new Set([item?.habitacion_id,...(item?.habitaciones_ids||[])].filter(Boolean).map(Number))]
 const validDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(String(value||""))
 const paymentIsVoid=row=>["anulado","anulada","cancelado","cancelada","cancelled","void","rechazado","rechazada","rejected"].includes(String(row?.estado||"").trim().toLowerCase())
-const roomDetail=(item,roomId)=>(Array.isArray(item?.habitaciones_detalle)?item.habitaciones_detalle:[]).find(row=>Number(row?.habitacion_id)===Number(roomId))||{}
-const roomStart=(item,roomId)=>{const value=roomDetail(item,roomId)?.fecha_entrada;return validDate(value)?value:item?.fecha_entrada}
-const roomPlannedEnd=(item,roomId)=>{const value=roomDetail(item,roomId)?.fecha_salida;return validDate(value)?value:item?.fecha_salida}
-const roomCheckoutDate=(item,roomId)=>{const value=item?.room_checkout_dates?.[String(roomId)];return validDate(value)?String(value):""}
-const effectiveRoomEnd=(item,roomId)=>{const planned=roomPlannedEnd(item,roomId),release=roomCheckoutDate(item,roomId);return release&&release<planned?release:planned}
 
 export default function useReservationsData(propertyId){
   const[reservations,setReservations]=useState([])
@@ -49,13 +45,13 @@ export default function useReservationsData(propertyId){
     if(!target||target.activa===false)return{ok:false,message:"La habitación seleccionada ya no está activa."}
     if(["mantenimiento","fuera_servicio"].includes(String(target.estado||"").toLowerCase()))return{ok:false,message:`La habitación ${target.nombre} está fuera de servicio.`}
     if(!start||!end||end<=start)return{ok:false,message:"La fecha de salida tiene que ser posterior a la entrada."}
-    const[resRes,blockRes]=await Promise.all([
-      supabase.from("reservas").select("id,numero_reserva,nombre_huesped,habitacion_id,habitaciones_ids,habitaciones_detalle,room_checkout_dates,fecha_entrada,fecha_salida,estado,no_show").eq("property_id",propertyId).neq("id",Number(reservationId)).neq("estado","cancelada").neq("estado","fusionada").eq("no_show",false).lt("fecha_entrada",end).gt("fecha_salida",start),
+    const search=expandedReservationSearchWindow(start,end),[resRes,blockRes]=await Promise.all([
+      supabase.from("reservas").select("id,numero_reserva,nombre_huesped,habitacion_id,habitaciones_ids,habitaciones_detalle,room_checkout_dates,fecha_entrada,fecha_salida,estado,no_show,early_checkin,late_checkout").eq("property_id",propertyId).neq("id",Number(reservationId)).neq("estado","cancelada").neq("estado","fusionada").eq("no_show",false).lt("fecha_entrada",search.end).gt("fecha_salida",search.start),
       supabase.from("bloqueos").select("id,habitacion_id,fecha_desde,fecha_hasta,motivo").eq("property_id",propertyId).eq("habitacion_id",Number(roomId)).lt("fecha_desde",end).gt("fecha_hasta",start),
     ])
     if(resRes.error)throw resRes.error;if(blockRes.error)throw blockRes.error
-    const numericRoom=Number(roomId),conflict=(resRes.data||[]).find(row=>roomIds(row).includes(numericRoom)&&roomStart(row,numericRoom)<end&&effectiveRoomEnd(row,numericRoom)>start)
-    if(conflict)return{ok:false,message:`No se puede aplicar el cambio: la habitación ${target.nombre} está ocupada por ${conflict.nombre_huesped||conflict.numero_reserva||"otra reserva"} entre ${roomStart(conflict,numericRoom)} y ${effectiveRoomEnd(conflict,numericRoom)}.`}
+    const numericRoom=Number(roomId),conflict=(resRes.data||[]).find(row=>roomIds(row).includes(numericRoom)&&reservationRoomInventoryOverlaps(row,numericRoom,start,end))
+    if(conflict){const window=reservationRoomInventoryWindow(conflict,numericRoom);return{ok:false,message:`No se puede aplicar el cambio: la habitación ${target.nombre} está ocupada por ${conflict.nombre_huesped||conflict.numero_reserva||"otra reserva"} hasta ${window.end} por su inventario operativo.`}}
     const block=(blockRes.data||[])[0]
     if(block)return{ok:false,message:`No se puede aplicar el cambio: la habitación ${target.nombre} tiene un bloqueo${block.motivo?` (${block.motivo})`:""} durante esas fechas.`}
     return{ok:true,targetRoom:target}
