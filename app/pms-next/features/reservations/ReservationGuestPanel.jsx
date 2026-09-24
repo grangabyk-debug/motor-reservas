@@ -7,10 +7,10 @@ import ReservationGuestCheckout from"./ReservationGuestCheckout"
 import ReservationGroupGuestOverview from"./ReservationGroupGuestOverview"
 import ReservationGuestEditorFields from"./ReservationGuestEditorFields"
 import useGuestProfileAutocomplete from"./useGuestProfileAutocomplete"
+import{isGroupPrimaryPlaceholder}from"./reservationGuestIdentity"
 
 const blankGuest=(role="companion",roomId=null)=>({id:null,role,room_id:roomId||null,guest_profile_id:null,full_name:"",email:"",phone:"",document_type:"DNI",document_number:"",birth_date:"",sex:"",marital_status:"",cuil:"",nationality:"",language:"",address:"",city:"",province:"",country:"Argentina",postal_code:"",occupation:"",travel_reason:"",relationship:"",document_front_path:"",document_back_path:"",notes:"",checked_out_at:null})
 const clean=value=>String(value??"")
-const sameText=(a,b)=>clean(a).trim().toLocaleLowerCase("es")===clean(b).trim().toLocaleLowerCase("es")
 
 export default function ReservationGuestPanel({item,rooms=[],propertyId,onClose,onSaved}){
   const isGroup=Boolean(item?.group_id)||(rooms||[]).length>1||new Set([item?.habitacion_id,...(item?.habitaciones_ids||[])].filter(Boolean).map(String)).size>1
@@ -24,8 +24,7 @@ export default function ReservationGuestPanel({item,rooms=[],propertyId,onClose,
   const legacyAllInHouse=item?.estado==="alojado"&&checkedRoomIds.size===0
   const visibleGuests=useMemo(()=>guests.filter(guest=>!guest.room_id||roomIdSet.has(String(guest.room_id))).map(guest=>({...guest,_in_house:!guest.checked_out_at&&(legacyAllInHouse||Boolean(guest.room_id&&checkedRoomIds.has(String(guest.room_id))))})),[guests,roomIdSet,checkedRoomIds,legacyAllInHouse])
   const mainRef=useRef(null),editorRef=useRef(null),selected=useMemo(()=>guests.find(g=>String(g.id)===String(selectedId))||null,[guests,selectedId]),primary=useMemo(()=>visibleGuests.find(g=>g.role==="primary")||null,[visibleGuests]),companions=useMemo(()=>visibleGuests.filter(g=>g.role!=="primary"),[visibleGuests]),activeGuests=useMemo(()=>visibleGuests.filter(g=>g._in_house),[visibleGuests]),departedGuests=useMemo(()=>visibleGuests.filter(g=>Boolean(g.checked_out_at)),[visibleGuests])
-  const hasGuestIdentity=guest=>Boolean(guest?.guest_profile_id||clean(guest?.email).trim()||clean(guest?.phone).trim()||clean(guest?.document_number).trim()||guest?.birth_date)
-  const placeholderPrimary=guest=>Boolean(isGroup&&guest?.role==="primary"&&(!clean(guest?.full_name).trim()||(sameText(guest?.full_name,groupName)&&!hasGuestIdentity(guest))))
+  const placeholderPrimary=guest=>isGroupPrimaryPlaceholder(guest,groupName,isGroup)
   const displayGuestName=guest=>placeholderPrimary(guest)?"Titular pendiente de completar":guest?.full_name||"Sin nombre"
   const guestForEdit=guest=>guest?{...guest,full_name:placeholderPrimary(guest)?"":guest.full_name}:null
 
