@@ -74,7 +74,7 @@ export default function ReservationRecord({item,room,rooms=[],payments=[],proper
   const roomCheckoutCount=checkout.count,totalRoomCount=checkout.total,roomSummary=checkout.summary
   const roomingHasMore=roomingRows.length>8,visibleRoomingRows=roomingExpanded?roomingRows:roomingRows.slice(0,8)
   const chargeHasMore=articles.length>8,visibleArticles=chargeExpanded?articles:articles.slice(0,8)
-  const roomHeaderExtra=<RoomCheckoutHeader count={roomCheckoutCount} hasMore={roomingHasMore} expanded={roomingExpanded} totalRows={roomingRows.length} onToggle={()=>setRoomingExpanded(value=>!value)}/>
+  const roomHeaderExtra=<RoomCheckoutHeader checkout={checkout} hasMore={roomingHasMore} expanded={roomingExpanded} totalRows={roomingRows.length} onToggle={()=>setRoomingExpanded(value=>!value)}/>
 
   function navigateFromRecord(target,options){
     if(typeof window!=="undefined"&&RETURN_TARGETS.has(target))try{window.sessionStorage.setItem(RETURN_KEY,JSON.stringify({id:Number(item.id),name:item.nombre_huesped||"",code:item.numero_reserva||item.id}))}catch{}

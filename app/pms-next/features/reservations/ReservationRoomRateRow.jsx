@@ -26,14 +26,14 @@ export default function ReservationRoomRateRow({row,detail,checkoutDate="",curre
   const parts=[]
   if(row.matrimonial)parts.push(`${row.matrimonial} matrimonial${row.matrimonial===1?"":"es"}`)
   if(row.individual)parts.push(`${row.individual} individual${row.individual===1?"":"es"}`)
-  const changed=row.soldAs!==row.physicalCategory,checkedOut=Boolean(checkoutDate)
+  const changed=row.soldAs!==row.physicalCategory,checkedOut=Boolean(checkoutDate),earlyActive=Boolean(detail?.early_checkin_requested),lateActive=Boolean(detail?.late_checkout_requested)
   const canExpand=nightly.length>0&&varied
 
   return <div style={{display:"block",padding:0,borderLeft:checkedOut?"3px solid #2e9b61":"3px solid transparent",background:checkedOut?"color-mix(in srgb,#2e9b61 6%,var(--panelSolid))":"transparent"}}>
     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:14,padding:"10px 12px"}}>
       <span style={{minWidth:0,fontFamily:"inherit"}}>
         <b style={{display:"block",fontSize:11,fontWeight:850,lineHeight:1.35}}>Hab. {row.name} · vendida como {row.soldAs} · {fmtStay(row.start)} → {fmtStay(row.end)}</b>
-        <small style={{display:"block",marginTop:2,fontSize:11,lineHeight:1.35,fontFamily:"inherit",color:"var(--muted)"}}>Asignada: {row.physicalCategory}{changed?" · categoría física distinta":""} · {row.guests} huésped{row.guests===1?"":"es"} · {parts.length?parts.join(" + "):"Rooming sin configurar"}</small>
+        <small style={{display:"block",marginTop:2,fontSize:11,lineHeight:1.35,fontFamily:"inherit",color:"var(--muted)"}}>Asignada: {row.physicalCategory}{changed?" · categoría física distinta":""} · {row.guests} huésped{row.guests===1?"":"es"} · {parts.length?parts.join(" + "):"Rooming sin configurar"}</small>{earlyActive||lateActive?<span style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginTop:6}}>{earlyActive?<span style={{padding:"4px 7px",border:"1px solid color-mix(in srgb,var(--accent) 32%,var(--line))",borderRadius:999,background:"color-mix(in srgb,var(--accent) 8%,var(--panelSolid))",color:"var(--accent)",fontSize:10,fontWeight:900}}>✓ EARLY CHECK-IN · desde {detail?.early_checkin_time||"08:00"}</span>:null}{lateActive?<span style={{padding:"4px 7px",border:"1px solid #2e9b61",borderRadius:999,background:"#2e9b61",color:"#fff",fontSize:10,fontWeight:900,boxShadow:"0 5px 14px rgba(46,155,97,.18)"}}>✓ LATE CHECK-OUT · hasta {detail?.late_checkout_time||"18:00"}</span>:null}</span>:null}
       </span>
       <span style={{display:"grid",justifyItems:"end",gap:3,flex:"0 0 auto",textAlign:"right"}}>
         {checkedOut?<span style={{padding:"4px 7px",border:"1px solid color-mix(in srgb,#2e9b61 30%,var(--line))",borderRadius:999,background:"color-mix(in srgb,#2e9b61 9%,var(--panelSolid))",color:"#26794d",fontSize:8.8,fontWeight:950,letterSpacing:".02em"}}>✓ CHECK-OUT · {fmtStay(checkoutDate)}</span>:null}
