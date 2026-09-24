@@ -67,7 +67,7 @@ export default function ReservationMergeDialog({ item, propertyId, rooms = [], o
     }
   }
 
-  const overlay = { position: "fixed", inset: 0, zIndex: 280, display: "grid", placeItems: "center", padding: 16, background: "rgba(10,18,35,.38)", backdropFilter: "blur(10px)" }
+  const overlay = { position: "fixed", inset: 0, zIndex: 280, display: "grid", placeItems: "center", padding: 16, background: "rgba(10,18,35,.38)" }
   const panel = { width: "min(760px,calc(100vw - 28px))", maxHeight: "88vh", overflow: "auto", border: "1px solid color-mix(in srgb,#fff 35%,var(--line))", borderRadius: 20, padding: 18, background: "color-mix(in srgb,var(--panelSolid) 94%,transparent)", boxShadow: "0 30px 90px rgba(20,30,55,.3)" }
   const resultStyle = active => ({ width: "100%", display: "grid", gridTemplateColumns: "1fr auto", gap: 10, textAlign: "left", padding: "11px 12px", border: `1px solid ${active ? "color-mix(in srgb,var(--accent) 48%,var(--line))" : "var(--line)"}`, borderRadius: 12, background: active ? "color-mix(in srgb,var(--accent) 8%,var(--panelSolid))" : "var(--panelSolid)", color: "var(--text)", cursor: "pointer", font: "inherit" })
 

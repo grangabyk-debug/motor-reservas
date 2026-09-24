@@ -3,7 +3,17 @@
 import{useEffect,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 
-const PROFILE_FIELDS=["full_name","email","phone","document_type","document_number","birth_date","sex","marital_status","cuil","nationality","language","address","city","province","country","postal_code","occupation","travel_reason","document_front_path","document_back_path"]
+const PROFILE_FIELDS=["full_name","email","phone","document_type","document_number","birth_date","sex","marital_status","cuil","nationality","language","address","city","province","country","postal_code","occupation","travel_reason","document_front_path","document_back_path","notes"]
+const lower=value=>String(value||"").trim().toLocaleLowerCase("es")
+const digits=value=>String(value||"").replace(/\D/g,"")
+const alnum=value=>lower(value).replace(/[^a-z0-9áéíóúüñ]/g,"")
+const identityMatches=(profile,guest)=>Boolean(
+  profile&&guest&&(
+    (profile.email&&guest.email&&lower(profile.email)===lower(guest.email))||
+    (profile.document_number&&guest.document_number&&alnum(profile.document_number)===alnum(guest.document_number))||
+    (profile.phone&&guest.phone&&digits(profile.phone)&&digits(profile.phone)===digits(guest.phone))
+  )
+)
 
 export default function useGuestProfileAutocomplete({propertyId,draft,setDraft}){
   const[profileMatches,setProfileMatches]=useState([]),[profileSearching,setProfileSearching]=useState(false),[profileApplied,setProfileApplied]=useState("")
@@ -16,9 +26,30 @@ export default function useGuestProfileAutocomplete({propertyId,draft,setDraft})
       try{
         const needle=term.replace(/[%_*,()]/g," ").trim().replace(/\s+/g," ")
         if(needle.length<3){if(!cancelled)setProfileMatches([]);return}
-        const{data,error}=await supabase.from("hotel_guest_profiles").select("id,full_name,email,phone,document_type,document_number,birth_date,sex,marital_status,cuil,nationality,language,address,city,province,country,postal_code,occupation,travel_reason,document_front_path,document_back_path,last_stay_at,status,merged_into_id").eq("property_id",propertyId).eq("status","active").is("merged_into_id",null).ilike("full_name",`%${needle}%`).order("last_stay_at",{ascending:false,nullsFirst:false}).limit(6)
-        if(error)throw error
-        if(!cancelled)setProfileMatches((data||[]).filter(profile=>String(profile.id)!==String(draft?.guest_profile_id||"")))
+        const selectFields="id,full_name,email,phone,document_type,document_number,birth_date,sex,marital_status,cuil,nationality,language,address,city,province,country,postal_code,occupation,travel_reason,document_front_path,document_back_path,notes,last_stay_at,status,merged_into_id"
+        const direct=await supabase.from("hotel_guest_profiles").select(selectFields).eq("property_id",propertyId).eq("status","active").is("merged_into_id",null).ilike("full_name",`%${needle}%`).order("last_stay_at",{ascending:false,nullsFirst:false}).limit(6)
+        if(direct.error)throw direct.error
+        const matches=[...(direct.data||[])]
+        if(matches.length<6){
+          const historical=await supabase.from("hotel_reservation_guests").select("guest_profile_id,full_name,email,phone,document_number,updated_at").eq("property_id",propertyId).not("guest_profile_id","is",null).ilike("full_name",`%${needle}%`).order("updated_at",{ascending:false}).limit(12)
+          if(!historical.error&&historical.data?.length){
+            const known=new Set(matches.map(profile=>String(profile.id)))
+            const ids=[...new Set(historical.data.map(row=>row.guest_profile_id).filter(Boolean).map(String))].filter(id=>!known.has(id))
+            if(ids.length){
+              const linked=await supabase.from("hotel_guest_profiles").select(selectFields).eq("property_id",propertyId).eq("status","active").is("merged_into_id",null).in("id",ids)
+              if(!linked.error){
+                for(const row of historical.data){
+                  if(matches.length>=6)break
+                  const profile=(linked.data||[]).find(candidate=>String(candidate.id)===String(row.guest_profile_id))
+                  if(!profile||known.has(String(profile.id))||!identityMatches(profile,row))continue
+                  matches.push({...profile,full_name:row.full_name||profile.full_name,_historical_name:row.full_name||""})
+                  known.add(String(profile.id))
+                }
+              }
+            }
+          }
+        }
+        if(!cancelled)setProfileMatches(matches.filter(profile=>String(profile.id)!==String(draft?.guest_profile_id||"")).slice(0,6))
       }catch{if(!cancelled)setProfileMatches([])}
       finally{if(!cancelled)setProfileSearching(false)}
     },240)

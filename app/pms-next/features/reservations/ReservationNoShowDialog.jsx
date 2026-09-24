@@ -35,7 +35,7 @@ export default function ReservationNoShowDialog({item,onClose,onConfirm,onPay,sa
     if(typeof window!=="undefined"&&penaltyAmount>0)try{window.sessionStorage.setItem(CASH_PREFILL_KEY,JSON.stringify({reservationId:Number(item.id),amount:penaltyAmount,reason:"no_show_penalty",createdAt:Date.now()}))}catch{}
     onPay?.(penaltyAmount)
   }
-  const overlay={position:"fixed",inset:0,zIndex:275,display:"grid",placeItems:"center",padding:12,overflow:"hidden",overscrollBehavior:"contain",background:"rgba(15,22,36,.45)",backdropFilter:"blur(12px) saturate(1.08)"}
+  const overlay={position:"fixed",inset:0,zIndex:275,display:"grid",placeItems:"center",padding:12,overflow:"hidden",overscrollBehavior:"contain",background:"rgba(15,22,36,.45)"}
   const panel={width:"min(620px,calc(100vw - 24px))",maxHeight:"calc(100vh - 24px)",display:"flex",flexDirection:"column",minHeight:0,border:"1px solid color-mix(in srgb,var(--line) 82%,#fff)",borderRadius:22,background:"color-mix(in srgb,var(--panelSolid) 97%,transparent)",boxShadow:"0 28px 80px rgba(17,28,52,.32)",overflow:"hidden"}
   const button={height:40,padding:"0 14px",border:"1px solid var(--line)",borderRadius:11,background:"var(--panelSolid)",color:"var(--text)",font:"inherit",fontSize:11,fontWeight:850,cursor:saving?"wait":"pointer"}
   return <div style={overlay} role="dialog" aria-modal="true" aria-label="Marcar reserva como No Show"><section style={panel}>

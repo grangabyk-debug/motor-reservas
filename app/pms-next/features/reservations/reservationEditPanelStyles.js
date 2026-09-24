@@ -1,4 +1,4 @@
-export const overlay={position:"fixed",inset:0,zIndex:240,display:"grid",placeItems:"center",padding:18,background:"rgba(9,16,32,.38)"}
+export const overlay={position:"fixed",inset:0,zIndex:240,display:"grid",placeItems:"center",padding:18,background:"rgba(9,16,32,.38)",color:"var(--text)",fontFamily:"Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}
 export const shell={width:"min(940px,calc(100vw - 28px))",maxHeight:"92vh",overflow:"auto",padding:18,border:"1px solid color-mix(in srgb,#fff 34%,var(--line))",borderRadius:22,background:"var(--panelSolid)",boxShadow:"inset 0 1px color-mix(in srgb,#fff 58%,transparent),0 30px 90px rgba(18,30,58,.28)"}
 export const grid={display:"grid",gridTemplateColumns:"1.18fr 1.18fr .55fr .62fr 1fr 1.08fr",gap:8,marginTop:12}
 export const label={display:"grid",gap:4,fontSize:10,fontWeight:850,color:"var(--muted)"}
