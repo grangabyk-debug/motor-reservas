@@ -49,7 +49,7 @@ export default function useGuestProfileAutocomplete({propertyId,draft,setDraft})
             }
           }
         }
-        if(!cancelled)setProfileMatches(matches.filter(profile=>String(profile.id)!==String(draft?.guest_profile_id||"")).slice(0,6))
+        if(!cancelled)setProfileMatches(matches.slice(0,6))
       }catch{if(!cancelled)setProfileMatches([])}
       finally{if(!cancelled)setProfileSearching(false)}
     },240)
