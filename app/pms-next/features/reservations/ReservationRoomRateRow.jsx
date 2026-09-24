@@ -1,6 +1,7 @@
 "use client"
 
 import{useMemo,useState}from"react"
+import{roomSpecialStayEnabled}from"./reservationSpecialStayState"
 
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:2}).format(Number(value)||0)
 const fmtNight=value=>value?new Intl.DateTimeFormat("es-AR",{weekday:"short",day:"2-digit",month:"short"}).format(new Date(`${String(value).slice(0,10)}T12:00:00`)).replaceAll(".",""):"—"
@@ -18,7 +19,7 @@ function nightlyRows(detail,taxEnabled,vatRate){
   }).filter(entry=>entry.date&&Number.isFinite(entry.gross)).sort((a,b)=>a.date.localeCompare(b.date))
 }
 
-export default function ReservationRoomRateRow({row,detail,checkoutDate="",currency="ARS",taxEnabled=false,vatRate=0,defaultOpen=false}){
+export default function ReservationRoomRateRow({row,detail,item,checkoutDate="",currency="ARS",taxEnabled=false,vatRate=0,defaultOpen=false}){
   const nightly=useMemo(()=>nightlyRows(detail,taxEnabled,vatRate),[detail,taxEnabled,vatRate])
   const varied=useMemo(()=>nightly.length>1&&nightly.some(entry=>Math.abs(entry.gross-nightly[0].gross)>.01),[nightly])
   const[open,setOpen]=useState(()=>Boolean(defaultOpen&&varied))
@@ -26,7 +27,7 @@ export default function ReservationRoomRateRow({row,detail,checkoutDate="",curre
   const parts=[]
   if(row.matrimonial)parts.push(`${row.matrimonial} matrimonial${row.matrimonial===1?"":"es"}`)
   if(row.individual)parts.push(`${row.individual} individual${row.individual===1?"":"es"}`)
-  const changed=row.soldAs!==row.physicalCategory,checkedOut=Boolean(checkoutDate),earlyActive=Boolean(detail?.early_checkin_requested),lateActive=Boolean(detail?.late_checkout_requested)
+  const changed=row.soldAs!==row.physicalCategory,checkedOut=Boolean(checkoutDate),earlyActive=roomSpecialStayEnabled(item,row.roomId,"early"),lateActive=roomSpecialStayEnabled(item,row.roomId,"late")
   const canExpand=nightly.length>0&&varied
 
   return <div style={{display:"block",padding:0,borderLeft:checkedOut?"3px solid #2e9b61":"3px solid transparent",background:checkedOut?"color-mix(in srgb,#2e9b61 6%,var(--panelSolid))":"transparent"}}>

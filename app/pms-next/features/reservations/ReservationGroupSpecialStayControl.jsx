@@ -3,27 +3,13 @@
 import{useEffect,useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 import{activeReservationRoomIds,roundMoney}from"./reservationEditUtils"
+import{roomSpecialStayEnabled}from"./reservationSpecialStayState"
 
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:2}).format(Number(value)||0)
-const truthy=value=>["true","t","1","yes","on"].includes(String(value??"").toLowerCase())
-const validDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(String(value||""))
 const roomKey=svc=>Number(svc?.habitacion_id??svc?.room_id)
 const gross=(net,vat)=>roundMoney((Number(net)||0)+roundMoney((Number(net)||0)*(Number(vat)||0)/100))
 
 function detailFor(item,id){return(Array.isArray(item?.habitaciones_detalle)?item.habitaciones_detalle:[]).find(row=>Number(row?.habitacion_id)===Number(id))||{}}
-function roomStart(item,id){const d=detailFor(item,id);return String(d.fecha_entrada||item?.fecha_entrada||"").slice(0,10)}
-function roomEnd(item,id){const d=detailFor(item,id);return String(d.fecha_salida||item?.fecha_salida||"").slice(0,10)}
-function enabledFor(item,id,kind){
-  const d=detailFor(item,id)
-  if(kind==="late"&&validDate(item?.room_checkout_dates?.[`late:${id}`]))return true
-  const explicit=`${kind}_${kind==="early"?"checkin":"checkout"}_requested`
-  if(Object.prototype.hasOwnProperty.call(d,explicit))return truthy(d[explicit])
-  const timeKey=kind==="early"?"early_checkin_time":"late_checkout_time",netKey=kind==="early"?"early_checkin_net":"late_checkout_net"
-  if(d?.[timeKey]||Number(d?.[netKey])>0)return true
-  return kind==="early"
-    ?Boolean(item?.early_checkin)&&roomStart(item,id)===String(item?.fecha_entrada||"").slice(0,10)
-    :Boolean(item?.late_checkout)&&roomEnd(item,id)===String(item?.fecha_salida||"").slice(0,10)
-}
 function rateFor(item,room,id,kind){
   const d=detailFor(item,id),raw=Array.isArray(d?.tarifas_por_noche)?[...d.tarifas_por_noche]:[]
   raw.sort((a,b)=>String(a?.fecha||a?.stay_date||"").localeCompare(String(b?.fecha||b?.stay_date||"")))
@@ -57,7 +43,7 @@ export default function ReservationGroupSpecialStayControl({item,allRooms=[],sta
   const earlyRate=rateFor(current,room,selectedId,"early"),lateRate=rateFor(current,room,selectedId,"late")
   const expectedEarlyNet=roundMoney(earlyRate*earlyPct/100),expectedLateNet=roundMoney(lateRate*latePct/100)
   const expectedEarly=gross(expectedEarlyNet,vat),expectedLate=gross(expectedLateNet,vat)
-  const earlyOn=enabledFor(current,selectedId,"early"),lateOn=enabledFor(current,selectedId,"late")
+  const earlyOn=roomSpecialStayEnabled(current,selectedId,"early"),lateOn=roomSpecialStayEnabled(current,selectedId,"late")
   const actualEarlyNet=serviceNet(current,selectedId,"early"),actualLateNet=serviceNet(current,selectedId,"late")
   const actualEarly=actualEarlyNet?gross(actualEarlyNet,vat):expectedEarly,actualLate=actualLateNet?gross(actualLateNet,vat):expectedLate
   const earlyMismatch=earlyOn&&actualEarlyNet>0&&Math.abs(actualEarly-expectedEarly)>.02,lateMismatch=lateOn&&actualLateNet>0&&Math.abs(actualLate-expectedLate)>.02
