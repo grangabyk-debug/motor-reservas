@@ -9,16 +9,18 @@ const fmtShort=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month
 export default function ReservationStayActions({item,saving=false,onPrimary,onNoShow,onCancel}){
   const[open,setOpen]=useState(false)
   const operationalDay=useOperationalDate(item?.property_id)
-  const rootRef=useRef(null),progress=reservationCheckinProgress(item||{},operationalDay),partial=progress.partial
-  const waitingFuture=partial&&progress.eligiblePending===0&&progress.futurePendingRoomIds.length>0
-  const isCheckout=item?.estado==="alojado"&&!partial
+  const rootRef=useRef(null),progress=reservationCheckinProgress(item||{},operationalDay)
+  const hasChecked=progress.checkedRoomIds.length>0,hasEligiblePending=progress.eligiblePendingRoomIds.length>0,hasFuturePending=progress.futurePendingRoomIds.length>0
+  const waitingFuture=item?.estado==="alojado"&&hasChecked&&!hasEligiblePending&&hasFuturePending
+  const needsCheckin=item?.estado!=="alojado"||!hasChecked||hasEligiblePending||hasFuturePending
+  const isCheckout=item?.estado==="alojado"&&hasChecked&&!hasEligiblePending&&!hasFuturePending
   const isClosed=item?.estado==="finalizada"||item?.estado==="cancelada"
   const menuDisabled=saving||isClosed
   const primaryDisabled=saving||Boolean(item?.no_show)||isClosed||waitingFuture
-  const roomNoShowAvailable=partial&&(progress.eligiblePendingRoomIds.length>0||progress.expiredPendingRoomIds.length>0)
+  const roomNoShowAvailable=item?.estado==="alojado"&&hasChecked&&(progress.eligiblePendingRoomIds.length>0||progress.expiredPendingRoomIds.length>0)
   const noShowDisabled=saving||item?.estado==="finalizada"||item?.estado==="cancelada"||(item?.estado==="alojado"&&!roomNoShowAvailable)
   const canCancel=item?.estado!=="cancelada"&&!item?.no_show&&item?.estado!=="finalizada"
-  const mainLabel=item?.no_show?"No Show":waitingFuture?`Próximo check-in · ${fmtShort(progress.nextPendingDate)}`:partial?`Completar check-in · ${progress.eligiblePending}`:isCheckout?"Check-out":"Check-in"
+  const mainLabel=item?.no_show?"No Show":waitingFuture?`Próximo check-in · ${fmtShort(progress.nextPendingDate)}`:hasEligiblePending?`Completar check-in · ${progress.eligiblePending}`:isCheckout?"Check-out":"Check-in"
   const noShowLabel=item?.no_show?"Reabrir No Show":item?.estado==="alojado"&&roomNoShowAvailable?"No Show de habitación":"Marcar No Show"
 
   useEffect(()=>{setOpen(false)},[item?.id])
@@ -31,7 +33,7 @@ export default function ReservationStayActions({item,saving=false,onPrimary,onNo
   return <div ref={rootRef} style={{position:"relative",display:"inline-flex"}}>
     <button type="button" aria-haspopup="menu" aria-expanded={open} disabled={menuDisabled} onClick={()=>setOpen(value=>!value)} style={mainStyle}><span>{mainLabel}</span><svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></button>
     {open?<div role="menu" style={{position:"absolute",right:0,top:"calc(100% + 7px)",zIndex:260,width:205,padding:6,border:"1px solid var(--line)",borderRadius:12,background:"color-mix(in srgb,var(--panelSolid) 97%,transparent)",boxShadow:"0 18px 46px rgba(18,30,52,.18)",backdropFilter:"blur(18px)",WebkitBackdropFilter:"blur(18px)"}}>
-      <button type="button" role="menuitem" disabled={primaryDisabled} onClick={()=>run(onPrimary)} style={{...menuButton,opacity:primaryDisabled?.45:1,cursor:primaryDisabled?"not-allowed":"pointer"}}>{waitingFuture?`Check-in habilitado el ${fmtShort(progress.nextPendingDate)}`:partial?`Completar check-in · ${progress.eligiblePending} pendiente${progress.eligiblePending===1?"":"s"}`:isCheckout?"Hacer check-out":"Hacer check-in"}</button>
+      <button type="button" role="menuitem" disabled={primaryDisabled} onClick={()=>run(onPrimary)} style={{...menuButton,opacity:primaryDisabled?.45:1,cursor:primaryDisabled?"not-allowed":"pointer"}}>{waitingFuture?`Check-in habilitado el ${fmtShort(progress.nextPendingDate)}`:hasEligiblePending?`Completar check-in · ${progress.eligiblePending} pendiente${progress.eligiblePending===1?"":"s"}`:isCheckout?"Hacer check-out":"Hacer check-in"}</button>
       <button type="button" role="menuitem" disabled={noShowDisabled&&!item?.no_show} onClick={()=>run(onNoShow)} style={{...menuButton,color:item?.no_show?"var(--text)":"#9a5b18",opacity:noShowDisabled&&!item?.no_show?0.45:1,cursor:noShowDisabled&&!item?.no_show?"not-allowed":"pointer"}}>{noShowLabel}</button>
       {canCancel?<><div style={{height:1,margin:"4px 3px",background:"var(--line)"}}/><button type="button" role="menuitem" disabled={saving} onClick={()=>run(onCancel)} style={{...menuButton,color:"#c24850",cursor:saving?"not-allowed":"pointer",opacity:saving?.5:1}}>Cancelar reserva</button></>:null}
     </div>:null}
