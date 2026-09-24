@@ -4,6 +4,7 @@ import{useEffect,useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 import{commercialPriceFromNet,normalizeTaxSettings}from"../../core/priceTax"
 import{pricingFromSettings}from"../../core/currency"
+import{expandedReservationSearchWindow,reservationRoomInventoryOverlaps,reservationRoomInventoryWindow}from"./reservationInventoryAvailability"
 
 const validDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(String(value||""))
 const roomIds=item=>[...new Set([item?.habitacion_id,...(item?.habitaciones_ids||[])].filter(Boolean).map(Number))]
@@ -34,8 +35,8 @@ export default function ReservationRoomChangeControl({item,roomId,start,end,curr
     if(isGroup){setError("Esta reserva tiene varias habitaciones. La reasignación grupal está protegida para no reemplazar el conjunto por accidente.");setOpen(true);return}
     setOpen(true);setLoading(true);setError("");setQuery("");setMode("available")
     try{
-      const[resRes,blockRes]=await Promise.all([
-        supabase.from("reservas").select("id,numero_reserva,nombre_huesped,habitacion_id,habitaciones_ids,habitaciones_detalle,room_checkout_dates,fecha_entrada,fecha_salida,estado,no_show").eq("property_id",item.property_id).neq("id",Number(item.id)).neq("estado","cancelada").eq("no_show",false).lt("fecha_entrada",end).gt("fecha_salida",start),
+      const search=expandedReservationSearchWindow(start,end),[resRes,blockRes]=await Promise.all([
+        supabase.from("reservas").select("id,numero_reserva,nombre_huesped,habitacion_id,habitaciones_ids,habitaciones_detalle,room_checkout_dates,fecha_entrada,fecha_salida,estado,no_show,early_checkin,late_checkout").eq("property_id",item.property_id).neq("id",Number(item.id)).neq("estado","cancelada").neq("estado","fusionada").or("no_show.eq.false,no_show.is.null").lt("fecha_entrada",search.end).gt("fecha_salida",search.start),
         supabase.from("bloqueos").select("id,habitacion_id,fecha_desde,fecha_hasta,motivo").eq("property_id",item.property_id).lt("fecha_desde",end).gt("fecha_hasta",start),
       ])
       if(resRes.error)throw resRes.error;if(blockRes.error)throw blockRes.error
@@ -43,11 +44,11 @@ export default function ReservationRoomChangeControl({item,roomId,start,end,curr
       const quoteEntries=await Promise.all(allRooms.map(async room=>{const{data,error}=await supabase.rpc("hl_quote_room_upgrade_atomic",{p_reserva_id:Number(item.id),p_from_room_id:Number(currentRoom?.id||item.habitacion_id),p_to_room_id:Number(room.id),p_start:start,p_end:end});return[Number(room.id),error?null:data||null]}))
       const quoteByRoom=new Map(quoteEntries)
       const next=allRooms.map(room=>{
-        const id=Number(room.id),current=id===selectedId,roomState=normalize(room.estado),conflict=reservations.find(row=>roomIds(row).includes(id)&&roomStart(row,id)<end&&roomEnd(row,id)>start),block=blocks.find(row=>Number(row.habitacion_id)===id),sameCategory=normalize(room.tipo)===originalCategory,quote=quoteByRoom.get(id),sourceFinal=Number(quote?.source_reservation_final_rate),targetFinal=Number(quote?.target_reservation_final_rate),sourceRate=Number.isFinite(sourceFinal)?sourceFinal:currentFinalRate,finalRate=Number.isFinite(targetFinal)?targetFinal:null
+        const id=Number(room.id),current=id===selectedId,roomState=normalize(room.estado),conflict=reservations.find(row=>roomIds(row).includes(id)&&reservationRoomInventoryOverlaps(row,id,start,end)),block=blocks.find(row=>Number(row.habitacion_id)===id),sameCategory=normalize(room.tipo)===originalCategory,quote=quoteByRoom.get(id),sourceFinal=Number(quote?.source_reservation_final_rate),targetFinal=Number(quote?.target_reservation_final_rate),sourceRate=Number.isFinite(sourceFinal)?sourceFinal:currentFinalRate,finalRate=Number.isFinite(targetFinal)?targetFinal:null
         let available=true,reason="Disponible para toda la estadía"
         if(room.activa===false){available=false;reason="Habitación inactiva"}
         else if(["mantenimiento","fuera_servicio"].includes(roomState)){available=false;reason="Fuera de servicio / mantenimiento"}
-        else if(conflict){available=false;reason=`Ocupada por ${conflict.nombre_huesped||conflict.numero_reserva||"otra reserva"} · ${roomStart(conflict,id)} → ${roomEnd(conflict,id)}`}
+        else if(conflict){const window=reservationRoomInventoryWindow(conflict,id);available=false;reason=`Ocupada por ${conflict.nombre_huesped||conflict.numero_reserva||"otra reserva"} · inventario ${window.start} → ${window.end}`}
         else if(block){available=false;reason=`Bloqueada${block.motivo?` · ${block.motivo}`:""} · ${block.fecha_desde} → ${block.fecha_hasta}`}
         if(current){available=true;reason=Number(room.id)===Number(currentRoom?.id)?"Habitación actual de la reserva":"Cambio seleccionado"}
         return{room,current,available,reason,sameCategory,quote,sourceRate,finalRate,currency:quote?.reservation_currency||currency,rateDiff:finalRate==null?0:finalRate-sourceRate}
