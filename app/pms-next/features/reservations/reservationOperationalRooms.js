@@ -13,7 +13,7 @@ export function operationalRoomIds(item,rooms=[]){
     addId(ids,detail?.moved_to_room_id)
     for(const movement of Array.isArray(detail?.movement_history)?detail.movement_history:[])addId(ids,movement?.habitacion_id)
   }
-  for(const key of Object.keys(item?.room_checkout_dates||{}))if(/^\\d+$/.test(key))addId(ids,key)
+  for(const key of Object.keys(item?.room_checkout_dates||{}))if(/^\d+$/.test(key))addId(ids,key)
   return[...ids]
 }
 
