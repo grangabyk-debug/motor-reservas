@@ -10,13 +10,26 @@ const CATEGORY_LABEL={parking:"Cochera",pet:"Mascotas",extra:"Extra",service:"Se
 const MANUAL_ID="__manual__",MANUAL_CHARGE={id:MANUAL_ID,name:"Consumo manual / no catalogado",category:"service",amount:0,charge_mode:"per_unit"}
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:2}).format(Number(value)||0)
 const dateKey=value=>String(value||"").slice(0,10)
+const validDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(dateKey(value))
 const diffDays=(from,to)=>Math.max(1,Math.round((new Date(`${to}T12:00:00`)-new Date(`${from}T12:00:00`))/86400000)||1)
 const roundMoney=value=>Math.round((Number(value)||0)*100)/100
+const historyRoles=new Set(["previous_room","transient_room","cancelled_room","no_show_room"])
+function chargeStayForFolio(reservation,folio){
+  const reservationStart=dateKey(reservation?.fecha_entrada),reservationEnd=dateKey(reservation?.fecha_salida),roomId=folio?.room_id
+  if(!roomId)return{start:reservationStart,end:reservationEnd,nights:diffDays(reservationStart,reservationEnd)}
+  const details=Array.isArray(reservation?.habitaciones_detalle)?reservation.habitaciones_detalle:[],matches=details.filter(row=>Number(row?.habitacion_id)===Number(roomId))
+  const detail=matches.find(row=>!historyRoles.has(String(row?.segment_role||"").toLowerCase()))||matches[matches.length-1]||{}
+  let start=validDate(detail?.fecha_entrada)?dateKey(detail.fecha_entrada):reservationStart,end=validDate(detail?.fecha_salida)?dateKey(detail.fecha_salida):reservationEnd
+  const actual=dateKey(reservation?.room_checkout_dates?.[String(roomId)])
+  if(validDate(actual)&&actual>start&&actual<end)end=actual
+  if(!validDate(start)||!validDate(end)||end<=start){start=reservationStart;end=reservationEnd}
+  return{start,end,nights:diffDays(start,end)}
+}
 
 export default function ReservationChargePanel({reservation,propertyId,onClose,onSaved}){
   const[catalog,setCatalog]=useState([]),[folios,setFolios]=useState([]),[settings,setSettings]=useState({}),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState("")
   const[selectedId,setSelectedId]=useState(""),[folioId,setFolioId]=useState(""),[quantity,setQuantity]=useState(1),[from,setFrom]=useState(dateKey(reservation.fecha_entrada)),[to,setTo]=useState(dateKey(reservation.fecha_salida)),[wholeStay,setWholeStay]=useState(true),[note,setNote]=useState(""),[unitFinalPrice,setUnitFinalPrice]=useState(""),[manualName,setManualName]=useState("")
-  const currency=reservation.moneda||settings.preferences?.currency||"ARS",stayStart=dateKey(reservation.fecha_entrada),stayEnd=dateKey(reservation.fecha_salida),stayNights=Math.max(1,Number(reservation.noches)||diffDays(stayStart,stayEnd))
+  const currency=reservation.moneda||settings.preferences?.currency||"ARS",reservationStart=dateKey(reservation.fecha_entrada),reservationEnd=dateKey(reservation.fecha_salida)
   const taxes=normalizeTaxSettings({...settings.taxes,enabled:typeof reservation.impuestos_desglosados==="boolean"?reservation.impuestos_desglosados:settings.taxes?.enabled,vat_rate:reservation.impuestos_desglosados?Number(reservation.iva_porcentaje??settings.taxes?.vat_rate??21):settings.taxes?.vat_rate})
 
   useEffect(()=>{let cancelled=false;(async()=>{setLoading(true);setError("");try{
@@ -31,6 +44,8 @@ export default function ReservationChargePanel({reservation,propertyId,onClose,o
 
   const selected=useMemo(()=>String(selectedId)===MANUAL_ID?MANUAL_CHARGE:catalog.find(row=>String(row.id)===String(selectedId))||null,[catalog,selectedId])
   const selectedFolio=useMemo(()=>folios.find(row=>row.id===folioId)||null,[folios,folioId])
+  const chargeStay=useMemo(()=>chargeStayForFolio(reservation,selectedFolio),[selectedFolio?.room_id,reservation.fecha_entrada,reservation.fecha_salida,reservation.habitaciones_detalle,reservation.room_checkout_dates])
+  const stayStart=chargeStay.start||reservationStart,stayEnd=chargeStay.end||reservationEnd,stayNights=chargeStay.nights
   const effectiveMode=selected?.category==="parking"?"per_night":selected?.charge_mode
   const timed=effectiveMode==="per_night"||effectiveMode==="per_person_night"
   const units=Math.max(1,Number(quantity)||1)
@@ -42,6 +57,7 @@ export default function ReservationChargePanel({reservation,propertyId,onClose,o
   const unitLabel=selected?.category==="parking"?"Vehículos":effectiveMode?.includes("person")?"Personas":"Cantidad"
 
   useEffect(()=>{if(!selected)return;const defaultQty=effectiveMode==="per_person"||effectiveMode==="per_person_night"?Math.max(1,Number(reservation.cantidad_huespedes)||1):1;setQuantity(defaultQty);setWholeStay(true);setFrom(stayStart);setTo(stayEnd);setNote("");setManualName("");setUnitFinalPrice(selected.id===MANUAL_ID?"":String(commercialPriceFromNet(selected.amount,taxes)))},[selectedId,taxes.enabled,taxes.vat_rate,taxes.price_tax_mode])
+  useEffect(()=>{if(!selectedFolio)return;setWholeStay(true);setFrom(stayStart);setTo(stayEnd)},[selectedFolio?.id,stayStart,stayEnd])
   function toggleWholeStay(checked){setWholeStay(checked);if(checked){setFrom(stayStart);setTo(stayEnd)}}
   function changeFrom(value){const next=value<stayStart?stayStart:value>=stayEnd?stayStart:value;setFrom(next);if(to<=next)setTo(nextDayWithin(next,stayEnd));setWholeStay(next===stayStart&&to===stayEnd)}
   function changeTo(value){const next=value>stayEnd?stayEnd:value<=from?nextDayWithin(from,stayEnd):value;setTo(next);setWholeStay(from===stayStart&&next===stayEnd)}

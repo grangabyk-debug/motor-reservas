@@ -59,7 +59,7 @@
 .docs header{height:34px;padding:0 9px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--accent) 4%,var(--panelSolid))}
 .docs header b{font-size:10px}
 .docs header button{height:25px;font-size:10px}
-.docs>div{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:8px;padding:7px 9px;border-bottom:1px solid color-mix(in srgb,var(--line) 80%,transparent)}
+.docs>div{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;align-items:center;gap:8px;padding:6px 9px;border-bottom:1px solid color-mix(in srgb,var(--line) 80%,transparent)}
 .docs>div:last-child{border-bottom:0}
 .docs span b,.docs span small{display:block}
 .docs span b{font-size:10px}
