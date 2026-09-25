@@ -46,9 +46,7 @@ export default function ReservationsWorkspace({propertyId,onNavigate,allowedView
   function openEdit(event){
     event?.preventDefault?.()
     event?.stopPropagation?.()
-    const top=typeof window!=="undefined"?window.scrollY:null
     setEditOpen(true)
-    if(top!==null)requestAnimationFrame(()=>requestAnimationFrame(()=>window.scrollTo({top,left:window.scrollX,behavior:"auto"})))
   }
   function closeRecord(){setEditOpen(false);setSelected(null);setCheckoutConfirm(null);setGroupCheckoutConfirm(null);setCheckinConfirm(null);setCheckinError("");setNoShowConfirm(null);setNoShowError("");setRestoreNoShowConfirm(null);setRestoreNoShowError("");setRestoreCancelledConfirm(null);setRestoreCancelledError("");setCancelConfirm(null);setCancelError("");syncRecordUrl(null)}
   function selectMode(next){setReservationSearch("");setMode(next)}
