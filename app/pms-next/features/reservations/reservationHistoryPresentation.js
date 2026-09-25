@@ -5,6 +5,14 @@ const commercialRate=(value,payload,reservation,key)=>{const stored=Number(paylo
 export default function historyPresentation(event,fallbackCurrency="ARS",reservation=null){
   const payload=event?.payload||{},currency=payload.after_currency||payload.before_currency||payload.currency||fallbackCurrency||"ARS"
   if(payload.invalidated===true||payload.correction===true||payload.repair===true)return{title:event?.title||"Corrección de cuenta",detail:event?.detail||"Se corrigió un cálculo anterior de la reserva."}
+  if(event?.event_type==="group_room_extension"){
+    const extensions=Array.isArray(payload.extensions)?payload.extensions:[],first=extensions[0]||{},rooms=extensions.map(row=>row.room_name||row.room_id).filter(Boolean).join(", "),extra=extensions.reduce((sum,row)=>sum+Math.max(0,Number(row.extra_nights)||0),0),extensionFinal=extensions.reduce((sum,row)=>sum+Math.max(0,Number(row.extension_final_total)||0),0),lateNet=extensions.reduce((sum,row)=>sum+Math.max(0,Number(row.late_credit_booked)||0),0),deltaNet=extensions.reduce((sum,row)=>sum+Math.max(0,Number(row.net_delta_booked)||0),0),lateFinal=commercialRate(lateNet,payload,reservation,"__missing_late_final"),deltaFinal=commercialRate(deltaNet,payload,reservation,"__missing_delta_final")
+    const dates=first.old_end&&first.new_end?`${fmtDate(first.old_end)} → ${fmtDate(first.new_end)}`:""
+    const amounts=extensionFinal?` · extensión ${money(extensionFinal,currency)}`:""
+    const late=lateFinal>0?` · crédito Late −${money(lateFinal,currency)}`:""
+    const additional=deltaFinal>0?` · adicional real ${money(deltaFinal,currency)}`:""
+    return{title:`Extensión de noches${rooms?` · Hab. ${rooms}`:""}`,detail:`${dates}${extra?` · +${extra} noche${extra===1?"":"s"}`:""}${amounts}${late}${additional}`}
+  }
   if(event?.event_type==="room"&&payload.mid_stay_split===true){
     const prefix=String(event?.detail||"Cambio de habitación").split(" · tarifa")[0]
     if(payload.reprice===false)return{title:event?.title||"Cambio de habitación durante la estadía",detail:`${prefix} · tarifa original mantenida`}
