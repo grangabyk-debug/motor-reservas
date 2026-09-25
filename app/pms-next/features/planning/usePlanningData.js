@@ -78,6 +78,18 @@ export default function usePlanningData(propertyId,windowStart,windowEndExclusiv
     try{const{data,error:rpcError}=await supabase.rpc("hl_planning_move_reservation_priced_atomic",{p_reserva_id:numericId,p_habitacion_id:numericRoom,p_fecha_entrada:start,p_fecha_salida:end,p_reprice:Boolean(reprice)});if(rpcError)throw rpcError;await load(true);const oldRoomData=rooms.find(room=>Number(room.id)===Number(previous.habitacion_id)),newRoomData=rooms.find(room=>Number(room.id)===numericRoom),oldRoom=oldRoomData?.nombre||previous.habitacion_id,newRoom=newRoomData?.nombre||numericRoom,roomChanged=Number(previous.habitacion_id)!==numericRoom,startChanged=previous.fecha_entrada!==start,durationChanged=oldNights!==newNights,categoryChanged=roomChanged&&String(oldRoomData?.tipo||"")!==String(newRoomData?.tipo||""),oldRate=Number(previous.tarifa_noche)||0,newRate=Number(data?.tarifa_noche)||0,currency=data?.moneda||previous.moneda||"ARS",direction=newRate>oldRate?"Upgrade":newRate<oldRate?"Downgrade":"Cambio de categoría";let message="Cambio guardado en el Planning.";if(categoryChanged)message=`${direction}: ${oldRoom} (${oldRoomData?.tipo||"sin categoría"}) → ${newRoom} (${newRoomData?.tipo||"sin categoría"}) · ${reprice&&oldRate!==newRate?`tarifa ${money(oldRate,currency)} → ${money(newRate,currency)}`:"tarifa original mantenida"}.`;else if(roomChanged&&startChanged)message=`Habitación ${oldRoom} → ${newRoom} · nueva entrada ${start}${reprice&&oldRate!==newRate?` · tarifa ${money(oldRate,currency)} → ${money(newRate,currency)}`:""}.`;else if(roomChanged)message=`Habitación ${oldRoom} → ${newRoom}${reprice&&oldRate!==newRate?` · tarifa ${money(oldRate,currency)} → ${money(newRate,currency)}`:""}.`;else if(startChanged)message=`Reserva movida a ${start}.`;if(!(durationChanged&&!roomChanged&&!startChanged))toast({title:"Planning actualizado",message});if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("hl:pms-reservation-updated",{detail:{reservationId:numericId}}));return data}catch(err){await load(true);toast({tone:"error",title:"Cambio revertido",message:"El servidor no pudo confirmar el movimiento y el Planning volvió al estado anterior.",duration:4200});throw err}
   },[reservations,rooms,windowStart,windowEndExclusive,load])
 
+  const extendGroupRoom=useCallback(async({reservationId,roomId,end})=>{
+    const numericId=Number(reservationId),numericRoom=Number(roomId)
+    setError("")
+    const{data,error:rpcError}=await supabase.rpc("hl_extend_group_rooms_atomic",{p_reserva_id:numericId,p_room_ids:[numericRoom],p_new_end:end})
+    if(rpcError)throw rpcError
+    await load(true)
+    const room=rooms.find(row=>Number(row.id)===numericRoom)
+    toast({title:"Noches extendidas",message:`Hab. ${room?.nombre||numericRoom} · nueva salida ${end}. Se aplicó la misma lógica de tarifas, Late y folios que desde la ficha.`})
+    if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("hl:pms-reservation-updated",{detail:{reservationId:numericId}}))
+    return data
+  },[load,rooms])
+
   const createReservation=useCallback(async draft=>{
     const{data:userData,error:userError}=await supabase.auth.getUser();if(userError)throw userError
     const roomIds=uniqueNumeric(draft.roomIds?.length?draft.roomIds:[draft.roomId]);if(!roomIds.length)throw new Error("Elegí al menos una habitación.")
@@ -114,5 +126,5 @@ export default function usePlanningData(propertyId,windowStart,windowEndExclusiv
     const{data,error:rpcError}=await supabase.rpc("hl_create_reservation_atomic",{p_reservation:payload,p_payments:[]});if(rpcError)throw rpcError;await load(true);const names=selectedRooms.map(room=>room.nombre).join(", ");toast({title:roomIds.length>1?"Reserva grupal creada":"Reserva creada",message:`${draft.guest.trim()} · ${roomIds.length>1?`${roomIds.length} habitaciones (${names})`:`Habitación ${names}`} · ${nights} noche${nights===1?"":"s"}${discountAmount>0?` · descuento ${discountType==="percent"?`${discountValue}%`:money(discountAmount,draft.currency)} (${reasonLabel})`:""} · ${policy.name}.`});if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("hl:pms-reservation-updated",{detail:{reservationId:data.id}}));return data
   },[propertyId,rooms,cancellationPolicies,windowStart,windowEndExclusive,load])
 
-  return{rooms,reservations,blocks,cancellationPolicies,loading,error,setError,load,moveReservation,createReservation}
+  return{rooms,reservations,blocks,cancellationPolicies,loading,error,setError,load,moveReservation,extendGroupRoom,createReservation}
 }

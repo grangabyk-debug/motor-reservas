@@ -52,7 +52,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
       if(ensure.error)throw ensure.error
       const[folioRes,itemRes,allocationRes,paymentRes,docRes]=await Promise.all([
         supabase.from("hotel_folios").select("id,room_id,folio_type,label,payer_type,payer_name,currency,status,is_primary,sort_order,created_at").eq("property_id",propertyId).eq("reservation_id",Number(reservation.id)).neq("status","void").order("sort_order").order("created_at"),
-        supabase.from("hotel_folio_items").select("id,folio_id,room_id,source_type,source_key,description,detail,service_date,quantity,unit_price,discount,tax_rate,tax,subtotal,total,currency,status,invoice_document_id,created_at").eq("property_id",propertyId).eq("reservation_id",Number(reservation.id)).order("service_date").order("created_at"),
+        supabase.from("hotel_folio_items").select("id,folio_id,room_id,source_type,source_key,description,detail,service_date,quantity,unit_price,discount,tax_rate,tax,subtotal,total,currency,status,invoice_document_id,created_at").eq("property_id",propertyId).eq("reservation_id",Number(reservation.id)).order("created_at",{ascending:true}),
         supabase.from("hotel_folio_payment_allocations").select("id,folio_id,payment_id,amount,currency,source,created_at").eq("property_id",propertyId).eq("reservation_id",Number(reservation.id)),
         supabase.from("pagos").select("id,folio_id,monto,refunded_amount,moneda,payment_currency,payment_amount,fx_rate,fx_source,fx_as_of,metodo,estado,referencia,nota,created_at").eq("property_id",propertyId).eq("reserva_id",Number(reservation.id)).order("created_at",{ascending:false}),
         supabase.from("hotel_finance_documents").select("id,folio_id,payment_id,document_type,number,status,currency,subtotal,tax,total,balance,billing_to,items,folio_item_ids,billing_mode,issued_at,created_at,related_document_id,adjustment_reason").eq("property_id",propertyId).eq("reservation_id",Number(reservation.id)).order("created_at",{ascending:false}),
@@ -114,9 +114,8 @@ export default function ReservationFolioBilling({reservation,propertyId,property
   const invoiceCalc=useMemo(()=>calculateInvoiceTotals(invoiceLines,billingTributes),[invoiceLines,billingTributes])
 
   function selectFolio(id){
-    const top=typeof window!=="undefined"?window.scrollY:null
-    setSelectedId(id);setSelectedItems(new Set())
-    if(top!==null)requestAnimationFrame(()=>window.scrollTo({top,left:window.scrollX,behavior:"auto"}))
+    setSelectedId(id)
+    setSelectedItems(new Set())
   }
   function toggleItem(id){setSelectedItems(current=>{const next=new Set(current);next.has(id)?next.delete(id):next.add(id);return next})}
 
@@ -256,9 +255,9 @@ export default function ReservationFolioBilling({reservation,propertyId,property
     <header className={s.header}>
       <div><small>CUENTA DE LA ESTADÍA</small><h3>Folios y facturas</h3></div>
       <div className={s.headerActions}>
-        <button type="button" onClick={()=>setNewOpen(true)}>＋ Folio</button>
+        <button type="button" onMouseDown={event=>event.preventDefault()} onClick={()=>setNewOpen(true)}>＋ Folio</button>
         <button type="button" onClick={printFolio} disabled={!selected}>Imprimir</button>
-        <button type="button" className={s.primary} onClick={()=>openInvoice("folio")} disabled={!selected}>＋ Factura</button>
+        <button type="button" className={s.primary} onMouseDown={event=>event.preventDefault()} onClick={()=>openInvoice("folio")} disabled={!selected}>＋ Factura</button>
       </div>
     </header>
     {error?<div className={s.error}>{error}</div>:null}
@@ -310,11 +309,11 @@ export default function ReservationFolioBilling({reservation,propertyId,property
     </>:<div className={s.empty}>No hay folios disponibles.</div>}
 
     {newOpen?<div className={s.overlay} onMouseDown={event=>event.target===event.currentTarget&&setNewOpen(false)}><div className={s.modal}>
-      <button className={s.close} onClick={()=>setNewOpen(false)}>×</button><small>NUEVO FOLIO</small><h2>Separar una cuenta</h2><p>Usalo para empresa, agencia, pasajero o una parte específica del grupo.</p>
-      <label>Nombre del folio<input value={newDraft.label} onChange={event=>setNewDraft(v=>({...v,label:event.target.value}))} placeholder="Ej. Empresa ACME / Habitación 203 extras" autoFocus/></label>
+      <button type="button" className={s.close} onClick={()=>setNewOpen(false)}>×</button><small>NUEVO FOLIO</small><h2>Separar una cuenta</h2><p>Usalo para empresa, agencia, pasajero o una parte específica del grupo.</p>
+      <label>Nombre del folio<input value={newDraft.label} onChange={event=>setNewDraft(v=>({...v,label:event.target.value}))} placeholder="Ej. Empresa ACME / Habitación 203 extras"/></label>
       <label>Quién paga<select value={newDraft.payer_type} onChange={event=>setNewDraft(v=>({...v,payer_type:event.target.value}))}><option value="guest">Huésped</option><option value="company">Empresa</option><option value="agency">Agencia</option><option value="group">Grupo</option><option value="other">Otro</option></select></label>
       <label>Nombre / razón social<input value={newDraft.payer_name} onChange={event=>setNewDraft(v=>({...v,payer_name:event.target.value}))} placeholder="Opcional"/></label>
-      <footer><button onClick={()=>setNewOpen(false)}>Cancelar</button><button className={s.primary} onClick={createFolio} disabled={saving||!newDraft.label.trim()}>{saving?"Creando…":"Crear folio"}</button></footer>
+      <footer><button type="button" onClick={()=>setNewOpen(false)}>Cancelar</button><button type="button" className={s.primary} onClick={createFolio} disabled={saving||!newDraft.label.trim()}>{saving?"Creando…":"Crear folio"}</button></footer>
     </div></div>:null}
 
     <ReservationInvoiceDialog

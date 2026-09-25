@@ -78,8 +78,25 @@ export default function PlanningWorkspace({propertyId,property,onNavigate,newRes
   function selectReservation(item){setPreview(null);setRateMove(null);setFormOpen(false);setFormError("");setRangeSelection(null);setSelected(item)}
   function isGroup(item){return uniqueIds([...(item?._reservation_room_ids||[]),item?.habitacion_id,...(item?.habitaciones_ids||[])]).length>1}
   function beginDrag(event,item){if(isGroup(item)){event.preventDefault();data.setError("Las reservas grupales se modifican desde su ficha para conservar todas las habitaciones asignadas.");return}event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("text/plain",String(item.id));setPreview(null);setRateMove(null);setDragging({item,mode:"move"});setSelected(null);setRangeSelection(null)}
-  function beginResize(item,end){if(isGroup(item)){data.setError("Las reservas grupales se modifican desde su ficha para conservar todas las habitaciones asignadas.");return}if(!end||end===item.fecha_salida)return;if(end<=item.fecha_entrada){data.setError("La salida tiene que quedar después de la entrada.");return}const room=roomById.get(Number(item.habitacion_id)),oldNights=Math.max(1,diffDays(item.fecha_entrada,item.fecha_salida)),newNights=Math.max(1,diffDays(item.fecha_entrada,end)),currentRate=Number(item.tarifa_noche)||0;setPreview(null);setSelected(null);setDragging(null);setDropCell("");setRangeSelection(null);setRateMove({kind:"duration",reservationId:item.id,roomId:item.habitacion_id,start:item.fecha_entrada,end,oldStart:item.fecha_entrada,oldEnd:item.fecha_salida,oldNights,newNights,sourceRoom:room,targetRoom:room,currentRate,targetRate:currentRate,currency:item.moneda||"ARS"})}
-  async function commitMove(change,reprice=false){if(!change||saving)return;setSaving(true);data.setError("");try{await data.moveReservation({reservationId:change.reservationId,roomId:change.roomId,start:change.start,end:change.end,reprice});setRateMove(null)}catch(err){data.setError(err?.message||"No se pudo mover la reserva.")}finally{setSaving(false)}}
+  function beginResize(item,end){
+    const group=isGroup(item)
+    if(!end||end===item.fecha_salida)return
+    if(end<=item.fecha_entrada){data.setError("La salida tiene que quedar después de la entrada.");return}
+    if(group&&end<item.fecha_salida){data.setError("En una reserva grupal, acortar noches se hace desde la ficha para no afectar otros tramos. Para extender, podés hacerlo directamente desde el Planning.");return}
+    const room=roomById.get(Number(item.habitacion_id)),oldNights=Math.max(1,diffDays(item.fecha_entrada,item.fecha_salida)),newNights=Math.max(1,diffDays(item.fecha_entrada,end)),currentRate=Number(item.tarifa_noche)||0
+    setPreview(null);setSelected(null);setDragging(null);setDropCell("");setRangeSelection(null)
+    setRateMove({kind:group?"group-duration":"duration",reservationId:item.id,roomId:item.habitacion_id,start:item.fecha_entrada,end,oldStart:item.fecha_entrada,oldEnd:item.fecha_salida,oldNights,newNights,sourceRoom:room,targetRoom:room,currentRate,targetRate:currentRate,currency:item.moneda||"ARS"})
+  }
+  async function commitMove(change,reprice=false){
+    if(!change||saving)return
+    setSaving(true);data.setError("")
+    try{
+      if(change.kind==="group-duration")await data.extendGroupRoom({reservationId:change.reservationId,roomId:change.roomId,end:change.end})
+      else await data.moveReservation({reservationId:change.reservationId,roomId:change.roomId,start:change.start,end:change.end,reprice})
+      setRateMove(null)
+    }catch(err){data.setError(err?.message||"No se pudo actualizar la estadía.")}
+    finally{setSaving(false)}
+  }
   async function dropReservation(event,roomId,day){
     event.preventDefault()
     if(!dragging)return
