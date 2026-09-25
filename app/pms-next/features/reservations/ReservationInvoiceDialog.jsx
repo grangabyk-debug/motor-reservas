@@ -32,10 +32,79 @@ export default function ReservationInvoiceDialog({
   const[foreignTouristVerified,setForeignTouristVerified]=useState(false)
   const[foreignPaymentVerified,setForeignPaymentVerified]=useState(false)
   const[portalRoot,setPortalRoot]=useState(null)
+  const[recipientOptions,setRecipientOptions]=useState([])
+  const[recipientKey,setRecipientKey]=useState("")
   useEffect(()=>{
     if(!open||typeof document==="undefined"){setPortalRoot(null);return}
     setPortalRoot(document.querySelector("[data-theme]")||document.body)
   },[open])
+  useEffect(()=>{
+    if(!open||!reservation?.id||!reservation?.property_id||!selected)return
+    let cancelled=false
+    ;(async()=>{
+      try{
+        const [guestRes,linkRes]=await Promise.all([
+          supabase.from("hotel_reservation_guests").select("id,room_id,role,full_name,email,phone,document_type,document_number,cuil,address,city,province,country,relationship,sort_order,checked_out_at").eq("property_id",reservation.property_id).eq("reservation_id",Number(reservation.id)).order("sort_order"),
+          supabase.from("reservas").select("partner_id").eq("property_id",reservation.property_id).eq("id",Number(reservation.id)).maybeSingle(),
+        ])
+        if(guestRes.error)throw guestRes.error
+        if(linkRes.error)throw linkRes.error
+        const allGuests=guestRes.data||[]
+        let guests=selected.room_id?allGuests.filter(row=>Number(row.room_id)===Number(selected.room_id)):allGuests.filter(row=>String(row.role||"").toLowerCase()==="primary")
+        if(!guests.length&&!selected.room_id)guests=allGuests.slice(0,1)
+        guests=guests.slice().sort((a,b)=>{
+          const ap=String(a.relationship||"").toLowerCase()==="titular"||String(a.role||"").toLowerCase()==="primary"?0:1
+          const bp=String(b.relationship||"").toLowerCase()==="titular"||String(b.role||"").toLowerCase()==="primary"?0:1
+          return ap-bp||(Number(a.sort_order)||0)-(Number(b.sort_order)||0)
+        })
+        const guestOptions=guests.filter(row=>String(row.full_name||"").trim()).map(row=>{
+          const taxId=String(row.cuil||row.document_number||"").trim()
+          return{
+            key:"guest:"+row.id,type:"guest",label:String(row.full_name||"").trim(),
+            subtitle:selected.room_id?selected.label:"Huésped principal",
+            name:String(row.full_name||"").trim(),email:String(row.email||"").trim(),phone:String(row.phone||"").trim(),
+            taxId,docType:String(row.cuil||"").trim()?"cuil":defaultRecipientDocType("consumidor_final",taxId),
+            address:[row.address,row.city,row.province,row.country].filter(Boolean).join(", "),
+          }
+        })
+        let companyOptions=[]
+        const partnerId=linkRes.data?.partner_id
+        if(partnerId){
+          const partnerRes=await supabase.from("hotel_partners").select("id,kind,name,tax_id,email,phone,active").eq("property_id",reservation.property_id).eq("id",partnerId).maybeSingle()
+          if(partnerRes.error)throw partnerRes.error
+          const p=partnerRes.data
+          if(p&&p.active!==false&&p.name)companyOptions=[{key:"partner:"+p.id,type:"company",label:String(p.name).trim(),subtitle:String(p.kind||"").toLowerCase()==="agency"?"Agencia vinculada":"Empresa vinculada",name:String(p.name).trim(),email:String(p.email||"").trim(),phone:String(p.phone||"").trim(),taxId:String(p.tax_id||"").trim(),docType:defaultRecipientDocType("responsable_inscripto",p.tax_id||""),address:""}]
+        }else if(["company","agency"].includes(String(selected.payer_type||"").toLowerCase())&&String(selected.payer_name||"").trim()){
+          companyOptions=[{key:"folio-company:"+selected.id,type:"company",label:String(selected.payer_name).trim(),subtitle:String(selected.payer_type).toLowerCase()==="agency"?"Agencia del folio":"Empresa del folio",name:String(selected.payer_name).trim(),email:"",phone:"",taxId:"",docType:"cuit",address:""}]
+        }
+        if(cancelled)return
+        const options=[...guestOptions,...companyOptions]
+        setRecipientOptions(options)
+        const preferred=(selected.room_id?guestOptions[0]:null)||companyOptions[0]||guestOptions[0]||null
+        if(preferred){
+          setRecipientKey(preferred.key)
+          setBillingName(preferred.name||"")
+          setBillingEmail(preferred.email||"")
+          setBillingPhone(preferred.phone||"")
+          setBillingTaxId(preferred.taxId||"")
+          setBillingDocType(preferred.docType||defaultRecipientDocType("consumidor_final",preferred.taxId||""))
+          setBillingAddress(preferred.address||"")
+        }
+      }catch{if(!cancelled){setRecipientOptions([]);setRecipientKey("")}}
+    })()
+    return()=>{cancelled=true}
+  },[open,reservation?.id,reservation?.property_id,selected?.id,selected?.room_id,selected?.payer_type,selected?.payer_name])
+  function chooseRecipient(key){
+    setRecipientKey(key)
+    const row=recipientOptions.find(option=>option.key===key)
+    if(!row)return
+    setBillingName(row.name||"")
+    setBillingEmail(row.email||"")
+    setBillingPhone(row.phone||"")
+    setBillingTaxId(row.taxId||"")
+    setBillingDocType(row.docType||defaultRecipientDocType("consumidor_final",row.taxId||""))
+    setBillingAddress(row.address||"")
+  }
   useEffect(()=>{
     if(!open)return
     let cancelled=false
@@ -95,6 +164,12 @@ export default function ReservationInvoiceDialog({
         <div style={{color:"var(--muted)"}}>{paymentSnapshotPreview?.payment_methods?.length?paymentSnapshotPreview.payment_methods.map((row,index)=><span key={row.payment_id+`-${index}`} style={{display:"block"}}>{row.method} · {money(row.amount,row.currency)}</span>):"Sin pagos aplicados a este comprobante todavía."}</div>
         {paymentSnapshotPreview?.payment_pending>0.02?<small style={{color:"var(--muted)"}}>Pendiente al emitir: {money(paymentSnapshotPreview.payment_pending,billingCurrency)}</small>:null}
       </div>
+
+      {recipientOptions.length?<div style={{margin:"10px 0 0",padding:"10px 12px",border:"1px solid color-mix(in srgb,var(--accent) 20%,var(--line))",borderRadius:12,background:"color-mix(in srgb,var(--accent) 4%,var(--panelSolid))",display:"grid",gap:6}}>
+        <label style={{display:"grid",gap:5}}><span style={{fontSize:10,fontWeight:850}}>Facturar a</span><select value={recipientKey} onChange={event=>chooseRecipient(event.target.value)} style={{height:38,border:"1px solid var(--line)",borderRadius:10,padding:"0 10px",background:"var(--panelSolid)",color:"var(--text)",font:"inherit"}}>
+          {recipientOptions.map(row=><option key={row.key} value={row.key}>{row.type==="company"?"Empresa / agencia":"Huésped"} · {row.label}{row.subtitle?" · "+row.subtitle:""}</option>)}
+        </select><small style={{color:"var(--muted)",fontSize:9.5}}>El folio de una habitación toma por defecto al huésped cargado en esa habitación. Si la reserva tiene empresa o agencia vinculada, también podés elegirla.</small></label>
+      </div>:null}
 
       <div className={s.formGrid}>
         <label><span>Cliente</span><input value={billingName} onChange={event=>setBillingName(event.target.value)}/></label>

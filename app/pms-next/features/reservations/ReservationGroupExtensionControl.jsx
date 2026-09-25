@@ -21,11 +21,11 @@ export default function ReservationGroupExtensionControl({item,allRooms=[],disab
   const rows=useMemo(()=>ids.map(id=>{const detail=reservationRoomDetail(item,id),room=roomMap.get(id);return{id,room,detail,end:String(detail?.fecha_salida||item?.fecha_salida||"").slice(0,10),start:String(detail?.fecha_entrada||item?.fecha_entrada||"").slice(0,10),late:roomSpecialStayEnabled(item,id,"late")}}),[ids.join("|"),item?.habitaciones_detalle,item?.fecha_entrada,item?.fecha_salida,item?.room_checkout_dates,roomMap])
   const maxEnd=useMemo(()=>rows.reduce((max,row)=>row.end>max?row.end:max,String(item?.fecha_salida||"").slice(0,10)),[rows,item?.fecha_salida])
   const minEnd=useMemo(()=>rows.reduce((min,row)=>!min||row.end<min?row.end:min,""),[rows])
-  const[open,setOpen]=useState(false),[newEnd,setNewEnd]=useState(()=>addDays(maxEnd,1)),[states,setStates]=useState({}),[selected,setSelected]=useState(new Set()),[checking,setChecking]=useState(false),[saving,setSaving]=useState(false),[error,setError]=useState("")
+  const[open,setOpen]=useState(false),[newEnd,setNewEnd]=useState(()=>addDays(minEnd||maxEnd,1)),[states,setStates]=useState({}),[selected,setSelected]=useState(new Set()),[checking,setChecking]=useState(false),[saving,setSaving]=useState(false),[error,setError]=useState("")
   const factor=item?.impuestos_desglosados?1+Math.max(0,Number(item?.iva_porcentaje)||0)/100:1
   const validationKey=rows.map(row=>[row.id,row.end,row.late,row.detail?.late_checkout_net||0].join(":")).join("|")
 
-  useEffect(()=>{if(open){setNewEnd(addDays(maxEnd,1));setSelected(new Set());setStates({});setError("")}},[open,maxEnd])
+  useEffect(()=>{if(open){setNewEnd(addDays(minEnd||maxEnd,1));setSelected(new Set());setStates({});setError("")}},[open,minEnd,maxEnd])
 
   useEffect(()=>{
     if(!open||!validDate(newEnd)||!rows.length)return
