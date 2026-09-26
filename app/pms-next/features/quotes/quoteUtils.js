@@ -6,9 +6,9 @@ export const nights=(a,b)=>Math.max(1,Math.round((new Date(`${b}T12:00:00`)-new 
 export const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency,maximumFractionDigits:0}).format(Number(value)||0)
 export const esc=value=>String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"})[char])
 
-export function freshForm(currency="ARS"){
+export function freshForm(currency="ARS",ratePlanCode="BB"){
   const start=dateKey(new Date())
-  return{name:"",email:"",phone:"",start,end:addDays(start,1),pax:2,currency,validUntil:addDays(dateKey(new Date()),7),terms:"Tarifas sujetas a disponibilidad al momento de confirmar.",notes:"",selection:{}}
+  return{name:"",email:"",phone:"",start,end:addDays(start,1),pax:2,currency,validUntil:addDays(dateKey(new Date()),7),terms:"Tarifas sujetas a disponibilidad al momento de confirmar.",notes:"",selection:{},ratePlanCode}
 }
 const roomCapacity=room=>Math.max(1,Number(room?.capacidad)||1)
 function distributeGuests(picks,total){
@@ -49,6 +49,6 @@ export function roomingDetails(picks,totalGuests){
   return picks.map(pick=>{const guests=distribution.get(String(pick.room.id))||0,beds=defaultBeds(pick.room,guests);return{habitacion_id:Number(pick.room.id),nombre:pick.room.nombre,categoria_asignada:pick.room.tipo||"Habitación",categoria_vendida:pick.soldAs||pick.room.tipo||"Habitación",huespedes:guests,tarifa_noche:Math.max(0,Number(pick.rate)||0),rooming:{matrimonial:beds.matrimonial,individual:beds.individual}}})
 }
 export function buildQuoteText({quote,group,quoteLines,propertyName}){
-  const hotel=propertyName||"Hotel",guest=group?.contact_name||group?.name||"huésped",roomLines=(quoteLines||[]).filter(line=>line.category==="room"),taxIncluded=roomLines.some(line=>line.metadata?.price_tax_mode==="tax_included"&&Number(line.metadata?.vat_rate)>0),taxExcluded=roomLines.some(line=>line.metadata?.price_tax_mode==="tax_excluded"&&Number(line.metadata?.vat_rate)>0),concepts=roomLines.map(line=>`${Number(line.quantity)||1} × ${line.description}: ${money(line.total||line.unit_price,quote.currency)}`).join("\n"),taxNote=taxIncluded?" · IVA incluido":taxExcluded?" · total con IVA agregado":""
-  return`Hola ${guest},\n\nTe enviamos el presupuesto para tu estadía en ${hotel}.\n\nPresupuesto: ${quote.quote_number}\nEntrada: ${group?.arrival_date||"—"}\nSalida: ${group?.departure_date||"—"}\n${concepts?`Habitación: ${concepts}\n`:""}Pasajeros: ${group?.estimated_pax||0}\nTotal del presupuesto: ${money(quote.total,quote.currency)}${taxNote}\nVálido hasta: ${quote.valid_until||"—"}\n\n${quote.terms||"Tarifas sujetas a disponibilidad al momento de confirmar."}\n\nSi necesitás hacer algún cambio o agregar una solicitud, respondé este correo.\n\nSaludos,\n${hotel}`
+  const hotel=propertyName||"Hotel",guest=group?.contact_name||group?.name||"huésped",roomLines=(quoteLines||[]).filter(line=>line.category==="room"),planName=roomLines.find(line=>line.metadata?.rate_plan_name)?.metadata?.rate_plan_name||"",taxIncluded=roomLines.some(line=>line.metadata?.price_tax_mode==="tax_included"&&Number(line.metadata?.vat_rate)>0),taxExcluded=roomLines.some(line=>line.metadata?.price_tax_mode==="tax_excluded"&&Number(line.metadata?.vat_rate)>0),concepts=roomLines.map(line=>`${Number(line.quantity)||1} × ${line.description}: ${money(line.total||line.unit_price,quote.currency)}`).join("\n"),taxNote=taxIncluded?" · IVA incluido":taxExcluded?" · total con IVA agregado":""
+  return`Hola ${guest},\n\nTe enviamos el presupuesto para tu estadía en ${hotel}.\n\nPresupuesto: ${quote.quote_number}\nEntrada: ${group?.arrival_date||"—"}\nSalida: ${group?.departure_date||"—"}\n${concepts?`Habitación: ${concepts}\n`:""}${planName?`Plan tarifario: ${planName}\n`:""}Pasajeros: ${group?.estimated_pax||0}\nTotal del presupuesto: ${money(quote.total,quote.currency)}${taxNote}\nVálido hasta: ${quote.valid_until||"—"}\n\n${quote.terms||"Tarifas sujetas a disponibilidad al momento de confirmar."}\n\nSi necesitás hacer algún cambio o agregar una solicitud, respondé este correo.\n\nSaludos,\n${hotel}`
 }

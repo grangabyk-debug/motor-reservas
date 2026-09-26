@@ -10,11 +10,11 @@ const round2=value=>Math.round((Number(value)||0)*100)/100
 
 function nightlyRows(detail,taxEnabled,vatRate){
   const raw=Array.isArray(detail?.tarifas_por_noche)?detail.tarifas_por_noche:[]
-  const factor=taxEnabled?1+Math.max(0,Number(vatRate)||0)/100:1
+  const factor=taxEnabled?1+Math.max(0,Number(vatRate)||0)/100:1,planFinalPerNight=(Number(detail?.rate_plan_adjustment_final_per_person)||0)*Math.max(0,Number(detail?.huespedes)||0)
   return raw.map((entry,index)=>{
     const net=Number(entry?.tarifa_neta??entry?.price??entry?.tarifa)
     const grossStored=Number(entry?.tarifa_final)
-    const gross=Number.isFinite(grossStored)?grossStored:round2(net*factor)
+    const gross=(Number.isFinite(grossStored)?grossStored:round2(net*factor))+planFinalPerNight
     return{key:`${entry?.fecha||entry?.stay_date||index}`,date:String(entry?.fecha||entry?.stay_date||""),net:Number.isFinite(net)?net:0,gross:Number.isFinite(gross)?gross:0,source:String(entry?.fuente||entry?.source||"")}
   }).filter(entry=>entry.date&&Number.isFinite(entry.gross)).sort((a,b)=>a.date.localeCompare(b.date))
 }
@@ -34,7 +34,7 @@ export default function ReservationRoomRateRow({row,detail,item,checkoutDate="",
     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:14,padding:"10px 12px"}}>
       <span style={{minWidth:0,fontFamily:"inherit"}}>
         <b style={{display:"block",fontSize:11,fontWeight:850,lineHeight:1.35}}>Hab. {row.name} · vendida como {row.soldAs} · {fmtStay(row.start)} → {fmtStay(row.end)}</b>
-        <small style={{display:"block",marginTop:2,fontSize:11,lineHeight:1.35,fontFamily:"inherit",color:"var(--muted)"}}>Asignada: {row.physicalCategory}{changed?" · categoría física distinta":""} · {row.guests} huésped{row.guests===1?"":"es"} · {parts.length?parts.join(" + "):"Rooming sin configurar"}</small>{earlyActive||lateActive?<span style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginTop:6}}>{earlyActive?<span style={{padding:"4px 7px",border:"1px solid color-mix(in srgb,#2e9b61 38%,var(--line))",borderRadius:999,background:"color-mix(in srgb,#2e9b61 10%,var(--panelSolid))",color:"#26794d",fontSize:10,fontWeight:900}}>✓ EARLY CHECK-IN · desde {detail?.early_checkin_time||"08:00"}</span>:null}{lateActive?<span style={{padding:"4px 7px",border:"1px solid #2e9b61",borderRadius:999,background:"#2e9b61",color:"#fff",fontSize:10,fontWeight:900,boxShadow:"0 5px 14px rgba(46,155,97,.18)"}}>✓ LATE CHECK-OUT · hasta {detail?.late_checkout_time||"18:00"}</span>:null}</span>:null}
+        <small style={{display:"block",marginTop:2,fontSize:11,lineHeight:1.35,fontFamily:"inherit",color:"var(--muted)"}}>Asignada: {row.physicalCategory}{changed?" · categoría física distinta":""} · {row.guests} huésped{row.guests===1?"":"es"} · {parts.length?parts.join(" + "):"Rooming sin configurar"}{detail?.rate_plan_name?" · "+detail.rate_plan_name:""}</small>{earlyActive||lateActive?<span style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginTop:6}}>{earlyActive?<span style={{padding:"4px 7px",border:"1px solid color-mix(in srgb,#2e9b61 38%,var(--line))",borderRadius:999,background:"color-mix(in srgb,#2e9b61 10%,var(--panelSolid))",color:"#26794d",fontSize:10,fontWeight:900}}>✓ EARLY CHECK-IN · desde {detail?.early_checkin_time||"08:00"}</span>:null}{lateActive?<span style={{padding:"4px 7px",border:"1px solid #2e9b61",borderRadius:999,background:"#2e9b61",color:"#fff",fontSize:10,fontWeight:900,boxShadow:"0 5px 14px rgba(46,155,97,.18)"}}>✓ LATE CHECK-OUT · hasta {detail?.late_checkout_time||"18:00"}</span>:null}</span>:null}
       </span>
       <span style={{display:"grid",justifyItems:"end",gap:3,flex:"0 0 auto",textAlign:"right"}}>
         {checkedOut?<span style={{padding:"4px 7px",border:"1px solid color-mix(in srgb,#7656c9 34%,var(--line))",borderRadius:999,background:"color-mix(in srgb,#7656c9 10%,var(--panelSolid))",color:"#5e43aa",fontSize:8.8,fontWeight:950,letterSpacing:".02em"}}>✓ CHECK-OUT · {fmtStay(checkoutDate)}</span>:null}

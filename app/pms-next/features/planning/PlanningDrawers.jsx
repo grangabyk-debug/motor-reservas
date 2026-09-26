@@ -5,6 +5,7 @@ import{createPortal}from"react-dom"
 import{supabase}from"../../../../lib/supabase"
 import{CreateReservationDrawer as LegacyCreateReservationDrawer,ReservationDetailDrawer as LegacyReservationDetailDrawer}from"./PlanningDrawersLegacy"
 import useMaintenanceCheckoutGuard from"./useMaintenanceCheckoutGuard"
+import{normalizeRatePlans}from"../../core/ratePlans"
 import s from"./planning.module.css"
 
 export const ReservationDetailDrawer=LegacyReservationDetailDrawer
@@ -102,7 +103,7 @@ function GuestRecognitionPanel({propertyId,draft,setDraft,drawerStep,roomById}){
 
 export function CreateReservationDrawer(props){
   const{draft,setDraft,availableRooms=[],propertyId}=props
-  const[rateCurrency,setRateCurrency]=useState(null),[effectiveRates,setEffectiveRates]=useState({}),[resolvedPropertyId,setResolvedPropertyId]=useState(propertyId||null)
+  const[rateCurrency,setRateCurrency]=useState(null),[ratePlans,setRatePlans]=useState(()=>normalizeRatePlans({})),[effectiveRates,setEffectiveRates]=useState({}),[resolvedPropertyId,setResolvedPropertyId]=useState(propertyId||null)
   const roomIdsKey=useMemo(()=>availableRooms.map(room=>room.id).join(","),[availableRooms])
   const baseRatesKey=useMemo(()=>availableRooms.map(room=>`${room.id}:${Number(room.precio)||0}`).join("|") ,[availableRooms])
   const presentationPolicies=useMemo(()=>(props.cancellationPolicies||[]).map(policy=>({...policy,is_default:false})),[props.cancellationPolicies])
@@ -124,8 +125,8 @@ export function CreateReservationDrawer(props){
         const settingsRes=await supabase.from("property_settings").select("settings").eq("property_id",pid).maybeSingle()
         if(settingsRes.error)throw settingsRes.error
         if(cancelled)return
-        const code=String(settingsRes.data?.settings?.pricing?.rate_currency||"ARS").toUpperCase()==="USD"?"USD":"ARS"
-        setRateCurrency(code);setDraft(current=>current&&current.currency!==code?{...current,currency:code}:current)
+        const settings=settingsRes.data?.settings||{},code=String(settings?.pricing?.rate_currency||"ARS").toUpperCase()==="USD"?"USD":"ARS",plans=normalizeRatePlans(settings)
+        setRateCurrency(code);setRatePlans(plans);setDraft(current=>current?{...current,currency:code,ratePlanCode:current.ratePlanCode||plans.default_code}:current)
       }catch{if(!cancelled)setRateCurrency(current=>current||"ARS")}
     })()
     return()=>{cancelled=true}
@@ -133,7 +134,7 @@ export function CreateReservationDrawer(props){
 
   useEffect(()=>{
     if(typeof window==="undefined"||!pid)return
-    const handler=event=>{if(String(event.detail?.propertyId)!==String(pid))return;const code=String(event.detail?.settings?.pricing?.rate_currency||"ARS").toUpperCase()==="USD"?"USD":"ARS";setRateCurrency(code);setDraft(current=>current&&current.currency!==code?{...current,currency:code}:current)}
+    const handler=event=>{if(String(event.detail?.propertyId)!==String(pid))return;const settings=event.detail?.settings||{},code=String(settings?.pricing?.rate_currency||"ARS").toUpperCase()==="USD"?"USD":"ARS",plans=normalizeRatePlans(settings);setRateCurrency(code);setRatePlans(plans);setDraft(current=>current?{...current,currency:code,ratePlanCode:current.ratePlanCode||plans.default_code}:current)}
     window.addEventListener("hl:property-settings-updated",handler)
     return()=>window.removeEventListener("hl:property-settings-updated",handler)
   },[pid,setDraft])
@@ -167,5 +168,5 @@ export function CreateReservationDrawer(props){
   const forcedDraft=draft&&rateCurrency?{...draft,currency:rateCurrency}:draft
   const forcedSetDraft=updater=>setDraft(current=>{const next=typeof updater==="function"?updater(current):updater;if(!next||!rateCurrency)return next;return next.currency===rateCurrency?next:{...next,currency:rateCurrency}})
   const maintenance=useMaintenanceCheckoutGuard({propertyId:pid,draft:forcedDraft,setDraft:forcedSetDraft,drawerStep:props.drawerStep,roomById:pricedRoomById})
-  return <><LegacyCreateReservationDrawer {...props} propertyId={pid} draft={forcedDraft} setDraft={forcedSetDraft} availableRooms={pricedRooms} roomById={pricedRoomById} cancellationPolicies={presentationPolicies} onSave={()=>maintenance.run(props.onSave)}/><GuestRecognitionPanel propertyId={pid} draft={forcedDraft} setDraft={forcedSetDraft} drawerStep={props.drawerStep} roomById={pricedRoomById}/>{maintenance.panel}</>
+  return <><LegacyCreateReservationDrawer {...props} propertyId={pid} draft={forcedDraft} setDraft={forcedSetDraft} availableRooms={pricedRooms} roomById={pricedRoomById} cancellationPolicies={presentationPolicies} ratePlans={ratePlans} onSave={()=>maintenance.run(props.onSave)}/><GuestRecognitionPanel propertyId={pid} draft={forcedDraft} setDraft={forcedSetDraft} drawerStep={props.drawerStep} roomById={pricedRoomById}/>{maintenance.panel}</>
 }
