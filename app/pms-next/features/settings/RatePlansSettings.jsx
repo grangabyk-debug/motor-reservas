@@ -10,7 +10,6 @@ export default function RatePlansSettings({value,currency="ARS",taxes={},canEdit
   const[form,setForm]=useState(()=>normalizeRatePlans(value))
   const mode=!taxes?.enabled?"sin IVA":taxes?.price_tax_mode==="tax_excluded"?"neto + IVA":"precio final con IVA incluido"
   function patchPlan(code,patch){setForm(current=>({...current,plans:current.plans.map(plan=>plan.code===code?{...plan,...patch}:plan)}))}
-  function chooseDefault(code){setForm(current=>({...current,default_code:code,plans:current.plans.map(plan=>plan.code===code?{...plan,active:true,adjustment_per_person:0}:plan)}))}
   function save(){const normalized=normalizeRatePlans(form);onSave?.(normalized)}
   return <div className={s.panel}>
     <h2>Planes tarifarios y régimen</h2>
@@ -24,7 +23,7 @@ export default function RatePlansSettings({value,currency="ARS",taxes={},canEdit
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
           <div><b style={{fontSize:12}}>{plan.name}</b><small style={{display:"block",marginTop:2,color:"var(--muted)"}}>{plan.code} · {isDefault?"Plan base · la tarifa actual ya incluye este régimen":"Opcional"}</small></div>
           <div style={{display:"flex",gap:7,alignItems:"center"}}>
-            {!isDefault?<button type="button" disabled={!canEdit||saving||!plan.active} onClick={()=>chooseDefault(plan.code)} style={{height:32,padding:"0 9px",border:"1px solid var(--line)",borderRadius:8,background:"var(--panelSolid)",color:"var(--text)",font:"inherit",fontSize:9.5,fontWeight:800}}>Usar como base</button>:<span style={{fontSize:9,fontWeight:900,color:"var(--accent)"}}>PREDETERMINADO</span>}
+            {isDefault?<span style={{fontSize:9,fontWeight:900,color:"var(--accent)"}}>PREDETERMINADO</span>:null}
             <label style={{display:"flex",alignItems:"center",gap:6,fontSize:10,fontWeight:800,color:"var(--muted)"}}><input type="checkbox" disabled={!canEdit||saving||isDefault} checked={plan.active} onChange={e=>patchPlan(plan.code,{active:e.target.checked,public:e.target.checked?plan.public:false})}/> Ofrecer</label>
           </div>
         </div>

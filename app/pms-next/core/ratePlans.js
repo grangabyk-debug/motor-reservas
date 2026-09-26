@@ -16,10 +16,8 @@ export function normalizeRatePlans(input={}){
     const defaultActive=preset.code==="BB"
     return{...preset,active:current.active==null?defaultActive:Boolean(current.active),public:current.public==null?Boolean(current.active??defaultActive):Boolean(current.public),adjustment_per_person:number(current.adjustment_per_person),description:String(current.description??preset.description),sort_order:index}
   })
-  let defaultCode=String(raw.default_code||"BB").toUpperCase()
-  if(!plans.some(plan=>plan.code===defaultCode))defaultCode="BB"
+  const defaultCode="BB"
   plans=plans.map(plan=>plan.code===defaultCode?{...plan,active:true,adjustment_per_person:0}:plan)
-  if(!plans.some(plan=>plan.active)){defaultCode="BB";plans=plans.map(plan=>plan.code==="BB"?{...plan,active:true,adjustment_per_person:0}:plan)}
   return{version:1,default_code:defaultCode,plans}
 }
 
