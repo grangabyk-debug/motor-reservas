@@ -24,7 +24,7 @@ export default function RatePlansSettings({value,currency="ARS",taxes={},canEdit
           <div><b style={{fontSize:12}}>{plan.name}</b><small style={{display:"block",marginTop:2,color:"var(--muted)"}}>{plan.code} · {isDefault?"Plan base · la tarifa actual ya incluye este régimen":"Opcional"}</small></div>
           <div style={{display:"flex",gap:7,alignItems:"center"}}>
             {isDefault?<span style={{fontSize:9,fontWeight:900,color:"var(--accent)"}}>PREDETERMINADO</span>:null}
-            <label style={{display:"flex",alignItems:"center",gap:6,fontSize:10,fontWeight:800,color:"var(--muted)"}}><input type="checkbox" disabled={!canEdit||saving||isDefault} checked={plan.active} onChange={e=>patchPlan(plan.code,{active:e.target.checked,public:e.target.checked?plan.public:false})}/> Ofrecer</label>
+            <label style={{display:"flex",alignItems:"center",gap:6,fontSize:10,fontWeight:800,color:"var(--muted)"}}><input type="checkbox" disabled={!canEdit||saving||isDefault} checked={plan.active} onChange={e=>patchPlan(plan.code,{active:e.target.checked,public:e.target.checked})}/> Ofrecer</label>
           </div>
         </div>
         <div className={s.settingsFieldPair}>
