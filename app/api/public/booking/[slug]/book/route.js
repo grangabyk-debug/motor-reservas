@@ -15,7 +15,7 @@ async function sendConfirmation(client,slug,payload,booking,baseUrl){
   try{
     const{data:config,error}=await client.rpc("hl_public_booking_config",{p_slug:slug});if(error)throw error
     const hotel=config?.name||"Hotel",subject=`${hotel} · Reserva ${booking.numero_reserva||booking.id}`,currency=booking.currency||config?.currency||"ARS",nights=Math.max(1,Number(booking.nights)||1),nightly=Number(booking.total||0)/nights
-    const lines=[`Hola ${payload.name},`,``,`Tu reserva en ${hotel} quedó confirmada.`,``,`Número de reserva: ${booking.numero_reserva||booking.id}`,`Entrada: ${booking.check_in||payload.check_in}`,`Salida: ${booking.check_out||payload.check_out}`,`Noches: ${nights}`,`Pasajeros: ${payload.guests||1}`,`Tipo de habitación: ${booking.room_type||payload.room_type}`,`Camas / rooming: ${roomingLabel(booking.rooming||payload.rooming)}`]
+    const lines=[`Hola ${payload.name},`,``,`Tu reserva en ${hotel} quedó confirmada.`,``,`Número de reserva: ${booking.numero_reserva||booking.id}`,`Entrada: ${booking.check_in||payload.check_in}`,`Salida: ${booking.check_out||payload.check_out}`,`Noches: ${nights}`,`Pasajeros: ${payload.guests||1}`,`Tipo de habitación: ${booking.room_type||payload.room_type}`,`Camas / rooming: ${roomingLabel(booking.rooming||payload.rooming)}`];if(booking?.rate_plan?.name)lines.push(`Plan tarifario: ${booking.rate_plan.name}`)
     if(booking?.voucher){lines.push(`Voucher: ${booking.voucher.name||booking.voucher.slug}`,`Subtotal: ${money(booking.subtotal,currency)}`,`Impuestos: ${money(booking.tax_amount,currency)}`,`Total voucher: ${money(booking.total,currency)}`);if(booking.voucher.commercial_conditions)lines.push(`Condiciones del voucher: ${booking.voucher.commercial_conditions}`)}else{lines.push(`Tarifa promedio por noche: ${money(nightly,currency)}`,`Total: ${money(booking.total,currency)}`)}
     lines.push("",...policyLines(booking.cancellation_policy||config?.default_cancellation_policy,currency))
     if(config?.contact_phone||config?.contact_email)lines.push("",`Contacto del hotel: ${[config.contact_phone,config.contact_email].filter(Boolean).join(" · ")}`)
@@ -28,19 +28,19 @@ async function sendConfirmation(client,slug,payload,booking,baseUrl){
 export async function POST(request,{params}){
   try{
     const{slug}=await params,raw=await request.json().catch(()=>null);if(!raw)return Response.json({error:"Solicitud inválida."},{status:400})
-    const payload={check_in:text(raw.check_in,10),check_out:text(raw.check_out,10),guests:Math.min(20,Math.max(1,Number(raw.guests)||1)),name:text(raw.name,160),email:text(raw.email,180),phone:text(raw.phone,80),rooming:cleanRooming(raw.rooming),room_type:text(raw.room_type,120),request_id:text(raw.request_id,120),voucher_slug:text(raw.voucher_slug,120).toLowerCase()}
+    const payload={check_in:text(raw.check_in,10),check_out:text(raw.check_out,10),guests:Math.min(20,Math.max(1,Number(raw.guests)||1)),name:text(raw.name,160),email:text(raw.email,180),phone:text(raw.phone,80),rooming:cleanRooming(raw.rooming),room_type:text(raw.room_type,120),request_id:text(raw.request_id,120),voucher_slug:text(raw.voucher_slug,120).toLowerCase(),rate_plan_code:text(raw.rate_plan_code,16).toUpperCase()||"BB"}
     if(!payload.name||!payload.room_type||!payload.email)return Response.json({error:"Faltan datos para confirmar la reserva."},{status:400})
     const client=publicClient(),session=clientKey(request),limit=await client.rpc("hl_public_booking_rate_limit",{p_slug:slug,p_client_key:`book:${session}`,p_limit:12,p_window_minutes:15});if(limit.error)throw limit.error
     if(limit.data!==true)return Response.json({error:"Se realizaron demasiados intentos de reserva. Esperá unos minutos y volvé a intentar."},{status:429,headers:{"Retry-After":"300","Cache-Control":"no-store"}})
-    await client.rpc("hl_public_web_event",{p_slug:slug,p_event:"booking_start",p_source:"engine",p_session:session,p_metadata:{room_type:payload.room_type}})
-    const{data,error}=await client.rpc("hl_public_booking_create",{p_slug:slug,p_payload:payload});if(error)throw error
-    if(!data?.idempotent_replay)await client.rpc("hl_public_web_event",{p_slug:slug,p_event:"booking_confirmed",p_source:"engine",p_session:session,p_metadata:{room_type:payload.room_type}})
+    await client.rpc("hl_public_web_event",{p_slug:slug,p_event:"booking_start",p_source:"engine",p_session:session,p_metadata:{room_type:payload.room_type,rate_plan_code:payload.rate_plan_code}})
+    const{data,error}=await client.rpc("hl_public_booking_create_with_plan",{p_slug:slug,p_payload:payload});if(error)throw error
+    if(!data?.idempotent_replay)await client.rpc("hl_public_web_event",{p_slug:slug,p_event:"booking_confirmed",p_source:"engine",p_session:session,p_metadata:{room_type:payload.room_type,rate_plan_code:payload.rate_plan_code}})
     const email_sent=await sendConfirmation(client,slug,payload,data,new URL(request.url).origin)
     return Response.json({...data,email_sent},{status:data?.idempotent_replay?200:201,headers:{"Cache-Control":"no-store"}})
   }catch(error){
     console.error("public booking create",error)
     const message=String(error?.message||"")
-    const publicMessage=message.includes("voucher está agotado")?"Ese voucher se agotó.":message.includes("inventario de voucher")?"No queda disponibilidad del voucher para esa fecha.":message.includes("fuera de la vigencia")?"Las fechas elegidas están fuera de la vigencia del voucher.":message.includes("requiere")&&message.includes("noche")?message:message.includes("acaba de dejar")?"Ese tipo de habitación acaba de agotarse. Volvé a buscar disponibilidad.":message.includes("capacidad")?"La habitación no admite esa cantidad de huéspedes.":"No se pudo confirmar la reserva. Volvé a buscar disponibilidad."
+    const publicMessage=message.includes("voucher está agotado")?"Ese voucher se agotó.":message.includes("inventario de voucher")?"No queda disponibilidad del voucher para esa fecha.":message.includes("fuera de la vigencia")?"Las fechas elegidas están fuera de la vigencia del voucher.":message.includes("requiere")&&message.includes("noche")?message:message.includes("Plan tarifario no disponible")?"Ese plan tarifario ya no está disponible. Volvé a buscar disponibilidad.":message.includes("acaba de dejar")?"Ese tipo de habitación acaba de agotarse. Volvé a buscar disponibilidad.":message.includes("capacidad")?"La habitación no admite esa cantidad de huéspedes.":"No se pudo confirmar la reserva. Volvé a buscar disponibilidad."
     return Response.json({error:publicMessage},{status:409,headers:{"Cache-Control":"no-store"}})
   }
 }
