@@ -80,6 +80,8 @@ begin
         'rate_plan_adjustment_booked_per_person',
           case when v_guests=0 then 0 else (v_new_rate-coalesce(v_base_rate,0))/v_guests end,
         'rate_plan_adjustment_final_per_person',coalesce(nullif(p_room->>'ratePlanAdjustmentFinalPerPerson','')::numeric,0),
+        'rate_plan_booked_guests',v_guests,
+        'rate_plan_snapshot',jsonb_build_object('code',p_room->>'ratePlanCode','name',p_room->>'ratePlanName','meal_plan',p_room->>'ratePlanMeal','adjustment_per_person',coalesce(nullif(p_room->>'ratePlanAdjustmentConfiguredPerPerson','')::numeric,0),'booked_guests',v_guests,'captured_at',now()),
         'rate_plan_snapshot_at',now()
       )
       else e end order by ord
@@ -341,9 +343,115 @@ begin
 end;
 $$;
 
+create or replace function public.hl_change_group_reservation_room_with_plan_atomic(
+  p_reserva_id bigint,
+  p_from_room_id bigint,
+  p_to_room_id bigint,
+  p_reprice boolean default false
+) returns public.reservas
+language plpgsql
+security definer
+set search_path to 'public','private','pg_temp'
+as $$
+declare
+  before_row public.reservas%rowtype;
+  r public.reservas%rowtype;
+  source_detail jsonb;
+  guests integer:=0;
+  booked_pp numeric:=0;
+  plan_nightly numeric:=0;
+  plan_total numeric:=0;
+  start_date date;
+  end_date date;
+  nights integer:=1;
+  details jsonb;
+  next_subtotal numeric:=0;
+  next_discount numeric:=0;
+  next_net numeric:=0;
+  next_vat numeric:=0;
+  next_total numeric:=0;
+begin
+  select * into before_row from public.reservas where id=p_reserva_id for update;
+  if not found then raise exception using errcode='P0002',message='Reserva inexistente.'; end if;
+
+  select e into source_detail
+  from jsonb_array_elements(coalesce(before_row.habitaciones_detalle,'[]'::jsonb)) e
+  where coalesce(e->>'habitacion_id','')~'^[0-9]+$'
+    and (e->>'habitacion_id')::bigint=p_from_room_id
+    and lower(coalesce(e->>'segment_role','active_room')) not in('previous_room','transient_room','cancelled_room','no_show_room')
+  order by case when lower(coalesce(e->>'segment_role','active_room'))='active_room' then 0 else 1 end
+  limit 1;
+
+  r:=public.hl_change_group_reservation_room_atomic(p_reserva_id,p_from_room_id,p_to_room_id,p_reprice);
+  if not coalesce(p_reprice,false) or coalesce(source_detail->>'rate_plan_code','')='' then return r; end if;
+
+  guests:=greatest(0,coalesce(nullif(source_detail->>'rate_plan_booked_guests','')::integer,nullif(source_detail->>'huespedes','')::integer,0));
+  booked_pp:=coalesce(nullif(source_detail->>'rate_plan_adjustment_booked_per_person','')::numeric,0);
+  plan_nightly:=booked_pp*guests;
+  if abs(plan_nightly)<0.000001 then return r; end if;
+
+  start_date:=coalesce(nullif(source_detail->>'fecha_entrada','')::date,before_row.fecha_entrada);
+  end_date:=coalesce(nullif(source_detail->>'fecha_salida','')::date,before_row.fecha_salida);
+  nights:=greatest(1,end_date-start_date);
+  plan_total:=round(plan_nightly*nights,2);
+
+  select coalesce(jsonb_agg(
+    case when coalesce(e->>'habitacion_id','')~'^[0-9]+$'
+           and (e->>'habitacion_id')::bigint=p_to_room_id
+           and lower(coalesce(e->>'segment_role','active_room')) not in('previous_room','transient_room','cancelled_room','no_show_room')
+      then e||jsonb_build_object(
+        'tarifa_base_noche',greatest(0,coalesce(nullif(e->>'tarifa_noche','')::numeric,0)),
+        'tarifa_noche',greatest(0,coalesce(nullif(e->>'tarifa_noche','')::numeric,0)+plan_nightly),
+        'rate_plan_code',source_detail->>'rate_plan_code',
+        'rate_plan_name',source_detail->>'rate_plan_name',
+        'rate_plan_meal',source_detail->>'rate_plan_meal',
+        'rate_plan_regimen',source_detail->>'rate_plan_regimen',
+        'rate_plan_adjustment_currency',source_detail->>'rate_plan_adjustment_currency',
+        'rate_plan_adjustment_configured_per_person',coalesce(nullif(source_detail->>'rate_plan_adjustment_configured_per_person','')::numeric,0),
+        'rate_plan_adjustment_booked_per_person',booked_pp,
+        'rate_plan_adjustment_final_per_person',coalesce(nullif(source_detail->>'rate_plan_adjustment_final_per_person','')::numeric,0),
+        'rate_plan_booked_guests',guests,
+        'rate_plan_snapshot',coalesce(source_detail->'rate_plan_snapshot','{}'::jsonb)
+      )
+      else e end order by ord
+  ),'[]'::jsonb)
+  into details
+  from jsonb_array_elements(coalesce(r.habitaciones_detalle,'[]'::jsonb)) with ordinality x(e,ord);
+
+  next_subtotal:=greatest(0,round(coalesce(r.subtotal,0)+plan_total,2));
+  if lower(coalesce(r.descuento_tipo,'')) in('percent','porcentaje','percentage') then
+    next_discount:=round(next_subtotal*least(100,greatest(0,coalesce(r.descuento_valor,0)))/100,2);
+  elsif lower(coalesce(r.descuento_tipo,'')) in('amount','importe','fixed','fijo','monto') then
+    next_discount:=least(next_subtotal,greatest(0,coalesce(r.descuento_valor,r.descuento_importe,0)));
+  else
+    next_discount:=least(next_subtotal,greatest(0,coalesce(r.descuento_importe,0)));
+  end if;
+  next_net:=round(greatest(0,next_subtotal-next_discount),2);
+  next_vat:=case when coalesce(r.impuestos_desglosados,false) then round(next_net*greatest(0,coalesce(r.iva_porcentaje,0))/100,2) else 0 end;
+  next_total:=round(next_net+next_vat,2);
+
+  update public.reservas
+     set habitaciones_detalle=details,
+         tarifa_noche=greatest(0,coalesce(r.tarifa_noche,0)+plan_nightly),
+         subtotal=next_subtotal,
+         descuento_importe=next_discount,
+         precio_sin_impuestos_nacionales=next_net,
+         iva_importe=next_vat,
+         precio_total=next_total,
+         precio_total_usd=case when coalesce(tipo_cambio,0)>0 then round(next_total/tipo_cambio,2) else precio_total_usd end
+   where id=r.id
+   returning * into r;
+
+  perform private.hl_sync_reservation_folios_internal(r.id);
+  perform private.hl_rebuild_item_payment_allocations_from_folios(r.id);
+  return r;
+end;
+$$;
+
 grant execute on function public.hl_change_rate_currency_with_plans(uuid,text,numeric,jsonb,text,date) to authenticated;
 grant execute on function public.hl_add_room_to_reservation_with_plan_atomic(bigint,jsonb) to authenticated;
 grant execute on function public.hl_extend_group_rooms_with_plan_atomic(bigint,bigint[],date) to authenticated;
 grant execute on function public.hl_planning_move_reservation_with_plan_atomic(bigint,bigint,date,date,boolean) to authenticated;
+grant execute on function public.hl_change_group_reservation_room_with_plan_atomic(bigint,bigint,bigint,boolean) to authenticated;
 
 commit;
