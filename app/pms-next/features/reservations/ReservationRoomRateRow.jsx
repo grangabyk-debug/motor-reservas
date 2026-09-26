@@ -10,7 +10,7 @@ const round2=value=>Math.round((Number(value)||0)*100)/100
 
 function nightlyRows(detail,taxEnabled,vatRate){
   const raw=Array.isArray(detail?.tarifas_por_noche)?detail.tarifas_por_noche:[]
-  const factor=taxEnabled?1+Math.max(0,Number(vatRate)||0)/100:1,planGuests=Math.max(0,Number(detail?.rate_plan_booked_guests??detail?.rate_plan_snapshot?.booked_guests??detail?.huespedes)||0),planFinalPerNight=(Number(detail?.rate_plan_adjustment_final_per_person)||0)*planGuests
+  const factor=taxEnabled?1+Math.max(0,Number(vatRate)||0)/100:1,planGuests=Math.max(0,Number(detail?.rate_plan_booked_guests??detail?.rate_plan_snapshot?.booked_guests??detail?.huespedes)||0),planFinalPerNight=Number(detail?.rate_plan_adjustment_final_per_night)||(Number(detail?.rate_plan_adjustment_final_per_person)||0)*planGuests
   return raw.map((entry,index)=>{
     const net=Number(entry?.tarifa_neta??entry?.price??entry?.tarifa)
     const grossStored=Number(entry?.tarifa_final)
