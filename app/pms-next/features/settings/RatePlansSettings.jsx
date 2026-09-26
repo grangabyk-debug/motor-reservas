@@ -21,7 +21,7 @@ export default function RatePlansSettings({value,currency="ARS",taxes={},canEdit
     <div style={{display:"grid",gap:9}}>
       {form.plans.map(plan=>{const isDefault=plan.code===form.default_code;return <article key={plan.code} style={{padding:"11px 12px",border:"1px solid "+(isDefault?"color-mix(in srgb,var(--accent) 42%,var(--line))":"var(--line)"),borderRadius:11,background:isDefault?"color-mix(in srgb,var(--accent) 5%,var(--panelSolid))":"var(--panelSolid)"}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
-          <div><b style={{fontSize:12}}>{plan.name}</b><small style={{display:"block",marginTop:2,color:"var(--muted)"}}>{plan.code} · {isDefault?"Plan base · la tarifa actual ya incluye este régimen":"Opcional"}</small></div>
+          <div><b style={{fontSize:12}}>{plan.name}</b><small style={{display:"block",marginTop:2,color:"var(--muted)"}}>{plan.code} · {isDefault?"Plan base · la tarifa actual ya incluye este régimen":plan.code==="RO"?"Opcional · se descuenta de Alojamiento + desayuno":"Opcional"}</small></div>
           <div style={{display:"flex",gap:7,alignItems:"center"}}>
             {isDefault?<span style={{fontSize:9,fontWeight:900,color:"var(--accent)"}}>PREDETERMINADO</span>:null}
             <label style={{display:"flex",alignItems:"center",gap:6,fontSize:10,fontWeight:800,color:"var(--muted)"}}><input type="checkbox" disabled={!canEdit||saving||isDefault} checked={plan.active} onChange={e=>patchPlan(plan.code,{active:e.target.checked,public:e.target.checked})}/> Ofrecer</label>
@@ -36,9 +36,9 @@ export default function RatePlansSettings({value,currency="ARS",taxes={},canEdit
             </select>
           </label>
           <label className={s.settingsField}>
-            <span className={s.settingsFieldLabel}>{plan.code==="RO"?"Descuento":"Ajuste"}</span>
+            <span className={s.settingsFieldLabel}>{plan.code==="RO"?"Descuento sobre tarifa base":"Ajuste"}</span>
             <input className={s.settingsControl} type="number" step={currency==="ARS"?"100":"0.5"} disabled={!canEdit||saving||isDefault||!plan.active} value={isDefault?0:plan.adjustment_per_person} onChange={e=>patchPlan(plan.code,{adjustment_per_person:e.target.value})} placeholder={plan.code==="RO"?"Ej. 20000":"Ej. 10000"}/>
-            <small className={s.settingsFieldHelp}>{isDefault?"Incluido en la tarifa actual.":Number(plan.adjustment_per_person||0)===0?(plan.code==="RO"?"Sin descuento respecto del plan base.":"Sin diferencia respecto del plan base."):plan.code==="RO"?"Resta "+money(Math.abs(Number(plan.adjustment_per_person)||0),currency)+" por habitación / noche.":(ratePlanSignedAdjustment(plan)>0?"Suma ":"Resta ")+money(Math.abs(ratePlanSignedAdjustment(plan)),currency)+" por "+ratePlanBasisLabel(plan)+"."}</small>
+            <small className={s.settingsFieldHelp}>{isDefault?"Incluido en la tarifa actual.":plan.code==="RO"?(Number(plan.adjustment_per_person||0)===0?"Este valor se descuenta de Alojamiento + desayuno.":"Se descuenta de Alojamiento + desayuno · resta "+money(Math.abs(Number(plan.adjustment_per_person)||0),currency)+" por habitación / noche."):(Number(plan.adjustment_per_person||0)===0?"Sin diferencia respecto del plan base.":(ratePlanSignedAdjustment(plan)>0?"Suma ":"Resta ")+money(Math.abs(ratePlanSignedAdjustment(plan)),currency)+" por "+ratePlanBasisLabel(plan)+".")}</small>
           </label>
           <label className={s.settingsField}>
             <span className={s.settingsFieldLabel}>Detalle opcional</span>
