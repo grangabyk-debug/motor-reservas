@@ -10,18 +10,7 @@ import useOperationalDate from"../../core/useOperationalDate"
 import{expandedReservationSearchWindow,reservationRoomInventoryOverlaps,reservationRoomInventoryWindow}from"./reservationInventoryAvailability"
 import{groupRoomOverlay,groupRoomShell}from"./reservationGroupRoomChangeStyles"
 import{quoteWithRatePlan}from"./reservationRoomChangeFlow"
-
-const validDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(String(value||""))
-const normalize=value=>String(value||"").trim().toLowerCase()
-const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:0}).format(Number(value)||0)
-const roomIds=item=>[...new Set([item?.habitacion_id,...(item?.habitaciones_ids||[])].filter(Boolean).map(Number))]
-const detailFor=(item,roomId)=>(Array.isArray(item?.habitaciones_detalle)?item.habitaciones_detalle:[]).find(row=>Number(row?.habitacion_id)===Number(roomId))||{}
-const roomStart=(item,roomId)=>{const value=detailFor(item,roomId)?.fecha_entrada;return validDate(value)?String(value):item?.fecha_entrada}
-const roomPlannedEnd=(item,roomId)=>{const value=detailFor(item,roomId)?.fecha_salida;return validDate(value)?String(value):item?.fecha_salida}
-const roomEnd=(item,roomId)=>{const planned=roomPlannedEnd(item,roomId),release=item?.room_checkout_dates?.[String(roomId)];return validDate(release)&&String(release)<planned?String(release):planned}
-const round=value=>Math.round((Number(value)||0)*100)/100
-const prettyDate=value=>{if(!validDate(value))return value||"—";const[y,m,d]=String(value).split("-");return`${d}/${m}/${y}`}
-const inHouseState=value=>["alojado","inhouse","in_house","in house"].includes(normalize(value))
+import{detailFor,inHouseState,money,normalize,prettyDate,roomEnd,roomIds,roomPlannedEnd,roomStart,round,validDate}from"./reservationGroupRoomChangeUtils"
 
 export default function ReservationGroupRoomChangeControl({item,allRooms=[],busy=false,onMoved,historyMode=false}){
   const[localItem,setLocalItem]=useState(item),[sourceId,setSourceId]=useState(null),[options,setOptions]=useState([]),[loading,setLoading]=useState(false),[saving,setSaving]=useState(false),[error,setError]=useState(""),[query,setQuery]=useState(""),[mode,setMode]=useState("available"),[pending,setPending]=useState(null),[lockOpen,setLockOpen]=useState(false),[propertySettings,setPropertySettings]=useState({})

@@ -3,7 +3,8 @@
 import{useCallback,useEffect,useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
 import{normalizeTaxSettings,priceTaxCaption}from"../../core/priceTax"
-import{activeRatePlans,configuredAmountToFinal,defaultRatePlan,normalizeRatePlans,ratePlanByCode}from"../../core/ratePlans"
+import{normalizeRatePlans}from"../../core/ratePlans"
+import{buildQuoteLinesWithPlan,estimateQuoteWithPlan,resolveQuoteRatePlan}from"./quoteRatePlanPricing"
 import{pricingFromSettings}from"../../core/currency"
 import useQuoteAvailability from"./useQuoteAvailability"
 import prepareReservationFromQuote from"./quoteReservationSeed"
@@ -68,10 +69,10 @@ export default function QuotesWorkspace({propertyId,property,onNavigate,allowedV
   function patch(values){setForm(current=>({...current,...values}))}
   function changeDates(values){setForm(current=>{const adjusted=values.start?{...values,end:addDays(values.start,1)}:values,next={...current,...adjusted,selection:{}};window.setTimeout(()=>refreshAvailability(next),0);return next})}
   function setQty(type,qty){const max=availability.types.find(x=>x.name===type)?.available||0;const safe=Math.max(0,Math.min(max,Number(qty)||0));setForm(current=>({...current,selection:{...current.selection,[type]:safe}}))}
-  const planOptions=activeRatePlans(ratePlans),fallbackPlan=defaultRatePlan(ratePlans),requestedPlan=ratePlanByCode(ratePlans,form.ratePlanCode||fallbackPlan.code),selectedPlan=requestedPlan?.active?requestedPlan:fallbackPlan
+  const{planOptions,selectedPlan}=resolveQuoteRatePlan(ratePlans,form.ratePlanCode)
   const selectedRooms=useMemo(()=>Object.values(form.selection||{}).reduce((sum,value)=>sum+(Number(value)||0),0),[form.selection])
   const selectedCapacity=useMemo(()=>availability.types.reduce((sum,type)=>sum+(Number(form.selection?.[type.name])||0)*type.capacity,0),[availability.types,form.selection])
-  const baseEstimate=useMemo(()=>availability.types.reduce((sum,type)=>{const qty=Number(form.selection?.[type.name])||0,rates=(type.finalRateCandidates||[]).slice(0,qty);return sum+rates.reduce((subtotal,rate)=>subtotal+(Number(rate)||0)*nights(form.start,form.end),0)},0),[availability.types,form.selection,form.start,form.end]),planAdjustmentTotal=configuredAmountToFinal(Number(selectedPlan.adjustment_per_person)||0,taxes)*Math.max(1,Number(form.pax)||1)*nights(form.start,form.end),estimate=Math.max(0,baseEstimate+planAdjustmentTotal)
+  const estimate=estimateQuoteWithPlan({availability,selection:form.selection,start:form.start,end:form.end,pax:form.pax,selectedPlan,taxes})
 
   async function openReservationFromQuote(quote,groupOverride=null,quoteLinesOverride=null){
     const group=groupOverride||groups[quote.group_id],quoteLines=quoteLinesOverride||(lines[quote.id]||[])
@@ -89,9 +90,7 @@ export default function QuotesWorkspace({propertyId,property,onNavigate,allowedV
     try{
       const latest=await checkAvailability(form.start,form.end)
       for(const[type,qty]of Object.entries(form.selection)){if(Number(qty)>0&&(latest.types.find(x=>x.name===type)?.available||0)<Number(qty))throw new Error(`Cambió la disponibilidad de ${type}. Volvé a seleccionar las habitaciones.`)}
-      const stayNights=nights(form.start,form.end),roomLines=latest.types.flatMap(type=>{const qty=Number(form.selection[type.name])||0;if(!qty)return[];const rates=(type.rateCandidates||[]).slice(0,qty),finalRates=(type.finalRateCandidates||[]).slice(0,qty),configuredRates=(type.configuredRateCandidates||[]).slice(0,qty);if(rates.length<qty||finalRates.length<qty||configuredRates.length<qty)throw new Error(`Cambió la disponibilidad tarifaria de ${type.name}. Actualizá el presupuesto.`);const netStayTotal=rates.reduce((sum,rate)=>sum+(Number(rate)||0)*stayNights,0),finalStayTotal=finalRates.reduce((sum,rate)=>sum+(Number(rate)||0)*stayNights,0),configuredStayTotal=configuredRates.reduce((sum,rate)=>sum+(Number(rate)||0)*stayNights,0),avgNightlyNet=netStayTotal/(qty*stayNights),avgNightlyCommercial=configuredStayTotal/(qty*stayNights),avgNightlyFinal=finalStayTotal/(qty*stayNights);return[{category:"room",description:type.name,quantity:qty,unit_price:finalStayTotal/qty,sort_order:0,metadata:{room_type:type.name,nights:stayNights,nightly_rate:avgNightlyNet,nightly_rate_commercial:avgNightlyCommercial,nightly_rate_final:avgNightlyFinal,vat_rate:taxes.enabled?taxes.vat_rate:0,price_tax_mode:taxes.price_tax_mode,tax_included:Boolean(taxes.enabled&&taxes.price_tax_mode==="tax_included"),quoted_available:type.available,pricing_version:2,rate_plan_code:selectedPlan.code,rate_plan_name:selectedPlan.name,meal_plan:selectedPlan.meal_plan,rate_plan_adjustment_per_person:Number(selectedPlan.adjustment_per_person)||0}}]}),quoteLines=[...roomLines],planUnitFinal=configuredAmountToFinal(Number(selectedPlan.adjustment_per_person)||0,taxes),planUnits=Math.max(1,Number(form.pax)||1)*stayNights
-      if(Math.abs(planUnitFinal)>0.000001)quoteLines.push({category:planUnitFinal>0?"food":"discount",description:(planUnitFinal>0?"Régimen · ":"Ajuste régimen · ")+selectedPlan.name,quantity:planUnits,unit_price:Math.abs(planUnitFinal),sort_order:roomLines.length,metadata:{rate_plan_code:selectedPlan.code,rate_plan_name:selectedPlan.name,meal_plan:selectedPlan.meal_plan,per_person_per_night:true,price_tax_mode:taxes.enabled?taxes.price_tax_mode:"disabled",vat_rate:taxes.enabled?taxes.vat_rate:0}})
-      const quoteTotal=quoteLines.reduce((sum,line)=>sum+(line.category==="discount"?-1:1)*(Number(line.quantity)||0)*(Number(line.unit_price)||0),0)
+      const{quoteLines,quoteTotal}=buildQuoteLinesWithPlan({latest,selection:form.selection,start:form.start,end:form.end,pax:form.pax,selectedPlan,taxes})
       const groupPayload={property_id:propertyId,name:form.name.trim(),kind:"group",status:"prospect",arrival_date:form.start,departure_date:form.end,contact_name:form.name.trim(),contact_email:form.email.trim()||null,contact_phone:form.phone.trim()||null,room_block:selectedRooms,estimated_pax:Math.max(1,Number(form.pax)||1),sales_stage:"quoted",budget_currency:form.currency||currency,budget_total:quoteTotal,notes:form.notes.trim()||null}
       const{data:group,error:groupError}=await supabase.from("hotel_groups").insert(groupPayload).select("id").single();if(groupError)throw groupError;groupId=group.id
       const quoteNumber=`PRE-${dateKey(new Date()).replaceAll("-","")}-${String(Date.now()).slice(-5)}`
