@@ -27,13 +27,15 @@ export default function RatePlansSettings({value,currency="ARS",taxes={},canEdit
             <label style={{display:"flex",alignItems:"center",gap:6,fontSize:10,fontWeight:800,color:"var(--muted)"}}><input type="checkbox" disabled={!canEdit||saving||isDefault} checked={plan.active} onChange={e=>patchPlan(plan.code,{active:e.target.checked,public:e.target.checked?plan.public:false})}/> Ofrecer</label>
           </div>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"minmax(150px,.7fr) minmax(220px,1.3fr)",gap:8,marginTop:9,alignItems:"start"}}>
-          <label style={{display:"flex",flexDirection:"column",gap:5,fontSize:10,fontWeight:800,color:"var(--muted)"}}>Ajuste por persona / noche
-            <input style={{height:40,minHeight:40,width:"100%",boxSizing:"border-box"}} type="number" step={currency==="ARS"?"100":"0.5"} disabled={!canEdit||saving||isDefault||!plan.active} value={isDefault?0:plan.adjustment_per_person} onChange={e=>patchPlan(plan.code,{adjustment_per_person:Number(e.target.value)||0})}/>
-            <small style={{fontWeight:600,lineHeight:1.35}}>{isDefault?"Incluido en la tarifa actual.":plan.adjustment_per_person===0?"Sin diferencia respecto del plan base.":(plan.adjustment_per_person>0?"Suma ":"Resta ")+money(Math.abs(plan.adjustment_per_person),currency)+" por huésped/noche."}</small>
+        <div className={s.settingsFieldPair}>
+          <label className={s.settingsField}>
+            <span className={s.settingsFieldLabel}>Ajuste por persona / noche</span>
+            <input className={s.settingsControl} type="number" step={currency==="ARS"?"100":"0.5"} disabled={!canEdit||saving||isDefault||!plan.active} value={isDefault?0:plan.adjustment_per_person} onChange={e=>patchPlan(plan.code,{adjustment_per_person:Number(e.target.value)||0})}/>
+            <small className={s.settingsFieldHelp}>{isDefault?"Incluido en la tarifa actual.":plan.adjustment_per_person===0?"Sin diferencia respecto del plan base.":(plan.adjustment_per_person>0?"Suma ":"Resta ")+money(Math.abs(plan.adjustment_per_person),currency)+" por huésped/noche."}</small>
           </label>
-          <label style={{display:"flex",flexDirection:"column",gap:5,fontSize:10,fontWeight:800,color:"var(--muted)"}}>Detalle opcional
-            <input style={{height:40,minHeight:40,width:"100%",boxSizing:"border-box"}} disabled={!canEdit||saving} value={plan.description||""} onChange={e=>patchPlan(plan.code,{description:e.target.value})} placeholder="Qué incluye este régimen"/>
+          <label className={s.settingsField}>
+            <span className={s.settingsFieldLabel}>Detalle opcional</span>
+            <input className={s.settingsControl} disabled={!canEdit||saving} value={plan.description||""} onChange={e=>patchPlan(plan.code,{description:e.target.value})} placeholder="Qué incluye este régimen"/>
           </label>
         </div>
       </article>})}
