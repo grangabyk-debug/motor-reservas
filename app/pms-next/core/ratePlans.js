@@ -10,17 +10,18 @@ const number=value=>Number.isFinite(Number(value))?Number(value):0
 const rawConfig=input=>input&&typeof input==="object"&&input.rate_plans&&typeof input.rate_plans==="object"?input.rate_plans:input&&typeof input==="object"?input:{}
 export const ratePlanBasis=plan=>plan?.adjustment_basis==="per_room"?"per_room":"per_person"
 export const ratePlanBasisLabel=plan=>ratePlanBasis(plan)==="per_room"?"habitación / noche":"persona / noche"
+export const ratePlanSignedAdjustment=plan=>String(plan?.code||"").toUpperCase()==="RO"?-Math.abs(number(plan?.adjustment_per_person)):number(plan?.adjustment_per_person)
 
 export function normalizeRatePlans(input={}){
   const raw=rawConfig(input),saved=new Map((Array.isArray(raw.plans)?raw.plans:[]).map(plan=>[String(plan?.code||"").toUpperCase(),plan]))
   let plans=RATE_PLAN_PRESETS.map((preset,index)=>{
-    const current=saved.get(preset.code)||{},basis=current.adjustment_basis==="per_room"||current.adjustment_basis==="per_person"?current.adjustment_basis:preset.adjustment_basis
+    const current=saved.get(preset.code)||{},basis=preset.code==="RO"?"per_room":current.adjustment_basis==="per_room"||current.adjustment_basis==="per_person"?current.adjustment_basis:preset.adjustment_basis
     const defaultActive=preset.code==="BB"
-    return{...preset,active:current.active==null?defaultActive:Boolean(current.active),public:current.public==null?Boolean(current.active??defaultActive):Boolean(current.public),adjustment_basis:basis,adjustment_per_person:number(current.adjustment_per_person),description:String(current.description??preset.description),sort_order:index}
+    return{...preset,active:current.active==null?defaultActive:Boolean(current.active),public:current.public==null?Boolean(current.active??defaultActive):Boolean(current.public),adjustment_basis:basis,adjustment_per_person:preset.code==="RO"?Math.abs(number(current.adjustment_per_person)):number(current.adjustment_per_person),description:String(current.description??preset.description),sort_order:index}
   })
   const defaultCode="BB"
   plans=plans.map(plan=>plan.code===defaultCode?{...plan,active:true,adjustment_basis:"per_room",adjustment_per_person:0}:plan)
-  return{version:2,default_code:defaultCode,plans}
+  return{version:3,default_code:defaultCode,plans}
 }
 
 export const activeRatePlans=input=>normalizeRatePlans(input).plans.filter(plan=>plan.active)
@@ -41,7 +42,7 @@ export function configuredAmountToFinal(amount,taxes={}){
   return enabled&&mode==="tax_excluded"&&rate>0?value*(1+rate/100):value
 }
 export function ratePlanAmounts(plan,guests,taxes={},rooms=1){
-  const basis=ratePlanBasis(plan),configuredValue=number(plan?.adjustment_per_person),units=basis==="per_room"?Math.max(0,number(rooms)):Math.max(0,number(guests)),netValue=configuredAmountToNet(configuredValue,taxes),finalValue=configuredAmountToFinal(configuredValue,taxes)
+  const basis=ratePlanBasis(plan),configuredValue=ratePlanSignedAdjustment(plan),units=basis==="per_room"?Math.max(0,number(rooms)):Math.max(0,number(guests)),netValue=configuredAmountToNet(configuredValue,taxes),finalValue=configuredAmountToFinal(configuredValue,taxes)
   return{basis,units,configuredValue,netValue,finalValue,configuredPerNight:configuredValue*units,netPerNight:netValue*units,finalPerNight:finalValue*units}
 }
 export function convertRatePlans(input,factor){

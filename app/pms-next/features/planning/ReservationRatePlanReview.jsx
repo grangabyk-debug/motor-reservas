@@ -1,10 +1,10 @@
 "use client"
 
-import{ratePlanBasisLabel}from"../../core/ratePlans"
+import{ratePlanBasisLabel,ratePlanSignedAdjustment}from"../../core/ratePlans"
 
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:0}).format(Number(value)||0)
 
 export default function ReservationRatePlanReview({selectedPlan,plans=[],currency="ARS",roomCount=1,onChange}){
-  const section={padding:"11px",border:"1px solid color-mix(in srgb,var(--accent) 28%,var(--line))",borderRadius:10,background:"color-mix(in srgb,var(--bg) 48%,var(--panelSolid))",marginBottom:10},adjustment=Number(selectedPlan?.adjustment_per_person)||0
+  const section={padding:"11px",border:"1px solid color-mix(in srgb,var(--accent) 28%,var(--line))",borderRadius:10,background:"color-mix(in srgb,var(--bg) 48%,var(--panelSolid))",marginBottom:10},adjustment=ratePlanSignedAdjustment(selectedPlan)
   return <div style={section}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}><div><small style={{display:"block",fontSize:10,fontWeight:900,letterSpacing:".06em",color:"var(--accent)"}}>PLAN TARIFARIO</small><b style={{display:"block",marginTop:3,fontSize:12}}>{selectedPlan.name}</b><small style={{display:"block",marginTop:3,color:"var(--muted)",fontSize:10}}>{adjustment?(adjustment>0?"+":"−")+money(Math.abs(adjustment),currency)+" por "+ratePlanBasisLabel(selectedPlan)+" respecto del plan base":"Incluido en la tarifa actual"}</small></div>{plans.length>1?<select value={selectedPlan.code} onChange={event=>onChange?.(event.target.value)} style={{minWidth:210,height:38,border:"1px solid var(--line)",borderRadius:10,background:"var(--panelSolid)",color:"var(--text)",padding:"0 10px",font:"inherit",fontSize:10.5,fontWeight:800}}>{plans.map(plan=><option key={plan.code} value={plan.code}>{plan.name}</option>)}</select>:<span style={{fontSize:10,fontWeight:850,color:"var(--muted)"}}>Predeterminado</span>}</div>{roomCount>1&&plans.length>1?<small style={{display:"block",marginTop:7,color:"var(--muted)",fontSize:10}}>El plan elegido se aplica a todas por defecto. En el Rooming de abajo podés cambiarlo por habitación.</small>:null}</div>
 }

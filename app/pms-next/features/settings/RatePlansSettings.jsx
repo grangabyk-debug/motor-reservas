@@ -1,7 +1,7 @@
 "use client"
 
 import{useState}from"react"
-import{normalizeRatePlans,ratePlanBasis,ratePlanBasisLabel}from"../../core/ratePlans"
+import{normalizeRatePlans,ratePlanBasis,ratePlanBasisLabel,ratePlanSignedAdjustment}from"../../core/ratePlans"
 import s from"./settings.module.css"
 
 const money=(value,currency)=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:2}).format(Number(value)||0)
@@ -13,7 +13,7 @@ export default function RatePlansSettings({value,currency="ARS",taxes={},canEdit
   function save(){const normalized=normalizeRatePlans(form);onSave?.(normalized)}
   return <div className={s.panel}>
     <h2>Planes tarifarios y régimen</h2>
-    <p className={s.panelIntro}>La tarifa actual de Habitaciones y Tarifas y disponibilidad es el precio del plan base. Por defecto es Alojamiento + desayuno. Los demás planes aplican un ajuste por habitación/noche o por persona/noche, según el régimen.</p>
+    <p className={s.panelIntro}>La tarifa actual de Habitaciones y Tarifas y disponibilidad es el precio del plan base. Por defecto es Alojamiento + desayuno. Solo alojamiento descuenta por habitación/noche sobre esa tarifa base. Los regímenes de comidas pueden sumar por persona/noche.</p>
     <div style={{padding:"12px 13px",border:"1px solid color-mix(in srgb,var(--accent) 28%,var(--line))",borderRadius:12,background:"color-mix(in srgb,var(--accent) 6%,var(--panelSolid))",marginBottom:14}}>
       <b style={{display:"block",fontSize:12}}>No cambia el contrato de precios</b>
       <small style={{display:"block",marginTop:4,color:"var(--muted)",lineHeight:1.5}}>Los ajustes usan la misma moneda ({currency}) y la misma regla fiscal ({mode}). El IVA, USD y el calendario siguen teniendo una sola fuente de verdad.</small>
@@ -30,15 +30,15 @@ export default function RatePlansSettings({value,currency="ARS",taxes={},canEdit
         <div className={s.ratePlanFields}>
           <label className={s.settingsField}>
             <span className={s.settingsFieldLabel}>Se aplica por</span>
-            <select className={s.settingsControl} disabled={!canEdit||saving||isDefault||!plan.active} value={ratePlanBasis(plan)} onChange={e=>patchPlan(plan.code,{adjustment_basis:e.target.value})}>
+            <select className={s.settingsControl} disabled={!canEdit||saving||isDefault||!plan.active||plan.code==="RO"} value={ratePlanBasis(plan)} onChange={e=>patchPlan(plan.code,{adjustment_basis:e.target.value})}>
               <option value="per_room">Habitación / noche</option>
               <option value="per_person">Persona / noche</option>
             </select>
           </label>
           <label className={s.settingsField}>
-            <span className={s.settingsFieldLabel}>Ajuste</span>
-            <input className={s.settingsControl} type="number" step={currency==="ARS"?"100":"0.5"} disabled={!canEdit||saving||isDefault||!plan.active} value={isDefault?0:plan.adjustment_per_person} onChange={e=>patchPlan(plan.code,{adjustment_per_person:e.target.value})} placeholder={plan.code==="RO"?"Ej. -15000":"Ej. 10000"}/>
-            <small className={s.settingsFieldHelp}>{isDefault?"Incluido en la tarifa actual.":Number(plan.adjustment_per_person||0)===0?"Sin diferencia respecto del plan base.":(Number(plan.adjustment_per_person)>0?"Suma ":"Resta ")+money(Math.abs(Number(plan.adjustment_per_person)||0),currency)+" por "+ratePlanBasisLabel(plan)+"."}</small>
+            <span className={s.settingsFieldLabel}>{plan.code==="RO"?"Descuento":"Ajuste"}</span>
+            <input className={s.settingsControl} type="number" step={currency==="ARS"?"100":"0.5"} disabled={!canEdit||saving||isDefault||!plan.active} value={isDefault?0:plan.adjustment_per_person} onChange={e=>patchPlan(plan.code,{adjustment_per_person:e.target.value})} placeholder={plan.code==="RO"?"Ej. 20000":"Ej. 10000"}/>
+            <small className={s.settingsFieldHelp}>{isDefault?"Incluido en la tarifa actual.":Number(plan.adjustment_per_person||0)===0?(plan.code==="RO"?"Sin descuento respecto del plan base.":"Sin diferencia respecto del plan base."):plan.code==="RO"?"Resta "+money(Math.abs(Number(plan.adjustment_per_person)||0),currency)+" por habitación / noche.":(ratePlanSignedAdjustment(plan)>0?"Suma ":"Resta ")+money(Math.abs(ratePlanSignedAdjustment(plan)),currency)+" por "+ratePlanBasisLabel(plan)+"."}</small>
           </label>
           <label className={s.settingsField}>
             <span className={s.settingsFieldLabel}>Detalle opcional</span>
