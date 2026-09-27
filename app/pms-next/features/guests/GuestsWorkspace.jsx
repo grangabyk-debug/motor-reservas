@@ -50,10 +50,12 @@ export default function GuestsWorkspace({propertyId,onNavigate,allowedViews=[]})
   const mergeCard={border:"1px solid rgba(34,64,52,.14)",borderRadius:14,padding:11,background:"rgba(255,255,255,.78)",display:"grid",gap:3,textAlign:"left",width:"100%",fontFamily:"inherit",cursor:"pointer"}
 
   return <section className={s.page}>
-    <header className={s.heading}><div><small>GUESTBOOK · CRM HOTELERO</small><h1>Huéspedes</h1><p>Una ficha viva por huésped: estadías, preferencias y oportunidades en un solo lugar.</p></div><div className={s.headerActions}><button type="button" className={s.softButton} onClick={()=>setOverlay("segments")}><PmsIcon name="filter"/>Segmentos</button><button type="button" className={s.softButton} onClick={()=>setOverlay("journey")}><PmsIcon name="calendar"/>Pre check-in</button>{selected?<button type="button" className={s.softButton} onClick={openMerge}><PmsIcon name="guest"/>Fusionar perfiles</button>:null}<button type="button" className={s.primary} onClick={openNew}><PmsIcon name="plus"/>Agregar huésped</button></div></header>
-    {data.error&&<div className={s.errorBanner}>{data.error}</div>}
-    <GuestAttentionPanel propertyId={propertyId} onOpenGuest={openAttentionGuest}/>
-    <GuestDuplicateWatch propertyId={propertyId}/>
+    <div className={s.topRegion}>
+      <header className={s.heading}><div><small>GUESTBOOK · CRM HOTELERO</small><h1>Huéspedes</h1><p>Una ficha viva por huésped: estadías, preferencias y oportunidades en un solo lugar.</p></div><div className={s.headerActions}><button type="button" className={s.softButton} onClick={()=>setOverlay("segments")}><PmsIcon name="filter"/>Segmentos</button><button type="button" className={s.softButton} onClick={()=>setOverlay("journey")}><PmsIcon name="calendar"/>Pre check-in</button>{selected?<button type="button" className={s.softButton} onClick={openMerge}><PmsIcon name="guest"/>Fusionar perfiles</button>:null}<button type="button" className={s.primary} onClick={openNew}><PmsIcon name="plus"/>Agregar huésped</button></div></header>
+      {data.error&&<div className={s.errorBanner}>{data.error}</div>}
+      <GuestAttentionPanel propertyId={propertyId} onOpenGuest={openAttentionGuest}/>
+      <GuestDuplicateWatch propertyId={propertyId}/>
+    </div>
     <div className={s.workspace}>
       <aside className={s.indexPanel}>
         <div className={s.indexHead}><div><small>ÍNDICE DEL GUESTBOOK</small><b>{data.totalProfiles} perfiles</b><em>{data.limited&&!debouncedQuery?`Mostrando ${data.guests.length} recientes`:debouncedQuery?`${data.guests.length} resultados`:"Todos cargados"}</em></div><span className={s.signalPill}>{signalCount} señales</span></div>
