@@ -92,6 +92,23 @@ export default function useGuestsData(propertyId,searchTerm=""){
     setProfiles(list=>list.map(item=>item.id===data.id?data:item));return data
   },[propertyId])
 
+  const loadGuestById=useCallback(async id=>{
+    if(!propertyId||!id)throw new Error("Perfil de huésped inválido.")
+    let{data:profile,error:profileError}=await supabase.from("hotel_guest_profiles").select(PROFILE_FIELDS).eq("property_id",propertyId).eq("id",id).maybeSingle()
+    if(profileError)throw profileError
+    if(profile?.merged_into_id){
+      const merged=await supabase.from("hotel_guest_profiles").select(PROFILE_FIELDS).eq("property_id",propertyId).eq("id",profile.merged_into_id).maybeSingle()
+      if(merged.error)throw merged.error
+      profile=merged.data||profile
+    }
+    if(!profile)throw new Error("No encontramos la ficha del huésped.")
+    const reservationRes=await supabase.from("reservas").select("id,guest_profile_id,group_id,nombre_huesped,email_huesped,telefono_huesped,fecha_entrada,fecha_salida,estado,precio_total,moneda,canal_reserva,habitacion_id,habitaciones_ids,merged_into_id").eq("property_id",propertyId).eq("guest_profile_id",profile.id).not("estado","in","(cancelada,fusionada)").order("fecha_salida",{ascending:false}).limit(300)
+    if(reservationRes.error)throw reservationRes.error
+    setProfiles(list=>[profile,...list.filter(item=>item.id!==profile.id)].slice(0,SEARCH_LIMIT))
+    setReservations(list=>{const map=new Map(list.map(item=>[Number(item.id),item]));for(const item of reservationRes.data||[])map.set(Number(item.id),item);return[...map.values()]})
+    return profile
+  },[propertyId])
+
   const searchMergeCandidates=useCallback(async(term,excludeId)=>{
     const needle=cleanSearch(term)
     let query=supabase.from("hotel_guest_profiles").select(PROFILE_FIELDS).eq("property_id",propertyId).is("merged_into_id",null).neq("id",excludeId).order("last_stay_at",{ascending:false,nullsFirst:false}).limit(30)
@@ -109,5 +126,5 @@ export default function useGuestsData(propertyId,searchTerm=""){
     return result
   },[propertyId,load])
 
-  return{guests,reservations,totalProfiles,limited:totalProfiles>profiles.length,loading,error,setError,load,createGuest,updateGuest,searchMergeCandidates,mergeGuest}
+  return{guests,reservations,totalProfiles,limited:totalProfiles>profiles.length,loading,error,setError,load,loadGuestById,createGuest,updateGuest,searchMergeCandidates,mergeGuest}
 }

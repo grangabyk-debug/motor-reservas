@@ -7,7 +7,8 @@ import{addDays,diffDays,money,unique}from"./reservationEditUtils"
 import ReservationAddRoomGuestPicker from"./ReservationAddRoomGuestPicker"
 import useOperationalDate from"../../core/useOperationalDate"
 import{normalizeTaxSettings}from"../../core/priceTax"
-import{activeRatePlans,configuredAmountToNet,defaultRatePlan,netAmountToFinal,normalizeRatePlans,ratePlanByCode}from"../../core/ratePlans"
+import{activeRatePlans,defaultRatePlan,normalizeRatePlans,ratePlanByCode}from"../../core/ratePlans"
+import{quotePlanAmounts}from"./reservationAddRoomRatePlan"
 import{expandedReservationSearchWindow,reservationRoomInventoryOverlaps,reservationRoomInventoryWindow}from"./reservationInventoryAvailability"
 
 const validDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(String(value||""))

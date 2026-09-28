@@ -19,14 +19,14 @@ export default function ReservationPreview({preview}){
   const[position,setPosition]=useState({left:12,top:12,ready:false})
   useLayoutEffect(()=>{
     if(!preview?.item||!preview?.rect||!cardRef.current)return
-    const rect=preview.rect,card=cardRef.current,gap=9,margin=12
-    const width=card.offsetWidth||330,height=card.offsetHeight||280
+    const rect=preview.rect,card=cardRef.current,gap=9,margin=12,safeTop=72
+    const width=card.offsetWidth||330,height=Math.min(card.offsetHeight||280,Math.max(220,window.innerHeight-safeTop-margin))
     const left=Math.max(margin,Math.min(rect.left,window.innerWidth-width-margin))
     const below=rect.bottom+gap
     const above=rect.top-height-gap
     let top=below
     if(below+height>window.innerHeight-margin)top=above
-    top=Math.max(margin,Math.min(top,window.innerHeight-height-margin))
+    top=Math.max(safeTop,Math.min(top,window.innerHeight-height-margin))
     setPosition({left,top,ready:true})
   },[preview])
   if(!preview?.item)return null

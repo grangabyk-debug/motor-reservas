@@ -70,7 +70,7 @@
 .stayPrice{margin-left:auto;font-size:10px;font-weight:820;white-space:nowrap}
 .resizeHandle{position:absolute;right:2px;top:3px;width:17px;height:24px;display:grid;place-items:center;border-radius:4px;background:color-mix(in srgb,var(--panelSolid) 72%,transparent);font-size:10px;font-weight:900;cursor:ew-resize;opacity:.58}
 .stay:hover .resizeHandle,.stay:focus-visible .resizeHandle{opacity:1}
-.reservationPreview{position:fixed;z-index:130;width:330px;max-width:calc(100vw - 24px);padding:13px;border:1px solid var(--line);border-radius:12px;background:color-mix(in srgb,var(--panelSolid) 97%,transparent);color:var(--text);box-shadow:0 22px 58px rgba(15,27,51,.28);backdrop-filter:blur(24px) saturate(1.2);pointer-events:none}
+.reservationPreview{position:fixed;z-index:260;width:330px;max-width:calc(100vw - 24px);max-height:calc(100dvh - 84px);overflow:auto;overscroll-behavior:contain;padding:13px;border:1px solid var(--line);border-radius:12px;background:color-mix(in srgb,var(--panelSolid) 97%,transparent);color:var(--text);box-shadow:0 22px 58px rgba(15,27,51,.28);backdrop-filter:blur(24px) saturate(1.2);pointer-events:none;scrollbar-width:thin}
 .previewTop{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding-bottom:9px;border-bottom:1px solid var(--line)}
 .previewTop div small,.previewTop div b{display:block}
 .previewTop div small{font-size:10px;color:var(--muted);font-weight:760}

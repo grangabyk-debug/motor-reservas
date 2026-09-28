@@ -57,7 +57,7 @@ export default function GuestAttentionPanel({propertyId,onOpenGuest}){
         const profile=profileById.get(String(guest.guest_profile_id||""))||{},reservation=reservationById.get(Number(guest.reservation_id));if(!reservation)continue
         const birth=guest.birth_date||profile.birth_date,days=daysUntilBirthday(birth),count=stayCounts.get(String(guest.guest_profile_id||""))?.size||1,vip=profile.vip_level||"standard",birthday=days!=null&&days<=birthdayLead,returning=count>=returnThreshold
         if(!birthday&&!returning&&!["vip","signature"].includes(vip))continue
-        const kind=birthday?"birthday":["vip","signature"].includes(vip)?"vip":"returning",name=guest.full_name||profile.full_name||reservation.nombre_huesped||"Huésped",benefit=clean(profile.preferences?.benefit_note)||(birthday?birthdayBenefit:returning?returnBenefit:"Revisar preferencias y nivel de servicio antes de atender.")
+        const kind=birthday?"birthday":["vip","signature"].includes(vip)?"vip":"returning",name=profile.full_name||guest.full_name||reservation.nombre_huesped||"Huésped",benefit=clean(profile.preferences?.benefit_note)||(birthday?birthdayBenefit:returning?returnBenefit:"Revisar preferencias y nivel de servicio antes de atender.")
         const identity=guest.guest_profile_id?`profile:${guest.guest_profile_id}`:`name:${norm(name)}`,key=`${identity}|reservation:${reservation.id}`
         if(attention.has(key))continue
         attention.set(key,{id:key,profileId:guest.guest_profile_id||profile.id||null,kind,name,days,count,vip,reservation,room:roomById.get(Number(guest.room_id||reservation.habitacion_id))||"—",benefit})
