@@ -146,8 +146,9 @@ export default function RoomingEditor({draft,setDraft,rooms=[],categories=[],cur
   const shell={marginTop:12,border:"1px solid color-mix(in srgb,var(--line) 78%,transparent)",borderRadius:14,overflow:"hidden",background:"color-mix(in srgb,var(--panelSolid) 86%,transparent)",boxShadow:"inset 0 1px color-mix(in srgb,#fff 48%,transparent),0 10px 26px rgba(28,42,68,.05)"}
   const top={display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,padding:"11px 12px",borderBottom:"1px solid var(--line)",background:"color-mix(in srgb,var(--bg) 38%,var(--panelSolid))"}
   const row={padding:"10px 12px",borderBottom:"1px solid color-mix(in srgb,var(--line) 82%,transparent)"}
-  const topGrid={display:"grid",gridTemplateColumns:"minmax(110px,1fr) minmax(170px,1.55fr) minmax(82px,.72fr)",gap:9,alignItems:"end"}
-  const bottomGrid={display:"grid",gridTemplateColumns:"minmax(105px,.9fr) minmax(125px,1fr) minmax(145px,1.15fr)",gap:9,alignItems:"end",marginTop:9}
+  const roomingGrid={display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:9,alignItems:"end"}
+  const topGrid=roomingGrid
+  const bottomGrid={...roomingGrid,marginTop:9}
   const control={height:40,width:"100%",minWidth:0,boxSizing:"border-box",border:"1px solid var(--line)",borderRadius:10,background:"color-mix(in srgb,var(--panelSolid) 88%,transparent)",color:"var(--text)",padding:"0 10px",font:"inherit",fontSize:11,fontWeight:760,outline:"none"}
   const tinyLabel={display:"block",height:14,marginBottom:5,fontSize:9,fontWeight:850,letterSpacing:".03em",color:"var(--muted)",whiteSpace:"nowrap"}
   return <section style={shell} aria-label="Rooming por habitación">
