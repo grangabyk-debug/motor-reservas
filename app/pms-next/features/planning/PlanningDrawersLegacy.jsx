@@ -46,7 +46,7 @@ function compareRooms(a,b,guests){
 
 export {default as ReservationDetailDrawer}from"./PlanningReservationDetailDrawer"
 
-export function CreateReservationDrawer({draft,setDraft,drawerStep,setDrawerStep,draftState,externalError="",availableRooms,roomById,cancellationPolicies=[],ratePlans=null,nights,total,saving,onClose,onDiscard,onNext,onSave}){
+export function CreateReservationDrawer({draft,setDraft,drawerStep,setDrawerStep,draftState,externalError="",availableRooms,roomById,availabilityResolved=true,cancellationPolicies=[],ratePlans=null,nights,total,saving,onClose,onDiscard,onNext,onSave}){
   if(!draft)return null
   const guests=Math.max(1,Number(draft.guests)||1),roomIdsKey=availableRooms.map(room=>room.id).join(",")
   const[blockedRoomIds,setBlockedRoomIds]=useState(()=>new Set())
@@ -55,10 +55,10 @@ export function CreateReservationDrawer({draft,setDraft,drawerStep,setDrawerStep
   const availabilityKey=sortedRooms.map(room=>`${room.id}:${room.available?1:0}:${room.estado||""}:${room.capacidad||1}:${Number(room.precio)||0}`).join("|")
   const commercialCategories=[...new Set(effectiveRooms.map(room=>String(room.tipo||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es"))
   const rawSelectedRoomIds=uniqueIds(draft.roomIds?.length?draft.roomIds:[draft.roomId])
-  const selectedRoomIds=rawSelectedRoomIds.filter(id=>{const room=effectiveRooms.find(item=>String(item.id)===id);return room&&room.available&&room.estado!=="mantenimiento"})
+  const selectedRoomIds=availabilityResolved?rawSelectedRoomIds.filter(id=>{const room=effectiveRooms.find(item=>String(item.id)===id);return room&&room.available&&room.estado!=="mantenimiento"}):rawSelectedRoomIds
   const selectedRooms=selectedRoomIds.map(id=>roomById.get(Number(id))).filter(Boolean)
   const roomNames=selectedRooms.map(room=>room.nombre),capacity=selectedRooms.reduce((sum,room)=>sum+roomCapacity(room),0)
-  const invalidSelectedRooms=effectiveRooms.filter(room=>rawSelectedRoomIds.includes(String(room.id))&&(!room.available||room.estado==="mantenimiento")),hasInvalidSelection=invalidSelectedRooms.length>0
+  const invalidSelectedRooms=availabilityResolved?effectiveRooms.filter(room=>rawSelectedRoomIds.includes(String(room.id))&&(!room.available||room.estado==="mantenimiento")):[],hasInvalidSelection=invalidSelectedRooms.length>0
   const recommendedRoom=sortedRooms.find(room=>room.available&&room.estado!=="mantenimiento"&&roomCapacity(room)>=guests)||sortedRooms.find(room=>room.available&&room.estado!=="mantenimiento")
   const[localError,setLocalError]=useState("")
   const taxConfig=useReservationTaxConfig(selectedRoomIds[0]||rawSelectedRoomIds[0],setDraft)
@@ -92,6 +92,7 @@ export function CreateReservationDrawer({draft,setDraft,drawerStep,setDrawerStep
     return()=>{cancelled=true}
   },[draft.start,draft.end,roomIdsKey])
   useEffect(()=>{
+    if(!availabilityResolved)return
     const current=uniqueIds(draft.roomIds?.length?draft.roomIds:[draft.roomId])
     const valid=current.filter(id=>{const room=effectiveRooms.find(item=>String(item.id)===id);return room&&room.available&&room.estado!=="mantenimiento"})
     const isGroup=current.length>1
@@ -103,7 +104,7 @@ export function CreateReservationDrawer({draft,setDraft,drawerStep,setDrawerStep
     if(current.length===next.length&&current.every((id,index)=>id===next[index]))return
     const nextRate=next.reduce((sum,id)=>sum+(Number(roomById.get(Number(id))?.precio)||0),0)
     setDraft(currentDraft=>({...currentDraft,roomIds:next,roomId:next[0]||"",rate:nextRate,roomSelectionManual:manual&&valid.length>0}))
-  },[draft.start,draft.end,draft.guests,availabilityKey])
+  },[draft.start,draft.end,draft.guests,availabilityKey,availabilityResolved])
 
   function toggleRoom(room){const id=String(room.id),current=uniqueIds(draft.roomIds?.length?draft.roomIds:[draft.roomId]),isSelected=current.includes(id),unavailable=!room.available||room.estado==="mantenimiento";if(unavailable)return;const next=isSelected?current.filter(value=>value!==id):[...current,id],nextRate=next.reduce((sum,value)=>sum+(Number(roomById.get(Number(value))?.pricing_net)||0),0);setDraft(currentDraft=>({...currentDraft,roomIds:next,roomId:next[0]||"",rate:nextRate,roomSelectionManual:true}))}
   const title=drawerStep===0?"Elegí las fechas":drawerStep===1?"Seleccioná habitaciones":drawerStep===2?"Datos del titular":"Revisá la reserva"
