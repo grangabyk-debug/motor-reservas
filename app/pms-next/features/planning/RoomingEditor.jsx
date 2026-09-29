@@ -2,6 +2,7 @@
 
 import{useEffect,useMemo,useState}from"react"
 import{supabase}from"../../../../lib/supabase"
+import{normalizeTaxSettings}from"../../core/priceTax"
 import{activeRatePlans,defaultRatePlan,normalizeRatePlans,ratePlanAmounts,ratePlanByCode}from"../../core/ratePlans"
 
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:0}).format(Number(value)||0)
@@ -57,7 +58,7 @@ function fitBeds(room,guests,matrimonial,individual,changed=""){
   if(g>0&&m*2+i<g)return defaultBeds(room,g)
   return{matrimonial:m,individual:i}
 }
-function makeAssignment(room,guests){const safeGuests=clamp(guests,1,roomCapacity(room)),beds=defaultBeds(room,safeGuests);return{soldAs:clean(room?.tipo)||"Habitación",guests:safeGuests,matrimonial:beds.matrimonial,individual:beds.individual,rate:Number(room?.precio)||0,manualRate:false}}
+function makeAssignment(room,guests){const safeGuests=clamp(guests,1,roomCapacity(room)),beds=defaultBeds(room,safeGuests);return{soldAs:clean(room?.tipo)||"Habitación",guests:safeGuests,matrimonial:beds.matrimonial,individual:beds.individual,rate:Number(room?.pricing_net??room?.precio)||0,manualRate:false}}
 function distributedGuests(rooms,total){
   const result=new Map(),capacities=new Map(rooms.map(room=>[String(room.id),roomCapacity(room)])),remaining={value:Math.max(0,Number(total)||0)}
   rooms.forEach(room=>result.set(String(room.id),0))
@@ -88,7 +89,7 @@ export function reservationRoomingSummary(item,assignedRooms=[]){
   return roomingLabel(configured[0])
 }
 
-export default function RoomingEditor({draft,setDraft,rooms=[],categories=[],currency="ARS",editableRate=true,ratePlans=null,defaultRatePlanCode="",allowRatePlanOverride=false}){
+export default function RoomingEditor({draft,setDraft,rooms=[],categories=[],currency="ARS",editableRate=true,ratePlans=null,defaultRatePlanCode="",allowRatePlanOverride=false,taxConfig=null}){
   const selectedKey=idsOf(rooms).join("|"),planConfig=normalizeRatePlans(ratePlans||{}),plans=activeRatePlans(planConfig),defaultPlanCode=defaultRatePlanCode||defaultRatePlan(planConfig).code,showPlan=Boolean(allowRatePlanOverride&&plans.length>1)
   const[bedConfigById,setBedConfigById]=useState({}),[bedConfigReady,setBedConfigReady]=useState(false)
   useEffect(()=>{
@@ -103,17 +104,19 @@ export default function RoomingEditor({draft,setDraft,rooms=[],categories=[],cur
   const effectiveRooms=useMemo(()=>rooms.map(room=>({...room,bed_configuration:Object.prototype.hasOwnProperty.call(room,"bed_configuration")?room.bed_configuration:bedConfigById[String(room.id)]||""})),[rooms,bedConfigById])
   const bedConfigKey=effectiveRooms.map(room=>`${room.id}:${room.bed_configuration||""}`).join("|")
   const categoryOptions=[...new Set([...(categories||[]).map(clean),...effectiveRooms.map(room=>clean(room.tipo))].filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es"))
-  const vatRate=draft?.impuestosDesglosados===false?0:Math.max(0,Number(draft?.ivaPorcentaje)||0),rateFactor=1+vatRate/100,displayRate=value=>Math.round((Number(value)||0)*rateFactor*100)/100,netRate=value=>Math.round(((Number(value)||0)/rateFactor)*100)/100
+  const taxes=normalizeTaxSettings(taxConfig||{enabled:draft?.impuestosDesglosados!==false,vat_rate:Math.max(0,Number(draft?.ivaPorcentaje)||0),price_tax_mode:draft?.priceTaxMode||"tax_included"}),vatRate=taxes.enabled?Math.max(0,Number(taxes.vat_rate)||0):0,rateFactor=taxes.enabled?1+vatRate/100:1,displayRate=value=>Math.round((Number(value)||0)*rateFactor*100)/100,netRate=value=>Math.round(((Number(value)||0)/rateFactor)*100)/100
   useEffect(()=>{
     if(!effectiveRooms.length||!bedConfigReady)return
     setDraft(current=>{
       if(!current)return current
-      const ids=idsOf(effectiveRooms),existing=current.roomAssignments||{},requested=Math.max(effectiveRooms.length,Number(current.guests)||1),distribution=distributedGuests(effectiveRooms,requested),next={}
+      const ids=idsOf(effectiveRooms),existing=current.roomAssignments||{},requested=Math.max(effectiveRooms.length,Number(current.guests)||1)
+      const hasValidDistribution=ids.every(id=>{const room=effectiveRooms.find(item=>String(item.id)===id),guests=Number(existing[id]?.guests);return Boolean(existing[id])&&guests>=1&&guests<=roomCapacity(room)})&&ids.reduce((sum,id)=>sum+Math.max(0,Number(existing[id]?.guests)||0),0)===requested
+      const distribution=hasValidDistribution?new Map(ids.map(id=>[id,Math.max(1,Number(existing[id]?.guests)||1)])):distributedGuests(effectiveRooms,requested),next={}
       effectiveRooms.forEach(room=>{
-        const id=String(room.id),desired=distribution.get(id)||0,previous=existing[id]
+        const id=String(room.id),desired=Math.max(1,distribution.get(id)||1),previous=existing[id]
         if(previous){
           const guestChanged=Number(previous.guests||0)!==desired,beds=guestChanged?defaultBeds(room,desired):fitBeds(room,desired,previous.matrimonial,previous.individual)
-          next[id]={soldAs:clean(previous.soldAs)||clean(room.tipo)||"Habitación",guests:desired,matrimonial:beds.matrimonial,individual:beds.individual,rate:Number(previous.rate??room.precio)||0,manualRate:Boolean(previous.manualRate),ratePlanCode:previous.ratePlanCode||current.ratePlanCode||defaultPlanCode}
+          next[id]={soldAs:clean(previous.soldAs)||clean(room.tipo)||"Habitación",guests:desired,matrimonial:beds.matrimonial,individual:beds.individual,rate:Number(previous.rate??room.pricing_net??room.precio)||0,manualRate:Boolean(previous.manualRate),ratePlanCode:previous.ratePlanCode||current.ratePlanCode||defaultPlanCode}
         }else next[id]={...makeAssignment(room,desired),ratePlanCode:current.ratePlanCode||defaultPlanCode}
       })
       const totalRate=ids.reduce((sum,id)=>sum+(Number(next[id].rate)||0),0)
@@ -132,23 +135,23 @@ export default function RoomingEditor({draft,setDraft,rooms=[],categories=[],cur
       if(Object.prototype.hasOwnProperty.call(patch,"guests")){const beds=defaultBeds(room,next.guests);next.matrimonial=beds.matrimonial;next.individual=beds.individual}
       else{const changed=Object.prototype.hasOwnProperty.call(patch,"matrimonial")?"matrimonial":Object.prototype.hasOwnProperty.call(patch,"individual")?"individual":"",beds=fitBeds(room,next.guests,next.matrimonial,next.individual,changed);next.matrimonial=beds.matrimonial;next.individual=beds.individual}
       assignments[id]=next
-      const selected=idsOf(effectiveRooms),totalRate=selected.reduce((sum,key)=>sum+(Number(assignments[key]?.rate)||0),0)
-      return{...current,roomAssignments:assignments,rate:totalRate,roomSelectionManual:true}
+      const selected=idsOf(effectiveRooms),totalRate=selected.reduce((sum,key)=>sum+(Number(assignments[key]?.rate)||0),0),totalGuests=selected.reduce((sum,key)=>sum+Math.max(1,Number(assignments[key]?.guests)||1),0)
+      return{...current,guests:totalGuests,roomAssignments:assignments,rate:totalRate,roomSelectionManual:true}
     })
   }
 
   if(!effectiveRooms.length)return null
   if(!bedConfigReady)return <div style={{marginTop:12,padding:"11px 12px",border:"1px solid var(--line)",borderRadius:12,color:"var(--muted)",fontSize:10.5,fontWeight:700}}>Cargando configuración física de camas…</div>
-  const assignments=draft.roomAssignments||{},selectedIds=idsOf(effectiveRooms),effectiveRateFor=(room,assignment)=>{const plan=ratePlanByCode(planConfig,assignment?.ratePlanCode||draft.ratePlanCode||defaultPlanCode),baseRate=Number(assignment?.rate??room?.precio)||0,guestCount=Math.max(0,Number(assignment?.guests)||0),planNet=ratePlanAmounts(plan?.active?plan:defaultRatePlan(planConfig),guestCount,{enabled:draft?.impuestosDesglosados!==false,vat_rate:vatRate,price_tax_mode:draft?.priceTaxMode||"tax_included"},1).netPerNight;return Math.max(0,baseRate+planNet)},totalRate=selectedIds.reduce((sum,id)=>{const room=effectiveRooms.find(item=>String(item.id)===id),assignment=assignments[id]||makeAssignment(room,0);return sum+effectiveRateFor(room,assignment)},0),assignedGuests=selectedIds.reduce((sum,id)=>sum+Math.max(0,Number(assignments[id]?.guests)||0),0),requestedGuests=Math.max(effectiveRooms.length,Number(draft.guests)||1)
+  const assignments=draft.roomAssignments||{},selectedIds=idsOf(effectiveRooms),effectiveRateFor=(room,assignment)=>{const plan=ratePlanByCode(planConfig,assignment?.ratePlanCode||draft.ratePlanCode||defaultPlanCode),baseRate=Number(assignment?.rate??room?.pricing_net??room?.precio)||0,guestCount=Math.max(1,Number(assignment?.guests)||1),planNet=ratePlanAmounts(plan?.active?plan:defaultRatePlan(planConfig),guestCount,taxes,1).netPerNight;return Math.max(0,baseRate+planNet)},totalRate=selectedIds.reduce((sum,id)=>{const room=effectiveRooms.find(item=>String(item.id)===id),assignment=assignments[id]||makeAssignment(room,0);return sum+effectiveRateFor(room,assignment)},0),assignedGuests=selectedIds.reduce((sum,id)=>sum+Math.max(0,Number(assignments[id]?.guests)||0),0),requestedGuests=Math.max(effectiveRooms.length,Number(draft.guests)||1)
   const shell={marginTop:12,border:"1px solid color-mix(in srgb,var(--line) 78%,transparent)",borderRadius:14,overflow:"hidden",background:"color-mix(in srgb,var(--panelSolid) 86%,transparent)",boxShadow:"inset 0 1px color-mix(in srgb,#fff 48%,transparent),0 10px 26px rgba(28,42,68,.05)"}
   const top={display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,padding:"11px 12px",borderBottom:"1px solid var(--line)",background:"color-mix(in srgb,var(--bg) 38%,var(--panelSolid))"}
   const row={padding:"10px 12px",borderBottom:"1px solid color-mix(in srgb,var(--line) 82%,transparent)"}
-  const grid={display:"grid",gridTemplateColumns:showPlan?"minmax(105px,1fr) minmax(118px,1fr) minmax(64px,.52fr) minmax(78px,.65fr) minmax(78px,.65fr) minmax(94px,.82fr)":"minmax(108px,1.05fr) minmax(64px,.55fr) minmax(82px,.68fr) minmax(82px,.68fr) minmax(96px,.85fr)",gap:7,alignItems:"end"}
-  const control={height:36,width:"100%",boxSizing:"border-box",border:"1px solid var(--line)",borderRadius:10,background:"color-mix(in srgb,var(--panelSolid) 88%,transparent)",color:"var(--text)",padding:"0 10px",font:"inherit",fontSize:11,fontWeight:760,outline:"none"}
+  const grid={display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:8,alignItems:"end"}
+  const control={height:38,width:"100%",minWidth:0,boxSizing:"border-box",border:"1px solid var(--line)",borderRadius:10,background:"color-mix(in srgb,var(--panelSolid) 88%,transparent)",color:"var(--text)",padding:"0 9px",font:"inherit",fontSize:10.8,fontWeight:760,outline:"none"}
   const tinyLabel={display:"block",height:13,marginBottom:5,fontSize:9,fontWeight:850,letterSpacing:".03em",color:"var(--muted)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}
   return <section style={shell} aria-label="Rooming por habitación">
     <header style={top}><div><small style={{display:"block",fontSize:9,fontWeight:900,letterSpacing:".1em",color:"var(--accent)"}}>HABITACIONES SELECCIONADAS</small><b style={{display:"block",marginTop:2,fontSize:12}}>Rooming y categoría vendida por habitación</b></div><span style={{fontSize:10,color:assignedGuests===requestedGuests?"var(--muted)":"var(--red)",fontWeight:assignedGuests===requestedGuests?600:850}}>{effectiveRooms.length} habitación{effectiveRooms.length===1?"":"es"} · {assignedGuests}/{requestedGuests} huéspedes</span></header>
-    {effectiveRooms.map(room=>{const id=String(room.id),assignment=assignments[id]||makeAssignment(room,0),capacity=roomCapacity(room),options=Array.from({length:capacity},(_,index)=>index+1),matOptions=Array.from({length:Math.floor(capacity/2)+1},(_,index)=>index),indOptions=Array.from({length:capacity+1},(_,index)=>index),physical=clean(room.tipo)||"Habitación",sold=clean(assignment.soldAs)||physical,different=sold!==physical,effectiveNetRate=effectiveRateFor(room,assignment),selectedPlan=ratePlanByCode(planConfig,assignment.ratePlanCode||draft.ratePlanCode||defaultPlanCode),planNet=ratePlanAmounts(selectedPlan?.active?selectedPlan:defaultRatePlan(planConfig),assignment.guests,{enabled:draft?.impuestosDesglosados!==false,vat_rate:vatRate,price_tax_mode:draft?.priceTaxMode||"tax_included"},1).netPerNight;return <article key={id} style={row}>
+    {effectiveRooms.map(room=>{const id=String(room.id),assignment=assignments[id]||makeAssignment(room,0),capacity=roomCapacity(room),options=Array.from({length:capacity},(_,index)=>index+1),matOptions=Array.from({length:Math.floor(capacity/2)+1},(_,index)=>index),indOptions=Array.from({length:capacity+1},(_,index)=>index),physical=clean(room.tipo)||"Habitación",sold=clean(assignment.soldAs)||physical,different=sold!==physical,effectiveNetRate=effectiveRateFor(room,assignment),selectedPlan=ratePlanByCode(planConfig,assignment.ratePlanCode||draft.ratePlanCode||defaultPlanCode),planNet=ratePlanAmounts(selectedPlan?.active?selectedPlan:defaultRatePlan(planConfig),assignment.guests,taxes,1).netPerNight;return <article key={id} style={row}>
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:9,flexWrap:"wrap"}}><span style={{width:20,height:20,display:"grid",placeItems:"center",borderRadius:6,border:"1px solid color-mix(in srgb,#2f8e58 38%,var(--line))",background:"color-mix(in srgb,#36a269 12%,transparent)",color:"#268357",fontSize:11,fontWeight:950}}>✓</span><b style={{fontSize:12}}>Hab. {room.nombre}</b>{room.bed_configuration?<span style={{fontSize:9.5,color:"var(--muted)",fontWeight:700}}>· Configuración: {room.bed_configuration}</span>:null}{different?<span style={{marginLeft:"auto",padding:"4px 7px",borderRadius:999,background:"color-mix(in srgb,var(--accent) 11%,transparent)",color:"var(--accent)",fontSize:9,fontWeight:850}}>Vendida como {sold}</span>:null}</div>
       <div style={grid}>
         <label><span style={tinyLabel}>Vendida como</span><select value={sold} onChange={event=>update(room,{soldAs:event.target.value})} style={control}>{categoryOptions.map(value=><option key={value} value={value}>{value}</option>)}</select></label>
@@ -159,7 +162,7 @@ export default function RoomingEditor({draft,setDraft,rooms=[],categories=[],cur
         <label><span style={tinyLabel}>Tarifa final</span><input type="number" min="0" value={displayRate(effectiveNetRate)} disabled={!editableRate} readOnly={!editableRate} onChange={editableRate?event=>update(room,{rate:Math.max(0,netRate(event.target.value)-planNet)}):undefined} title={editableRate?"Precio final por noche, incluyendo el plan tarifario":"La tarifa se modifica con la lógica de cambio de habitación / estadía"} style={{...control,opacity:editableRate?1:.68,cursor:editableRate?"text":"not-allowed"}}/></label>
       </div>
     </article>})}
-    <footer style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:14,padding:"11px 12px",background:"color-mix(in srgb,var(--bg) 34%,var(--panelSolid))"}}><span style={{fontSize:10,fontWeight:850,color:"var(--muted)"}}>Precio final por noche · {currency}{vatRate?` · IVA ${vatRate}% incluido`:""}</span><b style={{minWidth:110,padding:"8px 11px",border:"1px solid var(--line)",borderRadius:10,background:"var(--panelSolid)",fontSize:12,textAlign:"right"}}>{money(displayRate(totalRate),currency)}</b></footer>
-    <style>{`@media(max-width:760px){[aria-label="Rooming por habitación"] article>div:nth-child(2){grid-template-columns:1fr 1fr!important}[aria-label="Rooming por habitación"] article>div:nth-child(2)>label:last-child{grid-column:1/-1}}`}</style>
+    <footer style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:14,padding:"11px 12px",background:"color-mix(in srgb,var(--bg) 34%,var(--panelSolid))"}}><span style={{fontSize:10,fontWeight:850,color:"var(--muted)"}}>Precio final por noche · {currency}{taxes.enabled&&vatRate?` · IVA ${vatRate}% ${taxes.price_tax_mode==="tax_included"?"incluido":"agregado"}`:""}</span><b style={{minWidth:110,padding:"8px 11px",border:"1px solid var(--line)",borderRadius:10,background:"var(--panelSolid)",fontSize:12,textAlign:"right"}}>{money(displayRate(totalRate),currency)}</b></footer>
+    <style>{`@media(max-width:430px){[aria-label="Rooming por habitación"] article>div:nth-child(2){grid-template-columns:1fr 1fr!important}[aria-label="Rooming por habitación"] article>div:nth-child(2)>label:last-child{grid-column:1/-1}}`}</style>
   </section>
 }
