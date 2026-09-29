@@ -146,55 +146,24 @@ export default function RoomingEditor({draft,setDraft,rooms=[],categories=[],cur
   const shell={marginTop:12,border:"1px solid color-mix(in srgb,var(--line) 78%,transparent)",borderRadius:14,overflow:"hidden",background:"color-mix(in srgb,var(--panelSolid) 86%,transparent)",boxShadow:"inset 0 1px color-mix(in srgb,#fff 48%,transparent),0 10px 26px rgba(28,42,68,.05)"}
   const top={display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,padding:"11px 12px",borderBottom:"1px solid var(--line)",background:"color-mix(in srgb,var(--bg) 38%,var(--panelSolid))"}
   const row={padding:"10px 12px",borderBottom:"1px solid color-mix(in srgb,var(--line) 82%,transparent)"}
-  const topGrid={marginTop:0}
-  const bottomGrid={marginTop:9}
-  const field={display:"block",minWidth:0}
+  const controlsGrid={display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",columnGap:9,rowGap:9,alignItems:"end",width:"100%"}
+  const field={display:"grid",gridTemplateRows:"14px 40px",gap:5,minWidth:0,width:"100%"}
   const control={display:"block",height:40,width:"100%",minWidth:0,maxWidth:"100%",boxSizing:"border-box",border:"1px solid var(--line)",borderRadius:10,background:"color-mix(in srgb,var(--panelSolid) 88%,transparent)",color:"var(--text)",padding:"0 10px",font:"inherit",fontSize:11,fontWeight:760,outline:"none"}
-  const tinyLabel={display:"block",height:14,marginBottom:5,fontSize:9,fontWeight:850,letterSpacing:".03em",color:"var(--muted)",whiteSpace:"nowrap"}
+  const tinyLabel={display:"block",height:14,fontSize:9,fontWeight:850,letterSpacing:".03em",color:"var(--muted)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}
   return <section style={shell} aria-label="Rooming por habitación">
     <header style={top}><div><small style={{display:"block",fontSize:9,fontWeight:900,letterSpacing:".1em",color:"var(--accent)"}}>HABITACIONES SELECCIONADAS</small><b style={{display:"block",marginTop:2,fontSize:12}}>Rooming y categoría vendida por habitación</b></div><span style={{fontSize:10,color:assignedGuests===requestedGuests?"var(--muted)":"var(--red)",fontWeight:assignedGuests===requestedGuests?600:850}}>{effectiveRooms.length} habitación{effectiveRooms.length===1?"":"es"} · {assignedGuests}/{requestedGuests} huéspedes</span></header>
     {effectiveRooms.map(room=>{const id=String(room.id),assignment=assignments[id]||makeAssignment(room,0),capacity=roomCapacity(room),options=Array.from({length:capacity},(_,index)=>index+1),matOptions=Array.from({length:Math.floor(capacity/2)+1},(_,index)=>index),indOptions=Array.from({length:capacity+1},(_,index)=>index),physical=clean(room.tipo)||"Habitación",sold=clean(assignment.soldAs)||physical,different=sold!==physical,effectiveNetRate=effectiveRateFor(room,assignment),selectedPlan=ratePlanByCode(planConfig,assignment.ratePlanCode||draft.ratePlanCode||defaultPlanCode),planNet=ratePlanAmounts(selectedPlan?.active?selectedPlan:defaultRatePlan(planConfig),assignment.guests,taxes,1).netPerNight;return <article key={id} style={row}>
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:9,flexWrap:"wrap"}}><span style={{width:20,height:20,display:"grid",placeItems:"center",borderRadius:6,border:"1px solid color-mix(in srgb,#2f8e58 38%,var(--line))",background:"color-mix(in srgb,#36a269 12%,transparent)",color:"#268357",fontSize:11,fontWeight:950}}>✓</span><b style={{fontSize:12}}>Hab. {room.nombre}</b>{room.bed_configuration?<span style={{fontSize:9.5,color:"var(--muted)",fontWeight:700}}>· Configuración: {room.bed_configuration}</span>:null}{different?<span style={{marginLeft:"auto",padding:"4px 7px",borderRadius:999,background:"color-mix(in srgb,var(--accent) 11%,transparent)",color:"var(--accent)",fontSize:9,fontWeight:850}}>Vendida como {sold}</span>:null}</div>
-      <div className="hl-rooming-equal-row" style={topGrid}>
-        <label className="hl-rooming-equal-cell" style={field}><span style={tinyLabel}>Vendida como</span><select value={sold} title={sold} onChange={event=>update(room,{soldAs:event.target.value})} className="hl-rooming-equal-control" style={control}>{categoryOptions.map(value=><option key={value} value={value}>{value}</option>)}</select></label>
-        {showPlan?<label className="hl-rooming-equal-cell" style={field}><span style={tinyLabel}>Plan tarifario</span><select value={assignment.ratePlanCode||draft.ratePlanCode||defaultPlanCode} title={selectedPlan?.name||""} onChange={event=>update(room,{ratePlanCode:event.target.value})} className="hl-rooming-equal-control" style={control}>{plans.map(plan=><option key={plan.code} value={plan.code}>{plan.name}</option>)}</select></label>:<span style={field}/>} 
-        <label className="hl-rooming-equal-cell" style={field}><span style={{...tinyLabel,color:"var(--accent)"}}>Huéspedes</span><select value={assignment.guests} onChange={event=>update(room,{guests:Number(event.target.value)})} className="hl-rooming-equal-control" style={control}>{options.map(value=><option key={value} value={value}>{value}</option>)}</select></label>
-      </div>
-      <div className="hl-rooming-equal-row" style={bottomGrid}>
-        <label className="hl-rooming-equal-cell" style={field}><span style={tinyLabel}>Matrimonial</span><select aria-label={`Camas matrimoniales en habitación ${room.nombre}`} title={`Cama matrimonial · ocupa 2 plazas · capacidad máxima ${capacity}`} value={assignment.matrimonial} onChange={event=>update(room,{matrimonial:Number(event.target.value)})} className="hl-rooming-equal-control" style={control}>{matOptions.map(value=><option key={value} value={value}>{value}</option>)}</select></label>
-        <label className="hl-rooming-equal-cell" style={field}><span style={tinyLabel}>Individual / twin</span><select aria-label={`Camas individuales en habitación ${room.nombre}`} title={`Cama individual / twin · ocupa 1 plaza · capacidad máxima ${capacity}`} value={assignment.individual} onChange={event=>update(room,{individual:Number(event.target.value)})} className="hl-rooming-equal-control" style={control}>{indOptions.map(value=><option key={value} value={value}>{value}</option>)}</select></label>
-        <label className="hl-rooming-equal-cell" style={field}><span style={tinyLabel}>Tarifa final</span><input type="number" min="0" value={displayRate(effectiveNetRate)} disabled={!editableRate} readOnly={!editableRate} onChange={editableRate?event=>update(room,{rate:Math.max(0,netRate(event.target.value)-planNet)}):undefined} title={editableRate?"Precio final por noche, incluyendo el plan tarifario":"La tarifa se modifica con la lógica de cambio de habitación / estadía"} className="hl-rooming-equal-control" style={{...control,opacity:editableRate?1:.68,cursor:editableRate?"text":"not-allowed"}}/></label>
+      <div style={controlsGrid}>
+        <label style={field}><span style={tinyLabel}>Vendida como</span><select value={sold} title={sold} onChange={event=>update(room,{soldAs:event.target.value})} style={control}>{categoryOptions.map(value=><option key={value} value={value}>{value}</option>)}</select></label>
+        {showPlan?<label style={field}><span style={tinyLabel}>Plan tarifario</span><select value={assignment.ratePlanCode||draft.ratePlanCode||defaultPlanCode} title={selectedPlan?.name||""} onChange={event=>update(room,{ratePlanCode:event.target.value})} style={control}>{plans.map(plan=><option key={plan.code} value={plan.code}>{plan.name}</option>)}</select></label>:<label style={{...field,visibility:"hidden"}} aria-hidden="true"><span style={tinyLabel}>Plan tarifario</span><span style={control}/></label>}
+        <label style={field}><span style={{...tinyLabel,color:"var(--accent)"}}>Huéspedes</span><select value={assignment.guests} onChange={event=>update(room,{guests:Number(event.target.value)})} style={control}>{options.map(value=><option key={value} value={value}>{value}</option>)}</select></label>
+        <label style={field}><span style={tinyLabel}>Matrimonial</span><select aria-label={`Camas matrimoniales en habitación ${room.nombre}`} title={`Cama matrimonial · ocupa 2 plazas · capacidad máxima ${capacity}`} value={assignment.matrimonial} onChange={event=>update(room,{matrimonial:Number(event.target.value)})} style={control}>{matOptions.map(value=><option key={value} value={value}>{value}</option>)}</select></label>
+        <label style={field}><span style={tinyLabel}>Individual / twin</span><select aria-label={`Camas individuales en habitación ${room.nombre}`} title={`Cama individual / twin · ocupa 1 plaza · capacidad máxima ${capacity}`} value={assignment.individual} onChange={event=>update(room,{individual:Number(event.target.value)})} style={control}>{indOptions.map(value=><option key={value} value={value}>{value}</option>)}</select></label>
+        <label style={field}><span style={tinyLabel}>Tarifa final</span><input type="number" min="0" value={displayRate(effectiveNetRate)} disabled={!editableRate} readOnly={!editableRate} onChange={editableRate?event=>update(room,{rate:Math.max(0,netRate(event.target.value)-planNet)}):undefined} title={editableRate?"Precio final por noche, incluyendo el plan tarifario":"La tarifa se modifica con la lógica de cambio de habitación / estadía"} style={{...control,opacity:editableRate?1:.68,cursor:editableRate?"text":"not-allowed"}}/></label>
       </div>
     </article>})}
     <footer style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:14,padding:"11px 12px",background:"color-mix(in srgb,var(--bg) 34%,var(--panelSolid))"}}><span style={{fontSize:10,fontWeight:850,color:"var(--muted)"}}>Precio final por noche · {currency}{taxes.enabled&&vatRate?` · IVA ${vatRate}% ${taxes.price_tax_mode==="tax_included"?"incluido":"agregado"}`:""}</span><b style={{minWidth:110,padding:"8px 11px",border:"1px solid var(--line)",borderRadius:10,background:"var(--panelSolid)",fontSize:12,textAlign:"right"}}>{money(displayRate(totalRate),currency)}</b></footer>
-    <style>{`
-      [aria-label="Rooming por habitación"] .hl-rooming-equal-row{
-        display:grid!important;
-        grid-template-columns:repeat(3,minmax(0,1fr))!important;
-        width:100%!important;
-        min-width:0!important;
-        gap:9px!important;
-        align-items:end!important;
-      }
-      [aria-label="Rooming por habitación"] .hl-rooming-equal-row>.hl-rooming-equal-cell{
-        display:block!important;
-        width:100%!important;
-        min-width:0!important;
-        max-width:100%!important;
-        margin:0!important;
-        padding:0!important;
-        box-sizing:border-box!important;
-      }
-      [aria-label="Rooming por habitación"] .hl-rooming-equal-control{
-        display:block!important;
-        width:100%!important;
-        min-width:0!important;
-        max-width:100%!important;
-        box-sizing:border-box!important;
-      }
-      @media(max-width:460px){
-        [aria-label="Rooming por habitación"] .hl-rooming-equal-row{grid-template-columns:1fr!important}
-      }
-    `}</style>
+
   </section>
 }
