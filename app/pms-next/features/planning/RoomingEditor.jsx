@@ -108,7 +108,7 @@ export default function RoomingEditor({draft,setDraft,rooms=[],categories=[],cur
     if(!effectiveRooms.length||!bedConfigReady)return
     setDraft(current=>{
       if(!current)return current
-      const ids=idsOf(effectiveRooms),existing=current.roomAssignments||{},requested=Math.max(1,Number(current.guests)||1),distribution=distributedGuests(effectiveRooms,requested),next={}
+      const ids=idsOf(effectiveRooms),existing=current.roomAssignments||{},requested=Math.max(effectiveRooms.length,Number(current.guests)||1),distribution=distributedGuests(effectiveRooms,requested),next={}
       effectiveRooms.forEach(room=>{
         const id=String(room.id),desired=distribution.get(id)||0,previous=existing[id]
         if(previous){
@@ -119,8 +119,8 @@ export default function RoomingEditor({draft,setDraft,rooms=[],categories=[],cur
       const totalRate=ids.reduce((sum,id)=>sum+(Number(next[id].rate)||0),0)
       const sameKeys=Object.keys(existing).length===ids.length&&ids.every(id=>existing[id])
       const sameAssignments=sameKeys&&ids.every(id=>{const a=existing[id],b=next[id];return clean(a.soldAs)===clean(b.soldAs)&&Number(a.guests||0)===Number(b.guests||0)&&Number(a.matrimonial||0)===Number(b.matrimonial||0)&&Number(a.individual||0)===Number(b.individual||0)&&Number(a.rate||0)===Number(b.rate||0)&&Boolean(a.manualRate)===Boolean(b.manualRate)&&String(a.ratePlanCode||"")===String(b.ratePlanCode||"")})
-      if(sameAssignments&&Number(current.rate||0)===totalRate)return current
-      return{...current,roomAssignments:next,rate:totalRate}
+      if(sameAssignments&&Number(current.rate||0)===totalRate&&Number(current.guests||0)===requested)return current
+      return{...current,guests:requested,roomAssignments:next,rate:totalRate}
     })
   },[selectedKey,bedConfigReady,bedConfigKey,setDraft])
 
@@ -139,7 +139,7 @@ export default function RoomingEditor({draft,setDraft,rooms=[],categories=[],cur
 
   if(!effectiveRooms.length)return null
   if(!bedConfigReady)return <div style={{marginTop:12,padding:"11px 12px",border:"1px solid var(--line)",borderRadius:12,color:"var(--muted)",fontSize:10.5,fontWeight:700}}>Cargando configuración física de camas…</div>
-  const assignments=draft.roomAssignments||{},selectedIds=idsOf(effectiveRooms),effectiveRateFor=(room,assignment)=>{const plan=ratePlanByCode(planConfig,assignment?.ratePlanCode||draft.ratePlanCode||defaultPlanCode),baseRate=Number(assignment?.rate??room?.precio)||0,guestCount=Math.max(0,Number(assignment?.guests)||0),planNet=ratePlanAmounts(plan?.active?plan:defaultRatePlan(planConfig),guestCount,{enabled:draft?.impuestosDesglosados!==false,vat_rate:vatRate,price_tax_mode:draft?.priceTaxMode||"tax_included"},1).netPerNight;return Math.max(0,baseRate+planNet)},totalRate=selectedIds.reduce((sum,id)=>{const room=effectiveRooms.find(item=>String(item.id)===id),assignment=assignments[id]||makeAssignment(room,0);return sum+effectiveRateFor(room,assignment)},0),assignedGuests=selectedIds.reduce((sum,id)=>sum+Math.max(0,Number(assignments[id]?.guests)||0),0),requestedGuests=Math.max(1,Number(draft.guests)||1)
+  const assignments=draft.roomAssignments||{},selectedIds=idsOf(effectiveRooms),effectiveRateFor=(room,assignment)=>{const plan=ratePlanByCode(planConfig,assignment?.ratePlanCode||draft.ratePlanCode||defaultPlanCode),baseRate=Number(assignment?.rate??room?.precio)||0,guestCount=Math.max(0,Number(assignment?.guests)||0),planNet=ratePlanAmounts(plan?.active?plan:defaultRatePlan(planConfig),guestCount,{enabled:draft?.impuestosDesglosados!==false,vat_rate:vatRate,price_tax_mode:draft?.priceTaxMode||"tax_included"},1).netPerNight;return Math.max(0,baseRate+planNet)},totalRate=selectedIds.reduce((sum,id)=>{const room=effectiveRooms.find(item=>String(item.id)===id),assignment=assignments[id]||makeAssignment(room,0);return sum+effectiveRateFor(room,assignment)},0),assignedGuests=selectedIds.reduce((sum,id)=>sum+Math.max(0,Number(assignments[id]?.guests)||0),0),requestedGuests=Math.max(effectiveRooms.length,Number(draft.guests)||1)
   const shell={marginTop:12,border:"1px solid color-mix(in srgb,var(--line) 78%,transparent)",borderRadius:14,overflow:"hidden",background:"color-mix(in srgb,var(--panelSolid) 86%,transparent)",boxShadow:"inset 0 1px color-mix(in srgb,#fff 48%,transparent),0 10px 26px rgba(28,42,68,.05)"}
   const top={display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,padding:"11px 12px",borderBottom:"1px solid var(--line)",background:"color-mix(in srgb,var(--bg) 38%,var(--panelSolid))"}
   const row={padding:"10px 12px",borderBottom:"1px solid color-mix(in srgb,var(--line) 82%,transparent)"}

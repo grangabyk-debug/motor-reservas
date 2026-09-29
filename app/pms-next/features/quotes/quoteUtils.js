@@ -8,7 +8,7 @@ export const esc=value=>String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;"
 
 export function freshForm(currency="ARS",ratePlanCode="BB"){
   const start=dateKey(new Date())
-  return{name:"",email:"",phone:"",start,end:addDays(start,1),pax:2,currency,validUntil:addDays(dateKey(new Date()),7),terms:"Tarifas sujetas a disponibilidad al momento de confirmar.",notes:"",selection:{},ratePlanCode}
+  return{name:"",email:"",phone:"",guestProfileId:"",start,end:addDays(start,1),pax:2,currency,validUntil:addDays(dateKey(new Date()),7),terms:"Tarifas sujetas a disponibilidad al momento de confirmar.",notes:"",selection:{},ratePlanCode}
 }
 const roomCapacity=room=>Math.max(1,Number(room?.capacidad)||1)
 function distributeGuests(picks,total){
