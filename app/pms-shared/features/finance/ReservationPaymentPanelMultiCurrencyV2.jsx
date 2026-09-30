@@ -229,13 +229,21 @@ export default function ReservationPaymentPanelMultiCurrencyV2({ propertyId, res
 
   const resolvedParts = useMemo(() => {
     if (!split || !reservation || !parts.length) return []
-    return parts.map(part => {
+    let used = 0
+    return parts.map((part, index) => {
       const code = normalizeCurrency(part.currency)
+      const last = index === parts.length - 1
+      if (last) {
+        const applied = roundMoney(Math.max(0, selectedDue - used))
+        const physical = fromReservation(applied, code)
+        return { ...part, currency: code, amount: physical == null ? 0 : physical, applied }
+      }
       const physical = numberValue(part.amount)
       const applied = toReservation(physical, code)
+      if (applied != null) used = roundMoney(used + applied)
       return { ...part, currency: code, amount: physical, applied: applied == null ? 0 : roundMoney(applied) }
     })
-  }, [split, reservation, parts, toReservation])
+  }, [split, reservation, parts, selectedDue, toReservation, fromReservation])
 
   const splitTotal = roundMoney(resolvedParts.reduce((sum, part) => sum + Number(part.applied || 0), 0))
   const splitDifference = roundMoney(selectedDue - splitTotal)
@@ -281,11 +289,9 @@ export default function ReservationPaymentPanelMultiCurrencyV2({ propertyId, res
     const secondMethod = paymentMethods.find(item => item !== firstMethod) || "Transferencia bancaria"
     const halfApplied = roundMoney(selectedDue / 2)
     const halfPhysical = fromReservation(halfApplied, paymentCurrency)
-    const remainderApplied = roundMoney(selectedDue - halfApplied)
-    const remainderPhysical = fromReservation(remainderApplied, reservationCurrency)
     setParts([
       { method: firstMethod, currency: paymentCurrency, amount: halfPhysical == null ? 0 : halfPhysical },
-      { method: secondMethod, currency: reservationCurrency, amount: remainderPhysical == null ? 0 : remainderPhysical },
+      { method: secondMethod, currency: reservationCurrency, amount: 0 },
     ])
     setSplit(true)
     setCashReceived("")
@@ -304,21 +310,15 @@ export default function ReservationPaymentPanelMultiCurrencyV2({ propertyId, res
     setCashReceived("")
   }
 
-  function completePartRemainder(index) {
-    const otherApplied = resolvedParts.reduce((sum, part, i) => i === index ? sum : sum + Math.max(0, Number(part.applied) || 0), 0)
-    const needed = roundMoney(Math.max(0, selectedDue - otherApplied))
-    const code = normalizeCurrency(parts[index]?.currency || reservationCurrency)
-    const physical = fromReservation(needed, code)
-    updatePart(index, { amount: physical == null ? 0 : physical })
-  }
-
   function addPart() {
     setParts(current => {
       if (current.length >= 4) return current
       const used = new Set(current.map(part => part.method))
       const nextMethod = paymentMethods.find(item => !used.has(item))
       if (!nextMethod) return current
-      return [...current.slice(0, -1), { method: nextMethod, currency: reservationCurrency, amount: 0 }, current[current.length - 1]]
+      const lastIndex = current.length - 1
+      const settled = current.map((part,index)=>index===lastIndex?{...part,amount:resolvedParts[lastIndex]?.amount??part.amount}:part)
+      return [...settled,{ method: nextMethod, currency: reservationCurrency, amount: 0 }]
     })
   }
 
@@ -456,7 +456,7 @@ export default function ReservationPaymentPanelMultiCurrencyV2({ propertyId, res
                 return <div key={index} className={s.formGrid} style={{ padding: 10, border: "1px solid var(--line)", borderRadius: 12 }}>
                   <label className={s.field}><span>Medio {index + 1}</span><select value={parts[index]?.method || part.method} onChange={event => updatePart(index, { method: event.target.value })}>{paymentMethods.map(item => <option key={item}>{item}</option>)}</select></label>
                   <label className={s.field}><span>Moneda</span><select value={parts[index]?.currency || part.currency} onChange={event => updatePart(index, { currency: event.target.value })}>{CURRENCIES.map(code => <option key={code}>{code}</option>)}</select></label>
-                  <label className={s.field}><span>Importe recibido</span><input type="number" min="0.01" step="0.01" value={parts[index]?.amount ?? ""} onChange={event => updatePart(index, { amount: event.target.value })} />{part.currency !== reservationCurrency ? <small>Aplica {money(part.applied, reservationCurrency)}</small> : null}{last ? <div className={s.quickAmount}><button type="button" onClick={() => completePartRemainder(index)}>Completar resto</button></div> : null}</label>
+                  <label className={s.field}><span>{last?"Importe restante":"Importe recibido"}</span><input type="number" min="0" step="0.01" value={last?part.amount:(parts[index]?.amount ?? "")} readOnly={last} onChange={last?undefined:event => updatePart(index, { amount: event.target.value })} />{last?<small>Se calcula automáticamente con lo que falta de los cargos seleccionados.</small>:part.currency !== reservationCurrency ? <small>Aplica {money(part.applied, reservationCurrency)}</small> : null}</label>
                   {parts.length > 2 ? <div className={s.field}><span>&nbsp;</span><button type="button" className={s.secondary} onClick={() => removePart(index)}>Quitar</button></div> : null}
                 </div>
               })}
