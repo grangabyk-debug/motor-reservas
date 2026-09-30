@@ -1,3 +1,4 @@
+import{lodgingFolioItemPresentation}from"./reservationLodgingConcept"
 "use client"
 
 import{useCallback,useEffect,useMemo,useState}from"react"
@@ -82,7 +83,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
     setSelectedItems(new Set())
   },[reservation.id,reservation.nombre_huesped,reservation.email_huesped,reservation.telefono_huesped,reservation.dni_huesped,reservation.direccion_huesped,reservation.ciudad_huesped,reservation.provincia_estado_huesped,reservation.pais_huesped,reservation.moneda,reservation.tipo_cambio])
   const selected=folios.find(row=>row.id===selectedId)||folios[0]||null
-  const activeItems=useMemo(()=>items.filter(row=>row.status==="active"),[items])
+  const activeItems=useMemo(()=>items.filter(row=>row.status==="active").map(row=>lodgingFolioItemPresentation(row,reservation)),[items,reservation?.habitaciones_detalle,reservation?.regimen])
   const allocationByPayment=useMemo(()=>{
     const map=new Map()
     for(const row of allocations)map.set(Number(row.payment_id),(map.get(Number(row.payment_id))||0)+Number(row.amount||0))
