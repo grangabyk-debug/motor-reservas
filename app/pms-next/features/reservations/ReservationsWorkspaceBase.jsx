@@ -54,9 +54,9 @@ export default function ReservationsWorkspace({propertyId,onNavigate,allowedView
 
   useEffect(()=>{
     if(!focusReservationId){focusReloadRef.current=null;return}
-    const wanted=Number(focusReservationId);let cancelled=false;syncRecordUrl(wanted);setEditOpen(false);if(selected&&Number(selected.id)!==wanted)setSelected(null)
+    const wanted=Number(focusReservationId),sameRecord=Number(selected?.id)===wanted;let cancelled=false;syncRecordUrl(wanted);if(!sameRecord){setEditOpen(false);if(selected)setSelected(null)}
     const target=items.find(item=>Number(item.id)===wanted)
-    if(target){focusReloadRef.current=null;setMode(target.estado==="cancelada"?"trash":target.no_show?"noshow":"active");setSelected(target);scrollTop();onFocusHandled?.();return}
+    if(target){focusReloadRef.current=null;setMode(target.estado==="cancelada"?"trash":target.no_show?"noshow":"active");setSelected(target);if(!sameRecord)scrollTop();onFocusHandled?.();return}
     if(focusReloadRef.current===String(wanted))return
     focusReloadRef.current=String(wanted)
     ;(async()=>{try{const{data:row,error:rowError}=await supabase.from("reservas").select(RECORD_SELECT).eq("property_id",propertyId).eq("id",wanted).single();if(rowError)throw rowError;if(cancelled)return;const record=enrichRecord(row);setMode(record.estado==="cancelada"?"trash":record.no_show?"noshow":"active");setSelected(record);scrollTop();onFocusHandled?.();data.load()}catch{if(cancelled)return;focusReloadRef.current=null;data.load()}})()
