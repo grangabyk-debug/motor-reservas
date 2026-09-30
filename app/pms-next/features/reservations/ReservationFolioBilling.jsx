@@ -115,11 +115,16 @@ export default function ReservationFolioBilling({reservation,propertyId,property
   const balance=selectedStats.charges-selectedStats.paid
   const invoiceCalc=useMemo(()=>calculateInvoiceTotals(invoiceLines,billingTributes),[invoiceLines,billingTributes])
 
-  function selectFolio(id){
-    setSelectedId(id)
-    setSelectedItems(new Set())
+  function keepViewport(action){
+    if(typeof window==="undefined"){action();return}
+    const top=window.scrollY
+    action()
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{if(Math.abs(window.scrollY-top)>1)window.scrollTo({top,behavior:"auto"})}))
   }
-  function toggleItem(id){setSelectedItems(current=>{const next=new Set(current);next.has(id)?next.delete(id):next.add(id);return next})}
+  function selectFolio(id){
+    keepViewport(()=>{setSelectedId(id);setSelectedItems(new Set())})
+  }
+  function toggleItem(id){keepViewport(()=>setSelectedItems(current=>{const next=new Set(current);next.has(id)?next.delete(id):next.add(id);return next}))}
 
   function linesFromFolio(){
     const source=checkedInvoiceItems.length?checkedInvoiceItems:invoiceableItems

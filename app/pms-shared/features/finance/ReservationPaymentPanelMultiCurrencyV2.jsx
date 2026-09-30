@@ -229,24 +229,17 @@ export default function ReservationPaymentPanelMultiCurrencyV2({ propertyId, res
 
   const resolvedParts = useMemo(() => {
     if (!split || !reservation || !parts.length) return []
-    let used = 0
-    return parts.map((part, index) => {
+    return parts.map(part => {
       const code = normalizeCurrency(part.currency)
-      const last = index === parts.length - 1
-      if (last) {
-        const applied = roundMoney(Math.max(0, selectedDue - used))
-        const physical = fromReservation(applied, code)
-        return { ...part, currency: code, amount: physical == null ? 0 : physical, applied }
-      }
       const physical = numberValue(part.amount)
       const applied = toReservation(physical, code)
-      if (applied != null) used = roundMoney(used + applied)
-      return { ...part, currency: code, amount: physical, applied: applied == null ? 0 : applied }
+      return { ...part, currency: code, amount: physical, applied: applied == null ? 0 : roundMoney(applied) }
     })
-  }, [split, reservation, parts, selectedDue, toReservation, fromReservation])
+  }, [split, reservation, parts, toReservation])
 
   const splitTotal = roundMoney(resolvedParts.reduce((sum, part) => sum + Number(part.applied || 0), 0))
-  const splitValid = split && resolvedParts.length >= 2 && resolvedParts.every(part => part.method && part.amount > 0 && part.applied > 0 && (part.currency === reservationCurrency || fxRate > 0)) && new Set(resolvedParts.map(part => part.method)).size === resolvedParts.length && Math.abs(splitTotal - selectedDue) < .011
+  const splitDifference = roundMoney(selectedDue - splitTotal)
+  const splitValid = split && resolvedParts.length >= 2 && resolvedParts.every(part => part.method && part.amount > 0 && part.applied > 0 && (part.currency === reservationCurrency || fxRate > 0)) && new Set(resolvedParts.map(part => part.method)).size === resolvedParts.length && Math.abs(splitDifference) < .011
   const cashPart = split ? resolvedParts.find(part => isCash(part.method)) : isCash(method) ? { currency: paymentCurrency, amount: paymentAmount, applied: singleApplied } : null
   const cashTarget = Number(cashPart?.amount || 0)
   const received = numberValue(cashReceived)
@@ -288,9 +281,11 @@ export default function ReservationPaymentPanelMultiCurrencyV2({ propertyId, res
     const secondMethod = paymentMethods.find(item => item !== firstMethod) || "Transferencia bancaria"
     const halfApplied = roundMoney(selectedDue / 2)
     const halfPhysical = fromReservation(halfApplied, paymentCurrency)
+    const remainderApplied = roundMoney(selectedDue - halfApplied)
+    const remainderPhysical = fromReservation(remainderApplied, reservationCurrency)
     setParts([
       { method: firstMethod, currency: paymentCurrency, amount: halfPhysical == null ? 0 : halfPhysical },
-      { method: secondMethod, currency: reservationCurrency, amount: 0 },
+      { method: secondMethod, currency: reservationCurrency, amount: remainderPhysical == null ? 0 : remainderPhysical },
     ])
     setSplit(true)
     setCashReceived("")
@@ -307,6 +302,14 @@ export default function ReservationPaymentPanelMultiCurrencyV2({ propertyId, res
   function updatePart(index, patch) {
     setParts(current => current.map((part, i) => i === index ? { ...part, ...patch } : part))
     setCashReceived("")
+  }
+
+  function completePartRemainder(index) {
+    const otherApplied = resolvedParts.reduce((sum, part, i) => i === index ? sum : sum + Math.max(0, Number(part.applied) || 0), 0)
+    const needed = roundMoney(Math.max(0, selectedDue - otherApplied))
+    const code = normalizeCurrency(parts[index]?.currency || reservationCurrency)
+    const physical = fromReservation(needed, code)
+    updatePart(index, { amount: physical == null ? 0 : physical })
   }
 
   function addPart() {
@@ -449,16 +452,16 @@ export default function ReservationPaymentPanelMultiCurrencyV2({ propertyId, res
               </>}
             </div> : <div style={{ display: "grid", gap: 10 }}>
               {resolvedParts.map((part, index) => {
-                const auto = index === resolvedParts.length - 1
+                const last = index === resolvedParts.length - 1
                 return <div key={index} className={s.formGrid} style={{ padding: 10, border: "1px solid var(--line)", borderRadius: 12 }}>
                   <label className={s.field}><span>Medio {index + 1}</span><select value={parts[index]?.method || part.method} onChange={event => updatePart(index, { method: event.target.value })}>{paymentMethods.map(item => <option key={item}>{item}</option>)}</select></label>
                   <label className={s.field}><span>Moneda</span><select value={parts[index]?.currency || part.currency} onChange={event => updatePart(index, { currency: event.target.value })}>{CURRENCIES.map(code => <option key={code}>{code}</option>)}</select></label>
-                  {auto ? <div className={s.field}><span>Resto automático</span><b>{money(part.amount, part.currency)}</b><small>Aplica {money(part.applied, reservationCurrency)}</small></div> : <label className={s.field}><span>Importe recibido</span><input type="number" min="0.01" step="0.01" value={parts[index]?.amount ?? ""} onChange={event => updatePart(index, { amount: event.target.value })} />{part.currency !== reservationCurrency ? <small>Aplica {money(part.applied, reservationCurrency)}</small> : null}</label>}
+                  <label className={s.field}><span>Importe recibido</span><input type="number" min="0.01" step="0.01" value={parts[index]?.amount ?? ""} onChange={event => updatePart(index, { amount: event.target.value })} />{part.currency !== reservationCurrency ? <small>Aplica {money(part.applied, reservationCurrency)}</small> : null}{last ? <div className={s.quickAmount}><button type="button" onClick={() => completePartRemainder(index)}>Completar resto</button></div> : null}</label>
                   {parts.length > 2 ? <div className={s.field}><span>&nbsp;</span><button type="button" className={s.secondary} onClick={() => removePart(index)}>Quitar</button></div> : null}
                 </div>
               })}
               {parts.length < 4 ? <button type="button" className={s.secondary} onClick={addPart}>+ Agregar otro medio</button> : null}
-              <p className={s.hint}>{splitValid ? `Pago completo · ${money(splitTotal, reservationCurrency)}` : `La suma debe completar ${money(selectedDue, reservationCurrency)}.`}</p>
+              <p className={s.hint}>{splitValid ? `Pago completo · ${money(splitTotal, reservationCurrency)}` : splitDifference > .009 ? `Faltan ${money(splitDifference, reservationCurrency)} para completar los cargos seleccionados (${money(selectedDue, reservationCurrency)}).` : splitDifference < -.009 ? `Te pasaste ${money(Math.abs(splitDifference), reservationCurrency)} sobre los cargos seleccionados (${money(selectedDue, reservationCurrency)}).` : `Completá los importes de los medios de pago.`}</p>
               <div className={s.formGrid}><label className={s.field}><span>Referencia</span><input value={reference} onChange={event => setReference(event.target.value)} /></label><label className={s.field}><span>Nota</span><input value={note} onChange={event => setNote(event.target.value)} /></label></div>
             </div>}
 

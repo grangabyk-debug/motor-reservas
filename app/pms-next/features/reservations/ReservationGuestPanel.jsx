@@ -37,14 +37,12 @@ export default function ReservationGuestPanel({item,rooms=[],propertyId,onClose,
   useEffect(()=>{let cancelled=false;async function load(){setLoading(true);setError("");try{await fetchGuests()}catch(err){if(!cancelled)setError(err?.message||"No se pudieron cargar los huéspedes.")}finally{if(!cancelled)setLoading(false)}}load();return()=>{cancelled=true}},[item.id,propertyId])
   useEffect(()=>{if(selected){setDraft(guestForEdit(selected));resetGuestProfileSearch()}},[selectedId])
 
-  function scrollTop(){requestAnimationFrame(()=>mainRef.current?.scrollTo({top:0,behavior:"smooth"}))}
-  function scrollEditor(){requestAnimationFrame(()=>editorRef.current?.scrollIntoView({behavior:"smooth",block:"start"}))}
-  function showNotice(message){setNotice(message);setError("");scrollTop()}
-  function showError(message){setError(message);setNotice("");scrollTop()}
+  function showNotice(message){setNotice(message);setError("")}
+  function showError(message){setError(message);setNotice("")}
   function setField(key,value){setNotice("");setError("");if(key==="full_name")clearAppliedProfile();setDraft(current=>key==="full_name"&&String(value??"")!==String(current?.full_name??"")?{...current,full_name:value,guest_profile_id:null}:{...current,[key]:value});if(key==="room_id"&&value)setActiveRoomId(String(value))}
-  function selectPerson(guest,{scroll=true}={}){setSelectedId(String(guest.id));setDraft(guestForEdit(guest));resetGuestProfileSearch();if(guest.room_id)setActiveRoomId(String(guest.room_id));setNotice("");setError("");if(scroll)scrollEditor()}
-  function selectRoom(room){const id=String(room.id);setActiveRoomId(id);const people=guests.filter(g=>String(g.room_id||"")===id),target=people.find(g=>!g.checked_out_at)||people[0];if(target)selectPerson(target,{scroll:false});else addCompanion(id,{scroll:false});setNotice("");setError("")}
-  function addCompanion(roomId=null,{scroll=true}={}){const targetRoom=roomId||activeRoomId||rooms[0]?.id||item.habitacion_id||null,id=`new-${Date.now()}`,next={...blankGuest("companion",targetRoom),id,property_id:propertyId,reservation_id:item.id,sort_order:companions.length+1};setGuests(current=>[...current,next]);setSelectedId(id);setDraft(next);resetGuestProfileSearch();if(targetRoom)setActiveRoomId(String(targetRoom));setNotice("");setError("");if(scroll)scrollEditor()}
+  function selectPerson(guest,{scroll=false}={}){const top=mainRef.current?.scrollTop??0;setSelectedId(String(guest.id));setDraft(guestForEdit(guest));resetGuestProfileSearch();if(guest.room_id)setActiveRoomId(String(guest.room_id));setNotice("");setError("");requestAnimationFrame(()=>{if(mainRef.current)mainRef.current.scrollTop=top;if(scroll)editorRef.current?.scrollIntoView({behavior:"auto",block:"nearest"})})}
+  function selectRoom(room){const top=mainRef.current?.scrollTop??0,id=String(room.id);setActiveRoomId(id);const people=guests.filter(g=>String(g.room_id||"")===id),target=people.find(g=>!g.checked_out_at)||people[0];if(target)selectPerson(target,{scroll:false});else addCompanion(id,{scroll:false});setNotice("");setError("");requestAnimationFrame(()=>{if(mainRef.current)mainRef.current.scrollTop=top})}
+  function addCompanion(roomId=null,{scroll=false}={}){const top=mainRef.current?.scrollTop??0,targetRoom=roomId||activeRoomId||rooms[0]?.id||item.habitacion_id||null,id=`new-${Date.now()}`,next={...blankGuest("companion",targetRoom),id,property_id:propertyId,reservation_id:item.id,sort_order:companions.length+1};setGuests(current=>[...current,next]);setSelectedId(id);setDraft(next);resetGuestProfileSearch();if(targetRoom)setActiveRoomId(String(targetRoom));setNotice("");setError("");requestAnimationFrame(()=>{if(mainRef.current)mainRef.current.scrollTop=top;if(scroll)editorRef.current?.scrollIntoView({behavior:"auto",block:"nearest"})})}
 
   async function persistGuest(current=draft){
     if(!current?.full_name?.trim())throw new Error("Ingresá nombre y apellido.")
