@@ -74,3 +74,8 @@ export function editRegimenSummary(details){
   if(names.length>1)return"Mixto"
   return active[0]?.rate_plan_regimen||names[0]||"Alojamiento"
 }
+
+export function editStayDelta({existingDetails,selectedRooms,assignments,ratePlans,taxes,defaultCode,item,ids}){
+  const preview=(selectedRooms||[]).map(room=>{const id=String(room.id),previous=(existingDetails||[]).find(value=>String(value?.habitacion_id)===id)||{},assignment=assignments?.[id]||{};return pricedEditDetail({previous,room,assignment,ratePlans,taxes,defaultCode,item})})
+  return round(editStayTotal(preview,item,ids)-editStayTotal(existingDetails,item,ids))
+}
