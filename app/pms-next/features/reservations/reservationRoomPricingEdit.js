@@ -1,10 +1,18 @@
 import{defaultRatePlan,legacyRegimenForPlan,normalizeRatePlans,ratePlanAmounts,ratePlanBasis,ratePlanByCode,ratePlanSignedAdjustment}from"../../core/ratePlans"
-import{normalizeTaxSettings}from"../../core/priceTax"
+import{finalPriceFromNet,normalizeTaxSettings}from"../../core/priceTax"
 
 const num=value=>Number.isFinite(Number(value))?Number(value):0
 const round=value=>Math.round(num(value)*100)/100
 const day=value=>String(value||"").slice(0,10)
+const nextDay=value=>{const d=new Date(day(value)+"T12:00:00");d.setDate(d.getDate()+1);return d.toISOString().slice(0,10)}
 const nights=(detail,item)=>{const explicit=Number(detail?.noches);if(Number.isFinite(explicit)&&explicit>0)return explicit;const start=day(detail?.fecha_entrada||item?.fecha_entrada),end=day(detail?.fecha_salida||item?.fecha_salida);if(!start||!end)return 1;return Math.max(1,Math.round((new Date(end+"T12:00:00")-new Date(start+"T12:00:00"))/86400000))}
+
+export function editStayDateKeys(detail={},item={}){
+  const start=day(detail?.fecha_entrada||item?.fecha_entrada),end=day(detail?.fecha_salida||item?.fecha_salida),out=[]
+  if(!start||!end||end<=start)return out
+  for(let cursor=start;cursor<end;cursor=nextDay(cursor))out.push(cursor)
+  return out
+}
 
 export function editRoomBaseRate(detail,room,item){
   const explicit=Number(detail?.tarifa_base_noche)
@@ -29,43 +37,57 @@ export function effectiveEditRoomRate({assignment,room,ratePlans,taxes,defaultCo
   return round(Math.max(0,base+ratePlanAmounts(plan,guests,taxes,1).netPerNight))
 }
 
-export function pricedEditDetail({previous={},room,assignment,ratePlans,taxes,defaultCode,item}){
+function occupancySegments(nightly=[]){
+  const segments=[]
+  for(const night of nightly){
+    const last=segments[segments.length-1]
+    if(last&&last.guests===night.guests&&last.to===night.date){last.to=nextDay(night.date);last.nights+=1;last.net_total=round(last.net_total+night.net_rate);last.final_total=round(last.final_total+night.final_rate);continue}
+    segments.push({from:night.date,to:nextDay(night.date),guests:night.guests,nights:1,net_total:night.net_rate,final_total:night.final_rate})
+  }
+  return segments
+}
+
+export function pricedEditDetail({previous={},room,assignment,ratePlans,taxes,defaultCode,item,occupancyByDate=null}){
   const selected=ratePlanByCode(ratePlans,assignment?.ratePlanCode||previous?.rate_plan_code||defaultCode)
-  const plan=selected?.active?selected:defaultRatePlan(ratePlans),guests=Math.max(1,num(assignment?.guests)||1)
-  const base=Math.max(0,num(assignment?.rate??editRoomBaseRate(previous,room,item)))
-  const amounts=ratePlanAmounts(plan,guests,taxes,1),effective=round(Math.max(0,base+amounts.netPerNight)),basis=ratePlanBasis(plan),signed=ratePlanSignedAdjustment(plan)
-  const extensionNights=Math.max(0,num(previous?.extension_nights))
+  const plan=selected?.active?selected:defaultRatePlan(ratePlans),baseGuests=Math.max(1,num(assignment?.guests)||1)
+  const base=Math.max(0,num(assignment?.rate??editRoomBaseRate(previous,room,item))),basis=ratePlanBasis(plan),signed=ratePlanSignedAdjustment(plan)
+  const dates=editStayDateKeys(previous,item),hasCustom=occupancyByDate&&dates.length>0
+  const nightly=hasCustom?dates.map(date=>{
+    const guests=Math.max(1,num(occupancyByDate?.[date])||baseGuests),amounts=ratePlanAmounts(plan,guests,taxes,1),netRate=round(Math.max(0,base+amounts.netPerNight))
+    return{date,guests,net_rate:netRate,final_rate:finalPriceFromNet(netRate,taxes),adjustment_net:round(amounts.netPerNight),adjustment_final:round(amounts.finalPerNight)}
+  }):[]
+  const maxGuests=nightly.length?Math.max(...nightly.map(n=>n.guests)):baseGuests
+  const amounts=ratePlanAmounts(plan,maxGuests,taxes,1),stayNet=nightly.length?round(nightly.reduce((sum,n)=>sum+n.net_rate,0)):null
+  const effective=nightly.length?round(stayNet/nightly.length):round(Math.max(0,base+amounts.netPerNight))
+  const avgAdjNet=nightly.length?round(nightly.reduce((sum,n)=>sum+n.adjustment_net,0)/nightly.length):round(amounts.netPerNight)
+  const avgAdjFinal=nightly.length?round(nightly.reduce((sum,n)=>sum+n.adjustment_final,0)/nightly.length):round(amounts.finalPerNight)
+  const segments=nightly.length?occupancySegments(nightly):null,variable=Boolean(segments&&new Set(nightly.map(n=>n.guests)).size>1)
+  const extensionFrom=day(previous?.extension_from),extensionNights=Math.max(0,num(previous?.extension_nights))
+  const extensionNightly=nightly.length&&extensionFrom?nightly.filter(n=>n.date>=extensionFrom):[]
   return{
     ...previous,
-    habitacion_id:Number(room.id),
-    nombre:room.nombre,
-    categoria_asignada:room.tipo||"Habitación",
-    categoria_vendida:assignment?.soldAs||room.tipo||"Habitación",
-    huespedes:guests,
-    tarifa_noche:effective,
-    tarifa_base_noche:round(base),
+    habitacion_id:Number(room.id),nombre:room.nombre,categoria_asignada:room.tipo||"Habitación",categoria_vendida:assignment?.soldAs||room.tipo||"Habitación",
+    huespedes:maxGuests,tarifa_noche:effective,tarifa_base_noche:round(base),
     rooming:{matrimonial:Math.max(0,num(assignment?.matrimonial)),individual:Math.max(0,num(assignment?.individual))},
-    rate_plan_code:plan.code,
-    rate_plan_name:plan.name,
-    rate_plan_meal:plan.meal_plan,
-    rate_plan_regimen:legacyRegimenForPlan(plan),
-    rate_plan_booked_guests:guests,
-    rate_plan_adjustment_basis:basis,
-    rate_plan_adjustment_configured_value:signed,
+    rate_plan_code:plan.code,rate_plan_name:plan.name,rate_plan_meal:plan.meal_plan,rate_plan_regimen:legacyRegimenForPlan(plan),
+    rate_plan_booked_guests:maxGuests,rate_plan_adjustment_basis:basis,rate_plan_adjustment_configured_value:signed,
     rate_plan_adjustment_configured_per_person:basis==="per_person"?signed:0,
     rate_plan_adjustment_booked_per_person:basis==="per_person"?round(amounts.netValue):0,
     rate_plan_adjustment_final_per_person:basis==="per_person"?round(amounts.finalValue):0,
-    rate_plan_adjustment_booked_per_night:round(amounts.netPerNight),
-    rate_plan_adjustment_final_per_night:round(amounts.finalPerNight),
-    rate_plan_snapshot:{code:plan.code,name:plan.name,meal_plan:plan.meal_plan,description:plan.description||"",booked_guests:guests,adjustment_basis:basis,adjustment_value:signed,adjustment_per_person:basis==="per_person"?signed:0,captured_at:new Date().toISOString()},
-    ...(extensionNights>0?{extension_net_total:round(effective*extensionNights),rate_plan_extension_net_total:round(amounts.netPerNight*extensionNights)}:{}),
+    rate_plan_adjustment_booked_per_night:avgAdjNet,rate_plan_adjustment_final_per_night:avgAdjFinal,
+    rate_plan_snapshot:{code:plan.code,name:plan.name,meal_plan:plan.meal_plan,description:plan.description||"",booked_guests:maxGuests,adjustment_basis:basis,adjustment_value:signed,adjustment_per_person:basis==="per_person"?signed:0,captured_at:new Date().toISOString()},
+    occupancy_nights:nightly.length?nightly:null,occupancy_segments:segments,variable_occupancy:variable,stay_net_total:nightly.length?stayNet:null,
+    ...(extensionNights>0?{extension_net_total:nightly.length&&extensionNightly.length?round(extensionNightly.reduce((sum,n)=>sum+n.net_rate,0)):round(effective*extensionNights),rate_plan_extension_net_total:nightly.length&&extensionNightly.length?round(extensionNightly.reduce((sum,n)=>sum+n.adjustment_net,0)):round(avgAdjNet*extensionNights)}:{}),
     tarifa_snapshot_at:new Date().toISOString()
   }
 }
 
 export function editStayTotal(details,item,roomIds){
   const wanted=new Set((roomIds||[]).map(String))
-  return round((details||[]).filter(detail=>wanted.has(String(detail?.habitacion_id))).reduce((sum,detail)=>sum+Math.max(0,num(detail?.tarifa_noche))*nights(detail,item),0))
+  return round((details||[]).filter(detail=>wanted.has(String(detail?.habitacion_id))).reduce((sum,detail)=>{
+    const explicit=Number(detail?.stay_net_total)
+    return sum+(Number.isFinite(explicit)?Math.max(0,explicit):Math.max(0,num(detail?.tarifa_noche))*nights(detail,item))
+  },0))
 }
 
 export function editRegimenSummary(details){
@@ -75,7 +97,7 @@ export function editRegimenSummary(details){
   return active[0]?.rate_plan_regimen||names[0]||"Alojamiento"
 }
 
-export function editStayDelta({existingDetails,selectedRooms,assignments,ratePlans,taxes,defaultCode,item,ids}){
-  const preview=(selectedRooms||[]).map(room=>{const id=String(room.id),previous=(existingDetails||[]).find(value=>String(value?.habitacion_id)===id)||{},assignment=assignments?.[id]||{};return pricedEditDetail({previous,room,assignment,ratePlans,taxes,defaultCode,item})})
+export function editStayDelta({existingDetails,selectedRooms,assignments,occupancyByRoom,ratePlans,taxes,defaultCode,item,ids}){
+  const preview=(selectedRooms||[]).map(room=>{const id=String(room.id),previous=(existingDetails||[]).find(value=>String(value?.habitacion_id)===id)||{},assignment=assignments?.[id]||{};return pricedEditDetail({previous,room,assignment,ratePlans,taxes,defaultCode,item,occupancyByDate:occupancyByRoom?.[id]||null})})
   return round(editStayTotal(preview,item,ids)-editStayTotal(existingDetails,item,ids))
 }

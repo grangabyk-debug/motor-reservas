@@ -89,7 +89,7 @@ export function reservationRoomingSummary(item,assignedRooms=[]){
   return roomingLabel(configured[0])
 }
 
-export default function RoomingEditor({draft,setDraft,rooms=[],categories=[],currency="ARS",editableRate=true,ratePlans=null,defaultRatePlanCode="",allowRatePlanOverride=false,taxConfig=null}){
+export default function RoomingEditor({draft,setDraft,rooms=[],categories=[],currency="ARS",editableRate=true,ratePlans=null,defaultRatePlanCode="",allowRatePlanOverride=false,taxConfig=null,onGuestsChange=null}){
   const selectedKey=idsOf(rooms).join("|"),planConfig=normalizeRatePlans(ratePlans||{}),plans=activeRatePlans(planConfig),defaultPlanCode=defaultRatePlanCode||defaultRatePlan(planConfig).code,showPlan=Boolean(allowRatePlanOverride&&plans.length>1)
   const[bedConfigById,setBedConfigById]=useState({}),[bedConfigReady,setBedConfigReady]=useState(false)
   useEffect(()=>{
@@ -127,7 +127,7 @@ export default function RoomingEditor({draft,setDraft,rooms=[],categories=[],cur
     })
   },[selectedKey,bedConfigReady,bedConfigKey,setDraft])
 
-  function update(room,patch){
+  function update(room,patch){if(Object.prototype.hasOwnProperty.call(patch,"guests"))onGuestsChange?.(String(room.id),Number(patch.guests)||1);
     const id=String(room.id)
     setDraft(current=>{
       const assignments={...(current.roomAssignments||{})},base=assignments[id]||makeAssignment(room,0),next={...base,...patch},capacity=roomCapacity(room)

@@ -25,17 +25,27 @@ export const activeReservationRoomIds=item=>{
 }
 
 export function initialReservationEditDraft(item,assigned){
-  const ids=activeReservationRoomIds(item),details=Array.isArray(item.habitaciones_detalle)?item.habitaciones_detalle:[],roomAssignments={}
-  for(const id of ids){const room=assigned.find(value=>String(value.id)===id),detail=details.find(value=>String(value?.habitacion_id)===id)||{},beds=detail.rooming||{},effective=Number(detail.tarifa_noche)||Number(room?.pricing_net??room?.precio)||Number(item.tarifa_noche)||0,bookedAdjustment=Number(detail.rate_plan_adjustment_booked_per_night)||0,base=Number.isFinite(Number(detail.tarifa_base_noche))?Math.max(0,Number(detail.tarifa_base_noche)):Math.max(0,effective-bookedAdjustment);roomAssignments[id]={soldAs:detail.categoria_vendida||room?.tipo||"Habitación",guests:Math.max(0,Number(detail.huespedes)||0),matrimonial:Math.max(0,Number(beds.matrimonial)||0),individual:Math.max(0,Number(beds.individual)||0),rate:base,ratePlanCode:detail.rate_plan_code||""}}
+  const ids=activeReservationRoomIds(item),details=Array.isArray(item.habitaciones_detalle)?item.habitaciones_detalle:[],roomAssignments={},occupancyByRoom={}
+  for(const id of ids){const room=assigned.find(value=>String(value.id)===id),detail=details.find(value=>String(value?.habitacion_id)===id)||{},beds=detail.rooming||{},effective=Number(detail.tarifa_noche)||Number(room?.pricing_net??room?.precio)||Number(item.tarifa_noche)||0,bookedAdjustment=Number(detail.rate_plan_adjustment_booked_per_night)||0,base=Number.isFinite(Number(detail.tarifa_base_noche))?Math.max(0,Number(detail.tarifa_base_noche)):Math.max(0,effective-bookedAdjustment);roomAssignments[id]={soldAs:detail.categoria_vendida||room?.tipo||"Habitación",guests:Math.max(0,Number(detail.huespedes)||0),matrimonial:Math.max(0,Number(beds.matrimonial)||0),individual:Math.max(0,Number(beds.individual)||0),rate:base,ratePlanCode:detail.rate_plan_code||""};if(Array.isArray(detail.occupancy_nights)&&detail.occupancy_nights.length)occupancyByRoom[id]=Object.fromEntries(detail.occupancy_nights.map(n=>[String(n?.date||"").slice(0,10),Math.max(1,Number(n?.guests)||1)]).filter(([date])=>validDate(date)))}
   const earlyAmount=Math.max(0,Number(item.early_checkin_importe)||0),lateAmount=Math.max(0,Number(item.late_checkout_importe)||0)
   const taxEnabled=Boolean(item.impuestos_desglosados),storedNet=Math.max(0,Number(item.precio_sin_impuestos_nacionales)||Number(item.subtotal)||0),storedVat=Math.max(0,Number(item.iva_importe)||0),vatRate=taxEnabled?Math.max(0,Number(item.iva_porcentaje)||(storedNet>0?roundMoney(storedVat/storedNet*100):0)):0
-  return{start:item.fecha_entrada,end:item.fecha_salida,guests:Math.max(1,Number(item.cantidad_huespedes)||1),phone:item.telefono_huesped||"",regimen:item.regimen||"Alojamiento",roomId:ids[0]||"",roomIds:ids,roomAssignments,rate:Number(item.tarifa_noche)||0,currency:item.moneda||"ARS",impuestosDesglosados:taxEnabled,ivaPorcentaje:vatRate,earlyCheckin:Boolean(item.early_checkin)||earlyAmount>0,lateCheckout:Boolean(item.late_checkout)||lateAmount>0,originalEarlyAmount:earlyAmount,originalLateAmount:lateAmount}
+  return{start:item.fecha_entrada,end:item.fecha_salida,guests:Math.max(1,Number(item.cantidad_huespedes)||1),phone:item.telefono_huesped||"",regimen:item.regimen||"Alojamiento",roomId:ids[0]||"",roomIds:ids,roomAssignments,occupancyByRoom,rate:Number(item.tarifa_noche)||0,currency:item.moneda||"ARS",impuestosDesglosados:taxEnabled,ivaPorcentaje:vatRate,earlyCheckin:Boolean(item.early_checkin)||earlyAmount>0,lateCheckout:Boolean(item.late_checkout)||lateAmount>0,originalEarlyAmount:earlyAmount,originalLateAmount:lateAmount}
 }
 
 export function originalNightlyRate(item,currentIds){
   const details=Array.isArray(item?.habitaciones_detalle)?item.habitaciones_detalle:[],released=releasedRoomIds(item)
   const active=(currentIds||[]).filter(id=>!released.has(String(id)))
   return active.reduce((sum,id)=>{const detail=details.find(value=>String(value?.habitacion_id)===String(id));return sum+Math.max(0,Number(detail?.tarifa_noche)||0)},0)||Number(item?.tarifa_noche)||0
+}
+
+
+function peakGuestCount(details,fallback=1){
+  const active=(details||[]).filter(detail=>!["previous_room","transient_room","cancelled_room","no_show_room"].includes(String(detail?.segment_role||"").toLowerCase()))
+  const dates=[...new Set(active.flatMap(detail=>Array.isArray(detail?.occupancy_nights)?detail.occupancy_nights.map(n=>String(n?.date||"").slice(0,10)).filter(validDate):[]))]
+  if(!dates.length)return Math.max(1,active.reduce((sum,detail)=>sum+Math.max(0,Number(detail?.huespedes)||0),0)||Number(fallback)||1)
+  let peak=0
+  for(const date of dates){let total=0;for(const detail of active){const night=Array.isArray(detail?.occupancy_nights)?detail.occupancy_nights.find(n=>String(n?.date||"").slice(0,10)===date):null;if(night)total+=Math.max(1,Number(night.guests)||1);else{const start=String(detail?.fecha_entrada||"").slice(0,10),end=String(detail?.fecha_salida||"").slice(0,10);if(start&&end&&start<=date&&date<end)total+=Math.max(0,Number(detail?.huespedes)||0)}}peak=Math.max(peak,total)}
+  return Math.max(1,peak||Number(fallback)||1)
 }
 
 export function buildReservationMetadataPatch({baseItem,draft,details,ids,effectiveNightly,addedStayAmount=0,earlyPercent,latePercent,newNights}){
@@ -50,7 +60,7 @@ export function buildReservationMetadataPatch({baseItem,draft,details,ids,effect
   const released=releasedRoomIds(baseItem),activeIds=unique(ids),activeSet=new Set(activeIds),baseDetails=Array.isArray(baseItem?.habitaciones_detalle)?baseItem.habitaciones_detalle:[]
   const historyDetails=baseDetails.filter(detail=>{const id=String(detail?.habitacion_id||"");return id&&released.has(id)&&!activeSet.has(id)})
   const persistedDetails=[...(details||[]),...historyDetails],persistedIds=unique([...activeIds,...historyDetails.map(detail=>detail?.habitacion_id)])
-  return{habitacion_id:Number(activeIds[0]),habitaciones_ids:persistedIds.map(Number),telefono_huesped:draft.phone.trim()||null,regimen:draft.regimen.trim()||null,cantidad_huespedes:Math.max(1,Number(draft.guests)||1),habitaciones_detalle:persistedDetails,tarifa_noche:effectiveNightly,noches:newNights,early_checkin:Boolean(draft.earlyCheckin),early_checkin_importe:nextEarly,late_checkout:Boolean(draft.lateCheckout),late_checkout_importe:nextLate,subtotal:nextNet,precio_sin_impuestos_nacionales:nextNet,iva_importe:nextVat,precio_total:nextTotal}
+  return{habitacion_id:Number(activeIds[0]),habitaciones_ids:persistedIds.map(Number),telefono_huesped:draft.phone.trim()||null,regimen:draft.regimen.trim()||null,cantidad_huespedes:peakGuestCount(persistedDetails,draft.guests),habitaciones_detalle:persistedDetails,tarifa_noche:effectiveNightly,noches:newNights,early_checkin:Boolean(draft.earlyCheckin),early_checkin_importe:nextEarly,late_checkout:Boolean(draft.lateCheckout),late_checkout_importe:nextLate,subtotal:nextNet,precio_sin_impuestos_nacionales:nextNet,iva_importe:nextVat,precio_total:nextTotal}
 }
 
 

@@ -38,10 +38,11 @@ export function lodgingFolioItemPresentation(row,reservation){
   if(!detail||!plan)return row
   const roomName=clean(detail.nombre)||clean(lodgingRoomId(row))
   if(!roomName)return row
-  const detailText=clean(row.detail)
+  const detailText=clean(row.detail),variable=Boolean(detail?.variable_occupancy&&Array.isArray(detail?.occupancy_segments)&&detail.occupancy_segments.length>1)
+  const baseDetail=/^mixto(?:\s*·|$)/i.test(detailText)?detailText.replace(/^mixto/i,plan):detailText||null
   return{
     ...row,
     description:`Alojamiento · Habitación ${roomName} · ${plan}`,
-    detail:/^mixto(?:\s*·|$)/i.test(detailText)?detailText.replace(/^mixto/i,plan):detailText||null,
+    detail:variable?`${baseDetail||plan} · ocupación variable`:baseDetail,
   }
 }
