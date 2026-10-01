@@ -44,6 +44,6 @@ export function lodgingFolioItemPresentation(row,reservation){
   return{
     ...row,
     description:`Alojamiento · Habitación ${roomName} · ${plan}`,
-    detail:variable?`${baseDetail||plan} · ocupación variable`:baseDetail,
+    detail:detail?.rate_plan_variable?"Régimen variable por noche · ver detalle de la estadía":variable?`${baseDetail||plan} · ocupación variable`:baseDetail,
   }
 }
