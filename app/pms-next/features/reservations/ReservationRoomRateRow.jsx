@@ -9,12 +9,12 @@ const fmtStay=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:
 const round2=value=>Math.round((Number(value)||0)*100)/100
 
 function nightlyRows(detail,taxEnabled,vatRate){
+  const occupancy=Array.isArray(detail?.occupancy_nights)?detail.occupancy_nights:[]
+  if(occupancy.length)return occupancy.map((entry,index)=>({key:`${entry?.date||index}`,date:String(entry?.date||""),net:Number(entry?.net_rate)||0,gross:Number(entry?.final_rate)||0,guests:Math.max(1,Number(entry?.guests)||1),source:"occupancy"})).filter(entry=>entry.date&&Number.isFinite(entry.gross)).sort((a,b)=>a.date.localeCompare(b.date))
   const raw=Array.isArray(detail?.tarifas_por_noche)?detail.tarifas_por_noche:[]
   const factor=taxEnabled?1+Math.max(0,Number(vatRate)||0)/100:1,planGuests=Math.max(0,Number(detail?.rate_plan_booked_guests??detail?.rate_plan_snapshot?.booked_guests??detail?.huespedes)||0),planFinalPerNight=Number(detail?.rate_plan_adjustment_final_per_night)||(Number(detail?.rate_plan_adjustment_final_per_person)||0)*planGuests
   return raw.map((entry,index)=>{
-    const net=Number(entry?.tarifa_neta??entry?.price??entry?.tarifa)
-    const grossStored=Number(entry?.tarifa_final)
-    const gross=(Number.isFinite(grossStored)?grossStored:round2(net*factor))+planFinalPerNight
+    const net=Number(entry?.tarifa_neta??entry?.price??entry?.tarifa),grossStored=Number(entry?.tarifa_final),gross=(Number.isFinite(grossStored)?grossStored:round2(net*factor))+planFinalPerNight
     return{key:`${entry?.fecha||entry?.stay_date||index}`,date:String(entry?.fecha||entry?.stay_date||""),net:Number.isFinite(net)?net:0,gross:Number.isFinite(gross)?gross:0,source:String(entry?.fuente||entry?.source||"")}
   }).filter(entry=>entry.date&&Number.isFinite(entry.gross)).sort((a,b)=>a.date.localeCompare(b.date))
 }
