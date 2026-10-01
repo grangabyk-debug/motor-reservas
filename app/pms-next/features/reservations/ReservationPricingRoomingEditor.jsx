@@ -9,12 +9,12 @@ const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"curren
 export default function ReservationPricingRoomingEditor({item,draft,setDraft,rooms=[],currency="ARS",ratePlans,taxConfig,defaultRatePlanCode,...props}){
   const note=Number(item?.paid||0)>0||item?.estado==="alojado",factor=taxConfig?.enabled===false?1:1+(Math.max(0,Number(taxConfig?.vat_rate)||0)/100)
   const details=Array.isArray(item?.habitaciones_detalle)?item.habitaciones_detalle:[]
-  const variableRateLabels=Object.fromEntries(details.filter(detail=>detail?.variable_occupancy&&Array.isArray(detail?.occupancy_nights)&&detail.occupancy_nights.length).map(detail=>{const values=detail.occupancy_nights.map(n=>Number(n?.final_rate)).filter(Number.isFinite),min=values.length?Math.min(...values):0,max=values.length?Math.max(...values):0;return[String(detail.habitacion_id),min===max?money(min,currency):`${money(min,currency)} – ${money(max,currency)}`]}))
+  const variableRateLabels=Object.fromEntries(details.filter(detail=>(detail?.variable_occupancy||detail?.rate_plan_variable)&&Array.isArray(detail?.occupancy_nights)&&detail.occupancy_nights.length).map(detail=>{const values=detail.occupancy_nights.map(n=>Number(n?.final_rate)).filter(Number.isFinite),min=values.length?Math.min(...values):0,max=values.length?Math.max(...values):0;return[String(detail.habitacion_id),min===max?money(min,currency):`${money(min,currency)} – ${money(max,currency)}`]}))
   const changes=rooms.map(room=>{
     const id=String(room.id),detail=details.find(value=>String(value?.habitacion_id)===id)||{},assignment=draft?.roomAssignments?.[id]||{}
     const preview=pricedEditDetail({previous:detail,room,assignment,ratePlans,taxes:taxConfig,defaultCode:defaultRatePlanCode,item,occupancyByDate:draft?.occupancyByRoom?.[id]||null})
     const current=editStayTotal([detail],item,[id]),next=editStayTotal([preview],item,[id]),total=(next-current)*factor
-    return{room:room.nombre||id,total,variable:Boolean(preview.variable_occupancy)}
+    return{room:room.nombre||id,total,variable:Boolean(preview.variable_occupancy||preview.rate_plan_variable)}
   }).filter(change=>Math.abs(change.total)>.01)
   function guestsChanged(id){setDraft(current=>{if(!current?.occupancyByRoom?.[id])return current;const next={...(current.occupancyByRoom||{})};delete next[id];return{...current,occupancyByRoom:next}})}
   return <>

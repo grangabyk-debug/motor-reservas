@@ -10,7 +10,7 @@ const round2=value=>Math.round((Number(value)||0)*100)/100
 
 function nightlyRows(detail,taxEnabled,vatRate){
   const occupancy=Array.isArray(detail?.occupancy_nights)?detail.occupancy_nights:[]
-  if(occupancy.length)return occupancy.map((entry,index)=>({key:`${entry?.date||index}`,date:String(entry?.date||""),net:Number(entry?.net_rate)||0,gross:Number(entry?.final_rate)||0,guests:Math.max(1,Number(entry?.guests)||1),source:"occupancy"})).filter(entry=>entry.date&&Number.isFinite(entry.gross)).sort((a,b)=>a.date.localeCompare(b.date))
+  if(occupancy.length)return occupancy.map((entry,index)=>({key:`${entry?.date||index}`,date:String(entry?.date||""),net:Number(entry?.net_rate)||0,gross:Number(entry?.final_rate)||0,guests:Math.max(1,Number(entry?.guests)||1),plan:String(entry?.rate_plan_name||""),source:"occupancy"})).filter(entry=>entry.date&&Number.isFinite(entry.gross)).sort((a,b)=>a.date.localeCompare(b.date))
   const raw=Array.isArray(detail?.tarifas_por_noche)?detail.tarifas_por_noche:[]
   const factor=taxEnabled?1+Math.max(0,Number(vatRate)||0)/100:1,planGuests=Math.max(0,Number(detail?.rate_plan_booked_guests??detail?.rate_plan_snapshot?.booked_guests??detail?.huespedes)||0),planFinalPerNight=Number(detail?.rate_plan_adjustment_final_per_night)||(Number(detail?.rate_plan_adjustment_final_per_person)||0)*planGuests
   return raw.map((entry,index)=>{
@@ -23,23 +23,23 @@ export default function ReservationRoomRateRow({row,detail,item,checkoutDate="",
   const nightly=useMemo(()=>nightlyRows(detail,taxEnabled,vatRate),[detail,taxEnabled,vatRate])
   const varied=useMemo(()=>nightly.length>1&&nightly.some(entry=>Math.abs(entry.gross-nightly[0].gross)>.01),[nightly])
   const[open,setOpen]=useState(()=>Boolean(defaultOpen&&varied))
-  const total=nightly.reduce((sum,entry)=>sum+entry.gross,0),variableOccupancy=Boolean(detail?.variable_occupancy&&nightly.length>1),minNight=nightly.length?Math.min(...nightly.map(entry=>entry.gross)):0,maxNight=nightly.length?Math.max(...nightly.map(entry=>entry.gross)):0
+  const total=nightly.reduce((sum,entry)=>sum+entry.gross,0),variablePricing=Boolean((detail?.variable_occupancy||detail?.rate_plan_variable)&&nightly.length>1),minNight=nightly.length?Math.min(...nightly.map(entry=>entry.gross)):0,maxNight=nightly.length?Math.max(...nightly.map(entry=>entry.gross)):0
   const parts=[]
   if(row.matrimonial)parts.push(`${row.matrimonial} matrimonial${row.matrimonial===1?"":"es"}`)
   if(row.individual)parts.push(`${row.individual} individual${row.individual===1?"":"es"}`)
   const changed=row.soldAs!==row.physicalCategory,checkedOut=Boolean(checkoutDate),earlyActive=roomSpecialStayEnabled(item,row.roomId,"early"),lateActive=roomSpecialStayEnabled(item,row.roomId,"late")
-  const canExpand=nightly.length>0&&varied
+  const canExpand=nightly.length>0&&(varied||detail?.rate_plan_variable)
 
   return <div style={{display:"block",padding:0,borderLeft:checkedOut?"3px solid #7656c9":"3px solid transparent",background:checkedOut?"color-mix(in srgb,#7656c9 7%,var(--panelSolid))":"transparent"}}>
     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:14,padding:"10px 12px"}}>
       <span style={{minWidth:0,fontFamily:"inherit"}}>
         <b style={{display:"block",fontSize:11,fontWeight:850,lineHeight:1.35}}>Hab. {row.name} · vendida como {row.soldAs} · {fmtStay(row.start)} → {fmtStay(row.end)}</b>
-        <small style={{display:"block",marginTop:2,fontSize:11,lineHeight:1.35,fontFamily:"inherit",color:"var(--muted)"}}>Asignada: {row.physicalCategory}{changed?" · categoría física distinta":""} · {row.guests} huésped{row.guests===1?"":"es"} · {parts.length?parts.join(" + "):"Rooming sin configurar"}{detail?.rate_plan_name?" · "+detail.rate_plan_name:""}</small>{earlyActive||lateActive?<span style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginTop:6}}>{earlyActive?<span style={{padding:"4px 7px",border:"1px solid color-mix(in srgb,#2e9b61 38%,var(--line))",borderRadius:999,background:"color-mix(in srgb,#2e9b61 10%,var(--panelSolid))",color:"#26794d",fontSize:10,fontWeight:900}}>✓ EARLY CHECK-IN · desde {detail?.early_checkin_time||"08:00"}</span>:null}{lateActive?<span style={{padding:"4px 7px",border:"1px solid #2e9b61",borderRadius:999,background:"#2e9b61",color:"#fff",fontSize:10,fontWeight:900,boxShadow:"0 5px 14px rgba(46,155,97,.18)"}}>✓ LATE CHECK-OUT · hasta {detail?.late_checkout_time||"18:00"}</span>:null}</span>:null}
+        <small style={{display:"block",marginTop:2,fontSize:11,lineHeight:1.35,fontFamily:"inherit",color:"var(--muted)"}}>Asignada: {row.physicalCategory}{changed?" · categoría física distinta":""} · {row.guests} huésped{row.guests===1?"":"es"} · {parts.length?parts.join(" + "):"Rooming sin configurar"}{detail?.rate_plan_variable?" · Régimen variable":detail?.rate_plan_name?" · "+detail.rate_plan_name:""}</small>{earlyActive||lateActive?<span style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginTop:6}}>{earlyActive?<span style={{padding:"4px 7px",border:"1px solid color-mix(in srgb,#2e9b61 38%,var(--line))",borderRadius:999,background:"color-mix(in srgb,#2e9b61 10%,var(--panelSolid))",color:"#26794d",fontSize:10,fontWeight:900}}>✓ EARLY CHECK-IN · desde {detail?.early_checkin_time||"08:00"}</span>:null}{lateActive?<span style={{padding:"4px 7px",border:"1px solid #2e9b61",borderRadius:999,background:"#2e9b61",color:"#fff",fontSize:10,fontWeight:900,boxShadow:"0 5px 14px rgba(46,155,97,.18)"}}>✓ LATE CHECK-OUT · hasta {detail?.late_checkout_time||"18:00"}</span>:null}</span>:null}
       </span>
       <span style={{display:"grid",justifyItems:"end",gap:3,flex:"0 0 auto",textAlign:"right"}}>
         {checkedOut?<span style={{padding:"4px 7px",border:"1px solid color-mix(in srgb,#7656c9 34%,var(--line))",borderRadius:999,background:"color-mix(in srgb,#7656c9 10%,var(--panelSolid))",color:"#5e43aa",fontSize:8.8,fontWeight:950,letterSpacing:".02em"}}>✓ CHECK-OUT · {fmtStay(checkoutDate)}</span>:null}
-        <strong style={{fontSize:11,fontFamily:"inherit"}}>{variableOccupancy?"Tarifa variable":money(row.rate,currency)}</strong>
-        <small style={{marginTop:0,fontWeight:650,color:"var(--muted)"}}>{variableOccupancy?`${money(minNight,currency)} – ${money(maxNight,currency)} / noche`:varied?"promedio/noche":"/ noche"}</small>
+        <strong style={{fontSize:11,fontFamily:"inherit"}}>{variablePricing?"Tarifa variable":money(row.rate,currency)}</strong>
+        <small style={{marginTop:0,fontWeight:650,color:"var(--muted)"}}>{variablePricing?`${money(minNight,currency)} – ${money(maxNight,currency)} / noche`:varied?"promedio/noche":"/ noche"}</small>
         {canExpand?<button type="button" onClick={()=>setOpen(value=>!value)} aria-expanded={open} style={{border:0,padding:0,background:"transparent",color:"var(--accent)",font:"inherit",fontSize:9.5,fontWeight:850,cursor:"pointer"}}>{open?"Ocultar detalle":"Ver detalle de tarifas"}</button>:null}
       </span>
     </div>
@@ -48,7 +48,7 @@ export default function ReservationRoomRateRow({row,detail,item,checkoutDate="",
         <span style={{fontSize:9.5,fontWeight:900,letterSpacing:".035em",color:"var(--text)"}}>TARIFA ACORDADA POR FECHA</span>
         <small style={{margin:0,fontSize:9,color:"var(--muted)"}}>Snapshot de la reserva</small>
       </div>
-      <div style={{display:"grid"}}>{nightly.map(entry=><div key={entry.key} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,padding:"7px 10px",borderBottom:"1px solid color-mix(in srgb,var(--line) 78%,transparent)"}}><span style={{fontSize:10.5,fontWeight:750,textTransform:"capitalize"}}>{fmtNight(entry.date)}{entry.guests?` · ${entry.guests} huésped${entry.guests===1?"":"es"}`:""}</span><strong style={{fontSize:10.5}}>{money(entry.gross,currency)}</strong></div>)}</div>
+      <div style={{display:"grid"}}>{nightly.map(entry=><div key={entry.key} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,padding:"7px 10px",borderBottom:"1px solid color-mix(in srgb,var(--line) 78%,transparent)"}}><span style={{fontSize:10.5,fontWeight:750,textTransform:"capitalize"}}>{fmtNight(entry.date)}{entry.plan?` · ${entry.plan}`:""}{entry.guests?` · ${entry.guests} huésped${entry.guests===1?"":"es"}`:""}</span><strong style={{fontSize:10.5}}>{money(entry.gross,currency)}</strong></div>)}</div>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,padding:"8px 10px",background:"color-mix(in srgb,var(--bg) 34%,var(--panelSolid))"}}><span style={{fontSize:9.5,fontWeight:850,color:"var(--muted)"}}>Total alojamiento · {nightly.length} noche{nightly.length===1?"":"s"}</span><strong style={{fontSize:11.5}}>{money(total,currency)}</strong></div>
     </div>:null}
   </div>

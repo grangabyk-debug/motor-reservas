@@ -11,7 +11,7 @@ export default function serviceLines(item,room,rooms=[]){
   if(segmented.length){
     segmented.forEach((detail,index)=>{
       const segmentNights=Math.max(1,Math.round((new Date(`${detail.fecha_salida}T12:00:00`)-new Date(`${detail.fecha_entrada}T12:00:00`))/86400000)||1)
-      const amount=Number(detail.tarifa_noche||0)*segmentNights
+      const explicit=Number(detail.stay_net_total),covered=Array.isArray(detail.occupancy_nights)&&detail.occupancy_nights.length===segmentNights,amount=Number.isFinite(explicit)&&covered?explicit:Number(detail.tarifa_noche||0)*segmentNights
       lines.push({key:`stay-segment-${detail.habitacion_id}-${index}`,title:`Alojamiento · Habitación ${detail.nombre||detail.habitacion_id}`,meta:`${lodgingPlanForDetail(detail,item)||item.regimen||"Alojamiento"} · ${segmentNights} noche${segmentNights===1?"":"s"} · ${taxEnabled?`Precio final · IVA ${vatRate}% incluido`:"Precio"}`,detail:`${fmtDate(detail.fecha_entrada)} → ${fmtDate(detail.fecha_salida)}${detail.segment_role==="previous_room"?" · tramo anterior":" · habitación actual"}`,amount,displayAmount:gross(amount)})
     })
   }else if(assigned.length>1)lines.push({key:"stay",title:`Alojamiento grupal · ${assigned.length} habitaciones`,meta:`${item.regimen||"Alojamiento"} · ${nights} noche${nights===1?"":"s"}`,detail:`${assigned.map(item=>item.nombre).join(", ")} · ${fmtDate(item.fecha_entrada)} al ${fmtDate(item.fecha_salida)}`,amount:stayAmount,displayAmount:gross(stayAmount)})

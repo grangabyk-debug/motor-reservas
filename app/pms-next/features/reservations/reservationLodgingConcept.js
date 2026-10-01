@@ -4,6 +4,7 @@ const clean=value=>String(value??"").trim()
 const day=value=>clean(value).slice(0,10)
 
 export function lodgingPlanForDetail(detail,reservation=null){
+  if(detail?.rate_plan_variable)return"Régimen variable"
   const names=[detail?.rate_plan_name,detail?.rate_plan_snapshot?.name,detail?.rate_plan_regimen]
   const own=names.map(clean).find(name=>name&&!/^mixto$/i.test(name))
   if(own)return own
@@ -38,7 +39,7 @@ export function lodgingFolioItemPresentation(row,reservation){
   if(!detail||!plan)return row
   const roomName=clean(detail.nombre)||clean(lodgingRoomId(row))
   if(!roomName)return row
-  const detailText=clean(row.detail),variable=Boolean(detail?.variable_occupancy&&Array.isArray(detail?.occupancy_segments)&&detail.occupancy_segments.length>1)
+  const detailText=clean(row.detail),variable=Boolean((detail?.variable_occupancy||detail?.rate_plan_variable)&&Array.isArray(detail?.occupancy_segments)&&detail.occupancy_segments.length>1)
   const baseDetail=/^mixto(?:\s*·|$)/i.test(detailText)?detailText.replace(/^mixto/i,plan):detailText||null
   return{
     ...row,
