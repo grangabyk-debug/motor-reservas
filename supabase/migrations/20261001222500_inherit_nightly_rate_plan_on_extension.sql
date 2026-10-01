@@ -211,7 +211,6 @@ begin
   perform private.hl_rebuild_item_payment_allocations_from_folios(r.id);
   return r;
 end;
-$function$
-
+$function$;
 
 grant execute on function public.hl_extend_group_rooms_with_plan_atomic(bigint,bigint[],date) to authenticated;
