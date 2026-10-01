@@ -9,6 +9,7 @@ import ReservationInvoiceDialog from"./ReservationInvoiceDialog"
 import ReservationDocumentHistory from"./ReservationDocumentHistory"
 import MovedRoomChargeNotice from"./MovedRoomChargeNotice"
 import ReservationFolioItemList from"./ReservationFolioItemList"
+import ReservationFolioConsolidateDialog from"./ReservationFolioConsolidateDialog"
 import{buildFolioBillingRows,billingRowParentId,billingRowSegmentKey}from"./reservationFolioNightlyBilling"
 import{deriveBillingRowsPaymentSnapshot}from"./reservationFolioBillingPaymentSnapshot"
 import{printReservationFolio}from"./reservationFolioPrint"
@@ -32,6 +33,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
   const[saving,setSaving]=useState(false)
   const[error,setError]=useState("")
   const[newOpen,setNewOpen]=useState(false)
+  const[consolidateOpen,setConsolidateOpen]=useState(false)
   const[newDraft,setNewDraft]=useState({label:"",payer_type:"guest",payer_name:""})
   const[invoiceOpen,setInvoiceOpen]=useState(false)
   const[invoiceMode,setInvoiceMode]=useState("folio")
@@ -201,10 +203,9 @@ export default function ReservationFolioBilling({reservation,propertyId,property
   }
 
   async function consolidate(){
-    if(!selected||selected.folio_type!=="master")return
-    if(!window.confirm("¿Mover al Folio maestro todos los consumos todavía no facturados de las habitaciones?"))return
+    if(!selected||selected.folio_type!=="master"||saving)return
     setSaving(true);setError("")
-    try{const res=await supabase.rpc("hl_consolidate_folio",{p_target_folio_id:selected.id});if(res.error)throw res.error;await load(true)}
+    try{const res=await supabase.rpc("hl_consolidate_folio",{p_target_folio_id:selected.id});if(res.error)throw res.error;setConsolidateOpen(false);await load(true)}
     catch(err){setError(err?.message||"No se pudieron consolidar los consumos.")}
     finally{setSaving(false)}
   }
@@ -292,7 +293,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
       </div>
 
       <div className={s.folioMeta} style={{display:"flex",alignItems:"center",justifyContent:"flex-start",gap:10,minHeight:36,padding:"6px 9px"}}>
-        {selected.folio_type==="master"&&folios.length>2?<button type="button" onClick={consolidate} disabled={saving} style={{flex:"0 0 auto",margin:0}}>Consolidar grupo</button>:null}
+        {selected.folio_type==="master"&&folios.length>2?<button type="button" onClick={()=>setConsolidateOpen(true)} disabled={saving} style={{flex:"0 0 auto",margin:0}}>Consolidar grupo</button>:null}
         <small style={{flex:"1 1 auto",minWidth:0,whiteSpace:"nowrap",textAlign:"left",margin:0,fontSize:"9px",letterSpacing:"-.01em"}}>{selectedItems.size?`${selectedItems.size} consumo${selectedItems.size===1?"":"s"} seleccionado${selectedItems.size===1?"":"s"} para facturar parcialmente`:"Seleccioná consumos si querés facturar sólo una parte."}</small>
       </div>
 
@@ -306,6 +307,8 @@ export default function ReservationFolioBilling({reservation,propertyId,property
 
       <ReservationDocumentHistory documents={documents} selected={selected} reservation={reservation} propertyId={propertyId} onRefresh={load} setError={setError} onIssueDocument={issueFinanceDocument}/>
     </>:<div className={s.empty}>No hay folios disponibles.</div>}
+
+    <ReservationFolioConsolidateDialog open={consolidateOpen} saving={saving} onClose={()=>!saving&&setConsolidateOpen(false)} onConfirm={consolidate}/>
 
     {newOpen?<div className={s.overlay} onMouseDown={event=>event.target===event.currentTarget&&setNewOpen(false)}><div className={s.modal}>
       <button type="button" className={s.close} onClick={()=>setNewOpen(false)}>×</button><small>NUEVO FOLIO</small><h2>Separar una cuenta</h2><p>Usalo para empresa, agencia, pasajero o una parte específica del grupo.</p>

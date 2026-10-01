@@ -15,7 +15,7 @@ export default function ReservationFolioItemList({folioItems=[],selectedItems,on
       <div className={s.itemMain}>
         <b>{row.description}</b>
         <small>{fmtDate(row.service_date)} · {typeLabels[row.source_type]||row.source_type}{row.detail?` · ${row.detail}`:""}</small>
-        {paid>.009?<small style={{marginTop:3,color:remaining>.009?"#9a6513":"#26794d",fontWeight:800}}>Pagado {money(paid,row.currency)}{remaining>.009?` · pendiente ${money(remaining,row.currency)}`:" · saldado"}</small>:null}
+        {paid>.009?<small style={{marginTop:3,color:remaining>.009?"#9a6513":"#26794d",fontWeight:800}}>{remaining>.009?`Pagado ${money(paid,row.currency)} · pendiente ${money(remaining,row.currency)}`:`Saldado · ${money(paid,row.currency)}`}</small>:null}
         {parts.map((part,index)=><small key={part.payment_id+"-"+index} style={{marginTop:2,color:"var(--muted)"}}>Pago #{part.payment_id} · {part.method} · {money(part.amount,part.currency||row.currency)}{part.origin?` · origen: ${part.origin}`:""}</small>)}
       </div>
       <strong>{money(row.total,row.currency)}</strong>
