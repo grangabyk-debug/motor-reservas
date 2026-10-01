@@ -56,7 +56,7 @@ export function buildReservationMetadataPatch({baseItem,draft,details,ids,effect
   const totalNow=Math.max(0,Number(baseItem.precio_total)||0),vatNow=Math.max(0,Number(baseItem.iva_importe)||0)
   const storedNet=Math.max(0,Number(baseItem.precio_sin_impuestos_nacionales)||Number(baseItem.subtotal)||0)
   const currentNet=storedNet>0?storedNet:taxEnabled?Math.max(0,totalNow-vatNow):totalNow
-  const baseNet=Math.max(0,currentNet-oldEarly-oldLate),nextNet=roundMoney(baseNet+Math.max(0,Number(addedStayAmount)||0)+nextEarly+nextLate),nextVat=taxEnabled?roundMoney(nextNet*vatRate/100):0,nextTotal=roundMoney(nextNet+nextVat)
+  const baseNet=Math.max(0,currentNet-oldEarly-oldLate),nextNet=roundMoney(Math.max(0,baseNet+(Number(addedStayAmount)||0)+nextEarly+nextLate)),nextVat=taxEnabled?roundMoney(nextNet*vatRate/100):0,nextTotal=roundMoney(nextNet+nextVat)
   const released=releasedRoomIds(baseItem),activeIds=unique(ids),activeSet=new Set(activeIds),baseDetails=Array.isArray(baseItem?.habitaciones_detalle)?baseItem.habitaciones_detalle:[]
   const historyDetails=baseDetails.filter(detail=>{const id=String(detail?.habitacion_id||"");return id&&released.has(id)&&!activeSet.has(id)})
   const persistedDetails=[...(details||[]),...historyDetails],persistedIds=unique([...activeIds,...historyDetails.map(detail=>detail?.habitacion_id)])
