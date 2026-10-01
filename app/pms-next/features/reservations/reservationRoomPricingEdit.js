@@ -85,8 +85,8 @@ export function pricedEditDetail({previous={},room,assignment,ratePlans,taxes,de
 export function editStayTotal(details,item,roomIds){
   const wanted=new Set((roomIds||[]).map(String))
   return round((details||[]).filter(detail=>wanted.has(String(detail?.habitacion_id))).reduce((sum,detail)=>{
-    const explicit=Number(detail?.stay_net_total)
-    return sum+(Number.isFinite(explicit)?Math.max(0,explicit):Math.max(0,num(detail?.tarifa_noche))*nights(detail,item))
+    const explicit=Number(detail?.stay_net_total),expected=nights(detail,item),covered=Array.isArray(detail?.occupancy_nights)?detail.occupancy_nights.length:0
+    return sum+(Number.isFinite(explicit)&&covered===expected?Math.max(0,explicit):Math.max(0,num(detail?.tarifa_noche))*expected)
   },0))
 }
 
