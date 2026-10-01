@@ -3,6 +3,7 @@ import{finalPriceFromNet,normalizeTaxSettings}from"../../core/priceTax"
 
 const num=value=>Number.isFinite(Number(value))?Number(value):0
 const round=value=>Math.round(num(value)*100)/100
+const precise=value=>Math.round(num(value)*1e6)/1e6
 const day=value=>String(value||"").slice(0,10)
 const nextDay=value=>{const d=new Date(day(value)+"T12:00:00");d.setDate(d.getDate()+1);return d.toISOString().slice(0,10)}
 const nights=(detail,item)=>{const explicit=Number(detail?.noches);if(Number.isFinite(explicit)&&explicit>0)return explicit;const start=day(detail?.fecha_entrada||item?.fecha_entrada),end=day(detail?.fecha_salida||item?.fecha_salida);if(!start||!end)return 1;return Math.max(1,Math.round((new Date(end+"T12:00:00")-new Date(start+"T12:00:00"))/86400000))}
@@ -22,19 +23,30 @@ export function editRoomBaseRate(detail,room,item){
   return Math.max(0,round(effective-booked))
 }
 
+export function editRoomBaseRateForDate(detail,date,fallback=0){
+  const key=day(date),rates=Array.isArray(detail?.tarifas_por_noche)?detail.tarifas_por_noche:[],scheduled=rates.find(entry=>day(entry?.fecha||entry?.stay_date)===key)
+  const scheduledNet=Number(scheduled?.tarifa_neta??scheduled?.price??scheduled?.tarifa)
+  if(Number.isFinite(scheduledNet)&&scheduledNet>=0)return precise(scheduledNet)
+  const occupancy=Array.isArray(detail?.occupancy_nights)?detail.occupancy_nights:[],stored=occupancy.find(entry=>day(entry?.date)===key)
+  const storedNet=Number(stored?.net_rate),storedAdjustment=Number(stored?.adjustment_net)
+  if(Number.isFinite(storedNet)&&Number.isFinite(storedAdjustment))return precise(Math.max(0,storedNet-storedAdjustment))
+  return precise(Math.max(0,num(fallback)))
+}
+
 export function editPricingContext(settings,item){
   const ratePlans=normalizeRatePlans(settings?.rate_plans||{})
   const taxes=normalizeTaxSettings(settings?.taxes||{enabled:item?.impuestos_desglosados!==false,vat_rate:num(item?.iva_porcentaje),price_tax_mode:"tax_included"})
   return{ratePlans,taxes,defaultCode:defaultRatePlan(ratePlans).code}
 }
 
-export function effectiveEditRoomRate({assignment,room,ratePlans,taxes,defaultCode}){
+export function effectiveEditRoomRate({assignment,room,ratePlans,taxes,defaultCode,detail=null,date=""}){
   const code=assignment?.ratePlanCode||defaultCode
   const selected=ratePlanByCode(ratePlans,code)
   const plan=selected?.active?selected:defaultRatePlan(ratePlans)
   const guests=Math.max(1,num(assignment?.guests)||1)
-  const base=Math.max(0,num(assignment?.rate??room?.pricing_net??room?.precio))
-  return round(Math.max(0,base+ratePlanAmounts(plan,guests,taxes,1).netPerNight))
+  const fallback=Math.max(0,num(assignment?.rate??room?.pricing_net??room?.precio))
+  const base=detail&&date?editRoomBaseRateForDate(detail,date,fallback):fallback
+  return precise(Math.max(0,base+ratePlanAmounts(plan,guests,taxes,1).netPerNight))
 }
 
 function occupancySegments(nightly=[]){
@@ -53,8 +65,8 @@ export function pricedEditDetail({previous={},room,assignment,ratePlans,taxes,de
   const base=Math.max(0,num(assignment?.rate??editRoomBaseRate(previous,room,item))),basis=ratePlanBasis(plan),signed=ratePlanSignedAdjustment(plan)
   const dates=editStayDateKeys(previous,item),hasCustom=occupancyByDate&&dates.length>0
   const nightly=hasCustom?dates.map(date=>{
-    const guests=Math.max(1,num(occupancyByDate?.[date])||baseGuests),amounts=ratePlanAmounts(plan,guests,taxes,1),netRate=round(Math.max(0,base+amounts.netPerNight))
-    return{date,guests,net_rate:netRate,final_rate:finalPriceFromNet(netRate,taxes),adjustment_net:round(amounts.netPerNight),adjustment_final:round(amounts.finalPerNight)}
+    const guests=Math.max(1,num(occupancyByDate?.[date])||baseGuests),amounts=ratePlanAmounts(plan,guests,taxes,1),dateBase=editRoomBaseRateForDate(previous,date,base),netRate=precise(Math.max(0,dateBase+amounts.netPerNight))
+    return{date,guests,base_net:dateBase,base_final:finalPriceFromNet(dateBase,taxes),net_rate:netRate,final_rate:finalPriceFromNet(netRate,taxes),adjustment_net:precise(amounts.netPerNight),adjustment_final:round(amounts.finalPerNight)}
   }):[]
   const maxGuests=nightly.length?Math.max(...nightly.map(n=>n.guests)):baseGuests
   const amounts=ratePlanAmounts(plan,maxGuests,taxes,1),stayNet=nightly.length?round(nightly.reduce((sum,n)=>sum+n.net_rate,0)):null
@@ -72,9 +84,9 @@ export function pricedEditDetail({previous={},room,assignment,ratePlans,taxes,de
     rate_plan_code:plan.code,rate_plan_name:plan.name,rate_plan_meal:plan.meal_plan,rate_plan_regimen:legacyRegimenForPlan(plan),
     rate_plan_booked_guests:maxGuests,rate_plan_adjustment_basis:basis,rate_plan_adjustment_configured_value:signed,
     rate_plan_adjustment_configured_per_person:basis==="per_person"?signed:0,
-    rate_plan_adjustment_booked_per_person:basis==="per_person"?round(amounts.netValue):0,
+    rate_plan_adjustment_booked_per_person:basis==="per_person"?precise(amounts.netValue):0,
     rate_plan_adjustment_final_per_person:basis==="per_person"?round(amounts.finalValue):0,
-    rate_plan_adjustment_booked_per_night:avgAdjNet,rate_plan_adjustment_final_per_night:avgAdjFinal,
+    rate_plan_adjustment_booked_per_night:nightly.length?precise(nightly.reduce((sum,n)=>sum+n.adjustment_net,0)/nightly.length):precise(amounts.netPerNight),rate_plan_adjustment_final_per_night:avgAdjFinal,
     rate_plan_snapshot:{code:plan.code,name:plan.name,meal_plan:plan.meal_plan,description:plan.description||"",booked_guests:maxGuests,adjustment_basis:basis,adjustment_value:signed,adjustment_per_person:basis==="per_person"?signed:0,captured_at:new Date().toISOString()},
     occupancy_nights:nightly.length?nightly:null,occupancy_segments:segments,variable_occupancy:variable,stay_net_total:nightly.length?stayNet:null,
     ...(extensionNights>0?{extension_net_total:nightly.length&&extensionNightly.length?round(extensionNightly.reduce((sum,n)=>sum+n.net_rate,0)):round(effective*extensionNights),rate_plan_extension_net_total:nightly.length&&extensionNightly.length?round(extensionNightly.reduce((sum,n)=>sum+n.adjustment_net,0)):round(avgAdjNet*extensionNights)}:{}),
