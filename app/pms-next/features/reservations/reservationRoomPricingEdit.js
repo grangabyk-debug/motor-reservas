@@ -101,3 +101,8 @@ export function editStayDelta({existingDetails,selectedRooms,assignments,occupan
   const preview=(selectedRooms||[]).map(room=>{const id=String(room.id),previous=(existingDetails||[]).find(value=>String(value?.habitacion_id)===id)||{},assignment=assignments?.[id]||{};return pricedEditDetail({previous,room,assignment,ratePlans,taxes,defaultCode,item,occupancyByDate:occupancyByRoom?.[id]||null})})
   return round(editStayTotal(preview,item,ids)-editStayTotal(existingDetails,item,ids))
 }
+
+export function editPlanSummary(details,fallback="Alojamiento"){
+  const names=[...new Set((details||[]).filter(detail=>detail?.rate_plan_code&&String(detail?.segment_role||"active_room").toLowerCase()!=="previous_room").map(detail=>detail.rate_plan_name||detail.rate_plan_regimen).filter(Boolean))]
+  return{hasRatePlanSnapshot:names.length>0,planSummary:names.length>1?"Mixto":names[0]||fallback}
+}
