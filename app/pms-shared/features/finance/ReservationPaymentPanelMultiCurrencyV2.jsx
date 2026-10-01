@@ -6,6 +6,7 @@ import { convertCurrency, pricingFromSettings } from "../../core/currency"
 import ReservationPaymentChargeSelector from "./ReservationPaymentChargeSelector"
 import QuickPartnerAccountCreator from "./QuickPartnerAccountCreator"
 import { allocatePaymentParts, buildChargeLines, paidTotal, roundMoney, selectedBalance, validPayment } from "./paymentChargeUtils"
+import { paymentApplicationsByItem } from "./paymentApplicationPresentation"
 import s from "./cashActions.module.css"
 
 const RESERVATION_SELECT = "id,numero_reserva,nombre_huesped,fecha_entrada,fecha_salida,precio_total,subtotal,moneda,estado,partner_id"
@@ -159,8 +160,8 @@ export default function ReservationPaymentPanelMultiCurrencyV2({ propertyId, res
       if (ensured.error) throw ensured.error
       const [reservationRes, paymentRes, itemRes, allocationRes] = await Promise.all([
         supabase.from("reservas").select(RESERVATION_SELECT).eq("property_id", propertyId).eq("id", Number(id)).single(),
-        supabase.from("pagos").select("id,reserva_id,monto,metodo,moneda,payment_currency,payment_amount,fx_rate,fx_source,fx_as_of,estado,refunded_amount,created_at").eq("property_id", propertyId).eq("reserva_id", Number(id)).order("created_at", { ascending: false }),
-        supabase.from("hotel_folio_items").select("id,folio_id,source_type,description,detail,service_date,total,currency,status,created_at").eq("property_id", propertyId).eq("reservation_id", Number(id)).eq("status", "active").order("created_at", { ascending: true }),
+        supabase.from("pagos").select("id,reserva_id,monto,metodo,moneda,payment_currency,payment_amount,fx_rate,fx_source,fx_as_of,estado,refunded_amount,nota,referencia,created_at").eq("property_id", propertyId).eq("reserva_id", Number(id)).order("created_at", { ascending: false }),
+        supabase.from("hotel_folio_items").select("id,folio_id,source_type,description,detail,service_date,total,currency,status,created_at").eq("property_id", propertyId).eq("reservation_id", Number(id)).order("created_at", { ascending: true }),
         supabase.from("hotel_folio_item_payment_allocations").select("folio_item_id,payment_id,amount").eq("property_id", propertyId).eq("reservation_id", Number(id)),
       ])
       if (reservationRes.error) throw reservationRes.error
@@ -216,6 +217,7 @@ export default function ReservationPaymentPanelMultiCurrencyV2({ propertyId, res
   const total = Number(reservation?.precio_total || 0)
   const pending = Math.max(0, total - paid)
   const lines = useMemo(() => buildChargeLines(folioItems, allocations, payments, total), [folioItems, allocations, payments, total])
+  const paymentApplications = useMemo(() => paymentApplicationsByItem({ items: folioItems, allocations, payments }), [folioItems, allocations, payments])
   const selectedDue = useMemo(() => selectedBalance(lines, selectedIds), [lines, selectedIds])
   const selectedLines = useMemo(() => lines.filter(line => selectedIds.has(String(line.id))), [lines, selectedIds])
 
@@ -420,12 +422,12 @@ export default function ReservationPaymentPanelMultiCurrencyV2({ propertyId, res
         {!reservation ? <SearchReservations propertyId={propertyId} onSelect={loadReservation} /> : loading ? <div className={s.empty}>Cargando cuenta…</div> : <>
           <div className={s.account}>
             <div className={s.accountHeader}><div><b>{reservation.nombre_huesped}</b><small>Reserva {reservation.numero_reserva || reservation.id} · {fmtDate(reservation.fecha_entrada)} → {fmtDate(reservation.fecha_salida)}</small></div><strong>{money(total, reservationCurrency)}</strong></div>
-            <ReservationPaymentChargeSelector lines={lines} selectedIds={selectedIds} onToggle={toggleCharge} onToggleAll={toggleAllCharges} selectedTotal={selectedDue} currency={reservationCurrency} />
+            <ReservationPaymentChargeSelector lines={lines} selectedIds={selectedIds} onToggle={toggleCharge} onToggleAll={toggleAllCharges} selectedTotal={selectedDue} currency={reservationCurrency} paymentApplications={paymentApplications} />
           </div>
 
           <div className={s.moneyHero}>
             <article><span>Total</span><b>{money(total, reservationCurrency)}</b><small>Cuenta completa</small></article>
-            <article className={s.paid}><span>Pagado</span><b>{money(paid, reservationCurrency)}</b><small>{payments.filter(validPayment).length} pago{payments.filter(validPayment).length === 1 ? "" : "s"}</small></article>
+            <article className={s.paid}><span>Pagado</span><b>{money(paid, reservationCurrency)}</b><small>{payments.filter(validPayment).length} pago{payments.filter(validPayment).length === 1 ? "" : "s"} · desglose por cargo arriba</small></article>
             <article className={s.due}><span>Pendiente</span><b>{money(pending, reservationCurrency)}</b><small>Saldo de la reserva</small></article>
           </div>
 

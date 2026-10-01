@@ -8,6 +8,7 @@ import s from"./reservationFolioBilling.module.css"
 import ReservationInvoiceDialog from"./ReservationInvoiceDialog"
 import ReservationDocumentHistory from"./ReservationDocumentHistory"
 import MovedRoomChargeNotice from"./MovedRoomChargeNotice"
+import ReservationFolioPaymentApplications from"./ReservationFolioPaymentApplications"
 import{printReservationFolio}from"./reservationFolioPrint"
 import{buildFolioInvoiceCoverage,folioItemBillingState,remainingInvoiceGross}from"./reservationBillingCoverage"
 import{netPayment,paymentCurrency,allocatedPhysicalAmount}from"./reservationPaymentInvoiceUtils"
@@ -301,6 +302,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
           </div>
         }):<div className={s.empty}>Este folio todavía no tiene consumos. Podés mover cargos desde otra habitación o usarlo como folio de empresa/grupo.</div>}
       </div>
+      <ReservationFolioPaymentApplications propertyId={propertyId} reservationId={reservation.id} selectedFolioId={selected.id} items={items} payments={payments} folioAllocations={allocations}/>
 
       {unallocatedPayments.length?<div className={s.unallocated}>
         <header><div><b>Pagos sin asignar</b><small>En reservas con varias habitaciones decidís a qué folio pertenece cada pago.</small></div></header>
