@@ -81,7 +81,7 @@ export function buildFinanceInvoicePayload({propertyId,reservation,selected,paym
   const tributes=normalizedTributes(billingTributes)
   const items=invoiceLines.map(line=>{
     const quantity=Math.max(0,Number(line.quantity||0)),unitPrice=Number(line.unit_price||0),taxRate=Math.max(0,Number(line.tax_rate||0)),subtotal=quantity*unitPrice,tax=subtotal*taxRate/100
-    return{folio_item_id:line.folio_item_id||null,service_date:line.service_date||null,source_type:line.source_type||null,description:String(line.description||"").trim(),detail:line.detail||null,quantity,unit_price:unitPrice,tax_rate:taxRate,tax,subtotal,total:subtotal+tax}
+    return{folio_item_id:line.folio_item_id||null,segment_key:line.segment_key||null,service_date:line.service_date||null,source_type:line.source_type||null,description:String(line.description||"").trim(),detail:line.detail||null,quantity,unit_price:unitPrice,tax_rate:taxRate,tax,subtotal,total:subtotal+tax}
   })
   const otherNationalIndirect=round2(tributes.filter(row=>["national","internal"].includes(row.scope)).reduce((sum,row)=>sum+row.amount,0))
   return{

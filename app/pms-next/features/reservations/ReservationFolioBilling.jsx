@@ -8,9 +8,11 @@ import s from"./reservationFolioBilling.module.css"
 import ReservationInvoiceDialog from"./ReservationInvoiceDialog"
 import ReservationDocumentHistory from"./ReservationDocumentHistory"
 import MovedRoomChargeNotice from"./MovedRoomChargeNotice"
-import ReservationFolioPaymentApplications from"./ReservationFolioPaymentApplications"
+import ReservationFolioItemList from"./ReservationFolioItemList"
+import{buildFolioBillingRows,billingRowParentId,billingRowSegmentKey}from"./reservationFolioNightlyBilling"
+import{deriveBillingRowsPaymentSnapshot}from"./reservationFolioBillingPaymentSnapshot"
 import{printReservationFolio}from"./reservationFolioPrint"
-import{buildFolioInvoiceCoverage,folioItemBillingState,remainingInvoiceGross}from"./reservationBillingCoverage"
+import{buildFolioInvoiceCoverage,remainingInvoiceGross}from"./reservationBillingCoverage"
 import{netPayment,paymentCurrency,allocatedPhysicalAmount}from"./reservationPaymentInvoiceUtils"
 import{defaultRecipientDocType}from"./reservationInvoiceDocument"
 import{calculateInvoiceTotals,createFinanceInvoice,deriveInvoicePaymentSnapshot,issueArcaFinanceDocument}from"./reservationInvoiceFlow"
@@ -21,6 +23,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
   const[folios,setFolios]=useState([])
   const[items,setItems]=useState([])
   const[allocations,setAllocations]=useState([])
+  const[itemAllocations,setItemAllocations]=useState([])
   const[payments,setPayments]=useState([])
   const[documents,setDocuments]=useState([])
   const[selectedId,setSelectedId]=useState("")
@@ -53,18 +56,20 @@ export default function ReservationFolioBilling({reservation,propertyId,property
     try{
       const ensure=await supabase.rpc("hl_ensure_reservation_folios",{p_reservation_id:Number(reservation.id)})
       if(ensure.error)throw ensure.error
-      const[folioRes,itemRes,allocationRes,paymentRes,docRes]=await Promise.all([
+      const[folioRes,itemRes,allocationRes,itemAllocationRes,paymentRes,docRes]=await Promise.all([
         supabase.from("hotel_folios").select("id,room_id,folio_type,label,payer_type,payer_name,currency,status,is_primary,sort_order,created_at").eq("property_id",propertyId).eq("reservation_id",Number(reservation.id)).neq("status","void").order("sort_order").order("created_at"),
         supabase.from("hotel_folio_items").select("id,folio_id,room_id,source_type,source_key,description,detail,service_date,quantity,unit_price,discount,tax_rate,tax,subtotal,total,currency,status,invoice_document_id,created_at").eq("property_id",propertyId).eq("reservation_id",Number(reservation.id)).order("created_at",{ascending:true}),
         supabase.from("hotel_folio_payment_allocations").select("id,folio_id,payment_id,amount,currency,source,created_at").eq("property_id",propertyId).eq("reservation_id",Number(reservation.id)),
+        supabase.from("hotel_folio_item_payment_allocations").select("id,folio_item_id,payment_id,amount,currency,created_at").eq("property_id",propertyId).eq("reservation_id",Number(reservation.id)),
         supabase.from("pagos").select("id,folio_id,monto,refunded_amount,moneda,payment_currency,payment_amount,fx_rate,fx_source,fx_as_of,metodo,estado,referencia,nota,created_at").eq("property_id",propertyId).eq("reserva_id",Number(reservation.id)).order("created_at",{ascending:false}),
         supabase.from("hotel_finance_documents").select("id,folio_id,payment_id,document_type,number,status,currency,subtotal,tax,total,balance,billing_to,items,folio_item_ids,billing_mode,issued_at,created_at,related_document_id,adjustment_reason").eq("property_id",propertyId).eq("reservation_id",Number(reservation.id)).order("created_at",{ascending:false}),
       ])
-      for(const result of[folioRes,itemRes,allocationRes,paymentRes,docRes])if(result.error)throw result.error
+      for(const result of[folioRes,itemRes,allocationRes,itemAllocationRes,paymentRes,docRes])if(result.error)throw result.error
       const nextFolios=folioRes.data||[]
       setFolios(nextFolios)
       setItems(itemRes.data||[])
       setAllocations(allocationRes.data||[])
+      setItemAllocations(itemAllocationRes.data||[])
       setPayments(paymentRes.data||[])
       setDocuments(docRes.data||[])
       setSelectedId(current=>nextFolios.some(row=>row.id===current)?current:(nextFolios.find(row=>row.folio_type==="room")||nextFolios.find(row=>row.is_primary)||nextFolios[0])?.id||"")
@@ -86,6 +91,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
   },[reservation.id,reservation.nombre_huesped,reservation.email_huesped,reservation.telefono_huesped,reservation.dni_huesped,reservation.direccion_huesped,reservation.ciudad_huesped,reservation.provincia_estado_huesped,reservation.pais_huesped,reservation.moneda,reservation.tipo_cambio])
   const selected=folios.find(row=>row.id===selectedId)||folios[0]||null
   const activeItems=useMemo(()=>items.filter(row=>row.status==="active").map(row=>lodgingFolioItemPresentation(row,reservation)),[items,reservation?.habitaciones_detalle,reservation?.regimen])
+  const billingItems=useMemo(()=>buildFolioBillingRows({items:activeItems,reservation,itemAllocations,payments}),[activeItems,reservation?.habitaciones_detalle,itemAllocations,payments])
   const allocationByPayment=useMemo(()=>{
     const map=new Map()
     for(const row of allocations)map.set(Number(row.payment_id),(map.get(Number(row.payment_id))||0)+Number(row.amount||0))
@@ -93,7 +99,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
   },[allocations])
   const statsByFolio=useMemo(()=>{
     const map=new Map(folios.map(folio=>[folio.id,{charges:0,paid:0,invoiced:0}]))
-    for(const item of activeItems){const stat=map.get(item.folio_id);if(stat)stat.charges+=Number(item.total||0)}
+    for(const item of billingItems){const stat=map.get(item.folio_id);if(stat)stat.charges+=Number(item.total||0)}
     for(const row of allocations){const stat=map.get(row.folio_id);if(stat)stat.paid+=Number(row.amount||0)}
     for(const doc of documents){
       if(doc.status==="draft"||doc.status==="void")continue
@@ -102,19 +108,21 @@ export default function ReservationFolioBilling({reservation,propertyId,property
       else if(doc.document_type==="credit_note")stat.invoiced-=Number(doc.total||0)
     }
     return map
-  },[folios,activeItems,allocations,documents])
+  },[folios,billingItems,allocations,documents])
   const selectedStats=selected?statsByFolio.get(selected.id)||{charges:0,paid:0,invoiced:0}:{charges:0,paid:0,invoiced:0}
-  const folioItems=selected?activeItems.filter(row=>row.folio_id===selected.id):[]
+  const folioItems=selected?billingItems.filter(row=>row.folio_id===selected.id):[]
   const folioAllocations=selected?allocations.filter(row=>row.folio_id===selected.id):[]
   const folioPaymentIds=new Set(folioAllocations.map(row=>Number(row.payment_id)))
   const usedInvoicePaymentIds=useMemo(()=>new Set(documents.filter(doc=>doc.document_type==="invoice"&&!["void","cancelled","cancelada","anulado","anulada"].includes(String(doc.status||"").toLowerCase())&&doc.payment_id).map(doc=>Number(doc.payment_id))),[documents])
   const folioPayments=payments.filter(row=>folioPaymentIds.has(Number(row.id))&&!usedInvoicePaymentIds.has(Number(row.id)))
-  const invoiceCoverage=useMemo(()=>buildFolioInvoiceCoverage({items:activeItems,documents,folioId:selected?.id}),[activeItems,documents,selected?.id])
+  const invoiceCoverage=useMemo(()=>buildFolioInvoiceCoverage({items:billingItems,documents,folioId:selected?.id}),[billingItems,documents,selected?.id])
   const invoiceableItems=folioItems.filter(row=>remainingInvoiceGross(row,invoiceCoverage.get(row.id))>.009)
   const checkedInvoiceItems=invoiceableItems.filter(row=>selectedItems.has(row.id))
   const unallocatedPayments=payments.map(row=>({...row,remaining:Math.max(0,netPayment(row)-(allocationByPayment.get(Number(row.id))||0))})).filter(row=>row.remaining>.009)
   const balance=selectedStats.charges-selectedStats.paid
   const invoiceCalc=useMemo(()=>calculateInvoiceTotals(invoiceLines,billingTributes),[invoiceLines,billingTributes])
+  const invoiceScopeItems=checkedInvoiceItems.length?checkedInvoiceItems:invoiceableItems
+  const rowPaymentSnapshot=useMemo(()=>deriveBillingRowsPaymentSnapshot({rows:invoiceScopeItems,total:invoiceCalc.total,currency:billingCurrency,payments}),[invoiceScopeItems,invoiceCalc.total,billingCurrency,payments])
 
   function selectFolio(id){
     setSelectedId(id)
@@ -133,7 +141,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
       if(remainingGross>0&&remainingGross<Math.max(0,Number(row.total||0))-.009)unitPrice=remainingGross/(1+taxRate/100)/quantity
       else if(Number.isFinite(storedSubtotal)&&storedSubtotal!==0)unitPrice=storedSubtotal/quantity
       else if(!unitPrice&&Number(row.total||0)!==0)unitPrice=Number(row.total||0)/(1+taxRate/100)/quantity
-      return{folio_item_id:row.id,description:row.description||typeLabels[row.source_type]||"Cargo",detail:row.detail||null,source_type:row.source_type,quantity,unit_price:unitPrice,tax_rate:taxRate}
+      return{folio_item_id:billingRowParentId(row),segment_key:billingRowSegmentKey(row),service_date:row.service_date||null,description:row.description||typeLabels[row.source_type]||"Cargo",detail:row.detail||null,source_type:row.source_type,quantity,unit_price:unitPrice,tax_rate:taxRate}
     })
   }
 
@@ -238,7 +246,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
     if(!selected||saving)return
     setSaving(true);setError("")
     try{
-      const{invoice}=await createFinanceInvoice({propertyId,reservation,selected,billingStatus,billingCurrency,billingName,billingEmail,billingPhone,billingTaxId,billingDocType,billingAddress,billingDueAt,billingNotes,billingExchangeRate,invoiceCalc,invoiceLines,invoiceMode,invoicePaymentId,folioAllocations,payments,checkedInvoiceItems,invoiceableItems,taxCondition,fiscal,billingTributes})
+      const{invoice}=await createFinanceInvoice({propertyId,reservation,selected,billingStatus,billingCurrency,billingName,billingEmail,billingPhone,billingTaxId,billingDocType,billingAddress,billingDueAt,billingNotes,billingExchangeRate,invoiceCalc,invoiceLines,invoiceMode,invoicePaymentId,folioAllocations,payments,checkedInvoiceItems,invoiceableItems,taxCondition,fiscal,billingTributes,paymentSnapshotOverride:invoiceMode==="folio"?rowPaymentSnapshot:null})
       if(invoice&&typeof window!=="undefined")window.dispatchEvent(new CustomEvent("hl:pms-toast",{detail:{title:"Factura autorizada",message:`ARCA otorgó CAE ${invoice.cae||""}.`}}))
       setInvoiceOpen(false);setSelectedItems(new Set());setInvoicePaymentId("");setInvoiceLines([]);setBillingTributes([]);await load(true)
       window.dispatchEvent(new CustomEvent("hl:pms-data-updated",{detail:{propertyId,tables:["hotel_finance_documents","hotel_folio_items"]}}))
@@ -289,20 +297,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
       </div>
 
       <MovedRoomChargeNotice selected={selected} items={activeItems} folios={folios}/>
-      <div className={s.itemList}>
-        {folioItems.length?folioItems.map(row=>{
-          const coverage=invoiceCoverage.get(row.id),billing=folioItemBillingState(row,coverage),invoiceable=billing.remaining>.009,movable=billing.covered<=.009&&!row.invoice_document_id
-          const title=billing.key==="draft"?`${money(billing.draft,row.currency)} en factura borrador`:billing.key==="partial"?`${money(billing.issued,row.currency)} facturado de ${money(row.total,row.currency)}`:billing.label
-          return <div className={s.itemRow} key={row.id}>
-            <label className={s.check}><input type="checkbox" checked={selectedItems.has(row.id)} disabled={!invoiceable} onChange={()=>toggleItem(row.id)}/></label>
-            <div className={s.itemMain}><b>{row.description}</b><small>{fmtDate(row.service_date)} · {typeLabels[row.source_type]||row.source_type}{row.detail?` · ${row.detail}`:""}</small></div>
-            <strong>{money(row.total,row.currency)}</strong>
-            <span title={title} className={`${s.itemStatus} ${billing.key==="invoiced"?s.invoiced:billing.key==="draft"?s.draft:billing.key==="partial"?s.partial:""}`}>{billing.label}</span>
-            {movable&&folios.length>1?<select value={row.folio_id} disabled={saving} onChange={event=>moveItem(row,event.target.value)} aria-label="Mover consumo a otro folio">{folios.map(folio=><option key={folio.id} value={folio.id}>{folio.label}</option>)}</select>:<span/>}
-          </div>
-        }):<div className={s.empty}>Este folio todavía no tiene consumos. Podés mover cargos desde otra habitación o usarlo como folio de empresa/grupo.</div>}
-      </div>
-      <ReservationFolioPaymentApplications propertyId={propertyId} reservationId={reservation.id} selectedFolioId={selected.id} items={items} payments={payments} folioAllocations={allocations}/>
+      <ReservationFolioItemList folioItems={folioItems} selectedItems={selectedItems} onToggle={toggleItem} invoiceCoverage={invoiceCoverage} folios={folios} saving={saving} onMove={moveItem}/>
 
       {unallocatedPayments.length?<div className={s.unallocated}>
         <header><div><b>Pagos sin asignar</b><small>En reservas con varias habitaciones decidís a qué folio pertenece cada pago.</small></div></header>
@@ -360,7 +355,7 @@ export default function ReservationFolioBilling({reservation,propertyId,property
       billingNotes={billingNotes}
       setBillingNotes={setBillingNotes}
       invoiceCalc={invoiceCalc}
-      paymentSnapshotPreview={deriveInvoicePaymentSnapshot({total:invoiceCalc.total,currency:billingCurrency,paymentId:invoiceMode==="payment"?Number(invoicePaymentId)||null:null,folioAllocations,payments})}
+      paymentSnapshotPreview={invoiceMode==="folio"?rowPaymentSnapshot:deriveInvoicePaymentSnapshot({total:invoiceCalc.total,currency:billingCurrency,paymentId:Number(invoicePaymentId)||null,folioAllocations,payments})}
       saving={saving}
       prepareInvoice={prepareInvoice}
       onClose={()=>setInvoiceOpen(false)}

@@ -37,7 +37,7 @@ export async function issueArcaFinanceDocument({doc,reservation,relatedDocument=
 }
 
 export async function createFinanceInvoice(input){
-  const{propertyId,reservation,selected,billingStatus,billingCurrency,billingName,billingEmail,billingPhone,billingTaxId,billingDocType,billingAddress,billingDueAt,billingNotes,billingExchangeRate,invoiceCalc,invoiceLines,invoiceMode,invoicePaymentId,folioAllocations,payments,checkedInvoiceItems,invoiceableItems,taxCondition,fiscal,billingTributes}=input
+  const{propertyId,reservation,selected,billingStatus,billingCurrency,billingName,billingEmail,billingPhone,billingTaxId,billingDocType,billingAddress,billingDueAt,billingNotes,billingExchangeRate,invoiceCalc,invoiceLines,invoiceMode,invoicePaymentId,folioAllocations,payments,checkedInvoiceItems,invoiceableItems,taxCondition,fiscal,billingTributes,paymentSnapshotOverride}=input
   if(!billingName.trim())throw new Error("Ingresá el nombre o razón social del cliente.")
   if(!invoiceLines.length||invoiceCalc.total<=0)throw new Error("Agregá al menos un concepto con importe.")
   if(invoiceLines.some(line=>!String(line.description||"").trim()))throw new Error("Completá la descripción de todos los conceptos.")
@@ -54,10 +54,10 @@ export async function createFinanceInvoice(input){
     billingMode="payment"
   }else{
     const source=checkedInvoiceItems.length?checkedInvoiceItems:invoiceableItems
-    itemIds=source.map(row=>row.id);billingMode=checkedInvoiceItems.length?"partial_items":"folio"
+    itemIds=[...new Set(source.map(row=>row.billing_parent_id||row.id))];billingMode=checkedInvoiceItems.length?"partial_items":"folio"
   }
   if(String(billingCurrency).toUpperCase()==="USD"&&Number(billingExchangeRate)<=0)throw new Error("Para emitir en USD cargá la cotización ARS/USD.")
-  const paymentSnapshot=deriveInvoicePaymentSnapshot({total:invoiceCalc.total,currency:billingCurrency,paymentId,folioAllocations,payments})
+  const paymentSnapshot=invoiceMode==="folio"&&paymentSnapshotOverride?paymentSnapshotOverride:deriveInvoicePaymentSnapshot({total:invoiceCalc.total,currency:billingCurrency,paymentId,folioAllocations,payments})
   const userRes=await supabase.auth.getUser();if(userRes.error)throw userRes.error
   const payload=buildFinanceInvoicePayload({propertyId,reservation,selected,paymentId,billingStatus,billingCurrency,billingName,billingEmail,billingPhone,billingTaxId,billingDocType,billingAddress,billingDueAt,billingNotes,billingExchangeRate,invoiceCalc,invoiceLines,itemIds,billingMode,userId:userRes.data?.user?.id,taxCondition,fiscal,paymentSnapshot,billingTributes})
   const res=await supabase.from("hotel_finance_documents").insert(payload).select("*").single()
