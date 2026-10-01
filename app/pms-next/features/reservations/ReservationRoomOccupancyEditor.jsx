@@ -24,11 +24,11 @@ export default function ReservationRoomOccupancyEditor({item,draft,setDraft,room
   const cards=rooms.map(room=>{
     const id=String(room.id),detail=details.find(value=>String(value?.habitacion_id)===id)||{},assignment=draft?.roomAssignments?.[id]||{},dates=editStayDateKeys(detail,item)
     const selected=ratePlanByCode(ratePlans,assignment.ratePlanCode||detail.rate_plan_code||defaultRatePlanCode),plan=selected?.active?selected:defaultRatePlan(ratePlans)
-    if(dates.length<2||ratePlanBasis(plan)!=="per_person")return null
-    const custom=draft?.occupancyByRoom?.[id]||null,baseGuests=Math.max(1,Number(assignment.guests)||1),capacity=Math.max(1,Number(room.capacidad)||1)
+    if(dates.length<2)return null
+    const perPerson=ratePlanBasis(plan)==="per_person",custom=draft?.occupancyByRoom?.[id]||null,baseGuests=Math.max(1,Number(assignment.guests)||1),capacity=Math.max(1,Number(room.capacidad)||1)
     return <div key={id} style={{marginTop:9,padding:"10px 11px",border:"1px solid var(--line)",borderRadius:11,background:"color-mix(in srgb,var(--panelSolid) 92%,var(--bg))"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
-        <div><b style={{fontSize:11}}>Hab. {room.nombre} · ocupación por noche</b><div style={{marginTop:2,fontSize:9.5,color:"var(--muted)"}}>{custom?"Ocupación variable activa.":"Ahora se aplica la misma cantidad de huéspedes a toda la estadía."}</div></div>
+        <div><b style={{fontSize:11}}>Hab. {room.nombre} · ocupación por noche</b><div style={{marginTop:2,fontSize:9.5,color:"var(--muted)"}}>{custom?(perPerson?"Ocupación variable activa · recalcula la tarifa por noche.":"Ocupación variable activa · este plan cobra por habitación, la tarifa no cambia."):(perPerson?"Ahora se aplica la misma cantidad de huéspedes a toda la estadía.":"Podés variar huéspedes por noche; este plan mantiene el mismo precio por habitación.")}</div></div>
         <button type="button" onClick={()=>custom?clear(id):enable(room,dates,baseGuests)} style={{height:32,padding:"0 10px",border:"1px solid var(--line)",borderRadius:9,background:"var(--panel)",color:"var(--text)",font:"inherit",fontSize:10,fontWeight:800,cursor:"pointer"}}>{custom?`Aplicar ${baseGuests} a todas`:"Personalizar por noche"}</button>
       </div>
       {custom?<div style={{display:"grid",gap:6,marginTop:9}}>{dates.map(date=>{
