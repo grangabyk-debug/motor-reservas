@@ -37,7 +37,7 @@ export default function PlanningWorkspace({propertyId,property,onNavigate,newRes
   const[selected,setSelected]=useState(null),[preview,setPreview]=useState(null),[dragging,setDragging]=useState(null),[dropCell,setDropCell]=useState(""),[saving,setSaving]=useState(false),[rateMove,setRateMove]=useState(null)
   const[formOpen,setFormOpen]=useState(false),[drawerStep,setDrawerStep]=useState(0),[draft,setDraft]=useState(null),[draftState,setDraftState]=useState(""),[,setHasSavedDraft]=useState(false),[formError,setFormError]=useState("")
   const[settings,setSettings]=useState(DEFAULT_SETTINGS),[settingsOpen,setSettingsOpen]=useState(false),[selecting,setSelecting]=useState(false),[rangeSelection,setRangeSelection]=useState(null),[draftPricing,setDraftPricing]=useState(null)
-  const lastNewReservationRequest=useRef(newReservationRequest),formErrorTimer=useRef(null)
+  const lastNewReservationRequest=useRef(0),formErrorTimer=useRef(null)
 
   const days=useMemo(()=>Array.from({length:52},(_,index)=>addDays(anchor,index-2)),[anchor]),windowStart=days[0],windowEndExclusive=addDays(days.at(-1),1)
   const data=usePlanningData(propertyId,windowStart,windowEndExclusive),dayWidth=Math.max(28,Math.min(80,Number(settings.zoom)||38))

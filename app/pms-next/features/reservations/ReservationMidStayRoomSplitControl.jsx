@@ -32,11 +32,11 @@ function emit(detail){if(typeof window!=="undefined")window.dispatchEvent(new Cu
 export default function ReservationMidStayRoomSplitControl({item,rooms=[],propertyId}){
   const today=dateKey(new Date())
   const initialActive=useMemo(()=>activeRoomIds(item,today),[item,today])
-  const canRender=String(item?.estado||"").toLowerCase()==="alojado"&&!item?.no_show&&initialActive.length===1
-  const initialSourceId=initialActive[0]||Number(item?.habitacion_id)||null
-  const initialSource=rooms.find(room=>Number(room.id)===Number(initialSourceId))
-
+  const canRender=String(item?.estado||"").toLowerCase()==="alojado"&&!item?.no_show&&initialActive.length>0
   const[open,setOpen]=useState(false)
+  const[sourceChoice,setSourceChoice]=useState(()=>initialActive[0]||Number(item?.habitacion_id)||null)
+  const initialSourceId=Number(sourceChoice)||initialActive[0]||Number(item?.habitacion_id)||null
+  const initialSource=rooms.find(room=>Number(room.id)===Number(initialSourceId))
   const[fresh,setFresh]=useState(null)
   const[allRooms,setAllRooms]=useState([])
   const[effectiveDate,setEffectiveDate]=useState("")
@@ -52,9 +52,10 @@ export default function ReservationMidStayRoomSplitControl({item,rooms=[],proper
   const[paidTotal,setPaidTotal]=useState(0)
   const[error,setError]=useState("")
 
-  useEffect(()=>{setOpen(false);setFresh(null);setTargetId("");setReason("");setRateQuote(null);setQuoteLoading(false);setError("")},[item?.id])
+  useEffect(()=>{setOpen(false);setFresh(null);setTargetId("");setReason("");setRateQuote(null);setQuoteLoading(false);setError("");setSourceChoice(initialActive[0]||Number(item?.habitacion_id)||null)},[item?.id])
+  useEffect(()=>{if(initialActive.length&&!initialActive.includes(Number(sourceChoice)))setSourceChoice(initialActive[0])},[initialActive.join("|"),sourceChoice])
 
-  const sourceId=useMemo(()=>{const active=fresh?activeRoomIds(fresh,today):initialActive;return active[0]||Number(fresh?.habitacion_id||initialSourceId)||null},[fresh,today,initialActive,initialSourceId])
+  const sourceId=useMemo(()=>{const active=fresh?activeRoomIds(fresh,today):initialActive,chosen=Number(sourceChoice);return active.includes(chosen)?chosen:active[0]||Number(fresh?.habitacion_id||initialSourceId)||null},[fresh,today,initialActive,initialSourceId,sourceChoice])
   const sourceRoom=allRooms.find(room=>Number(room.id)===Number(sourceId))||rooms.find(room=>Number(room.id)===Number(sourceId))||initialSource||null
   const sourceDetail=fresh?detailFor(fresh,sourceId):detailFor(item,sourceId)
   const sourceStart=fresh?roomStart(fresh,sourceId):roomStart(item,sourceId)
@@ -101,13 +102,13 @@ export default function ReservationMidStayRoomSplitControl({item,rooms=[],proper
       if(paymentRes.error)throw paymentRes.error
       const row=reservationRes.data,active=activeRoomIds(row,today)
       if(String(row.estado||"").toLowerCase()!=="alojado")throw new Error("La reserva ya no está alojada.")
-      if(active.length!==1)throw new Error(active.length>1?"Esta reserva tiene varias habitaciones activas. Cambiá la habitación desde el rooming del grupo.":"No encontramos una habitación activa para dividir.")
-      const source=active[0],start=roomStart(row,source),end=plannedEnd(row,source),minimum=addDays(start,1),maximum=addDays(end,-1),suggested=today<minimum?minimum:today>maximum?maximum:today
+      if(!active.length)throw new Error("No encontramos una habitación activa para dividir.")
+      const chosen=Number(sourceChoice),source=active.includes(chosen)?chosen:active[0],start=roomStart(row,source),end=plannedEnd(row,source),minimum=addDays(start,1),maximum=addDays(end,-1),suggested=today<minimum?minimum:today>maximum?maximum:today
       if(!minimum||!maximum||maximum<minimum)throw new Error("Todavía no hay un corte de noche válido para dividir esta estadía. Si el cambio ocurre el mismo día del ingreso, usá el cambio de habitación normal.")
       const detail=detailFor(row,source)
       if(String(detail?.movement_locked||"").toLowerCase()==="true"||detail?.movement_locked===true)throw new Error(`El movimiento de esta habitación está bloqueado${detail?.movement_lock_reason?`: ${detail.movement_lock_reason}`:""}.`)
       const paid=(paymentRes.data||[]).filter(confirmedPayment).reduce((sum,payment)=>sum+Math.max(0,(Number(payment.monto)||0)-(Number(payment.refunded_amount)||0)),0)
-      setPaidTotal(paid);setFresh(row);setAllRooms(roomRes.data||[]);setEffectiveDate(suggested);setTargetId("");setReason("");setReprice(false);setRateQuote(null);setQuoteLoading(false);setOpen(true)
+      setSourceChoice(source);setPaidTotal(paid);setFresh(row);setAllRooms(roomRes.data||[]);setEffectiveDate(suggested);setTargetId("");setReason("");setReprice(false);setRateQuote(null);setQuoteLoading(false);setOpen(true)
     }catch(err){emit({tone:"error",title:"No se puede dividir la reserva",message:err?.message||"No se pudo preparar el cambio de habitación.",duration:4800})}
     finally{setLoading(false)}
   }
@@ -202,8 +203,8 @@ export default function ReservationMidStayRoomSplitControl({item,rooms=[],proper
     <section className={s.actionBar}>
       <div className={s.actionIcon}>⇄</div>
       <div className={s.actionCopy}><small>CAMBIO DURANTE LA ESTADÍA</small><b>¿El huésped cambia de habitación?</b><span>Dividí la reserva y conservá el historial de la habitación anterior.</span></div>
-      <div className={s.sourcePill}><small>AHORA</small><b>Hab. {initialSource?.nombre||initialSourceId}</b></div>
-      <button type="button" className={s.actionButton} disabled={loading||movementLocked} onClick={loadBase}>{loading?"Preparando…":"Dividir a otra habitación"}</button>
+      <div className={s.sourcePill}><small>{initialActive.length>1?"HABITACIÓN A DIVIDIR":"AHORA"}</small>{initialActive.length>1?<select value={sourceChoice||""} disabled={loading} onChange={event=>setSourceChoice(Number(event.target.value))} style={{height:30,maxWidth:150,border:"1px solid var(--line)",borderRadius:8,background:"var(--panelSolid)",color:"var(--text)",font:"inherit",fontSize:10,fontWeight:850,padding:"0 7px"}}>{initialActive.map(id=>{const room=rooms.find(value=>Number(value.id)===Number(id));return <option key={id} value={id}>Hab. {room?.nombre||id}</option>})}</select>:<b>Hab. {initialSource?.nombre||initialSourceId}</b>}</div>
+      <button type="button" className={s.actionButton} disabled={loading||movementLocked} onClick={loadBase}>{loading?"Preparando…":"Dividir reserva"}</button>
     </section>
     {movementLocked?<div className={s.locked}>🔒 Movimiento bloqueado{movementLockReason?` · ${movementLockReason}`:""}</div>:null}
 
