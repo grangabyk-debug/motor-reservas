@@ -136,7 +136,8 @@ export default function RoomingEditor({draft,setDraft,rooms=[],categories=[],cur
       else{const changed=Object.prototype.hasOwnProperty.call(patch,"matrimonial")?"matrimonial":Object.prototype.hasOwnProperty.call(patch,"individual")?"individual":"",beds=fitBeds(room,next.guests,next.matrimonial,next.individual,changed);next.matrimonial=beds.matrimonial;next.individual=beds.individual}
       assignments[id]=next
       const selected=idsOf(effectiveRooms),totalRate=selected.reduce((sum,key)=>sum+(Number(assignments[key]?.rate)||0),0),totalGuests=selected.reduce((sum,key)=>sum+Math.max(1,Number(assignments[key]?.guests)||1),0)
-      return{...current,guests:totalGuests,roomAssignments:assignments,rate:totalRate,roomSelectionManual:true}
+      const ratePlanCode=selected.length===1&&Object.prototype.hasOwnProperty.call(patch,"ratePlanCode")?next.ratePlanCode:current.ratePlanCode
+      return{...current,guests:totalGuests,roomAssignments:assignments,rate:totalRate,ratePlanCode,roomSelectionManual:true}
     })
   }
 
