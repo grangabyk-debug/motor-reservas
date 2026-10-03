@@ -44,7 +44,7 @@ export default function ReservationEditPanel({item,assignedRooms=[],allRooms=[],
     async function loadFees(){const propertyId=item.property_id;if(!propertyId)return;const{data}=await supabase.from("property_settings").select("settings").eq("property_id",propertyId).maybeSingle();if(cancelled)return;const settings=data?.settings||{},prefs=settings.preferences||{};setPricingSettings(settings);setStayFees({early_checkin_percent:prefs.early_checkin_percent??35,late_checkout_percent:prefs.late_checkout_percent??35,early_checkin_time:prefs.early_checkin_time||"08:00",late_checkout_time:prefs.late_checkout_time||"18:00"})}
     loadFees().catch(()=>{});return()=>{cancelled=true}
   },[item.property_id])
-  useEffect(()=>{if(isGroup)setDraft(initialReservationEditDraft(item,allRooms));setError("");setAvailabilityError("");setAvailabilityOk("")},[item.fecha_entrada,item.fecha_salida,item.tarifa_noche,item.subtotal])
+  useEffect(()=>{if(isGroup)setDraft(initialReservationEditDraft(item,allRooms));setError("");setAvailabilityError("")},[item.fecha_entrada,item.fecha_salida,item.tarifa_noche,item.subtotal])
 
   async function validateCandidate({start,end,roomId,apply}){
     if(!start||!end||end<=start){setAvailabilityOk("");setAvailabilityError("La salida debe ser posterior a la entrada.");return false}
