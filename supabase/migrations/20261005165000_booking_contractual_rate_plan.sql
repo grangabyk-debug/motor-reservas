@@ -12,17 +12,19 @@ begin
   if lower(coalesce(new.canal_reserva,'')) not in('booking.com','booking') then return new;end if;
   for d in select value from jsonb_array_elements(details) loop
     ext:=nullif(d->>'external_rate_plan_id','');
-    if ext is not null then
+    if ext is not null and nullif(d->>'rate_plan_code','') is null then
       select * into map_row from public.hotel_channel_mappings where property_id=new.property_id and mapping_type='rate_plan' and external_id=ext order by updated_at desc limit 1;
       code:=upper(coalesce(nullif(map_row.metadata->>'rate_plan_code',''),''));
       if code<>'' then
         select p into plan from jsonb_array_elements(private.hl_property_rate_plans(new.property_id)->'plans') p where upper(coalesce(p->>'code',''))=code limit 1;
         if plan is not null then
-          regimen:=coalesce(plan->>'legacy_regimen',plan->>'name','Alojamiento');all_regimens:=array_append(all_regimens,regimen);
+          regimen:=coalesce(plan->>'legacy_regimen',plan->>'name','Alojamiento');
           d:=d||jsonb_build_object('pricing_origin','ota_contractual','ota_contractual_price',true,'ota_contractual_net_night',coalesce(nullif(d->>'tarifa_noche','')::numeric,0),'rate_plan_code',plan->>'code','rate_plan_name',plan->>'name','rate_plan_meal',plan->>'meal_plan','rate_plan_regimen',regimen,'rate_plan_adjustment_basis',coalesce(plan->>'adjustment_basis','per_person'),'rate_plan_adjustment_configured_value',coalesce(nullif(plan->>'adjustment_per_person','')::numeric,0),'rate_plan_adjustment_booked_per_night',0,'rate_plan_adjustment_booked_per_person',0,'rate_plan_adjustment_final_per_person',0,'rate_plan_snapshot',jsonb_build_object('code',plan->>'code','name',plan->>'name','meal_plan',plan->>'meal_plan','description',plan->>'description','pricing_policy','ota_contractual','ota_rate_plan_id',ext,'captured_at',now()),'rate_plan_snapshot_at',now());
         end if;
       end if;
     end if;
+    regimen:=coalesce(d->>'rate_plan_regimen',d->>'rate_plan_name');
+    if nullif(regimen,'') is not null then all_regimens:=array_append(all_regimens,regimen); end if;
     next_details:=next_details||jsonb_build_array(d);
   end loop;
   new.habitaciones_detalle:=next_details;
