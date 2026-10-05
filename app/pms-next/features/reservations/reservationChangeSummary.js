@@ -26,3 +26,14 @@ export async function prepareReservationChangeSummary({item,draft,details,existi
   const paid=(payRes.data||[]).filter(row=>!blocked.has(String(row?.estado||"").toLowerCase())).reduce((sum,row)=>sum+Math.max(0,Number(row?.monto||0)-Number(row?.refunded_amount||0)),0),newTotal=Number(patch.precio_total)||0
   return{lines,currency:item.moneda||"ARS",oldTotal:Number(item.precio_total)||0,newTotal,paid,newBalance:Math.max(0,newTotal-paid)}
 }
+
+
+export async function validateReservationEdit({draft,selectedRooms,totalCapacity,assignedGuests,currentIds,datesChanged,roomChanged,item,onPreviewMove,isGroup,originalEarly,originalLate,specialAvailability}){
+  if(draft.end<=draft.start)throw new Error("La salida debe ser posterior a la entrada.")
+  if(!selectedRooms.length)throw new Error("Elegí una habitación activa.")
+  if(Number(draft.guests)>totalCapacity)throw new Error(`La capacidad seleccionada es de ${totalCapacity} huésped${totalCapacity===1?"":"es"}.`)
+  if(assignedGuests!==Number(draft.guests))throw new Error(`Distribuí los ${draft.guests} huésped${Number(draft.guests)===1?"":"es"} en el Rooming antes de guardar.`)
+  if(currentIds.length>1&&datesChanged)throw new Error("Las fechas de una reserva grupal se editan por habitación para validar todo el conjunto.")
+  if(datesChanged||roomChanged){const preview=await onPreviewMove({reservationId:item.id,roomId:Number(draft.roomId),start:draft.start,end:draft.end});if(!preview?.ok)throw new Error(preview?.message||"La habitación no está disponible para ese cambio.")}
+  if(!isGroup&&(draft.earlyCheckin!==originalEarly||draft.lateCheckout!==originalLate)){const special=await specialAvailability(draft.earlyCheckin,draft.lateCheckout);if(!special.ok)throw new Error(`No se pueden guardar los horarios especiales: ${special.message}`)}
+}
