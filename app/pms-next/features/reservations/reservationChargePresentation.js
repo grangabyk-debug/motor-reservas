@@ -1,7 +1,7 @@
 import{lodgingPlanForDetail}from"./reservationLodgingConcept"
 const fmtDate=value=>value?new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short",year:"numeric"}).format(new Date(`${String(value).slice(0,10)}T12:00:00`)).replace(".",""):"—"
 const money=(value,currency="ARS")=>new Intl.NumberFormat("es-AR",{style:"currency",currency:currency||"ARS",maximumFractionDigits:2}).format(Number(value)||0)
-const discountScopeText=item=>{const scope=item?.descuento_scope||{},coverage=Array.isArray(scope.coverage)?scope.coverage:[],dates=[...new Set(coverage.flatMap(row=>Array.isArray(row?.dates)?row.dates:[]).filter(Boolean))].sort(),rooms=[...new Set(coverage.map(row=>Number(row?.room_id)).filter(Number.isFinite))];if(!coverage.length)return"Alcance no documentado";const when=scope.mode==="first_night"?"Primera noche":dates.length===1?fmtDate(dates[0]):dates.length?dates.map(fmtDate).join(", "):"Noches seleccionadas";return`Alcance: ${when} · ${rooms.length} hab. · no incluye extensiones ni Early/Late`}
+const discountScopeText=item=>{const scope=item?.descuento_scope||{},coverage=Array.isArray(scope.coverage)?scope.coverage:[],dates=[...new Set(coverage.flatMap(row=>Array.isArray(row?.dates)?row.dates:[]).filter(Boolean))].sort(),rooms=[...new Set(coverage.map(row=>Number(row?.room_id)).filter(Number.isFinite))];if(!coverage.length)return"";const when=scope.mode==="first_night"?"Primera noche":dates.length===1?fmtDate(dates[0]):dates.length?dates.map(fmtDate).join(", "):"Noches seleccionadas";return`${when} · ${rooms.length} hab.`}
 
 export default function serviceLines(item,room,rooms=[]){
   const lines=[],assigned=rooms.length?rooms:[room].filter(Boolean),taxEnabled=Boolean(item.impuestos_desglosados),vatRate=taxEnabled?Math.max(0,Number(item.iva_porcentaje)||0):0,gross=value=>{const amount=Number(value)||0;return taxEnabled?Math.round(amount*(1+vatRate/100)*100)/100:amount}
@@ -29,7 +29,7 @@ export default function serviceLines(item,room,rooms=[]){
     const type=String(item.descuento_tipo||"").toLowerCase(),value=Math.max(0,Number(item.descuento_valor)||0),isPercent=type==="percent"||type==="porcentaje"
     const reason=String(item.descuento_motivo||"").trim()||"Motivo no documentado"
     const origin=String(item.descuento_origen||"manual").toLowerCase(),originLabel=origin==="rule"?"Regla configurada":origin==="promotion"?"Promoción configurada":origin==="package"?"Paquete":origin==="channel"?"Canal":"Ingresado manualmente"
-    lines.push({key:"discount",kind:"discount",title:isPercent&&value>0?`Descuento ${value}%`:"Descuento aplicado",meta:`${originLabel} · −${money(discountAmount,item.moneda)}`,detail:`${reason} · ${discountScopeText(item)}`,amount:-discountAmount})
+    lines.push({key:"discount",kind:"discount",title:isPercent&&value>0?`Descuento ${value}%`:"Descuento aplicado",meta:`${originLabel} · −${money(discountAmount,item.moneda)}`,detail:[reason,discountScopeText(item)].filter(Boolean).join(" · "),amount:-discountAmount})
   }
   return lines
 }
