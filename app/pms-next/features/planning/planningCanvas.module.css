@@ -54,9 +54,9 @@
 .rangeActions{position:absolute;top:7px;z-index:12;display:flex;gap:5px;transform:translateX(-50%);filter:drop-shadow(0 7px 13px rgba(20,34,60,.16))}
 .rangeActions button{width:30px;height:30px;display:grid;place-items:center;border:1px solid var(--line);border-radius:7px;background:var(--panelSolid);color:var(--red);font-size:16px;font-weight:900;cursor:pointer}
 .rangeActions .rangeConfirm{border-color:color-mix(in srgb,#39a762 42%,var(--line));background:#35a660;color:#fff}
-.stay{position:absolute;top:7px;z-index:6;height:32px;border:1px solid;border-radius:7px;display:flex;align-items:center;padding:0 21px 0 4px;overflow:hidden;cursor:default;user-select:none;box-shadow:0 2px 7px rgba(28,44,72,.1),inset 0 -3px color-mix(in srgb,currentColor 40%,transparent);transition:filter .12s ease,transform .12s ease,box-shadow .12s ease}
+.stay{position:absolute;top:7px;z-index:6;height:32px;border:1px solid;border-radius:7px;display:flex;align-items:center;padding:0 21px 0 4px;overflow:hidden;cursor:default!important;user-select:none;box-shadow:0 2px 7px rgba(28,44,72,.1),inset 0 -3px color-mix(in srgb,currentColor 40%,transparent);transition:filter .12s ease,transform .12s ease,box-shadow .12s ease}
 .stay:hover,.stay:focus-visible{z-index:9;filter:saturate(1.05);transform:translateY(-1px);box-shadow:0 5px 14px rgba(28,44,72,.15),inset 0 -3px color-mix(in srgb,currentColor 40%,transparent);outline:none}
-.stay:active{cursor:defaultbing}
+.stay:active{cursor:default!important}
 .confirmed{border-color:#65ad75;background:#d9efdc;color:#28683a}
 .attention{border-color:#dfa83d;background:#f8d98e;color:#79520f}
 .inhouse{border-color:#dc4f62;background:#ed6475;color:#fff}
